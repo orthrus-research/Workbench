@@ -50,15 +50,13 @@ def verify_runtime(home, *, compiler=False):
     return policy
 
 
-def provisioned_selection():
-    """Ask Core to retain the selected JDK and exact Gradle ZIP."""
+def provisioned_java_selection():
+    """Ask Core to retain the profile-selected JDK without provisioning Gradle."""
     for source in (ROOT / 'api/src', ROOT / 'core/src'):
         if str(source) not in sys.path:
             sys.path.insert(0, str(source))
     from workbench_core.development import enable_source_checkout
     from workbench_core.runtime_java import ensure_java_runtime
-    from workbench_core.build_toolchain_setup import prepare_zip_toolchain
-    from validation.provision_ide_toolchains import load_lock
     policy = json.loads(POLICY.read_bytes())
     enable_source_checkout(ROOT)
     result = ensure_java_runtime(ROOT, state_root=ROOT / '.workbench/axiom/build-toolchains/java',
@@ -68,6 +66,14 @@ def provisioned_selection():
         raise ValueError('Core Java acquisition differs from Cleanroom JVM selection')
     java = Path(url2pathname(urlparse(receipt['target']['java_home_uri']).path))
     verify_runtime(java, compiler=True)
+    return java
+
+
+def provisioned_selection():
+    """Ask Core to retain the selected JDK and exact Gradle ZIP."""
+    java = provisioned_java_selection()
+    from workbench_core.build_toolchain_setup import prepare_zip_toolchain
+    from validation.provision_ide_toolchains import load_lock
     lock = load_lock()['gradle']
     gradle = prepare_zip_toolchain(ROOT / '.workbench/axiom/build-toolchains/gradle',
                                    lock, executable='bin/gradle.bat' if os.name == 'nt' else 'bin/gradle')
@@ -76,12 +82,27 @@ def provisioned_selection():
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--java-home", required=True, type=Path)
+    parser.add_argument("--java-home", type=Path)
+    parser.add_argument("--provision-java", action="store_true", help="select and retain the profile-locked JDK through Core")
+    parser.add_argument("--github-env-file", type=Path, help="append WORKBENCH_TEST_JAVA to a CI environment file")
     parser.add_argument("--compiler", action="store_true")
     args = parser.parse_args(argv)
-    value = verify_runtime(args.java_home, compiler=args.compiler)
+    if args.provision_java == (args.java_home is not None):
+        parser.error("supply exactly one of --java-home or --provision-java")
+    if args.github_env_file is not None and not args.provision_java:
+        parser.error("--github-env-file requires --provision-java")
+    if args.provision_java:
+        java_home = provisioned_java_selection()
+        if args.github_env_file is not None:
+            with args.github_env_file.open("a", encoding="utf-8") as output:
+                output.write(f"WORKBENCH_TEST_JAVA={java_home / 'bin/java'}\n")
+        compiler = True
+    else:
+        java_home = args.java_home
+        compiler = args.compiler
+    value = verify_runtime(java_home, compiler=compiler)
     print(json.dumps({"verified": True, "runtimeVersion": value["runtimeVersion"],
-                      "policySha256": sha256(POLICY.read_bytes()).hexdigest(), "compiler": args.compiler}))
+                      "policySha256": sha256(POLICY.read_bytes()).hexdigest(), "compiler": compiler}))
     return 0
 
 

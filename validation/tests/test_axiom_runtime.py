@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,6 +15,19 @@ import axiom_runtime
 
 
 class AxiomRuntimeTests(unittest.TestCase):
+    @patch("axiom_runtime.verify_runtime", return_value={"runtimeVersion": "25.0.4"})
+    @patch("axiom_runtime.provisioned_java_selection")
+    def test_core_selected_java_is_exported_without_a_fixed_host_path(self, provision, verify):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary) / "selected-java"
+            provision.return_value = home
+            env_file = Path(temporary) / "github-env"
+            self.assertEqual(0, axiom_runtime.main([
+                "--provision-java", "--github-env-file", str(env_file),
+            ]))
+            self.assertEqual(f"WORKBENCH_TEST_JAVA={home / 'bin/java'}\n", env_file.read_text())
+            verify.assert_called_once_with(home, compiler=True)
+
     def test_runtime_has_one_profile_owner_and_matches_provisioning(self):
         policy = json.loads(axiom_runtime.POLICY.read_bytes())
         profile = yaml.safe_load((ROOT / "profiles/platforms/cleanroom/provisional.yaml").read_text())

@@ -149,6 +149,9 @@ jobs:
               raise SystemExit("environment status did not observe the required Pixi version")
           PY
 
+      - name: Select the profile-locked JDK 25 through Core
+        run: python3 tools/axiom_runtime.py --provision-java --github-env-file "$GITHUB_ENV"
+
       - name: Exercise the developer-facing core
         shell: bash
         run: |
@@ -219,6 +222,8 @@ jobs:
           locked: true
       - name: Provision the required locked Node implementation
         run: pixi run --locked --no-config python validation/provision_ide_toolchains.py --node-only --path-file "$GITHUB_PATH"
+      - name: Select the profile-locked JDK 25 through Core
+        run: python3 tools/axiom_runtime.py --provision-java --github-env-file "$GITHUB_ENV"
       - name: Inventory native fixture cases as not run
         run: pixi run --environment release --locked --no-config python validation/run_python_suite.py validation-native-fixtures --collect-only --report .workbench/validation/native-fixtures-not-run.json
       - name: Complete public source and repository policy coverage
