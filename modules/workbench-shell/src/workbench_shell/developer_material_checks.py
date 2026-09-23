@@ -108,6 +108,8 @@ def _load(root, identity, selection):
             or request["selection_id"] != selection.id or request["attempt_id"] != identity
             or request["authority"] != AUTHORITY or request["state"] != "prepared-not-run"):
         raise ValueError("material request differs from selected workspace or authority")
+    if request.get("sandbox_backend", "bubblewrap") not in {"bubblewrap", "docker", "gvisor"}:
+        raise ValueError("retained material request selects an unknown worker sandbox")
     inputs = _program(attempt, request["candidate"], request["program"], request["program_root"], "source", "program.zip")
     intent = storage.ordinary(attempt / "intent.json").read_bytes()
     expected_intent = b"{}" if request["intent_path"] is None else inputs.sources[request["intent_path"]]
@@ -546,7 +548,8 @@ def _prepare(selection, root, state, args):
         "workspace_uri": selection.pack_uri, "selection_id": selection.id,
         "operation_id": operation.id, "candidate": candidate,
         "program_root": program_root, "program": program, "intent_path": intent_path,
-        "baseline": baseline, "paths": paths, "inputs": binding, "setup_id": setup_id, "authority": AUTHORITY,
+        "baseline": baseline, "paths": paths, "inputs": binding, "setup_id": setup_id,
+        "sandbox_backend": getattr(args, "sandbox_backend", "bubblewrap"), "authority": AUTHORITY,
     })
     storage.write_json(attempt / "request.json", request)
     return request, _reference(attempt / "request.json", request)
@@ -590,7 +593,8 @@ def _execute(selection, root, state, identity, confirmation, cancelled):
             args = SimpleNamespace(**{key: Path(value) for key, value in request["paths"].items()},
                                    program=attempt / "program.zip", request=attempt / "intent.json",
                                    baseline_program=None if request["baseline"] is None else attempt / "baseline.zip",
-                                   profile=selection.pack_profile, context=request["inputs"]["context"]["id"])
+                                   profile=selection.pack_profile, context=request["inputs"]["context"]["id"],
+                                   sandbox_backend=request.get("sandbox_backend", "bubblewrap"))
             response, code = invoke("material-program", args, ExecutionContext(attempt, state, token),
                                     capture_directory=attempt / 'native-process', capture_binding=request['id'])
             _verify_response(response, request)
@@ -676,6 +680,8 @@ def _run(selection, argv, *, state_root, cancelled=lambda: False):
         prepare.add_argument("--request", help="Optional checkout-relative saved JSON expectations; omit for native diagnostics")
         prepare.add_argument("--context", required=True)
         prepare.add_argument("--baseline", help="Retained material attempt whose complete program is rerun in a fresh worker")
+        prepare.add_argument("--sandbox-backend", choices=("bubblewrap", "docker", "gvisor"),
+                             default="bubblewrap", help="Worker isolation for this retained attempt")
     for name in ("execute", "show", "source", "cancel", "register", "delivery", "diagnostics", "diagnostic"):
         command = actions.add_parser(name)
         command.add_argument("attempt")

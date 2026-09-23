@@ -45,6 +45,17 @@ tasks.withType<AbstractArchiveTask>().configureEach {
 tasks.test {
     useJUnitPlatform()
     systemProperty("axiom.test.runtimeClasspath", sourceSets.test.get().runtimeClasspath.asPath)
+    mapOf(
+        "AXIOM_TEST_SANDBOX_BACKEND" to "axiom.sandbox.backend",
+        "AXIOM_TEST_SANDBOX_DOCKER" to "axiom.sandbox.docker",
+        "AXIOM_TEST_SANDBOX_DOCKER_HOST" to "axiom.sandbox.dockerHost",
+        "AXIOM_TEST_SANDBOX_IMAGE" to "axiom.sandbox.image",
+        "AXIOM_TEST_SANDBOX_SESSION" to "axiom.sandbox.session",
+        "AXIOM_TEST_SANDBOX_USER" to "axiom.sandbox.user",
+        "AXIOM_TEST_SANDBOX_GROUPS" to "axiom.sandbox.groups",
+    ).forEach { (environment, property) ->
+        providers.environmentVariable(environment).orNull?.let { systemProperty(property, it) }
+    }
     providers.environmentVariable("AXIOM_REGISTRY_TEST_ROOT").orNull?.let {
         systemProperty("axiom.test.registryRoot", it)
     }

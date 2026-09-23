@@ -67,6 +67,15 @@ def _dispatch(arguments: list[str], root: Path) -> int:
     if arguments[:1] == ["tooling"]:
         from .tooling_provision import main as tooling
         return tooling(arguments[1:])
+    if arguments[:2] == ["sandbox", "recover"]:
+        from .axiom_sandbox import recover_axiom
+        parser = argparse.ArgumentParser(prog="workbench sandbox recover")
+        parser.add_argument("--state-root", type=Path)
+        selected = parser.parse_args(arguments[2:])
+        state = selected.state_root or resolve_physical_context(root).state_root
+        print(json.dumps({"schema": "workbench.sandbox-recovery.v1", "recovered_sessions":
+                          recover_axiom(state)}, sort_keys=True))
+        return 0
     from .module_cli import profile_admission_scope
     with profile_admission_scope(default_runtime_state_root(root)) as modules:
         return _dispatch_available(arguments, root, modules)
@@ -98,7 +107,7 @@ def _dispatch_available(arguments: list[str], root: Path, modules) -> int:
     if not arguments or arguments[:1] in (["-h"], ["--help"]):
         from workbench_api.profiles import profiles
         admitted_profiles = {profile.id for profile in profiles()}
-        print("Workbench Core: setup, repair, tooling, environment status, environment paths, storage, runtime, world, modules list, profiles list, version")
+        print("Workbench Core: setup, repair, tooling, sandbox recover, environment status, environment paths, storage, runtime, world, modules list, profiles list, version")
         for module in modules:
             if module.module:
                 for capability in module.module.capabilities:
