@@ -15,10 +15,9 @@ Workbench support is organized through
   [contribution guide](CONTRIBUTING.md), and existing issues before opening a
   new issue.
 
-Creating the repository does not by itself enable participation. Issue and
-pull-request intake must remain disabled until the repository has its governing
-code of conduct, a responsible owner, and a tested confidential conduct-
-reporting route.
+Public issue creation is enabled. `zestehl` is the responsible maintainer.
+Participation follows the [code of conduct](CODE_OF_CONDUCT.md), which provides
+a private route for conduct reports.
 
 ## What to include
 
@@ -43,6 +42,6 @@ observed there is not automatically a universal rule for every Minecraft
 - General mod-development discussion without a concrete Workbench problem is
   outside the issue tracker's scope.
 
-A confidential conduct-reporting route and its governing policy must be
-adopted before public community participation is enabled. Do not send a
-conduct report through a public issue or the vulnerability-reporting route.
+Send conduct reports privately to [zestehl@pm.me](mailto:zestehl@pm.me), as
+described in the [code of conduct](CODE_OF_CONDUCT.md). Do not send them through
+a public issue or the vulnerability-reporting route.

@@ -84,6 +84,12 @@ conduct, a responsible owner, and a tested confidential conduct-reporting
 route. Private vulnerability reporting is a separate security channel and is
 not a substitute.
 
+Bootstrap maintainer decision (2026-09-23): issue creation is open to all GitHub
+users. The [code of conduct](CODE_OF_CONDUCT.md) names `zestehl` as the
+responsible owner and `zestehl@pm.me` as the private conduct-reporting address.
+End-to-end delivery and acknowledgment of a test report have not yet been
+observed; that admission condition remains open.
+
 ## Independent component releases
 
 Workbench independently versions API, Core, each product module and profile,

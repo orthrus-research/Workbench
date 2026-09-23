@@ -61,5 +61,5 @@ requirements. The preview bundle's guide is pinned to its exact source commit.
 - **Reference:** [Architecture topology](docs/architecture/TOPOLOGY.md) ·
   [Component releases](packaging/release/README.md)
 
-[Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) ·
+[Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Support](SUPPORT.md) ·
 [Security](SECURITY.md) · [Governance](GOVERNANCE.md) · [License](LICENSE)

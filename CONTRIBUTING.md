@@ -4,6 +4,8 @@ Workbench changes are reviewed first for whether they help developers build,
 run, understand, and fix features. Fidelity and safety matter, but they should
 produce better software rather than process for its own sake.
 
+Participation follows the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## Before changing a module
 
 1. Identify whether the change belongs to a product-generic module, a platform
