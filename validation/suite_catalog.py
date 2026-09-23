@@ -134,6 +134,10 @@ VALIDATION_AUTHORITY_TEST_FILES = (
     "test_product_open_authority.py",
 )
 
+VALIDATION_NATIVE_FIXTURE_TEST_FILES = (
+    "test_axiom_native_execution.py",
+)
+
 
 # Order is intentional. Fast product, profile, and cross-owner checks run in
 # the default developer tier. The product-open integration regression remains
@@ -147,9 +151,7 @@ PYTHON_TEST_SUITES: tuple[PythonTestSuite, ...] = (
         "Workbench validation",
         "validation/tests",
         "quick",
-        "Source/build, native-fixture, orchestration, schema, and validator regressions.",
-        # Explicitly supplied original native fixtures can exceed fifteen minutes.
-        timeout_seconds=3600,
+        "Source/build, orchestration, schema, and validator regressions.",
         include_test_files=VALIDATION_FAST_TEST_FILES,
     ),
     PythonTestSuite(
@@ -402,6 +404,15 @@ PYTHON_TEST_SUITES: tuple[PythonTestSuite, ...] = (
         include_test_files=VALIDATION_AUTHORITY_TEST_FILES,
     ),
     PythonTestSuite(
+        "validation-native-fixtures",
+        "Axiom original-input native conformance",
+        "validation/tests",
+        "intensive",
+        "Explicit candidate, engine, JVM and fresh-report-root native execution.",
+        timeout_seconds=3600,
+        include_test_files=VALIDATION_NATIVE_FIXTURE_TEST_FILES,
+    ),
+    PythonTestSuite(
         "workbench-shell",
         "Workbench Shell",
         "modules/workbench-shell/tests",
@@ -442,6 +453,8 @@ SUITES_BY_NAME = {suite.name: suite for suite in PYTHON_TEST_SUITES}
 def suites_for_tier(tier: str) -> tuple[PythonTestSuite, ...]:
     if tier == "quick":
         return tuple(suite for suite in PYTHON_TEST_SUITES if suite.tier == "quick")
+    if tier == "source-ci":
+        return tuple(suite for suite in PYTHON_TEST_SUITES if suite.name != "validation-native-fixtures")
     if tier == "canonical":
         return PYTHON_TEST_SUITES
     raise ValueError(f"unknown validation tier: {tier}")

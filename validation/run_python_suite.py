@@ -371,6 +371,18 @@ def main() -> int:
             )
         return 1
     if args.collect_only:
+        if args.report is not None:
+            if args.report.exists() or args.report.is_symlink():
+                parser.error(f"refusing to replace a previous collection report: {args.report}")
+            ids = sorted(test.id() for test in _tests_in(discovered))
+            _write_json(args.report, {
+                "format": "workbench-python-test-collection-v1",
+                "suite": selected.name,
+                "state": "not-run",
+                "reason": "Collected for inventory only; no tests executed.",
+                "test_ids": ids,
+                "inventory_digest": inventory_digest(ids),
+            })
         print(f"[{selected.name}] collected {count} tests without import errors.")
         return 0
 

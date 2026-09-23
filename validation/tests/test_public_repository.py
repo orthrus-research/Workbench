@@ -109,7 +109,7 @@ class PublicRepositoryPlanTests(unittest.TestCase):
         self.assertEqual(
             {
                 "repository_created": True,
-                "history_pushed": False,
+                "history_pushed": True,
                 "repository_settings_applied": False,
                 "public_visibility_verified": True,
             },
@@ -173,6 +173,7 @@ class PublicRepositoryPlanTests(unittest.TestCase):
         public_without_migration = deepcopy(private)
         public_without_migration["hosting_state"] = "public"
         public_without_migration["claims"]["public_visibility_verified"] = True
+        public_without_migration["claims"]["history_pushed"] = False
         observed = validate_public_repository(public_without_migration, ROOT)
         self.assertFalse(observed["claims"]["history_pushed"])
         self.assertFalse(observed["claims"]["repository_settings_applied"])

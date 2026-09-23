@@ -17,7 +17,9 @@ from suite_catalog import (  # noqa: E402
     SUITES_BY_NAME,
     VALIDATION_AUTHORITY_TEST_FILES,
     VALIDATION_FAST_TEST_FILES,
+    VALIDATION_NATIVE_FIXTURE_TEST_FILES,
     PythonTestSuite,
+    suites_for_tier,
 )
 
 SKIP_DIRECTORIES = {
@@ -98,15 +100,7 @@ class TestSuiteCatalogTests(unittest.TestCase):
 
         self.assertTrue(quick_suites)
         self.assertTrue(intensive_suites)
-        # Supplied original native fixtures share this suite with fast regressions.
-        self.assertEqual(
-            {"validation": 3600},
-            {
-                suite.name: suite.timeout_seconds
-                for suite in quick_suites
-                if suite.timeout_seconds != 900
-            },
-        )
+        self.assertFalse(any(suite.timeout_seconds != 900 for suite in quick_suites))
         self.assertFalse(any(suite.exclusive for suite in quick_suites))
         self.assertEqual(
             {
@@ -122,6 +116,7 @@ class TestSuiteCatalogTests(unittest.TestCase):
         self.assertEqual(
             {
                 "validation-authority": (False, 9000),
+                "validation-native-fixtures": (False, 3600),
                 "workbench-shell": (False, 3600),
                 "blueprints": (False, 3600),
                 "crucible": (True, 9000),
@@ -137,7 +132,7 @@ class TestSuiteCatalogTests(unittest.TestCase):
         first_intensive = tiers.index("intensive")
         self.assertNotIn("quick", tiers[first_intensive:])
         self.assertEqual(
-            ["validation-authority", "workbench-shell", "blueprints", "crucible"],
+            ["validation-authority", "validation-native-fixtures", "workbench-shell", "blueprints", "crucible"],
             [suite.name for suite in PYTHON_TEST_SUITES if suite.tier == "intensive"],
         )
 
@@ -149,13 +144,23 @@ class TestSuiteCatalogTests(unittest.TestCase):
             path.name
             for path in SUITES_BY_NAME["validation-authority"].test_files()
         )
+        native_files = tuple(path.name for path in SUITES_BY_NAME["validation-native-fixtures"].test_files())
         self.assertEqual(set(VALIDATION_FAST_TEST_FILES), quick_files)
         self.assertEqual(VALIDATION_AUTHORITY_TEST_FILES, authority_files)
+        self.assertEqual(VALIDATION_NATIVE_FIXTURE_TEST_FILES, native_files)
         self.assertTrue(set(authority_files).isdisjoint(quick_files))
+        self.assertTrue(set(native_files).isdisjoint(quick_files | set(authority_files)))
         self.assertEqual(
             {path.name for path in (VALIDATION_ROOT / "tests").glob("test_*.py")},
-            quick_files | set(authority_files),
+            quick_files | set(authority_files) | set(native_files),
         )
+
+    def test_public_source_tier_declares_exact_native_fixture_exclusion(self) -> None:
+        canonical = {suite.name for suite in suites_for_tier("canonical")}
+        source = {suite.name for suite in suites_for_tier("source-ci")}
+        self.assertEqual({"validation-native-fixtures"}, canonical - source)
+        self.assertEqual(set(), source - canonical)
+        self.assertNotIn("validation-native-fixtures", {suite.name for suite in suites_for_tier("quick")})
 
     def test_explicit_test_file_membership_fails_closed(self) -> None:
         cases = (

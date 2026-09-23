@@ -11,7 +11,7 @@ import subprocess
 from orchestration import OrchestrationFailure, fingerprint_paths, load_suite_report
 from suite_measurement import inventory_digest
 
-STAGES = ("workbench", "canonical", "native-packages", "axiom", "ide", "physical-cleanroom")
+STAGES = ("workbench", "source-ci", "native-packages", "axiom", "ide", "physical-cleanroom")
 EVENTS = {"pull_request", "push", "schedule", "workflow_dispatch"}
 FORMAT = "workbench-ci-validation-plan-v1"
 REQUIRED_TESTS = {
@@ -44,14 +44,22 @@ def plan(event: str, changed_paths: list[str], *, revision: str) -> dict:
         for name in paths
     )
     ide = event != "pull_request" or not docs_only
-    rows = [{"name": name, "required": True, "reason": "complete source and installed-package coverage"}
+    reasons = {
+        "source-ci": "all public source suites except explicit original-input native fixtures",
+        "native-packages": "Linux x64 installed-package coverage",
+        "axiom": "hosted Axiom JVM and native worker checks",
+    }
+    rows = [{"name": name, "required": True,
+             "reason": reasons.get(name, "developer environment coverage")}
             for name in STAGES if name not in {"ide", "physical-cleanroom"}]
     rows.append({"name": "ide", "required": ide, "reason": "complete client sweep or source change" if ide else "known documentation-only pull request"})
     physical = event in {"schedule", "workflow_dispatch"}
     rows.append({"name": "physical-cleanroom", "required": physical,
                  "reason": "scheduled/manual physical build and process-custody sweep" if physical else "physical checks reserved for scheduled/manual sweep"})
     return {"format": FORMAT, "revision": revision, "event": event,
-            "changed_paths": paths, "stages": rows}
+            "changed_paths": paths, "stages": rows,
+            "excluded_suites": [{"name": "validation-native-fixtures", "state": "not-run",
+                                 "reason": "Requires explicit original candidate, engine, JVM and fresh report roots; run canonical qualification separately."}]}
 
 
 def gate(document: dict, results: dict) -> list[str]:

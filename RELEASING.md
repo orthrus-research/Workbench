@@ -1,17 +1,27 @@
 # Releasing Workbench
 
 This procedure governs candidates for `orthrus-research/workbench`. It does
-not authorize pushes, repository settings changes, tagging, or publication.
-Those actions require the applicable maintainer approval and hosted controls.
+not itself authorize pushes, repository settings changes, tagging, or publication.
 
-The destination already exists and is public. Its initial README/contribution/
-license history is not the reviewed Workbench migration baseline. Public visibility
-does not establish migration completion, protected settings, qualification or
-release approval. Preserve the existing remote history; selecting how to import
-the reviewed clean-root baseline requires an explicit maintainer decision, not
-an inferred force-push or mirror operation. The intended public branch is
-`master`; this declaration does not change the destination's existing default
-branch or remove its bootstrap history.
+The reviewed clean-root baseline was published as the initial public `master`
+commit. The [Linux x64 MVP prerelease](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-2026-09-23)
+followed on 2026-09-23. Its hosted validation had disclosed failures, so the
+prerelease does not establish stable release qualification. The private development
+`main` and public `master` have different histories; carry future reviewed source
+deltas across as new public commits, never by merging or mirror-pushing private
+history. Protected settings and support routes require separate observation.
+
+The public `validate` workflow runs quick checks, Linux x64 installed-package
+checks, Axiom engine checks and a `source-ci` tier. The latter runs every Python
+suite except `validation-native-fixtures`; its artifact inventories those
+original-input cases as **not run**. Full `--tier canonical` and `--full` retain
+the fixture-bound suite and require source-matched candidate, engine, JVM and
+fresh report roots. Windows and macOS package observations run in the separate
+`portability-observation` workflow and do not qualify the Linux release.
+
+The hosted Axiom failure diagnosed on 2026-09-23 was caused by Bubblewrap being unable to configure
+loopback in the hosted runner's network namespace. The worker sandbox policy has
+not been changed; that host remains unqualified for its native worker tests.
 
 ## Native version and artifact ownership
 
@@ -95,7 +105,7 @@ distribution or version. See [native assembly details](packaging/README.md).
    original dependency wheels because a later fresh resolve may select newer
    versions permitted by the native manifests.
 
-## Clean-root public migration
+## Clean-root public history and future updates
 
 The public baseline is an export of reviewed tracked bytes into a fresh
 repository. It must not publish the migration branch's private history, other
@@ -103,12 +113,13 @@ existing branches or tags. Keep private source history and internal harnesses
 outside the public repository. `.gitignore` alone does not remove tracked data
 or protect old history.
 
-The initial public `master` is one new root commit authored by the publishing
-maintainer. Initialize it in the verified export, never by renaming or pushing
-the private development branch. Check that its commit has no parents and that
-only the intended branch is selected. Keep the export manifest and scan receipts
-outside that public worktree. Agent instruction Markdown, local skills and agent
-configuration are excluded; public usage documentation remains included.
+The initial public `master` is one root commit authored by the publishing
+maintainer. Its parentless identity and the published prerelease belong to the
+historical release receipt. Future updates must preserve that public root and
+verify the reviewed source delta and public-tree exclusions before committing to
+`master`. Keep export manifests and scan receipts outside the public worktree.
+Agent instruction Markdown, local skills and agent configuration remain excluded;
+public usage documentation remains included.
 
 Use the local export tooling on the exact reviewed revision:
 
@@ -131,10 +142,10 @@ python tools/prepare_public_export.py verify --output /absolute/new/public-expor
 
 Run clean-checkout validation and artifact builds from the export itself, and
 scan the exact release artifacts separately. Preserve original import provenance
-and license notices. Only after review and explicit authorization should
-maintainers initialize the new public root history, configure the destination
-and push that history. Do not mirror-push, copy a dirty working directory, or
-publish private migration refs.
+and license notices. The export commands above apply to an initial migration or
+an independent new destination. For this repository's existing public `master`,
+use an exact reviewed delta and verify its resulting tree against private source.
+Do not mirror-push, copy a dirty working directory, or publish private refs.
 
 ## Hosted controls and publication
 

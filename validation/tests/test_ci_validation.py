@@ -34,6 +34,8 @@ class CiValidationTests(unittest.TestCase):
 
     def test_only_known_documentation_prs_omit_ide(self):
         document = self.selected(paths=["README.md", "docs/guide.md"])
+        self.assertEqual(["validation-native-fixtures"], [row["name"] for row in document["excluded_suites"]])
+        self.assertEqual(["not-run"], [row["state"] for row in document["excluded_suites"]])
         self.assertFalse(next(row["required"] for row in document["stages"] if row["name"] == "ide"))
         self.assertEqual([], gate(document, self.outcomes(document)))
         for event in ("push", "schedule", "workflow_dispatch"):
@@ -71,10 +73,13 @@ class CiValidationTests(unittest.TestCase):
         jobs = workflow["jobs"]
         self.assertEqual(set(STAGES) | {"plan"}, set(jobs["required-validation"]["needs"]))
         self.assertEqual("always()", jobs["required-validation"]["if"])
-        self.assertEqual({"ubuntu-24.04", "windows-2025", "macos-15"}, set(jobs["native-packages"]["strategy"]["matrix"]["os"]))
-        canonical = "\n".join(step.get("run", "") for step in jobs["canonical"]["steps"])
-        self.assertIn("--node-only", canonical)
-        self.assertIn("--tier canonical", canonical)
+        self.assertEqual("ubuntu-24.04", jobs["native-packages"]["runs-on"])
+        source = "\n".join(step.get("run", "") for step in jobs["source-ci"]["steps"])
+        self.assertIn("--node-only", source)
+        self.assertIn("--tier source-ci", source)
+        self.assertIn("validation-native-fixtures --collect-only --report", source)
+        portability = yaml.load((ROOT / ".github/workflows/portability.yml").read_text(), Loader=yaml.BaseLoader)
+        self.assertEqual({"windows-2025", "macos-15"}, set(portability["jobs"]["native-portability"]["strategy"]["matrix"]["os"]))
         native = "\n".join(step.get("run", "") for step in jobs["native-packages"]["steps"])
         self.assertIn("--from-wheelhouse", native)
         self.assertIn("--wheelhouse .workbench/native-suite", native)

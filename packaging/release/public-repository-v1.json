@@ -53,7 +53,7 @@
     "mirror_push_allowed": false
   },
   "claims": {
-    "history_pushed": false,
+    "history_pushed": true,
     "public_visibility_verified": true,
     "repository_created": true,
     "repository_settings_applied": false

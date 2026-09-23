@@ -173,11 +173,7 @@ jobs:
 
   native-packages:
     needs: plan
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -185,12 +181,6 @@ jobs:
         with:
           pixi-version: v0.75.0
           locked: true
-      - name: Exercise native Windows path behavior in source owners
-        if: matrix.os == 'windows-2025'
-        shell: bash
-        run: |
-          pixi run --environment release --locked --no-config python validation/validate.py --suite project-intelligence --suite pack-program-studio --result .workbench/validation/windows-paths-result.json
-          pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/windows-paths-result.json --group windows-paths
       - name: Build the complete native assembly once
         run: pixi run --environment release --locked --no-config python tools/build_native_distribution.py --suite --output .workbench/native-suite --diagnostics .workbench/validation/ci/native-build
       - name: Verify exact native wheels, relocated installation and installed workflows
@@ -202,7 +192,7 @@ jobs:
           pixi run --environment release --locked --no-config python tools/install_workbench.py .workbench/core-wheelhouse --destination "$RUNNER_TEMP/workbench-native-core" --diagnostics .workbench/validation/ci/core-install
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: success() && matrix.os == 'ubuntu-24.04'
+        if: success()
         with:
           name: native-linux-assembly
           path: .workbench/native-suite/
@@ -212,12 +202,12 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: native-diagnostics-${{ matrix.os }}
+          name: native-diagnostics-linux-x64
           path: .workbench/validation/
           include-hidden-files: true
           retention-days: 14
 
-  canonical:
+  source-ci:
     needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -229,14 +219,16 @@ jobs:
           locked: true
       - name: Provision the required locked Node implementation
         run: pixi run --locked --no-config python validation/provision_ide_toolchains.py --node-only --path-file "$GITHUB_PATH"
-      - name: Complete Python and repository policy coverage
-        run: pixi run --environment release --locked --no-config python validation/validate.py --tier canonical --policy --result .workbench/validation/canonical-result.json
+      - name: Inventory native fixture cases as not run
+        run: pixi run --environment release --locked --no-config python validation/run_python_suite.py validation-native-fixtures --collect-only --report .workbench/validation/native-fixtures-not-run.json
+      - name: Complete public source and repository policy coverage
+        run: pixi run --environment release --locked --no-config python validation/validate.py --tier source-ci --policy --result .workbench/validation/source-ci-result.json
       - name: Require the real pip isolation probe
-        run: pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/canonical-result.json --group pip
+        run: pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/source-ci-result.json --group pip
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: canonical-validation-diagnostics
+          name: source-ci-validation-diagnostics
           path: .workbench/validation/
           include-hidden-files: true
           retention-days: 14
@@ -300,7 +292,7 @@ jobs:
 
   required-validation:
     if: always()
-    needs: [plan, workbench, canonical, native-packages, axiom, ide, physical-cleanroom]
+    needs: [plan, workbench, source-ci, native-packages, axiom, ide, physical-cleanroom]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

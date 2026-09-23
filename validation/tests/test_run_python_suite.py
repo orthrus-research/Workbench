@@ -6,6 +6,7 @@ import argparse
 from io import StringIO
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -32,6 +33,21 @@ from suite_catalog import PythonTestSuite  # noqa: E402
 
 
 class PythonSuiteIsolationTests(unittest.TestCase):
+    def test_fixture_inventory_reports_exact_not_run_cases_without_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            report = Path(temporary) / "native-not-run.json"
+            command = [sys.executable, str(VALIDATION_ROOT / "run_python_suite.py"),
+                       "validation-native-fixtures", "--collect-only", "--report", str(report)]
+            first = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertEqual(0, first.returncode, first.stderr)
+            body = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual("not-run", body["state"])
+            self.assertEqual(18, len(body["test_ids"]))
+            self.assertTrue(all(test.startswith("test_axiom_native_execution.") for test in body["test_ids"]))
+            second = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertNotEqual(0, second.returncode)
+            self.assertIn("refusing to replace", second.stderr)
+
     def _run_cases(self, cases):
         suite = unittest.TestSuite(cases)
         phases = PhaseClock()

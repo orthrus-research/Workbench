@@ -1,0 +1,48 @@
+name: portability-observation
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  native-portability:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+      - name: Exercise native Windows path behavior in source owners
+        if: matrix.os == 'windows-2025'
+        shell: bash
+        run: |
+          pixi run --environment release --locked --no-config python validation/validate.py --suite project-intelligence --suite pack-program-studio --result .workbench/validation/windows-paths-result.json
+          pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/windows-paths-result.json --group windows-paths
+      - name: Build the complete native assembly once
+        run: pixi run --environment release --locked --no-config python tools/build_native_distribution.py --suite --output .workbench/native-suite --diagnostics .workbench/validation/ci/native-build
+      - name: Verify exact native wheels, relocated installation and installed workflows
+        run: pixi run --environment release --locked --no-config python tools/validate_native_packages.py --wheelhouse .workbench/native-suite --diagnostics .workbench/validation/ci/native-conformance
+      - name: Exercise the actual offline Core installation route
+        shell: bash
+        run: |
+          pixi run --environment release --locked --no-config python tools/build_native_distribution.py --from-wheelhouse .workbench/native-suite --output .workbench/core-wheelhouse --diagnostics .workbench/validation/ci/core-closure
+          pixi run --environment release --locked --no-config python tools/install_workbench.py .workbench/core-wheelhouse --destination "$RUNNER_TEMP/workbench-native-core" --diagnostics .workbench/validation/ci/core-install
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: native-portability-diagnostics-${{ matrix.os }}
+          path: .workbench/validation/
+          include-hidden-files: true
+          retention-days: 14

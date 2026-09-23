@@ -49,7 +49,7 @@ class CoverageCatalogTests(unittest.TestCase):
     def test_physical_and_installed_areas_preserve_prerequisites_and_bounded_claims(self):
         document = coverage_catalog.coverage_inventory()
         physical = [area for row in document['suites'] for area in row['areas'] if area['category']=='physical-runtime']
-        self.assertEqual(2, len(physical))
+        self.assertEqual(3, len(physical))
         self.assertTrue(all(area['prerequisites'] for area in physical))
         self.assertTrue(any('do not prove' in limitation for limitation in document['limitations']))
         shell = next(row for row in document['suites'] if row['suite']=='workbench-shell')

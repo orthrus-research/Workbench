@@ -738,7 +738,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--tier",
-        choices=("quick", "canonical"),
+        choices=("quick", "source-ci", "canonical"),
         default="quick",
         help=(
             "run cheap preflight and fast developer suites (default), or "
@@ -842,7 +842,7 @@ def execute_validation(args, selection=None) -> int:
             invocation.write()
             validate_repository_preflight(
                 files,
-                authority=tier == "canonical",
+                authority=tier in {"source-ci", "canonical"},
                 policy=run_policy,
             )
             try:
@@ -894,6 +894,8 @@ def execute_validation(args, selection=None) -> int:
         label = "Workbench focused validation (not canonical)"
     elif tier == "quick":
         label = "Workbench developer validation"
+    elif tier == "source-ci":
+        label = "Workbench public source validation (native fixtures not run)"
     else:
         label = "Workbench Python validation"
     print(

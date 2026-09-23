@@ -286,6 +286,12 @@ class ValidationCliTests(unittest.TestCase):
                 self.assertEqual("canonical", run_suites.call_args.kwargs["tier"])
                 self.assertEqual(selected, run_suites.call_args.kwargs["selected"])
 
+    def test_public_source_ci_retains_authority_preflight_and_declared_tier(self) -> None:
+        preflight, run_suites, _ = self._run_main("--tier", "source-ci", "--policy")
+        preflight.assert_called_once_with([], authority=True, policy=True)
+        self.assertEqual("source-ci", run_suites.call_args.kwargs["tier"])
+        self.assertEqual((), run_suites.call_args.kwargs["selected"])
+
     def test_source_drift_during_preflight_fails_before_suites(self) -> None:
         with (
             patch.object(sys, "argv", ["validate.py"]),

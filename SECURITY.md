@@ -6,18 +6,17 @@ unsafe to transmit.
 
 ## Supported versions
 
-Workbench has not published its first Orthrus Research release. No version is
-currently a supported public security line. Reports against the latest
-reviewed revision are still useful, but accepting a report is not a claim that
-the revision is release-qualified.
+The first Orthrus Research [Linux x64 MVP prerelease](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-2026-09-23)
+is available. It is a prerelease with disclosed qualification gaps, not a stable
+security-support line. Reports against it and later reviewed revisions are welcome;
+accepting a report does not qualify every component or platform.
 
-After public release, this table will name each supported component line
-independently. Similar Core, VS Code, and IntelliJ version numbers do not imply
-compatibility or a shared support window.
+Similar Core, VS Code, and IntelliJ version numbers do not imply compatibility
+or a shared support window.
 
 | Version | Supported |
 | --- | --- |
-| No public release yet | No |
+| Linux x64 MVP prerelease (2026-09-23) | Best-effort triage; no stable support commitment |
 
 ## Defaults
 
@@ -36,9 +35,9 @@ compatibility or a shared support window.
 
 Use GitHub's **Security > Report a vulnerability** form at
 `https://github.com/orthrus-research/workbench/security/advisories/new`. This
-is the intended confidential route. Private vulnerability reporting must be
-enabled and tested before a public release; publication is blocked without a
-working confidential security route.
+is the intended confidential route. GitHub reported private vulnerability
+reporting enabled on 2026-09-23; an end-to-end confidential report has not yet
+been tested.
 
 If the private form is unavailable after launch, open a content-free issue
 asking a maintainer to restore the private reporting route. Do not include the

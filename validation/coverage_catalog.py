@@ -99,6 +99,12 @@ OWNER_COVERAGE: dict[str, tuple[CoverageArea, ...]] = {
         _area("runtime-custody", "Pack observation receipts and source/runtime material or quest comparisons.", "test_material_backed_fluid_observation.py", "test_material_fluid_recipe_observation.py", "test_betterquesting_source_runtime.py"),
     ),
     "validation-authority": (_area("owner-integration", "Product-open projects a Cleanroom workspace into developer jobs.", "test_product_open_authority.py"),),
+    "validation-native-fixtures": (_area(
+        "physical-runtime",
+        "Original-input early, Groovy and selection stages execute in fresh sandbox workers.",
+        "test_axiom_native_execution.py",
+        prerequisites=("Explicit source-matched candidate, engine, JVM and new report roots for all three stages.",),
+    ),),
     "workbench-shell": (
         _area("owner-integration", "Public CLI, service protocol/host and feature-session handoffs.", "test_cli.py", "test_service_protocol_v3_contracts.py", "test_service_host_v3.py", "test_work_session_v2.py"),
         _area("runtime-custody", "Materialization, executable custody and dependency identities reject drift.", "test_runtime_materialize_v2.py", "test_executable_custody.py", "test_installed_runtime_dependency_identity.py"),
