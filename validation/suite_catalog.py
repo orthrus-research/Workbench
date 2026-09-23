@@ -9,6 +9,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEST_FILE_NAME_PATTERN = re.compile(r"^test_[A-Za-z0-9_]+\.py$")
 
+BLUEPRINTS_NATIVE_FIXTURE_TEST_FILES = (
+    "test_conformance.py",
+    "test_interface.py",
+    "test_simulation.py",
+)
+BLUEPRINTS_SOURCE_TEST_FILES = (
+    "test_contract.py",
+    "test_convention_patch.py",
+    "test_current_material_fluid_example.py",
+    "test_experimental_supersymmetry_pattern.py",
+    "test_lifecycle.py",
+    "test_planner.py",
+    "test_publication_filesystem.py",
+    "test_registration_catalog.py",
+    "test_registration_render.py",
+    "test_standards.py",
+)
+
 
 @dataclass(frozen=True)
 class PythonTestSuite:
@@ -430,9 +448,20 @@ PYTHON_TEST_SUITES: tuple[PythonTestSuite, ...] = (
         "Blueprints",
         "modules/blueprints/tests",
         "intensive",
-        "Registered standards, deterministic rendering, simulations, and safe application.",
+        "Registered standards, deterministic rendering, planning, and safe application.",
         python_paths=("modules/blueprints/src",),
         timeout_seconds=3600,
+        include_test_files=BLUEPRINTS_SOURCE_TEST_FILES,
+    ),
+    PythonTestSuite(
+        "blueprints-native-fixtures",
+        "Blueprints isolated simulation fixtures",
+        "modules/blueprints/tests",
+        "intensive",
+        "Engine conformance, interface, and simulation with a working Bubblewrap host.",
+        python_paths=("modules/blueprints/src",),
+        timeout_seconds=3600,
+        include_test_files=BLUEPRINTS_NATIVE_FIXTURE_TEST_FILES,
     ),
     PythonTestSuite(
         "crucible",
@@ -454,7 +483,8 @@ def suites_for_tier(tier: str) -> tuple[PythonTestSuite, ...]:
     if tier == "quick":
         return tuple(suite for suite in PYTHON_TEST_SUITES if suite.tier == "quick")
     if tier == "source-ci":
-        return tuple(suite for suite in PYTHON_TEST_SUITES if suite.name != "validation-native-fixtures")
+        native_fixtures = {"validation-native-fixtures", "blueprints-native-fixtures"}
+        return tuple(suite for suite in PYTHON_TEST_SUITES if suite.name not in native_fixtures)
     if tier == "canonical":
         return PYTHON_TEST_SUITES
     raise ValueError(f"unknown validation tier: {tier}")

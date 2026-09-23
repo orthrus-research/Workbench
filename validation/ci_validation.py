@@ -45,7 +45,7 @@ def plan(event: str, changed_paths: list[str], *, revision: str) -> dict:
     )
     ide = event != "pull_request" or not docs_only
     reasons = {
-        "source-ci": "all public source suites except explicit original-input native fixtures",
+        "source-ci": "public source suites with native fixture exclusions inventoried separately",
         "native-packages": "Linux x64 installed-package coverage",
         "axiom": "hosted Axiom JVM and native worker checks",
     }
@@ -58,8 +58,12 @@ def plan(event: str, changed_paths: list[str], *, revision: str) -> dict:
                  "reason": "scheduled/manual physical build and process-custody sweep" if physical else "physical checks reserved for scheduled/manual sweep"})
     return {"format": FORMAT, "revision": revision, "event": event,
             "changed_paths": paths, "stages": rows,
-            "excluded_suites": [{"name": "validation-native-fixtures", "state": "not-run",
-                                 "reason": "Requires explicit original candidate, engine, JVM and fresh report roots; run canonical qualification separately."}]}
+            "excluded_suites": [
+                {"name": "validation-native-fixtures", "state": "not-run",
+                 "reason": "Requires explicit original candidate, engine, JVM and fresh report roots; run canonical qualification separately."},
+                {"name": "blueprints-native-fixtures", "state": "not-run",
+                 "reason": "Requires a Bubblewrap host permitted to create the Blueprints sandbox namespaces; run canonical qualification separately."},
+            ]}
 
 
 def gate(document: dict, results: dict) -> list[str]:

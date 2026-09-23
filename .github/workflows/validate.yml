@@ -226,6 +226,8 @@ jobs:
         run: python3 tools/axiom_runtime.py --provision-java --github-env-file "$GITHUB_ENV"
       - name: Inventory native fixture cases as not run
         run: pixi run --environment release --locked --no-config python validation/run_python_suite.py validation-native-fixtures --collect-only --report .workbench/validation/native-fixtures-not-run.json
+      - name: Inventory Blueprints sandbox cases as not run
+        run: pixi run --environment release --locked --no-config python validation/run_python_suite.py blueprints-native-fixtures --collect-only --report .workbench/validation/blueprints-native-fixtures-not-run.json
       - name: Complete public source and repository policy coverage
         run: pixi run --environment release --locked --no-config python validation/validate.py --tier source-ci --policy --result .workbench/validation/source-ci-result.json
       - name: Require the real pip isolation probe

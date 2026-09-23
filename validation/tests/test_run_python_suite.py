@@ -48,6 +48,21 @@ class PythonSuiteIsolationTests(unittest.TestCase):
             self.assertNotEqual(0, second.returncode)
             self.assertIn("refusing to replace", second.stderr)
 
+    def test_blueprints_sandbox_inventory_reports_not_run_cases(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            report = Path(temporary) / "blueprints-not-run.json"
+            command = [sys.executable, str(VALIDATION_ROOT / "run_python_suite.py"),
+                       "blueprints-native-fixtures", "--collect-only", "--report", str(report)]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            body = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual("not-run", body["state"])
+            self.assertEqual(26, len(body["test_ids"]))
+            self.assertEqual(
+                {"test_conformance", "test_interface", "test_simulation"},
+                {test.split(".", 1)[0] for test in body["test_ids"]},
+            )
+
     def _run_cases(self, cases):
         suite = unittest.TestSuite(cases)
         phases = PhaseClock()

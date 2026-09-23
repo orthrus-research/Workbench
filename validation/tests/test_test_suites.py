@@ -13,6 +13,8 @@ REPOSITORY_ROOT = VALIDATION_ROOT.parent
 sys.path.insert(0, str(VALIDATION_ROOT))
 
 from suite_catalog import (  # noqa: E402
+    BLUEPRINTS_NATIVE_FIXTURE_TEST_FILES,
+    BLUEPRINTS_SOURCE_TEST_FILES,
     PYTHON_TEST_SUITES,
     SUITES_BY_NAME,
     VALIDATION_AUTHORITY_TEST_FILES,
@@ -119,6 +121,7 @@ class TestSuiteCatalogTests(unittest.TestCase):
                 "validation-native-fixtures": (False, 3600),
                 "workbench-shell": (False, 3600),
                 "blueprints": (False, 3600),
+                "blueprints-native-fixtures": (False, 3600),
                 "crucible": (True, 9000),
             },
             {
@@ -132,7 +135,7 @@ class TestSuiteCatalogTests(unittest.TestCase):
         first_intensive = tiers.index("intensive")
         self.assertNotIn("quick", tiers[first_intensive:])
         self.assertEqual(
-            ["validation-authority", "validation-native-fixtures", "workbench-shell", "blueprints", "crucible"],
+            ["validation-authority", "validation-native-fixtures", "workbench-shell", "blueprints", "blueprints-native-fixtures", "crucible"],
             [suite.name for suite in PYTHON_TEST_SUITES if suite.tier == "intensive"],
         )
 
@@ -158,9 +161,20 @@ class TestSuiteCatalogTests(unittest.TestCase):
     def test_public_source_tier_declares_exact_native_fixture_exclusion(self) -> None:
         canonical = {suite.name for suite in suites_for_tier("canonical")}
         source = {suite.name for suite in suites_for_tier("source-ci")}
-        self.assertEqual({"validation-native-fixtures"}, canonical - source)
+        self.assertEqual({"validation-native-fixtures", "blueprints-native-fixtures"}, canonical - source)
         self.assertEqual(set(), source - canonical)
-        self.assertNotIn("validation-native-fixtures", {suite.name for suite in suites_for_tier("quick")})
+        self.assertTrue((canonical - source).isdisjoint({suite.name for suite in suites_for_tier("quick")}))
+
+    def test_blueprints_files_form_one_exact_partition(self) -> None:
+        source_files = tuple(path.name for path in SUITES_BY_NAME["blueprints"].test_files())
+        native_files = tuple(path.name for path in SUITES_BY_NAME["blueprints-native-fixtures"].test_files())
+        self.assertEqual(BLUEPRINTS_SOURCE_TEST_FILES, source_files)
+        self.assertEqual(BLUEPRINTS_NATIVE_FIXTURE_TEST_FILES, native_files)
+        self.assertTrue(set(source_files).isdisjoint(native_files))
+        self.assertEqual(
+            {path.name for path in (REPOSITORY_ROOT / "modules/blueprints/tests").glob("test_*.py")},
+            set(source_files) | set(native_files),
+        )
 
     def test_explicit_test_file_membership_fails_closed(self) -> None:
         cases = (

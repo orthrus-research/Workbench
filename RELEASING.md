@@ -12,11 +12,12 @@ deltas across as new public commits, never by merging or mirror-pushing private
 history. Protected settings and support routes require separate observation.
 
 The public `validate` workflow runs quick checks, Linux x64 installed-package
-checks, Axiom engine checks and a `source-ci` tier. The latter runs every Python
-suite except `validation-native-fixtures`; its artifact inventories those
-original-input cases as **not run**. Full `--tier canonical` and `--full` retain
-the fixture-bound suite and require source-matched candidate, engine, JVM and
-fresh report roots. Windows and macOS package observations run in the separate
+checks, Axiom engine checks and a `source-ci` tier. The latter excludes the
+`validation-native-fixtures` and `blueprints-native-fixtures` suites; its artifact
+inventories their cases as **not run**. Full `--tier canonical` and `--full` retain
+both suites. The Axiom fixtures require a source-matched candidate, engine, JVM
+and fresh report roots. Blueprints simulation requires a Bubblewrap host permitted
+to create its sandbox namespaces. Windows and macOS package observations run in the separate
 `portability-observation` workflow and do not qualify the Linux release.
 
 The hosted Axiom failure diagnosed on 2026-09-23 was caused by Bubblewrap being unable to configure

@@ -34,8 +34,8 @@ class CiValidationTests(unittest.TestCase):
 
     def test_only_known_documentation_prs_omit_ide(self):
         document = self.selected(paths=["README.md", "docs/guide.md"])
-        self.assertEqual(["validation-native-fixtures"], [row["name"] for row in document["excluded_suites"]])
-        self.assertEqual(["not-run"], [row["state"] for row in document["excluded_suites"]])
+        self.assertEqual(["validation-native-fixtures", "blueprints-native-fixtures"], [row["name"] for row in document["excluded_suites"]])
+        self.assertEqual(["not-run", "not-run"], [row["state"] for row in document["excluded_suites"]])
         self.assertFalse(next(row["required"] for row in document["stages"] if row["name"] == "ide"))
         self.assertEqual([], gate(document, self.outcomes(document)))
         for event in ("push", "schedule", "workflow_dispatch"):
@@ -78,6 +78,7 @@ class CiValidationTests(unittest.TestCase):
         self.assertIn("--node-only", source)
         self.assertIn("--tier source-ci", source)
         self.assertIn("validation-native-fixtures --collect-only --report", source)
+        self.assertIn("blueprints-native-fixtures --collect-only --report", source)
         self.assertIn("axiom_runtime.py --provision-java --github-env-file", source)
         workbench = "\n".join(step.get("run", "") for step in jobs["workbench"]["steps"])
         self.assertIn("axiom_runtime.py --provision-java --github-env-file", workbench)

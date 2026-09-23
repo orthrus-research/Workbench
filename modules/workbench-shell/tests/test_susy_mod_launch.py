@@ -357,6 +357,11 @@ class SusyModLaunchStageTests(unittest.TestCase):
             ),
             patch.object(
                 susy_mod_launch,
+                "_launcher_path",
+                return_value="C:/PrismLauncher/prismlauncher.exe",
+            ) as launcher_path,
+            patch.object(
+                susy_mod_launch,
                 "ensure_java_runtime",
             ) as ensure_java,
             patch.object(
@@ -376,6 +381,7 @@ class SusyModLaunchStageTests(unittest.TestCase):
                     launcher_root=launcher_root,
                 )
 
+        launcher_path.assert_called_once_with(executable, {"os": "windows", "architecture": "x64"})
         ensure_java.assert_not_called()
         self.assertEqual(runtime_tree.call_count, 2)
         self.assertFalse((self.fixture.run_root / "runtime/launches").exists())
@@ -413,6 +419,11 @@ class SusyModLaunchStageTests(unittest.TestCase):
             ),
             patch.object(
                 susy_mod_launch,
+                "_launcher_path",
+                return_value="C:/PrismLauncher/prismlauncher.exe",
+            ) as launcher_path,
+            patch.object(
+                susy_mod_launch,
                 "host_platform",
                 return_value={"os": "linux", "architecture": "x64"},
             ),
@@ -432,6 +443,7 @@ class SusyModLaunchStageTests(unittest.TestCase):
                     launcher_root=launcher_root,
                 )
 
+        launcher_path.assert_called_once_with(executable, {"os": "windows", "architecture": "x64"})
         ensure_java.assert_not_called()
         self.assertFalse((self.fixture.run_root / "runtime/launches").exists())
         self.assertFalse(
