@@ -57,9 +57,9 @@ class PythonSuiteIsolationTests(unittest.TestCase):
             self.assertEqual(0, completed.returncode, completed.stderr)
             body = json.loads(report.read_text(encoding="utf-8"))
             self.assertEqual("not-run", body["state"])
-            self.assertEqual(26, len(body["test_ids"]))
+            self.assertEqual(40, len(body["test_ids"]))
             self.assertEqual(
-                {"test_conformance", "test_interface", "test_simulation"},
+                {"test_conformance", "test_interface", "test_lifecycle", "test_simulation"},
                 {test.split(".", 1)[0] for test in body["test_ids"]},
             )
 

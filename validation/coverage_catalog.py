@@ -113,10 +113,10 @@ OWNER_COVERAGE: dict[str, tuple[CoverageArea, ...]] = {
     ),
     "blueprints": (
         _area("isolated-behavior", "Contracts, standards and registrations validate deterministic rendering inputs.", "test_contract.py", "test_standards.py", "test_registration_catalog.py", "test_registration_render.py"),
-        _area("runtime-custody", "Lifecycle and filesystem publication preserve rollback, drift and no-side-effect gates.", "test_lifecycle.py", "test_publication_filesystem.py"),
+        _area("runtime-custody", "Filesystem publication preserves rollback, drift and no-side-effect gates.", "test_publication_filesystem.py"),
     ),
     "blueprints-native-fixtures": (
-        _area("physical-runtime", "Engine conformance, interface and simulation exercise isolated execution on real fixture repositories.", "test_conformance.py", "test_interface.py", "test_simulation.py", prerequisites=("Bubblewrap installed and permitted to create the sandbox namespaces used by Blueprints.",)),
+        _area("physical-runtime", "Engine conformance, interface, lifecycle and simulation exercise isolated execution on real fixture repositories.", "test_conformance.py", "test_interface.py", "test_lifecycle.py", "test_simulation.py", prerequisites=("Bubblewrap installed and permitted to create the sandbox namespaces used by Blueprints.",)),
     ),
     "crucible": (
         _area("runtime-custody", "Graph incremental reuse, independent reconstruction, recovery, custody and bounded ancestry.", "test_crucible_worldgen_v2.py", "test_crucible_job_v2_contracts.py", "test_cleanroom_runtime_custody.py", "test_runtime_manager_journal.py"),

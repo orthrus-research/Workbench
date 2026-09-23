@@ -12,6 +12,7 @@ TEST_FILE_NAME_PATTERN = re.compile(r"^test_[A-Za-z0-9_]+\.py$")
 BLUEPRINTS_NATIVE_FIXTURE_TEST_FILES = (
     "test_conformance.py",
     "test_interface.py",
+    "test_lifecycle.py",
     "test_simulation.py",
 )
 BLUEPRINTS_SOURCE_TEST_FILES = (
@@ -19,7 +20,6 @@ BLUEPRINTS_SOURCE_TEST_FILES = (
     "test_convention_patch.py",
     "test_current_material_fluid_example.py",
     "test_experimental_supersymmetry_pattern.py",
-    "test_lifecycle.py",
     "test_planner.py",
     "test_publication_filesystem.py",
     "test_registration_catalog.py",
@@ -458,7 +458,7 @@ PYTHON_TEST_SUITES: tuple[PythonTestSuite, ...] = (
         "Blueprints isolated simulation fixtures",
         "modules/blueprints/tests",
         "intensive",
-        "Engine conformance, interface, and simulation with a working Bubblewrap host.",
+        "Engine conformance, interface, lifecycle, and simulation with a working Bubblewrap host.",
         python_paths=("modules/blueprints/src",),
         timeout_seconds=3600,
         include_test_files=BLUEPRINTS_NATIVE_FIXTURE_TEST_FILES,

@@ -16,7 +16,7 @@ checks, Axiom engine checks and a `source-ci` tier. The latter excludes the
 `validation-native-fixtures` and `blueprints-native-fixtures` suites; its artifact
 inventories their cases as **not run**. Full `--tier canonical` and `--full` retain
 both suites. The Axiom fixtures require a source-matched candidate, engine, JVM
-and fresh report roots. Blueprints simulation requires a Bubblewrap host permitted
+and fresh report roots. Blueprints simulation and dependent lifecycle tests require a Bubblewrap host permitted
 to create its sandbox namespaces. Windows and macOS package observations run in the separate
 `portability-observation` workflow and do not qualify the Linux release.
 
