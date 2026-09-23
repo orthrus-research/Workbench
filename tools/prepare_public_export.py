@@ -95,12 +95,16 @@ PRIVATE_KEY_MARKERS = tuple(
     )
 )
 
-# Public binary content is fail-closed. Add a path only after its provenance,
-# deterministic generation, and validation are reviewed. Text SVG assets do
-# not need an entry because they must pass the UTF-8 text policy.
+# Public binary content is fail-closed. Admit only reviewed paths; pin copied
+# assets to exact bytes. Text SVG assets must pass the UTF-8 text policy.
 ALLOWED_BINARY_ASSETS: dict[str, bytes] = {
+    "assets/brand/orthrus-research-avatar.png": b"\x89PNG\r\n\x1a\n",
     "clients/vscode/media/workbench-icon.png":
         b"\x89PNG\r\n\x1a\n",
+}
+PINNED_BINARY_DIGESTS = {
+    "assets/brand/orthrus-research-avatar.png":
+        "bfe270518f8c0cd8da15d6a310eb16c45555d9d9b4640c177d901f996154ab89",
 }
 
 
@@ -276,6 +280,11 @@ def _validate_content(relative: str, content: bytes) -> str:
         if not content.startswith(binary_signature):
             raise PublicExportError(
                 f"allowlisted binary has an unexpected signature: {relative}"
+            )
+        expected_digest = PINNED_BINARY_DIGESTS.get(relative)
+        if expected_digest is not None and hashlib.sha256(content).hexdigest() != expected_digest:
+            raise PublicExportError(
+                f"allowlisted binary has an unexpected digest: {relative}"
             )
         return "reviewed-binary"
     try:

@@ -204,6 +204,14 @@ class PublicRepositoryPlanTests(unittest.TestCase):
 
 
 class PublicExportHardeningTests(unittest.TestCase):
+    def test_organization_avatar_requires_reviewed_bytes(self) -> None:
+        relative = "assets/brand/orthrus-research-avatar.png"
+        content = (ROOT / relative).read_bytes()
+        self.assertEqual("reviewed-binary", PUBLIC_EXPORT._validate_content(relative, content))
+        changed = content[:-1] + bytes([content[-1] ^ 1])
+        with self.assertRaisesRegex(PUBLIC_EXPORT.PublicExportError, "unexpected digest"):
+            PUBLIC_EXPORT._validate_content(relative, changed)
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(
             prefix="workbench-public-export-test-",
