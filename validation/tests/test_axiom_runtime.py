@@ -25,7 +25,10 @@ class AxiomRuntimeTests(unittest.TestCase):
             self.assertEqual(0, axiom_runtime.main([
                 "--provision-java", "--github-env-file", str(env_file),
             ]))
-            self.assertEqual(f"WORKBENCH_TEST_JAVA={home / 'bin/java'}\n", env_file.read_text())
+            self.assertEqual(
+                f"AXIOM_JAVA_HOME={home}\nWORKBENCH_TEST_JAVA={home / 'bin/java'}\n",
+                env_file.read_text(),
+            )
             verify.assert_called_once_with(home, compiler=True)
 
     def test_runtime_has_one_profile_owner_and_matches_provisioning(self):

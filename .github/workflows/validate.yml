@@ -23,7 +23,7 @@ jobs:
       - name: Verify exact upstream source inputs
         run: python3 tools/axiom_sources.py --provision .workbench/axiom-ci-sources
       - name: Resolve the locked Axiom runtime JDK
-        run: python3 -c 'from validation.provision_ide_toolchains import TOOLCHAIN_ROOT, load_lock; print("AXIOM_JAVA_HOME=" + str(TOOLCHAIN_ROOT / load_lock()["java_platform"]["archive_root"]))' >> "$GITHUB_ENV"
+        run: python3 tools/axiom_runtime.py --provision-java --github-env-file "$GITHUB_ENV"
       - name: Capture and exercise the portable source target
         run: |
           python3 tools/build_axiom_target.py --supersymmetry .workbench/axiom-ci-sources/supersymmetry --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --groovyscript .workbench/axiom-ci-sources/groovyscript --output .workbench/axiom-ci-target.zip

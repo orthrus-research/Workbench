@@ -92,6 +92,7 @@ class CiValidationTests(unittest.TestCase):
         self.assertIn("xvfb-run", ide)
         self.assertIn("--full --installed-core", ide)
         axiom = "\n".join(step.get("run", "") for step in jobs["axiom"]["steps"])
+        self.assertIn("axiom_runtime.py --provision-java --github-env-file", axiom)
         for tool in ("build_axiom.py", "axiom_sources.py", "build_axiom_target.py", "axiom_target_smoke.py", "axiom_source_conformance.py", "axiom_loader_conformance.py", "axiom_composition_conformance.py"):
             self.assertIn(tool, axiom)
 
