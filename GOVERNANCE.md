@@ -87,8 +87,8 @@ not a substitute.
 Bootstrap maintainer decision (2026-09-23): issue creation is open to all GitHub
 users. The [code of conduct](CODE_OF_CONDUCT.md) names `zestehl` as the
 responsible owner and `zestehl@pm.me` as the private conduct-reporting address.
-End-to-end delivery and acknowledgment of a test report have not yet been
-observed; that admission condition remains open.
+On 2026-09-23, `zestehl` confirmed that this is their main inbox and that it
+receives incoming email. No conduct report was sent merely to test the route.
 
 ## Independent component releases
 
