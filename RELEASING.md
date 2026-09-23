@@ -17,12 +17,15 @@ checks, Axiom engine checks and a `source-ci` tier. The latter excludes the
 inventories their cases as **not run**. Full `--tier canonical` and `--full` retain
 both suites. The Axiom fixtures require a source-matched candidate, engine, JVM
 and fresh report roots. Blueprints simulation and dependent lifecycle tests require a Bubblewrap host permitted
-to create its sandbox namespaces. Windows and macOS package observations run in the separate
-`portability-observation` workflow and do not qualify the Linux release.
+to create its sandbox namespaces. Windows and macOS package observations run weekly
+or on demand in the separate `portability-observation` workflow. They do not
+qualify or block the Linux release.
 
-The hosted Axiom failure diagnosed on 2026-09-23 was caused by Bubblewrap being unable to configure
-loopback in the hosted runner's network namespace. The worker sandbox policy has
-not been changed; that host remains unqualified for its native worker tests.
+The hosted Axiom failure diagnosed on 2026-09-23 was caused by Bubblewrap being
+unable to configure loopback in the hosted runner's network namespace. The
+`validate` workflow selects Core-provisioned Docker/runc workers for its Axiom
+job. The product default remains Bubblewrap; Docker and gVisor require explicit
+selection and qualification on the target host.
 
 ## Native version and artifact ownership
 

@@ -47,6 +47,8 @@ def main(argv=None):
     parser.add_argument("--provision", action="store_true", help="Use the existing hash-locked Workbench build toolchains")
     parser.add_argument("--output", type=Path, default=ROOT / ".workbench/build/axiom")
     parser.add_argument("--registry-root", type=Path, help="Existing profile-pinned utility JARs for offline native registry tests")
+    parser.add_argument("--sandbox-backend", choices=("bubblewrap", "docker", "gvisor"), default="bubblewrap",
+                        help="Select the Axiom worker backend for native tests and installed smoke")
     args = parser.parse_args(argv)
     if args.provision:
         if args.gradle or args.java_home:
@@ -72,11 +74,21 @@ def main(argv=None):
         environment.pop(key, None)
     environment.update(JAVA_HOME=str(java_home), GRADLE_USER_HOME=str(ROOT / ".workbench/axiom/gradle-home"),
                        AXIOM_REGISTRY_TEST_ROOT=str(registry_root))
-    subprocess.run([str(gradle), "-p", str(ROOT / "modules/axiom/jvm"), "--no-daemon", "--console=plain",
-                    "--dependency-verification=strict", "clean", "test", "installDist", "distZip", "sourcesJar"],
-                   cwd=ROOT, env=environment, check=True)
+    from axiom_sandbox import selected_worker
+    with selected_worker(args.sandbox_backend) as sandbox_arguments:
+        keys = {"axiom.sandbox.backend": "BACKEND", "axiom.sandbox.docker": "DOCKER",
+                "axiom.sandbox.dockerHost": "DOCKER_HOST", "axiom.sandbox.image": "IMAGE",
+                "axiom.sandbox.session": "SESSION", "axiom.sandbox.user": "USER",
+                "axiom.sandbox.groups": "GROUPS"}
+        for argument in sandbox_arguments:
+            property_name, value = argument.removeprefix("-D").split("=", 1)
+            environment["AXIOM_TEST_SANDBOX_" + keys[property_name]] = value
+        subprocess.run([str(gradle), "-p", str(ROOT / "modules/axiom/jvm"), "--no-daemon", "--console=plain",
+                        "--dependency-verification=strict", "clean", "test", "installDist", "distZip", "sourcesJar"],
+                       cwd=ROOT, env=environment, check=True)
     subprocess.run([sys.executable, str(ROOT / "tools/axiom_smoke.py"), "--engine-home",
-                    str(ROOT / "modules/axiom/jvm/build/install/workbench-axiom-engine"), "--java-home", str(java_home)],
+                    str(ROOT / "modules/axiom/jvm/build/install/workbench-axiom-engine"), "--java-home", str(java_home),
+                    "--sandbox-backend", args.sandbox_backend],
                    cwd=ROOT, check=True)
     from component_versions import load_authority
     component = load_authority()[1]["workbench-axiom-engine"]

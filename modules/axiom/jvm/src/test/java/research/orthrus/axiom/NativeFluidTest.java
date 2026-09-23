@@ -280,12 +280,12 @@ class NativeFluidTest {
     @Test void constructionRunsInsideFreshProductionSandboxWorkers() throws Exception {
         Path root = Path.of(System.getProperty("axiom.test.registryRoot"));
         for (int i=0;i<2;i++) {
-            var command = Main.sandboxCommand(List.of(root),
+            try (var worker = WorkerSandbox.launch(List.of(root),
                     Arrays.asList(System.getProperty("axiom.test.runtimeClasspath").split(File.pathSeparator)),
-                    Worker.class.getName(), List.of(root.toString()));
-            var process = new ProcessBuilder(command); process.environment().clear();
-            var result = Main.observe(process.start(),new byte[0],65536,65536,20000);
-            assertEquals("accepted",result.get("status"),result.toString());
+                    Worker.class.getName(), List.of(root.toString()))) {
+                var result = Main.observe(worker.process(),new byte[0],65536,65536,20000);
+                assertEquals("accepted",result.get("status"),result.toString());
+            }
         }
     }
 }

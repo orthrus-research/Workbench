@@ -143,10 +143,10 @@ class WorkerIsolationTest {
         List<String> classpath = Arrays.asList(System.getProperty("axiom.test.runtimeClasspath").split(File.pathSeparator));
         List<String> args = new ArrayList<>(List.of(mode));
         if (input != null) args.add(input.toString());
-        var builder = new ProcessBuilder(Main.sandboxCommand(mount ? List.of(input) : List.of(), classpath, Probe.class.getName(), args));
-        builder.environment().clear();
-        var result = Main.observe(builder.start(), new byte[0], 4096, 65536, 20_000);
-        assertEquals("accepted", result.get("status"), result.toString());
+        try (var worker = WorkerSandbox.launch(mount ? List.of(input) : List.of(), classpath, Probe.class.getName(), args)) {
+            var result = Main.observe(worker.process(), new byte[0], 4096, 65536, 20_000);
+            assertEquals("accepted", result.get("status"), result.toString());
+        }
     }
 
     @Test void nativeCompilationHelpersAndThreadsStillWorkWithoutStaticStateLeaking() throws Exception {
@@ -163,7 +163,7 @@ class WorkerIsolationTest {
     }
     @Test void compileTimeTransformCannotLaunchAProcess() throws Exception { probe("compile-transform", null, false); }
     @Test void hostFilesAreAbsentAndExplicitInputsAreReadOnly() throws Exception {
-        Path file = temporary.resolve("host-only.txt"); Files.writeString(file, "sentinel");
+        Path file = temporary.resolve("host,\"quoted\".txt"); Files.writeString(file, "sentinel");
         probe("read-host", file, false);
         probe("write-input", file, true);
         assertEquals("sentinel", Files.readString(file));

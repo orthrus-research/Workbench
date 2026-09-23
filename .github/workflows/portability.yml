@@ -2,10 +2,8 @@ name: portability-observation
 
 on:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - master
+  schedule:
+    - cron: "23 7 * * 1"
 
 permissions:
   contents: read

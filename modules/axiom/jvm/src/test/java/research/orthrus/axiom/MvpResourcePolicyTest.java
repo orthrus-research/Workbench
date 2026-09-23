@@ -20,10 +20,12 @@ class MvpResourcePolicyTest {
         }
     }
     @Test void workerInheritsHostResourcesAndUsesJvmErgonomics() throws Exception {
-        var command=Main.sandboxCommand(List.of(),Arrays.asList(System.getProperty("axiom.test.runtimeClasspath").split(File.pathSeparator)),
+        var classpath=Arrays.asList(System.getProperty("axiom.test.runtimeClasspath").split(File.pathSeparator));
+        var command=WorkerSandbox.command(List.of(),classpath,
                 Probe.class.getName(),List.of());
         for (String argument : command) assertFalse(argument.matches("-(Xmx|Xms|Xss|XX:(MaxMetaspaceSize|MaxDirectMemorySize|ReservedCodeCacheSize|ActiveProcessorCount)=).*"),argument);
-        var builder=new ProcessBuilder(command);builder.environment().clear();
-        assertEquals("accepted",Main.observe(builder.start(),new byte[0],0,0,0).get("status"));
+        try (var worker=WorkerSandbox.launch(List.of(),classpath,Probe.class.getName(),List.of())) {
+            assertEquals("accepted",Main.observe(worker.process(),new byte[0],0,0,0).get("status"));
+        }
     }
 }

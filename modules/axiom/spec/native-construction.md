@@ -119,9 +119,16 @@ extraction and carriers; it does not independently establish whole-game parity.
 
 ## Execution isolation
 
-`Main` retains one disposable bubblewrap worker per request. Read-only input,
-runtime and classpath mounts, a private temporary filesystem, PID/network
-namespaces, cleared environment and transport/deadline limits are retained.
+`Main` retains one disposable worker per request. The current local default is
+Bubblewrap. Workbench can explicitly select Docker's `runc` runtime or Docker
+with gVisor's `runsc` runtime through Core's sandbox host. Core checks the local
+daemon/runtime, provisions a digest-pinned Linux x64 base image, and owns
+session cleanup. The OCI worker mounts the selected Java runtime, input files
+and classpath read-only, uses a private temporary filesystem and network, drops
+capabilities, uses the invoking user's numeric identity and groups to read
+private profile inputs, and has no Docker socket mount. The
+backend and policy are recorded with the invocation. Neither backend silently
+falls back to another when unavailable.
 
 Before request parsing or compilation, `WorkerIsolation` installs Linux x86_64
 seccomp with required thread synchronization. Existing JVM threads receive the
@@ -142,7 +149,7 @@ Workbench resource targets are temporarily suspended for MVP development. The
 worker inherits host CPU/file/descriptor/address-space limits and uses JVM
 resource ergonomics. Core dumps remain disabled. Cancellation and fresh workers
 remain required; optimization and budget selection follow MVP.
-An unavailable kernel policy fails admission. A terminated worker with no result
+An unavailable kernel policy or selected container runtime fails admission. A terminated worker with no result
 is incomplete evaluation, never native recipe rejection. These are Linux-specific
 host protections, not a sandbox for the caller's in-process Java library use,
 loaded-memory attestation, or proof against a hostile JVM/kernel.

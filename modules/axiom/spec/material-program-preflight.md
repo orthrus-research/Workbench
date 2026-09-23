@@ -130,12 +130,18 @@ workbench context --state-root /private/developer-state run SESSION -- checks ma
 workbench context --state-root /private/developer-state run SESSION -- checks materials setup-status \
   --context supersymmetry:material-authoring-gt-base
 workbench context --state-root /private/developer-state run SESSION -- checks materials run \
-  --context supersymmetry:material-authoring-gt-base
+  --context supersymmetry:material-authoring-gt-base --sandbox-backend docker
 workbench context --state-root /private/developer-state run SESSION -- checks materials show ATTEMPT
 ```
 
-Replace `SESSION` and `ATTEMPT` with the exact returned identities. `run` captures
-the current saved files and executes that new snapshot in one command. Every
+Replace `SESSION` and `ATTEMPT` with the exact returned identities. The selected
+worker backend is retained with the attempt; choose `gvisor` when Docker
+has a registered `runsc` runtime, or omit the option for the Bubblewrap default.
+The Docker image is fetched by Core on first use and can then be used offline.
+`workbench sandbox recover --state-root /private/developer-state` removes only
+containers left by dead Workbench sessions.
+
+`run` captures the current saved files and executes that new snapshot in one command. Every
 invocation sees current saved additions (including untracked files), modifications
 and deletions. Snapshots and request identities are retained internally; no archive
 or fixture preparation is required. Unsaved editor buffers are not disk input.

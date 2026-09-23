@@ -51,7 +51,14 @@ def main(argv=None):
     parser.add_argument("--engine-home", type=Path, required=True)
     parser.add_argument("--java-home", type=Path, required=True)
     parser.add_argument("--workbench-python", type=Path, help="Also exercise an already installed Core/API/Axiom wheel closure")
+    parser.add_argument("--sandbox-backend", choices=("bubblewrap", "docker", "gvisor"), default="bubblewrap")
     args = parser.parse_args(argv)
+    from axiom_sandbox import selected_worker
+    with selected_worker(args.sandbox_backend) as sandbox_arguments:
+        return _run(args, sandbox_arguments)
+
+
+def _run(args, sandbox_arguments):
     java = args.java_home.resolve(strict=True) / "bin" / (
         "java.exe" if os.name == "nt" else "java"
     )
@@ -89,7 +96,7 @@ def main(argv=None):
                     raise AssertionError("Distribution omitted or altered a parser license/notice")
         if (engine / "third-party/antlr4-runtime.txt").read_bytes() != (ROOT / "modules/axiom/sources/licenses/antlr4-runtime.txt").read_bytes():
             raise AssertionError("Distribution omitted or altered ANTLR's license")
-        command = [str(java), *vm_arguments, "-Xmx256m", "-cp", str(engine / "lib/*"), "research.orthrus.axiom.Main"]
+        command = [str(java), *vm_arguments, *sandbox_arguments, "-Xmx256m", "-cp", str(engine / "lib/*"), "research.orthrus.axiom.Main"]
         environment = {"LANG": "C.UTF-8", "WORKBENCH_STATE_ROOT": str(root / "state"), "HOME": str(root)}
         rejected = subprocess.run([str(java), "-Djava.security.properties=unadmitted", *command[1:], "coverage"],
                                   capture_output=True, cwd=root, env=environment, timeout=45)
@@ -110,6 +117,7 @@ def main(argv=None):
                     request_path = root / "request.json"
                     request_path.write_bytes(raw)
                     invocation += ["--request", str(request_path)]
+                    invocation += ["--sandbox-backend", args.sandbox_backend]
             else:
                 invocation = [*command, operation]
             result = subprocess.run(invocation, input=raw, capture_output=True, cwd=root, env=environment, timeout=45)

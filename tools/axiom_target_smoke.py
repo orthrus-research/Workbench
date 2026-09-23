@@ -19,7 +19,14 @@ def main(argv=None):
     parser.add_argument("--target", type=Path, required=True)
     parser.add_argument("--workbench-python", type=Path)
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--sandbox-backend", choices=("bubblewrap", "docker", "gvisor"), default="bubblewrap")
     args = parser.parse_args(argv)
+    from axiom_sandbox import selected_worker
+    with selected_worker(args.sandbox_backend) as sandbox_arguments:
+        return _run(args, sandbox_arguments)
+
+
+def _run(args, sandbox_arguments):
     started = time.monotonic()
     cases = 0
     target_digest = sha256(args.target.read_bytes()).hexdigest()
@@ -37,12 +44,13 @@ def main(argv=None):
             if workbench:
                 command = [str(args.workbench_python.absolute()), "-I", "-m", "workbench_core", "axiom", "target",
                            "--engine-home", str(engine), "--java", str(java), "--target", str(target), "--profile", "supersymmetry"]
+                command += ["--sandbox-backend", args.sandbox_backend]
                 if request is not None:
                     path = root / "request.json"
                     path.write_text(json.dumps(request))
                     command += ["--request", str(path)]
             else:
-                command = [str(java), "-Xmx256m", "-cp", str(engine / "lib/*"), "research.orthrus.axiom.Main", "target", "--target", str(target)]
+                command = [str(java), *sandbox_arguments, "-Xmx256m", "-cp", str(engine / "lib/*"), "research.orthrus.axiom.Main", "target", "--target", str(target)]
             result = subprocess.run(command, input=b"" if request is None else json.dumps(request).encode(), cwd=root,
                                     capture_output=True, env=environment, timeout=45)
             if result.returncode != expected:

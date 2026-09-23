@@ -63,6 +63,32 @@ Cleanroom's provisional platform status and release/publication qualification re
 suspended pending the post-MVP optimization discussion; current measurements
 establish no full-check speedup.
 
+## Worker isolation
+
+The local default is Bubblewrap. For a Docker worker, select
+`--sandbox-backend docker` on `checks materials run` or `prepare`. Core checks a
+local Docker daemon with the `runc` runtime and retrieves the pinned Linux x64
+base image if absent. The selected Java and native inputs stay profile-owned;
+Core mounts only those inputs read-only into a fresh worker. Axiom records the
+selected backend and image policy with its invocation. Docker availability is
+required for this explicit choice, including offline runs unless the image is
+already present.
+
+`--sandbox-backend gvisor` uses the same Docker worker contract with the
+registered `runsc` runtime. The host must first install and register `runsc`
+with Docker; Core reports a missing runtime rather than changing backends.
+See the [gVisor Docker installation guide](https://gvisor.dev/docs/user_guide/quick_start/docker/).
+Core tracks each Docker session under the selected private state root. A later
+run removes a worker left by a terminated Workbench process; operators can
+request the same cleanup with `workbench sandbox recover --state-root STATE`.
+This recovery only removes containers bearing the recorded session identity.
+
+The Docker worker has passed the installed smoke and isolation probes. An
+unchanged saved 2,364-file program completed native execution with an incomplete
+pack-context result, and its saved invalid-color variant retained the original
+native error. This does not qualify complete saved-workspace acceptance. Hosted
+CI and gVisor native execution have not yet been observed on this change.
+
 Core can provision and verify the separately pinned Windows x64 Temurin 25.0.4+7
 runtime and install the engine at a long managed path. The installed `coverage`
 command runs from the tested ASCII state path. Some Unicode JDK custody paths
@@ -118,6 +144,9 @@ without publishing. Installed material-check setup
 can prepare that independent engine ZIP and the profile-owned original native
 inputs through Core, then assemble and retain the runtime. See the
 [setup command](spec/material-program-preflight.md) for `--prepare --engine-archive`.
+Pass `--sandbox-backend docker` to run the worker-bearing build tests and installed
+smoke under Core's Docker selection; `gvisor` requires the registered `runsc`
+runtime. The selected backend is explicit and never falls back during a build.
 Fresh setup with the selected Temurin 25.0.4+7 and all original expanded-context
 inputs passes the installed MVP scope. The two artifact URL paths with literal
 plus signs are encoded for acquisition without changing original filenames or

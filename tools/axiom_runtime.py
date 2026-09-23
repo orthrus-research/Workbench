@@ -84,7 +84,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--java-home", type=Path)
     parser.add_argument("--provision-java", action="store_true", help="select and retain the profile-locked JDK through Core")
-    parser.add_argument("--github-env-file", type=Path, help="append WORKBENCH_TEST_JAVA to a CI environment file")
+    parser.add_argument("--github-env-file", type=Path,
+                        help="append the verified JDK home and test executable to a CI environment file")
     parser.add_argument("--compiler", action="store_true")
     args = parser.parse_args(argv)
     if args.provision_java == (args.java_home is not None):
@@ -95,6 +96,7 @@ def main(argv=None):
         java_home = provisioned_java_selection()
         if args.github_env_file is not None:
             with args.github_env_file.open("a", encoding="utf-8") as output:
+                output.write(f"AXIOM_JAVA_HOME={java_home}\n")
                 output.write(f"WORKBENCH_TEST_JAVA={java_home / 'bin/java'}\n")
         compiler = True
     else:

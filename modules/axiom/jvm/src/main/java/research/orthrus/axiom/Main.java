@@ -91,12 +91,11 @@ public final class Main {
     private static Map<String, Object> supervise(String operation, byte[] request, Map<String, Path> inputs) throws Exception {
         List<String> arguments = new ArrayList<>(List.of("--worker", operation));
         inputs.forEach((flag, path) -> arguments.addAll(List.of(flag, path.toString())));
-        List<String> command = sandboxCommand(inputs.values(), Arrays.asList(System.getProperty("java.class.path").split(File.pathSeparator)),
-                Main.class.getName(), arguments);
-        ProcessBuilder builder = new ProcessBuilder(command);
-        builder.environment().clear();
-        Process child = builder.start();
-        return observe(child, request, 0, 0, 0);
+        try (WorkerSandbox.Worker child = WorkerSandbox.launch(inputs.values(),
+                Arrays.asList(System.getProperty("java.class.path").split(File.pathSeparator)),
+                Main.class.getName(), arguments)) {
+            return observe(child.process(), request, 0, 0, 0);
+        }
     }
     /** Shared with trusted isolation probes; entry point and classpath are never source-request fields. */
     static List<String> sandboxCommand(Collection<Path> inputs, List<String> classpathEntries,

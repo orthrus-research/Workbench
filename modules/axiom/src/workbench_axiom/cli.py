@@ -10,6 +10,7 @@ import sys
 
 from packaging.specifiers import SpecifierSet
 from workbench_api.processes import ProcessError, execute_process, capture_process, open_process_output
+from workbench_api.sandboxes import axiom_worker_sandbox
 from workbench_api.filesystem_paths import native_path
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
 
@@ -153,12 +154,15 @@ def invoke(operation, args, context, *, capture_directory=None, capture_binding=
     capture = {} if capture_directory is None else {"directory": capture_directory, "binding": capture_binding}
     from .java_runtime import vm_arguments, process_isolation
     isolated_inputs = [Path(p) for p in jars] + [Path(extra[i]) for i in range(1, len(extra), 2)]
-    result = process(
-        [str(java), *vm_arguments(), "-cp", os.pathsep.join(jars), contract["mainClass"], operation, *extra],
-        cwd=context.workspace, stdin=request, environment={"LANG": "C.UTF-8"},
-        cancelled=context.cancelled, timeout_seconds=None, output_limit=None, input_limit=None,
-        **capture, **process_isolation(java, isolated_inputs, source_evaluation=operation != "coverage"),
-    )
+    with axiom_worker_sandbox(getattr(args, "sandbox_backend", None) if operation != "coverage" else None,
+                              state_root=context.state_root, cancelled=context.cancelled) as sandbox:
+        result = process(
+            [str(java), *vm_arguments(), *sandbox.jvm_arguments, "-cp", os.pathsep.join(jars),
+             contract["mainClass"], operation, *extra],
+            cwd=context.workspace, stdin=request, environment={"LANG": "C.UTF-8"},
+            cancelled=context.cancelled, timeout_seconds=None, output_limit=None, input_limit=None,
+            **capture, **process_isolation(java, isolated_inputs, source_evaluation=operation != "coverage"),
+        )
     if capture_directory is None:
         value = _json(result.stdout)
     else:
@@ -205,6 +209,8 @@ def invoke(operation, args, context, *, capture_directory=None, capture_binding=
         "installationSha256": installation_digest, "requestSha256": sha256(request).hexdigest(),
         "installationIdentityScope": "preflight", "launchTimeLibraryIdentityVerified": False,
     }
+    if operation != "coverage":
+        value["invocation"]["sandbox"] = {"backend": sandbox.backend, "policy": sandbox.policy}
     if capture_directory is not None:
         value["invocation"]["capture"] = result.reference
     if profile_identity is not None:
@@ -220,6 +226,9 @@ def main(operation, arguments, context):
     parser = argparse.ArgumentParser(prog="workbench axiom " + operation)
     parser.add_argument("--engine-home", type=Path, required=True, help="Explicit installed Axiom distribution, not a source checkout")
     parser.add_argument("--java", type=Path, required=True, help="Explicit trusted profile-pinned Temurin 25.0.4+7 executable")
+    if operation != "coverage":
+        parser.add_argument("--sandbox-backend", choices=("bubblewrap", "docker", "gvisor"),
+                            help="Core-selected worker isolation; defaults to the currently qualified local backend")
     if operation == "target":
         parser.add_argument("--target", type=Path, required=True, help="Immutable Axiom source target package")
         parser.add_argument("--artifacts", type=Path, help="Optional immutable offline artifact bundle; never a mod installation")

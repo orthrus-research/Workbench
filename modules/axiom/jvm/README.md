@@ -29,10 +29,13 @@ version metadata remains in `build.gradle.kts`.
 The public Java entry point is `research.orthrus.axiom.Engine.run`.
 It admits the pinned runtime before evaluation. The current recipe endpoint
 still interprets a bounded Groovy AST; a trusted native-Groovy test is not a
-new arbitrary-source endpoint. `Main` supervises isolated Linux bubblewrap
-workers with input/output and time bounds. Each worker additionally installs
-thread-synchronized Linux syscall restrictions and hard resource limits before
-compilation. Native access is enabled only for that child to install the kernel
+new arbitrary-source endpoint. `Main` supervises one isolated Linux worker per
+attempt. Bubblewrap remains the current local default; Workbench can select a
+Core-provisioned digest-pinned Docker image with `runc` or gVisor `runsc` using
+`--sandbox-backend docker|gvisor` for source-evaluating commands. Core checks
+availability and cleans daemon-owned containers. Each worker additionally installs
+thread-synchronized Linux syscall restrictions and suppresses core dumps before
+compilation. MVP resource budgets remain suspended. Native access is enabled only for that child to install the kernel
 policy; the host/library JVM is never subjected to those process-global limits.
 
 The engine's installed sources and library inventory contain no retired

@@ -203,10 +203,10 @@ class MaterialRegistryTest {
     @Test void nativeRegistriesRunInFreshProductionSandboxWorkers() throws Exception {
         Path root = Path.of(System.getProperty("axiom.test.registryRoot"));
         for (int i = 0; i < 2; i++) {
-            var command = Main.sandboxCommand(List.of(root), Arrays.asList(System.getProperty("axiom.test.runtimeClasspath").split(File.pathSeparator)),
-                    Worker.class.getName(), List.of(root.toString()));
-            var process = new ProcessBuilder(command); process.environment().clear();
-            assertEquals("accepted", Main.observe(process.start(), new byte[0], 65536, 65536, 20_000).get("status"));
+            try (var worker = WorkerSandbox.launch(List.of(root), Arrays.asList(System.getProperty("axiom.test.runtimeClasspath").split(File.pathSeparator)),
+                    Worker.class.getName(), List.of(root.toString()))) {
+                assertEquals("accepted", Main.observe(worker.process(), new byte[0], 65536, 65536, 20_000).get("status"));
+            }
         }
     }
     private static List<MaterialState> values(MaterialRegistry registry) {

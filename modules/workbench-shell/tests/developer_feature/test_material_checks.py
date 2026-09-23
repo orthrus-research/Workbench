@@ -32,6 +32,12 @@ from workbench_shell import developer_material_checks as saved
 
 
 class SavedMaterialCheckTests(unittest.TestCase):
+    def test_sandbox_backend_is_bound_to_the_prepared_native_attempt(self):
+        request = self.prepare("--sandbox-backend", "docker")
+        self.assertEqual("docker", request["sandbox_backend"])
+        _, native = self.execute(request)
+        self.assertEqual("docker", native.call_args.args[1].sandbox_backend)
+
     def test_old_diagnostic_revision_verifies_without_manufactured_group_counts(self):
         from workbench_shell import developer_material_delivery as delivery
         original = delivery._contents

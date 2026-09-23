@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from workbench_api.modules import ExecutionContext
 from workbench_api.processes import ProcessResult, ProcessOutput, CapturedProcessResult
+from workbench_api.sandboxes import WorkerSandboxSelection
 from workbench_axiom.cli import ENGINE_NOTICES, distribution, installation, main, invoke, _response
 from workbench_axiom.material_checks import program_snapshot, source_acknowledgement
 
@@ -88,6 +89,31 @@ class AxiomIntegrationTests(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertEqual(response["result"], json.loads(output.getvalue())["result"])
         self.assertEqual({"LANG": "C.UTF-8"}, host.call_args.kwargs["environment"])
+
+    def test_source_evaluation_uses_core_selected_sandbox_and_records_policy(self):
+        from types import SimpleNamespace
+        import sys
+        request = self.root / "request.json"
+        request.write_text("{}")
+        args = SimpleNamespace(engine_home=self.root, java=Path(sys.executable), request=request,
+                               sandbox_backend="gvisor")
+        response = {"schema": "axiom.result.v1", "engineVersion": "0.1.0",
+                    "operation": "check", "status": "accepted", "result": {}}
+        selection = WorkerSandboxSelection("gvisor", "axiom.oci-worker.v1:test",
+                                           ("-Daxiom.sandbox.backend=gvisor",), "session-id")
+
+        @contextlib.contextmanager
+        def selected(backend, **kwargs):
+            self.assertEqual("gvisor", backend)
+            yield selection
+
+        context = ExecutionContext(self.root, self.root / "state", threading.Event())
+        with patch("workbench_axiom.cli.axiom_worker_sandbox", side_effect=selected), \
+                patch("workbench_axiom.cli.execute_process", return_value=ProcessResult(0, json.dumps(response).encode(), b"")) as host:
+            value, code = invoke("check", args, context)
+        self.assertEqual(0, code)
+        self.assertEqual({"backend": "gvisor", "policy": selection.policy}, value["invocation"]["sandbox"])
+        self.assertIn(selection.jvm_arguments[0], host.call_args.args[0])
 
     def test_exit_status_must_agree_with_domain_envelope(self):
         response = {"schema": "axiom.result.v1", "engineVersion": "0.1.0", "operation": "coverage", "status": "unsupported"}
