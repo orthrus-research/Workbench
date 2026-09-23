@@ -86,8 +86,10 @@ This recovery only removes containers bearing the recorded session identity.
 The Docker worker has passed the installed smoke and isolation probes. An
 unchanged saved 2,364-file program completed native execution with an incomplete
 pack-context result, and its saved invalid-color variant retained the original
-native error. This does not qualify complete saved-workspace acceptance. Hosted
-CI and gVisor native execution have not yet been observed on this change.
+native error. This does not qualify complete saved-workspace acceptance. The
+hosted [`validate` run](https://github.com/orthrus-research/Workbench/actions/runs/35908539265)
+passed its Axiom job with Core-managed Docker/runc. gVisor native execution has
+not yet been observed.
 
 Core can provision and verify the separately pinned Windows x64 Temurin 25.0.4+7
 runtime and install the engine at a long managed path. The installed `coverage`

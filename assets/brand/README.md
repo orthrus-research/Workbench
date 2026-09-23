@@ -1,7 +1,13 @@
 # Workbench brand assets
 
-`workbench-brand-v1.json` is the source of truth for the first public
-Workbench mark. It is an independently constructed set of declared geometric
+`orthrus-research-avatar.png` is a 256-pixel copy of the
+[Orthrus Research GitHub organization avatar](https://github.com/orthrus-research),
+retrieved on 2026-09-23. The root README displays it at 64 pixels to identify
+the parent organization. It is a raster reference for the README, not the
+source for generated client icons.
+
+`workbench-brand-v1.json` remains the source for the current Workbench client
+icon set. It is an independently constructed set of declared geometric
 primitives and does not trace or incorporate the earlier user-supplied woven
 mark.
 
