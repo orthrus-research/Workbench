@@ -66,10 +66,7 @@ class CiValidationTests(unittest.TestCase):
 
     def test_workflow_wires_complete_lanes_and_an_always_running_gate(self):
         workflow = yaml.load((ROOT / ".github/workflows/validate.yml").read_text(), Loader=yaml.BaseLoader)
-        self.assertTrue({"pull_request", "push", "schedule", "workflow_dispatch"} <= set(workflow["on"]))
-        repository = json.loads((ROOT / "packaging/release/public-repository-v1.json").read_text())
-        branch = repository["history_policy"]["public_default_branch"]
-        self.assertEqual([branch], workflow["on"]["push"]["branches"])
+        self.assertEqual({"workflow_dispatch"}, set(workflow["on"]))
         jobs = workflow["jobs"]
         self.assertEqual(set(STAGES) | {"plan"}, set(jobs["required-validation"]["needs"]))
         self.assertEqual("always()", jobs["required-validation"]["if"])
@@ -83,7 +80,11 @@ class CiValidationTests(unittest.TestCase):
         workbench = "\n".join(step.get("run", "") for step in jobs["workbench"]["steps"])
         self.assertIn("axiom_runtime.py --provision-java --github-env-file", workbench)
         portability = yaml.load((ROOT / ".github/workflows/portability.yml").read_text(), Loader=yaml.BaseLoader)
+        self.assertEqual({"workflow_dispatch"}, set(portability["on"]))
         self.assertEqual({"windows-2025", "macos-15"}, set(portability["jobs"]["native-portability"]["strategy"]["matrix"]["os"]))
+        candidate = yaml.load((ROOT / ".github/workflows/component-release.yml").read_text(), Loader=yaml.BaseLoader)
+        self.assertEqual({"workflow_dispatch"}, set(candidate["on"]))
+        self.assertEqual("startsWith(github.ref, 'refs/tags/workbench-')", candidate["jobs"]["identify"]["if"])
         native = "\n".join(step.get("run", "") for step in jobs["native-packages"]["steps"])
         self.assertIn("--from-wheelhouse", native)
         self.assertIn("--wheelhouse .workbench/native-suite", native)

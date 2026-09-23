@@ -2,12 +2,6 @@ name: validate
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 6 * * 1"
-  pull_request:
-  push:
-    branches:
-      - master
 
 permissions:
   contents: read

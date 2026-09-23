@@ -1,9 +1,7 @@
 name: Native component candidate
 
 on:
-  push:
-    tags:
-      - "workbench-*/v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,6 +12,7 @@ concurrency:
 
 jobs:
   identify:
+    if: startsWith(github.ref, 'refs/tags/workbench-')
     runs-on: ubuntu-24.04
     outputs:
       component: ${{ steps.tag.outputs.component }}

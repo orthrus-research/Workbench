@@ -41,8 +41,8 @@ changes, deletions, both sides of renames, and legitimate untracked files.
 Unknown or shared boundaries broaden to every Python suite. An empty diff also
 broadens; it never silently runs zero tests. See
 [ownership and selection](VALIDATION-SELECTION.md) for the dependency map and
-behavior categories. CI continues to run canonical Python independently of this
-optional local selector.
+behavior categories. Manually dispatched CI runs canonical Python independently
+of this optional local selector.
 
 ## Deeper checks
 
@@ -136,23 +136,24 @@ cancels the other client's owned commands and leaves a failed overall result.
 
 ## Continuous integration
 
-PRs and master pushes run quick checks, complete canonical Python and policy
-checks, and the existing Ubuntu/Windows/macOS native matrix. Required Node is
-provisioned explicitly. Full IDE hosts and the installed-Core journey run for
-source changes; only known documentation-only PRs omit that lane. Scheduled and
-manual sweeps also require physical Cleanroom build and custody probes.
+GitHub Actions runs only when a maintainer dispatches a workflow. Pushes, pull
+requests, component tags and schedules do not start CI. Dispatch `validate` for
+quick checks, source CI, Linux installed packages, Axiom, IDE hosts and physical
+Cleanroom build and custody probes. Dispatch `portability-observation` separately
+for Windows and macOS package observations. Required Node is provisioned
+explicitly. Local validation remains necessary before handoff.
 
-The canonical lane requires the real pip isolation probe to pass. The Windows
-lane runs the source owners' native long-path probes. Physical sweeps require
-all three named physical probes to pass. A skip cannot satisfy these required
-checks. Platform-inapplicable and optional tests remain visible in reports;
-their absence is not a claim that their behavior was exercised.
+The source CI lane requires the real pip isolation probe to pass. The separate
+Windows observation runs the source owners' native long-path probes. The manual
+physical sweep requires all three named physical probes to pass. A skip cannot
+satisfy these required checks. Platform-inapplicable and optional tests remain
+visible in reports; their absence is not a claim that their behavior was exercised.
 
 The aggregate `required-validation` job reconciles the plan with all job
 outcomes. Missing, unexpectedly skipped, cancelled or failed required jobs
 cannot produce a successful aggregate. Diagnostic artifacts are uploaded even
-after failures. These job definitions provide CI coverage; a local source run
-does not establish that the remote platform matrix passed.
+after failures. These job definitions provide CI coverage only when dispatched;
+a local source run does not establish that the remote platform matrix passed.
 
 If a required check cannot run, report it explicitly and keep the resulting
 claim narrow. A crash, timeout, corrupt output, missing report, or failed

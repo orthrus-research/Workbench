@@ -11,14 +11,15 @@ prerelease does not establish stable release qualification. The private developm
 deltas across as new public commits, never by merging or mirror-pushing private
 history. Protected settings and support routes require separate observation.
 
-The public `validate` workflow runs quick checks, Linux x64 installed-package
+The public `validate` workflow runs only on maintainer dispatch, not on pushes,
+pull requests or a schedule. It runs quick checks, Linux x64 installed-package
 checks, Axiom engine checks and a `source-ci` tier. The latter excludes the
 `validation-native-fixtures` and `blueprints-native-fixtures` suites; its artifact
 inventories their cases as **not run**. Full `--tier canonical` and `--full` retain
 both suites. The Axiom fixtures require a source-matched candidate, engine, JVM
 and fresh report roots. Blueprints simulation and dependent lifecycle tests require a Bubblewrap host permitted
-to create its sandbox namespaces. Windows and macOS package observations run weekly
-or on demand in the separate `portability-observation` workflow. They do not
+to create its sandbox namespaces. Windows and macOS package observations run
+only on demand in the separate `portability-observation` workflow. They do not
 qualify or block the Linux release.
 
 The hosted Axiom failure diagnosed on 2026-09-23 was caused by Bubblewrap being
@@ -231,14 +232,15 @@ when the observation says it is empty. Replacing existing public history require
 the separate `replace-public-history` approval action; `publish-source` never
 implies it. Missing or contradictory decisions block readiness.
 
-The [candidate workflow](.github/workflows/component-release.yml) accepts an
-annotated tag in the selected native component namespace, such as
-`workbench-atlas/v0.1.0-rc.1`. It verifies the tag against the owner's manifest,
+The [candidate workflow](.github/workflows/component-release.yml) runs only on
+maintainer dispatch against an annotated tag in the selected native component
+namespace, such as `gh workflow run component-release.yml --ref workbench-atlas/v0.1.0-rc.1`.
+It verifies the tag against the owner's manifest,
 builds the selected dependency closure or IDE client, installs/verifies the
 candidate, and retains its exact selected artifact. It has read-only repository
 permissions and does not create a GitHub release or publish to package indexes
-or IDE marketplaces. Final-version tags also create candidates, not automatic
-publication.
+or IDE marketplaces. Pushing a final-version tag does not start a candidate run
+or publish anything.
 
 Before a public tag, release or artifact upload, maintainers must observe and
 verify these controls in the Orthrus Research destination:
