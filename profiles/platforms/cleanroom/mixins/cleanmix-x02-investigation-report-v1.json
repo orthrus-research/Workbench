@@ -1,0 +1,301 @@
+{
+  "acceptance": {
+    "historical_five_family_requirement": "unavailable_version_guard",
+    "state": "review",
+    "supported_compatibility_claim": false
+  },
+  "artifacts": {
+    "candidate_cleanmix_0_7_0": {
+      "sha256": "a41daa71398e948bc09fa578ae2460be639df0fa82fccdb630b316418d5a4a36",
+      "size_bytes": 1094214
+    },
+    "candidate_foundation_0_19_11": {
+      "actual_class_loader_input_sha256": "41cc84afadb4155ea5d15f5132f08b23327e6bf51edfb5615d1a6f5c6eb7706f",
+      "sha256": "a9f5cf9cb54715edf22d6bcb49bae50f281f818b1731f53f22aab85a48a7b54b",
+      "size_bytes": 55607
+    },
+    "direct_application_agent": {
+      "sha256": "55d6644ce54ceddc324a230ad0322676eab8e51918bb4d1d97ff6bd6b4acb0e8",
+      "size_bytes": 374990
+    },
+    "historical_cleanmix_base_ac2b06c": {
+      "revision": "ac2b06c920608d566efe57386bf6b9b88552b02d",
+      "sha256": "2ef7b9718506b6f56b55c87c45d280809ab055abc43dd4545a423eba86c3883c",
+      "size_bytes": 1100522
+    },
+    "historical_foundation_0_19_9": {
+      "actual_class_loader_input_sha256": "e91b78341e98b7141666c128df0cc4917591430042bc0cb762858f7c0c0e46a2",
+      "sha256": "1023225a4504d2a28bd2949a3d673ade89fefb0cee7ef2f2c13621989a883548",
+      "size_bytes": 55281
+    },
+    "mixin_applicator_standard": {
+      "candidate_input_sha256": "b0bd92ba11df86ec1eb3027a665729877e87fe3ca4c3574995d18b0fd210cc46",
+      "historical_input_sha256": "b0bd92ba11df86ec1eb3027a665729877e87fe3ca4c3574995d18b0fd210cc46",
+      "instrumented_output_sha256": "78d5745c02921e3c67ca43c72077ade07b1345613963e9206d2cbf1f6ac3c951"
+    }
+  },
+  "baseline": {
+    "matrix_file_sha256": "a40d43d6b17f9fca653a7c777ff3c4d56c7adaa3b25297d99934b11d1f4c42fb",
+    "matrix_id": "cleanroom-cleanmix-runtime-regression-matrix:sha256:58ef3afb69e6293e88fa1418e99edb42f339ea3b65dab79c7d7f883c0e41e6d7",
+    "repository_commit": "0ee8b92472de69f3920d5818deef3ccf14df3403",
+    "x01_execution_id": "cleanmix-p0-runtime-matrix-execution:sha256:4558726335039b53c0c4d228f26376b3a79e54530824e2f21c78d1d2ba91c7db",
+    "x01_report_sha256": "f3afa2082a2dcde2e66147db1def2e7fd1a0aa83f29d50853e07d98ad38ae0a0"
+  },
+  "dispositions": {
+    "handler_first_entry_oracle": {
+      "alternative_explanations": [
+        "The pre-PR artifact may contain the named source defect without the bounded runtime path reaching the triggering application order.",
+        "Foundation enters the unchanged first-entry observer for a child before its parent, but delegated Mixin application still runs parent first."
+      ],
+      "result": "historical_defect_not_reproduced",
+      "summary": "The exact pre-PR artifact and the candidate both completed parent-then-child direct application, final definition, and 1/1 handler invocation in the child-request launch. The evidence does not authorize a claim that CleanMix 0.7.0 fixed the named defect."
+    },
+    "three_deep_xpass": {
+      "alternative_explanations": [
+        "The three final classes really do contain conforming generated handler names and invoke their intended counters once; method-name presence alone was not used as the oracle.",
+        "The first-entry probe observes a live Foundation path before the delegated CleanMix path and therefore cannot establish target application order."
+      ],
+      "result": "fixture_oracle_false_positive",
+      "summary": "The V1 launch requests and first-enters leaf first, but both candidate and exact historical control directly apply base, middle, then leaf. The V1 row never exercises its named child-first delegated-application condition."
+    }
+  },
+  "evidence": {
+    "execution_id": "cleanmix-x02-bounded-control-execution:sha256:9e0bcc18dbd51c94cba1f09c5481dd023779b55f1c653e94e3f4fb6be8864779",
+    "execution_report_sha256": "637851e02fb152ff4723dd39d99cd3e539f47117af729ff38408959343d263c7",
+    "ignored_root": ".workbench/evidence/cleanmix-runtime-conformance/x02-execution-v4",
+    "rows": [
+      {
+        "behavior": "conforming",
+        "direct_application_order": [
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeBase",
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeMiddle",
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeLeaf"
+        ],
+        "direct_receipt_id": "crucible-mixin-direct-application:sha256:6068677a482dc0b50050caabbffc86742170ca7916803e67ccdc797b5a3d7a1e",
+        "epoch": "candidate-cleanroom-0.6.8-alpha-cleanmix-0.7.0",
+        "final_definitions": [
+          {
+            "sha256": "09822aa1145a93fa2aa0b1235d32a051b9418cc41df9827293b81ce25132c09d",
+            "size_bytes": 1585,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeBase"
+          },
+          {
+            "sha256": "3e53fba2f7b7f78dcf6292610031c8f762f617a474c43652420e6725f01afdd4",
+            "size_bytes": 1567,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeMiddle"
+          },
+          {
+            "sha256": "f7f3af79781100bed259b453753fc76ebb82225a5e32e04d17db917599dedbea",
+            "size_bytes": 1557,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeLeaf"
+          }
+        ],
+        "handler_counts": [
+          1,
+          1,
+          1
+        ],
+        "launch_id": "cleanmix-x02-candidate-0.7.0-p0-xfail-three-deep-child-first-server",
+        "row_id": "P0-XFAIL-THREE-DEEP-CHILD-FIRST-SERVER"
+      },
+      {
+        "behavior": "conforming",
+        "direct_application_order": [
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeBase",
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeMiddle",
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeLeaf"
+        ],
+        "direct_receipt_id": "crucible-mixin-direct-application:sha256:8faf45343a921f52aadcc416786c63d46dd8926bb4cc756cfc53e3733a7b70e0",
+        "epoch": "candidate-cleanroom-0.6.8-alpha-cleanmix-0.7.0",
+        "final_definitions": [
+          {
+            "sha256": "651b0c816de352ee1749c98f93d95231eafd0a5340a360021bcc3145fa6edc44",
+            "size_bytes": 1585,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeBase"
+          },
+          {
+            "sha256": "6bb16a25c6186e9366ed116f134ac1744ac32b6e755da12b059ce19d9958203d",
+            "size_bytes": 1567,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeMiddle"
+          },
+          {
+            "sha256": "b9d6721ff1097b26cb5996d13a803c86fcffc8c5672af50e80ad476cc1c509c9",
+            "size_bytes": 1557,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeLeaf"
+          }
+        ],
+        "handler_counts": [
+          1,
+          1,
+          1
+        ],
+        "launch_id": "cleanmix-x02-candidate-0.7.0-x02-three-deep-parent-first-server",
+        "row_id": "X02-THREE-DEEP-PARENT-FIRST-SERVER"
+      },
+      {
+        "behavior": "conforming",
+        "direct_application_order": [
+          "dev.workbench.cleanmixhandler.target.ParentTarget",
+          "dev.workbench.cleanmixhandler.target.ChildTarget"
+        ],
+        "direct_receipt_id": "crucible-mixin-direct-application:sha256:038b1735e4a3630278c7aa2d0afd6d32e19206106568c33c32d26168bcfcfb1d",
+        "epoch": "candidate-cleanroom-0.6.8-alpha-cleanmix-0.7.0",
+        "final_definitions": [
+          {
+            "sha256": "116e0c9d9e2f0eb30f937b360e9885aedcc93494396bd64341de81e3a549d3e6",
+            "size_bytes": 1478,
+            "target": "dev.workbench.cleanmixhandler.target.ParentTarget"
+          },
+          {
+            "sha256": "cb2c566dc2478a76b840ac32272117efeb24e32ceda4bf90226f1d7236ef1160",
+            "size_bytes": 1408,
+            "target": "dev.workbench.cleanmixhandler.target.ChildTarget"
+          }
+        ],
+        "handler_counts": [
+          1,
+          1
+        ],
+        "launch_id": "cleanmix-x02-candidate-0.7.0-p0-handler-child-first-server",
+        "row_id": "P0-HANDLER-CHILD-FIRST-SERVER"
+      },
+      {
+        "behavior": "conforming",
+        "direct_application_order": [
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeBase",
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeMiddle",
+          "dev.workbench.cleanmixp0.KnownGapTargets$ThreeLeaf"
+        ],
+        "direct_receipt_id": "crucible-mixin-direct-application:sha256:bf321a42f787b556dc319d2d3da51e7bdfb6b18e3572101bf42be0d8e4ed360d",
+        "epoch": "historical-cleanroom-0.6.6-alpha-cleanmix-base-ac2b06c",
+        "final_definitions": [
+          {
+            "sha256": "e028d2d3a1dea40eca92df532d0f322e0f8b2c8f0bf06b60f43bfd273eb69d8d",
+            "size_bytes": 1585,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeBase"
+          },
+          {
+            "sha256": "9a76eab1fb140bfa314c0c08596eff31a6e1eb7cbb9005719036059bc460e904",
+            "size_bytes": 1567,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeMiddle"
+          },
+          {
+            "sha256": "24757ade2b3fc31f0037f752a48a21996e7f2846c9ed1279337c84def2870428",
+            "size_bytes": 1557,
+            "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeLeaf"
+          }
+        ],
+        "handler_counts": [
+          1,
+          1,
+          1
+        ],
+        "launch_id": "cleanmix-x02-base-ac2b06c-p0-xfail-three-deep-child-first-server",
+        "row_id": "P0-XFAIL-THREE-DEEP-CHILD-FIRST-SERVER"
+      },
+      {
+        "behavior": "conforming",
+        "direct_application_order": [
+          "dev.workbench.cleanmixhandler.target.ParentTarget",
+          "dev.workbench.cleanmixhandler.target.ChildTarget"
+        ],
+        "direct_receipt_id": "crucible-mixin-direct-application:sha256:44c6f5956b57de39ab9ab96df2442f6575c05a2a0b2cf8114b91cceaac7032e5",
+        "epoch": "historical-cleanroom-0.6.6-alpha-cleanmix-base-ac2b06c",
+        "final_definitions": [
+          {
+            "sha256": "3ada1520daf968aad4125a3c6a4ef3c9423865367491320f470431044f659254",
+            "size_bytes": 1478,
+            "target": "dev.workbench.cleanmixhandler.target.ParentTarget"
+          },
+          {
+            "sha256": "b693b5893a843dffb035a4d028e7863c7b15da945dba6fc2f8837fac1bdeb091",
+            "size_bytes": 1408,
+            "target": "dev.workbench.cleanmixhandler.target.ChildTarget"
+          }
+        ],
+        "handler_counts": [
+          1,
+          1
+        ],
+        "launch_id": "cleanmix-x02-base-ac2b06c-p0-handler-child-first-server",
+        "row_id": "P0-HANDLER-CHILD-FIRST-SERVER"
+      }
+    ],
+    "x01_retained_three_deep_final_definitions": [
+      {
+        "sha256": "8eab86edd3149ec9828eb49073b0b85d34b0aafb8b2de6533454abee9540c276",
+        "size_bytes": 1585,
+        "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeBase"
+      },
+      {
+        "sha256": "4db07a33c75a52d0826304e6ccc7b85b5e065737ed50e707ab8561ab1b27f760",
+        "size_bytes": 1567,
+        "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeMiddle"
+      },
+      {
+        "sha256": "37c9436871a3f48372f188011882d0fd858349486f54c83fb665159a0f51e510",
+        "size_bytes": 1557,
+        "target": "dev.workbench.cleanmixp0.KnownGapTargets$ThreeLeaf"
+      }
+    ]
+  },
+  "format": "workbench-cleanmix-x02-investigation-report-v1",
+  "limitations": [
+    "The exact historical runtime is Cleanroom 0.6.6-alpha with Foundation 0.19.9; Cleanroom 0.6.8-alpha is binary-incompatible with the pre-PR CleanMix artifact and fails before target application with NoSuchFieldError for CleanMixService.phaseTransitioner.",
+    "The four X01 discovery, selected-component, config-lifecycle, and transformer-chain observers are exact-byte-bound to the candidate epoch. Historical launches therefore retain healthy direct-application and Foundation final-definition evidence but cannot satisfy the five-family historical acceptance condition without separate multi-epoch observer versions.",
+    "Detached unrelated-target experiments did achieve direct child-first application, but were rejected because unrelated targets cannot inherit the parent target's injected exercise method; they produced the same missing child/middle/leaf invocation pattern parent-first and child-first.",
+    "No result in this report changes Matrix V1 or supports a general CleanMix, Cleanroom, Atlas, or consumer-mod compatibility claim."
+  ],
+  "matrix_v2_recommendation": {
+    "construction_authorized": false,
+    "rows": [
+      {
+        "action": "retain_behavior_case_replace_order_gate",
+        "reason": "The request path remains useful stress coverage, but first Foundation entry is not delegated application order. Require direct parent-then-child application plus 1/1 invocation and final bytes.",
+        "v1_row": "P0-HANDLER-CHILD-FIRST-SERVER"
+      },
+      {
+        "action": "retain_replace_order_gate",
+        "reason": "Retain the passing parent-first control and use direct application instead of first-entry order as the order oracle.",
+        "v1_row": "P0-HANDLER-PARENT-FIRST-SERVER"
+      },
+      {
+        "action": "retire_and_replace",
+        "reason": "The row cannot exercise its named child-first delegated order. Replace it with a child-request row whose explicit expected direct order is base, middle, leaf and whose expected disposition is pass.",
+        "v1_row": "P0-XFAIL-THREE-DEEP-CHILD-FIRST-SERVER"
+      },
+      {
+        "action": "retain_without_semantic_change",
+        "reason": "X02 found no evidence requiring changes to the two phase rows, two late-registration rows, lazy-inheritance row, or reentrant-pending row.",
+        "v1_row": "all_other_v1_rows"
+      }
+    ],
+    "state": "recommended_separate_task"
+  },
+  "report_id": "cleanmix-x02-investigation:sha256:c588bda59f1f117b0671730644bbf105bcda9a2a2c575f908655e961db848b42",
+  "review_gates": [
+    {
+      "action": "close_without_promotion",
+      "gate": "x01_three_deep_xpass_review",
+      "reason": "The unexpected pass is caused by a false order oracle; Matrix V1 remains unchanged."
+    },
+    {
+      "action": "close_as_not_reproduced",
+      "gate": "historical_handler_defect",
+      "reason": "The exact pre-PR artifact did not reproduce the defect under the bounded direct application control; do not claim the candidate fixed it."
+    },
+    {
+      "action": "replace",
+      "gate": "first_entry_order_acceptance",
+      "reason": "Use exact direct-application events for target/mixin ordering and retain first-entry evidence only as Foundation path diagnostics."
+    },
+    {
+      "action": "retain",
+      "gate": "final_definition_and_behavior",
+      "reason": "Direct application alone does not prove final bytes or intended runtime invocation."
+    }
+  ],
+  "schema_version": 1,
+  "state": "complete",
+  "task_id": "CRUCIBLE-M2-X02"
+}

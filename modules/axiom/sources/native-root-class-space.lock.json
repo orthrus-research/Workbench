@@ -1,0 +1,282 @@
+{
+  "schema": "axiom.native-root-class-space-source-lock.v1",
+  "revisions": {
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "foundation": "518565d49cd67eb48d025110855e0904956b2104"
+  },
+  "references": [
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/relauncher/CoreModManager.java",
+      "size": 20406,
+      "sha256": "73b664dcf2ec1ed55bf973cc198a6c1aabedfdcd6a37b04241641a432566fe68",
+      "gitBlob": "04b9a3a477b8cbde44d632b143922b8f578c6d6c"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/launcher/FMLServerTweaker.java",
+      "size": 2111,
+      "sha256": "7628628bb1fa791cd196bf74b62bb747a78567520aa53e1f80f1429beae8c907",
+      "gitBlob": "ad4af714c83116729135348dc2eb11c523a6c499"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/launcher/FMLTweaker.java",
+      "size": 6279,
+      "sha256": "bc7bcc71610166c37194a5b6d2e1d45df3c9341dbfd2c00bdb510263d88f4f29",
+      "gitBlob": "faf27b0313b7b39e69cb0fe87d30a3ec0b9ec156"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/relauncher/FMLLaunchHandler.java",
+      "size": 6676,
+      "sha256": "cb7c060002cab8ce0d01dd58f85c868100594e89476d3f8ff87c57795402d14c",
+      "gitBlob": "5eccf7530417ab5030f302703be3f7d74c7398b0"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/relauncher/FMLInjectionData.java",
+      "size": 2230,
+      "sha256": "447436aa667b3bc46378c1cf912e3abd5c92365bc0cc2b524fbd5bac7790d3dd",
+      "gitBlob": "3eaea30c7b27eb7b9a87dd0346905f144c393f85"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/relauncher/FMLCorePlugin.java",
+      "size": 1979,
+      "sha256": "756b5e20ed7a247b7f9d6124d5e9b30a2a10ed1616f118aed237dd86aeb967d3",
+      "gitBlob": "5fd23c16ec8ebb323e53fe91537fa130befc2bf3"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/classloading/FMLForgePlugin.java",
+      "size": 1425,
+      "sha256": "bc843508ebabb20af5012ea831672d2ad59fdd3cb6ed1f329b8e475f6b6b887e",
+      "gitBlob": "d6d831cbd2471cafb17fef7be1958170aca9419c"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/FMLSanityChecker.java",
+      "size": 8715,
+      "sha256": "ec0ea5bd8cec53c9efd85beaa69ec7d5f03f553bec22cd19b59b540cabad68bb",
+      "gitBlob": "2424a97178de6c18447dbaac4f16d50739ff146e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/patcher/ClassPatchManager.java",
+      "size": 10893,
+      "sha256": "0f42217fccbcb77b0211bcc9fec8e7e80de9df2709689d0d441d90938b25c261",
+      "gitBlob": "593ac2746a4d51771575f20d2f4757c7bd6caf0e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/patcher/ClassPatch.java",
+      "size": 1626,
+      "sha256": "6bd4626f9f887f49d436976938183eac2ab36059b0cd7f6587105623206b1c1e",
+      "gitBlob": "7b1b19d730bca9c7a1c48b45152091e2111b9563"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/deobf/FMLDeobfuscatingRemapper.java",
+      "size": 17960,
+      "sha256": "bc052606fb8ca9256b4857711dca950b72fbbbce7f21c081430e86c2e849379a",
+      "gitBlob": "7a5661c6cd382837400de02d6d17b650e2064534"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/deobf/FMLRemappingAdapter.java",
+      "size": 4963,
+      "sha256": "9d889f3ffc78599286fd7a5ca6f42e0ccfd031362de35ac6f7bcb1f53489607d",
+      "gitBlob": "6b18fd50c98b944a42256f3796b21eb731cecdb0"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/AccessTransformer.java",
+      "size": 16775,
+      "sha256": "750c47d46e6fbca4de047d1f70ba051bca892dd0eeddc842d25ef03f9d30d1df",
+      "gitBlob": "7ae454ab5c4974e27cae3929c676d2f4265fe951"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/config/ConfigManager.java",
+      "size": 20759,
+      "sha256": "50fdbc5149cbccafeef52c1275cd12a37585555cf3a3d4cb2a1404ffae9a093b",
+      "gitBlob": "c4dcda5fd39a0634022c25f3bd4ba6667ece4a0c"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/ForgeEarlyConfig.java",
+      "size": 6348,
+      "sha256": "9489172b9a972bf5c7ba90b4369b12c8ae610bf2d7a7eccc5752575e2164bb63",
+      "gitBlob": "00cd0e7f661d7e40056fc67b2833bc5661277a19"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/com/cleanroommc/common/CleanroomEnvironment.java",
+      "size": 989,
+      "sha256": "251931ad34ef846cbd3cbf2e901a1d237167d3bbadc0cf2973caee0cd1256cf3",
+      "gitBlob": "bde60e513c2ae13850f8da39aa206a3fcbbe847e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/launcher/Yggdrasil.java",
+      "size": 2318,
+      "sha256": "c8e8336c6a4ab7ee4a791eb7271b5ff2e4aa95f086cca670b3ff8f62cbbcce1c",
+      "gitBlob": "bf02d2725afc509d01ee0f1780187129a33a4ab2"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/ASMTransformerWrapper.java",
+      "size": 8839,
+      "sha256": "6e30518594e92a296bda50432bccafc1db0deb01e6794da1651692f3b114528a",
+      "gitBlob": "ef04ffd2d9e273d5a2b1ace111f0651033923f7a"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/net/minecraft/launchwrapper/Launch.java",
+      "size": 376,
+      "sha256": "2bc45e0ae24ac3c13aa88e226536c54c00eb927a386780b573ec5db260d342e4",
+      "gitBlob": "63ad1587a5a53be8b195eacad182ad070534044d"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/net/minecraft/launchwrapper/LaunchClassLoader.java",
+      "size": 2127,
+      "sha256": "669154bda670664937b217e9de0febe0406dd55b557071a38bf1e13a9b939592",
+      "gitBlob": "39cb57f18d78a71ed0642b87d5c4a40e51d65db3"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/top/outlands/foundation/boot/ActualClassLoader.java",
+      "size": 24000,
+      "sha256": "f42b316ed2e409888eff726622dee5f24e0eafccca0675aaee548f8c29dea89f",
+      "gitBlob": "8c4769f00c81b5b38776a4c093b03bff70e4e4a2"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/top/outlands/foundation/TransformerDelegate.java",
+      "size": 10692,
+      "sha256": "b93a1619bdac9aae3c43d3a36627391999000d7e2d60445a18420038b1acb13c",
+      "gitBlob": "0d723f686d093aa28754fd15b5367a6f043ad8b7"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/top/outlands/foundation/boot/TransformerHolder.java",
+      "size": 1284,
+      "sha256": "bb8e2e84c1839c3e5f97f131e14667e68e1bd473c6474a44e490f44b0da1f2d2",
+      "gitBlob": "d5597083ee22d0f6d3de37e440a77d227f3f4355"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/top/outlands/foundation/transformer/ASMVisitorTransformer.java",
+      "size": 1668,
+      "sha256": "fc2c9c7cfc0da2d5c7139dfc6fdaec9b255711080ad6c7d1ed78da1f030fbea8",
+      "gitBlob": "cf88a19dbd471c2e60d2ecc6601547a68ad2eb4b"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/top/outlands/foundation/transformer/ASMClassWriterTransformer.java",
+      "size": 2680,
+      "sha256": "2ce5c35d88c7f47bf95cd14ce12db6a88399ec98da59b6a6fe23a22ae388ea72",
+      "gitBlob": "1dc42c8092be3cf57648ca82995fe2c6031850a9"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/top/outlands/foundation/LaunchHandler.java",
+      "size": 6256,
+      "sha256": "e77ab96c9053bd9e39921c24cf45fe07ee79e5a957472ac3ad186fb6f2b32936",
+      "gitBlob": "96c13026eb4b3b27a8d6dfaf7ae73e5d04d0692c"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/launcher/FMLInjectionAndSortingTweaker.java",
+      "size": 2303,
+      "sha256": "6b78dd4d530ad8260eea326b819704ca091a77cba5f0cd7a8192d4e03648b47c",
+      "gitBlob": "967c49a20ef4e2cdab270714b02427e0a9e6dbf0"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/launcher/FMLDeobfTweaker.java",
+      "size": 3878,
+      "sha256": "6fabe2e8805144825c2815e14c48571b0aca1b46e454feaae8a4bc39abb4c62f",
+      "gitBlob": "806dedf1d693a4b69956609619c05426d44afa11"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/relauncher/libraries/LibraryManager.java",
+      "size": 25179,
+      "sha256": "e96aa7b4e7046dbd5d153e51ac80cc738c4155948817a9ef0470773d436fc67c",
+      "gitBlob": "aa5e0e44e06f289307d5f4ece34b0c16bb669f91"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/com/cleanroommc/discovery/CleanroomModDiscoverer.java",
+      "size": 29571,
+      "sha256": "4d6459cc6b5f6b248b7c0546829d95686477366405ff8441eab5150a2a5fd574",
+      "gitBlob": "29891a326a21f1b824785f68e41c215f3e293446"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/com/cleanroommc/cleanmix/CleanMixHooks.java",
+      "size": 7958,
+      "sha256": "7a2f87b95d62a9f07dbc57a882364b6f82357cbb9e15f90a92bbd64f2fd9432b",
+      "gitBlob": "ddb9381acc115f7a33c5be8c98d1e4f50c56376a"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/com/cleanroommc/cleanmix/service/CleanMixService.java",
+      "size": 4209,
+      "sha256": "7d36a14ecdb1150f97a84aea0f7fe13a0ca9d248376657fcc9a229fc2dd1523a",
+      "gitBlob": "03e6cb5c02b4d6474e8bd2d92ae81300de93f1d9"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/Loader.java",
+      "size": 38739,
+      "sha256": "37b45c0a3b0dd0374f2b8688f28cfba5dd9458fd7c48fbd3659257e93a34c3ec",
+      "gitBlob": "ef4482d0f8145dc5b8159d2eb2280af99ead105d"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/util/math/Vec3d.java.patch",
+      "size": 1187,
+      "sha256": "c930328712a92c39986bbb00efbe998e4743af15bfc0e40f6027527c9ead410e",
+      "gitBlob": "31210a6561795320467b5f9f72297499478b17eb"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/util/EnumFacing.java.patch",
+      "size": 1733,
+      "sha256": "f11b0e663264be2a98d3ec1c8fba2b97e0960a756fa58e015786cabedbdf62f8",
+      "gitBlob": "231311aa7147a825e7d8f69f058153397250ecd7"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/net/minecraft/launchwrapper/IClassTransformer.java",
+      "size": 867,
+      "sha256": "bdcec3bec5559a3a73d1d506a8e29de4c8e5d4138b9a701855f57f4f73b60721",
+      "gitBlob": "0886365e0428e20edd41500f2bab721512f75dfc"
+    },
+    {
+      "repository": "foundation",
+      "path": "src/main/java/top/outlands/foundation/boot/Foundation.java",
+      "size": 2230,
+      "sha256": "2457b0dd37dd0e9f5385595cbac2ed01eb96440146eb96f5a91555f088ff319a",
+      "gitBlob": "4257e85c128a12ea960427521b9c014b52fa1c3e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/com/cleanroommc/hackery/ReflectionHackery.java",
+      "size": 6213,
+      "sha256": "f48e04b3c9e91c29ed0e75b7bf21f309744bce199cc0f9fcad7e938912322720",
+      "gitBlob": "3f3f55557b44244f10134b12c8ef1ea8e829d1cc"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/ObjectHolderRef.java",
+      "size": 4950,
+      "sha256": "5cf9640ef9a2bb4e0e4d4ac94055b0d13db8cc008ec2b6ee7d42a32312a8796d",
+      "gitBlob": "194c71b6189d498a57efca18e0dbd092a9706908"
+    }
+  ]
+}

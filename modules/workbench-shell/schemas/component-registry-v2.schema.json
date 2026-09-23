@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/component-registry-v2.schema.json",
+  "title": "Workbench component registry V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "registry_id",
+    "lifecycle_states",
+    "constraints",
+    "components"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-component-registry-v2"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "registry_id": {
+      "const": "workbench-components"
+    },
+    "lifecycle_states": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "incomplete",
+          "ready",
+          "active",
+          "review",
+          "complete",
+          "blocked"
+        ]
+      },
+      "minItems": 6,
+      "uniqueItems": true
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shell_component",
+        "project_context_component",
+        "authority_components",
+        "profile_roots"
+      ],
+      "properties": {
+        "shell_component": {
+          "$ref": "#/$defs/componentId"
+        },
+        "project_context_component": {
+          "$ref": "#/$defs/componentId"
+        },
+        "authority_components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/componentId"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "profile_roots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/repositoryPath"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    }
+  },
+  "$defs": {
+    "componentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "repositoryPath": {
+      "type": "string",
+      "pattern": "^(modules|clients|profiles)/[a-zA-Z0-9_./-]+$"
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "path",
+        "state",
+        "depends_on"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/componentId"
+        },
+        "kind": {
+          "enum": [
+            "authority",
+            "foundation",
+            "client"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/repositoryPath"
+        },
+        "state": {
+          "enum": [
+            "incomplete",
+            "ready",
+            "active",
+            "review",
+            "complete",
+            "blocked"
+          ]
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/componentId"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

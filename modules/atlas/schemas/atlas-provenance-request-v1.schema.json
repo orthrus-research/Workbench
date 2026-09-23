@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-provenance-request-v1.schema.json",
+  "title": "Supersymmetry Atlas causal provenance request v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "request_id",
+    "query_instance_id",
+    "snapshot_id",
+    "scope",
+    "supporting_scopes",
+    "final_runtime_record",
+    "source_lock_id",
+    "policy_id",
+    "policy_sha256",
+    "bounds"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-atlas-causal-provenance-request-v1"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^atlas-provenance-request:sha256:[0-9a-f]{64}$"
+    },
+    "query_instance_id": {
+      "type": "string",
+      "pattern": "^atlas-query:sha256:[0-9a-f]{64}$"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "profile",
+        "physical_side"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "enum": [
+            "COMMON_FINAL_STATE",
+            "CLIENT_JEI_FINAL_STATE",
+            "OFFLINE_ARTIFACT_STATE"
+          ]
+        },
+        "physical_side": {
+          "enum": [
+            "CLIENT",
+            "DEDICATED_SERVER",
+            "OFFLINE"
+          ]
+        }
+      }
+    },
+    "supporting_scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "profile",
+          "physical_side"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "enum": [
+              "COMMON_FINAL_STATE",
+              "CLIENT_JEI_FINAL_STATE",
+              "OFFLINE_ARTIFACT_STATE"
+            ]
+          },
+          "physical_side": {
+            "enum": [
+              "CLIENT",
+              "DEDICATED_SERVER",
+              "OFFLINE"
+            ]
+          }
+        }
+      }
+    },
+    "final_runtime_record": {
+      "type": "object",
+      "required": [
+        "runtime_node_id",
+        "runtime_kind",
+        "runtime_record_sha256",
+        "capture_evidence_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "runtime_node_id": {
+          "type": "string",
+          "pattern": "^rg:(?:common_final_state_client|common_final_state_dedicated_server|client_jei_final_state_client|offline_artifact_state_offline):[a-z][a-z0-9_]*:.+$"
+        },
+        "runtime_kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "runtime_record_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "capture_evidence_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-evidence:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "source_lock_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+$"
+    },
+    "policy_id": {
+      "const": "ATLAS-CAUSAL-PROVENANCE-POLICY-V1"
+    },
+    "policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "bounds": {
+      "type": "object",
+      "required": [
+        "max_paths",
+        "max_nodes",
+        "max_relations",
+        "max_evidence_records"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_paths": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_nodes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_relations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_evidence_records": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

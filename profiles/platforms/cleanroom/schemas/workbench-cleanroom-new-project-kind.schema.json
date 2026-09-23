@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/profiles/cleanroom/workbench-cleanroom-new-project-kind.schema.json",
+  "title": "Current Cleanroom owner-admitted new mod kind",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {"pattern": "^sha256:[0-9a-f]{64}$", "type": "string"},
+    "record_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {"pattern": "^[A-Za-z0-9._/-]+\\.json$", "type": "string"},
+        "schema_path": {
+          "pattern": "^[A-Za-z0-9._/-]+\\.schema\\.json$",
+          "type": "string"
+        },
+        "schema_sha256": {"$ref": "#/$defs/digest"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["path", "schema_path", "schema_sha256", "sha256"],
+      "type": "object"
+    },
+    "schema_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "^[A-Za-z0-9._/-]+\\.schema\\.json$",
+          "type": "string"
+        },
+        "sha256": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["path", "sha256"],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "declaration_id": {"const": "cleanroom-new-project-kind-mod-v4"},
+    "declared_values": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "additionalProperties": false,
+          "properties": {
+            "admission_state": {"const": "owner-admitted"},
+            "construction_slot": {
+              "additionalProperties": false,
+              "properties": {
+                "construction_contract_id": {
+                  "const": "BLUEPRINTS-FRESH-PROJECT-CONSTRUCTION-V2"
+                },
+                "construction_owner_id": {
+                  "const": "workbench-cleanroom-mod-construction-owner:sha256:befe2af77e834818a6e2746ef9ddad70f740267330ddde2cbbf5f1730a1661ce"
+                },
+                "construction_owner_ref": {
+                  "allOf": [
+                    {"$ref": "#/$defs/record_ref"},
+                    {
+                      "properties": {
+                        "path": {
+                          "const": "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2.json"
+                        },
+                        "schema_path": {
+                          "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json"
+                        },
+                        "schema_sha256": {
+                          "const": "sha256:d7bf003ea570c221045c30d7b4f508fbbdb98e12b206287a0a44c5ae7335325a"
+                        },
+                        "sha256": {
+                          "const": "sha256:a373d634f5daf5870d4f75a7ca90101fd9e7670406bcbdec349bea42590d0b1e"
+                        }
+                      },
+                      "required": ["path", "schema_path", "schema_sha256", "sha256"]
+                    }
+                  ]
+                },
+                "constructor_component_id": {"const": "blueprints"},
+                "plan_schema_ref": {
+                  "allOf": [
+                    {"$ref": "#/$defs/schema_ref"},
+                    {
+                      "properties": {
+                        "path": {
+                          "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-plan-v2.schema.json"
+                        },
+                        "sha256": {
+                          "const": "sha256:2c6fe49d1e047eec56fb11ca0fa24e5ca37f35d855b2c17e5c2f758d90bfa332"
+                        }
+                      },
+                      "required": ["path", "sha256"]
+                    }
+                  ]
+                },
+                "request_schema_ref": {
+                  "allOf": [
+                    {"$ref": "#/$defs/schema_ref"},
+                    {
+                      "properties": {
+                        "path": {
+                          "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-request-v2.schema.json"
+                        },
+                        "sha256": {
+                          "const": "sha256:d2cd233a6b9d602bd248cd1b814487734d26d790949d1d60e4b346e6a0ca6005"
+                        }
+                      },
+                      "required": ["path", "sha256"]
+                    }
+                  ]
+                },
+                "result_schema_ref": {
+                  "allOf": [
+                    {"$ref": "#/$defs/schema_ref"},
+                    {
+                      "properties": {
+                        "path": {
+                          "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-result-v2.schema.json"
+                        },
+                        "sha256": {
+                          "const": "sha256:8dbf657bde3d794c21249cb42e01c421da7e100c96776c3a0b68c1b21993bbea"
+                        }
+                      },
+                      "required": ["path", "sha256"]
+                    }
+                  ]
+                },
+                "slot_id": {"const": "new-kind.cleanroom-mod.construction"},
+                "state": {"const": "bound"}
+              },
+              "required": [
+                "construction_contract_id",
+                "construction_owner_id",
+                "construction_owner_ref",
+                "constructor_component_id",
+                "plan_schema_ref",
+                "request_schema_ref",
+                "result_schema_ref",
+                "slot_id",
+                "state"
+              ],
+              "type": "object"
+            },
+            "kind_id": {"const": "workbench-new-project-kind:cleanroom-mod"},
+            "platform_profile_identity_id": {"const": "profile.cleanroom"},
+            "project_kind": {"const": "mod"},
+            "template_fixture_identity_id": {"const": "fixture.cleanroom-mod"},
+            "template_lock_ref": {
+              "allOf": [
+                {"$ref": "#/$defs/record_ref"},
+                {
+                  "properties": {
+                    "path": {
+                      "const": "profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop/fixture-lock-v1.json"
+                    },
+                    "schema_path": {
+                      "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-generic-mod-fixture-lock-v1.schema.json"
+                    },
+                    "schema_sha256": {
+                      "const": "sha256:362e5eb800cf6803ecc15b29192b7c627c47f57f48cb3eecb0d283c3168b66ba"
+                    },
+                    "sha256": {
+                      "const": "sha256:fc0845123d2a9b833a63b2d49a29a38b39388e8ac24a810dcc07e87a6fbad8d2"
+                    }
+                  },
+                  "required": ["path", "schema_path", "schema_sha256", "sha256"]
+                }
+              ]
+            },
+            "type": {"const": "new-project-kind"}
+          },
+          "required": [
+            "admission_state",
+            "construction_slot",
+            "kind_id",
+            "platform_profile_identity_id",
+            "project_kind",
+            "template_fixture_identity_id",
+            "template_lock_ref",
+            "type"
+          ],
+          "type": "object"
+        },
+        "candidate_lock_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/record_ref"},
+            {
+              "properties": {
+                "path": {
+                  "const": "profiles/platforms/cleanroom/candidates/0.6.8-alpha/candidate-lock-v1.json"
+                },
+                "schema_path": {
+                  "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-candidate-lock-v1.schema.json"
+                },
+                "schema_sha256": {
+                  "const": "sha256:847e6b0c0b3178e775bc9d537a41a8a5cddb0b35984743c1a7bb4c7f410fe6d7"
+                },
+                "sha256": {
+                  "const": "sha256:d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541"
+                }
+              },
+              "required": ["path", "schema_path", "schema_sha256", "sha256"]
+            }
+          ]
+        }
+      },
+      "required": ["candidate_lock_ref", "identity"],
+      "type": "object"
+    },
+    "format": {"const": "workbench-cleanroom-new-project-kind-v4"},
+    "identity_ids": {"const": ["new-kind.cleanroom-mod"]},
+    "limitations": {
+      "const": [
+        "This admission is limited to the exact locked generic Cleanroom mod tree and does not admit arbitrary mod or pack templates.",
+        "The construction slot is bound to the current Cleanroom fresh-project implementation and its exact owner record.",
+        "Construction covers preview, exact consented fresh-target application, retained receipts, and recovery; Gradle build, client, and dedicated-server compatibility remain separate checks."
+      ]
+    },
+    "owner_id": {"const": "cleanroom-platform-profile"},
+    "revision": {"const": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc"},
+    "schema_version": {"const": 4}
+  },
+  "required": [
+    "declaration_id",
+    "declared_values",
+    "format",
+    "identity_ids",
+    "limitations",
+    "owner_id",
+    "revision",
+    "schema_version"
+  ]
+}

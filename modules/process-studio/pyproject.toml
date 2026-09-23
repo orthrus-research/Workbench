@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-process-studio"
+version = "0.1.0"
+description = "Workbench process-studio module"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.0,<0.2.0", "workbench-crucible>=0.1.0,<0.2.0"]
+
+[project.entry-points."workbench.modules"]
+"process-studio" = "workbench_registration_process_studio:module"
+
+[tool.setuptools]
+packages = ["workbench_process_studio", "workbench_resources.modules.process-studio"]
+py-modules = ["workbench_registration_process_studio"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.process-studio" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.modules.process-studio" = ["pyproject.toml", "README.md", "src/**/*.py"]
+
+[tool.workbench]
+module-id = "process-studio"
+requires = ["crucible"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]

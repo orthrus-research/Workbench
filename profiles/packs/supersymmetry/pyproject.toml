@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-profile-supersymmetry"
+version = "0.1.4"
+description = "Explicit supersymmetry profile adapters and owned resources"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.2,<0.2.0", "workbench-project-intelligence>=0.1.0,<0.2.0", "workbench-crucible>=0.1.3,<0.2.0", "workbench-pack-program-studio>=0.1.1,<0.2.0", "workbench-material-semantics>=0.1.1,<0.2.0", "workbench-atlas>=0.1.1,<0.2.0", "workbench-profile-cleanroom>=0.1.0,<0.2.0"]
+
+[project.optional-dependencies]
+construction = ["workbench-blueprints>=0.1.1,<0.2.0"]
+observations = ["workbench-axiom>=0.1.1,<0.2.0", "workbench-core>=0.1.4,<0.2.0"]
+
+[project.entry-points."workbench.recipe_changes"]
+supersymmetry = "workbench_profile_supersymmetry.recipe_change"
+
+[project.entry-points."workbench.quest_changes"]
+supersymmetry = "workbench_profile_supersymmetry.quest_for_process"
+
+[project.entry-points."workbench.recipe_observers"]
+supersymmetry = "workbench_profile_supersymmetry.recipe_change_runtime_observation"
+
+[project.entry-points."workbench.material_fluid_policies"]
+supersymmetry = "workbench_profile_supersymmetry.material_fluid_runtime_policy"
+
+[project.entry-points."workbench.material_fluid_observers"]
+supersymmetry = "workbench_profile_supersymmetry.material_backed_fluid_observation"
+
+[project.entry-points."workbench.runtime_pairs"]
+supersymmetry = "workbench_profile_supersymmetry.material_fluid_runtime_pair"
+
+[project.entry-points."workbench.source_interpreters"]
+supersymmetry = "workbench_profile_supersymmetry.source_intelligence"
+
+[project.entry-points."workbench.semantic_projections"]
+supersymmetry = "workbench_profile_supersymmetry.semantic_projections"
+
+[project.entry-points."workbench.provenance_primitives"]
+supersymmetry = "workbench_profile_supersymmetry.provenance_primitives"
+
+[project.entry-points."workbench.recipe_graphs"]
+supersymmetry = "workbench_profile_supersymmetry.recipe_graphs"
+
+[project.entry-points."workbench.recipe_captures"]
+supersymmetry = "workbench_profile_supersymmetry.recipe_capture_runtime"
+
+[project.entry-points."workbench.observation_graphs"]
+supersymmetry = "workbench_profile_supersymmetry.observation_graphs"
+
+[project.entry-points."workbench.developer_checks"]
+supersymmetry = "workbench_profile_supersymmetry.developer_checks"
+
+[project.entry-points."workbench.profiles"]
+supersymmetry = "workbench_profile_supersymmetry:profile"
+
+[project.entry-points."workbench.axiom_targets"]
+supersymmetry = "workbench_profile_supersymmetry.axiom"
+
+[project.entry-points."workbench.runtime_providers"]
+supersymmetry = "workbench_profile_supersymmetry.runtime:provider"
+
+[tool.setuptools]
+packages = ["workbench_profile_supersymmetry", "workbench_resources.profiles.packs.supersymmetry"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.profiles.packs.supersymmetry" = "."
+
+[tool.setuptools.package-data]
+"workbench_profile_supersymmetry" = ["recipe_probe.groovy", "observer/*.java", "axiom-target-policy.json", "axiom-material-contexts.json", "axiom-material-admission.json", "axiom-native-early-context.json", "axiom-native-inputs.json"]
+"workbench_resources.profiles.packs.supersymmetry" = ["atlas/probes/forge-recipe-observer/src/main/java/**/*.java", "atlas/probes/ultimate-runtime-graph-producer/src/main/java/dev/workbench/crucible/runtimegraph/CanonicalJson.java", "atlas/probes/ultimate-runtime-graph-producer/src/main/java/dev/workbench/crucible/runtimegraph/Hashing.java", "atlas/developer-recipe-capture-input-v1.md", "pyproject.toml", "src/workbench_profile_supersymmetry/__init__.py", "acquisition-v1.json", "atlas/recipe-invalidation-diagnostic-v2.md", "atlas/recipe-reload-diagnostic-v1.md", "atlas/runtime-graph/cleanroom-compatibility-overlays-v1.json", "atlas/runtime-graph/cleanroom-runtime-compatibility-shims-v1.json", "atlas/semantic-projection/adapter-v1.json", "atlas/semantic-projection/fixtures/cement-reachability.json", "atlas/semantic-projection/fixtures/duplicate-gas-registration.json", "atlas/semantic-projection/fixtures/lv-mixer-capacity.json", "atlas/semantic-projection/fixtures/manifest.json", "atlas/src/atlas_pack_mutations.py", "atlas/src/atlas_source_index.py", "atlas/src/gt_recipe_registration_diagnostic.py", "atlas/src/recipe_invalidation_diagnostic.py", "atlas/src/recipe_reload_diagnostic.py", "atlas/src/supersymmetry_semantic_adapter.py", "blueprints/allocation/ledger.json", "blueprints/examples/README.md", "blueprints/examples/material-fluid-recipe-radon.json", "blueprints/examples/quest-for-process-gas-atomizer.json", "blueprints/examples/recipe-change-copper-sulfate-solution.json", "blueprints/experimental/patterns/material-backed-fluid-v1.json", "blueprints/experimental/standards/material-backed-fluid.yaml", "blueprints/experimental/standards/registry.json", "blueprints/experimental/templates/material-backed-fluid-en-us.lang.tpl", "blueprints/experimental/templates/material-backed-fluid-preinit.groovy.tpl", "compatibility/recurrent-complex-1.4.8.6-structure-context-arg3-v1.json", "compatibility/susycore-0.1.112-reccomplex-flag-v1.json", "diagnostics/recipe-invalidation-comparison-v2.schema.json", "diagnostics/recipe-invalidation-diagnostic-profile-v2.json", "diagnostics/recipe-invalidation-diagnostic-v2.schema.json", "diagnostics/recipe-reload-diagnostic-profile-v1.json", "diagnostics/susy-reccomplex-named-variable-0112-v1.json", "diagnostics/susy-reccomplex-named-variable-v1.json", "github-pr-provider-v1.json", "groovy/groovy-program-profile-v1.json", "profile.yaml", "registration/catalog-v1.json", "runtime/manual-artifacts-v1.json", "runtime/schemas/workbench-supersymmetry-installed-material-fluid-runtime-config-v1.schema.json", "runtime/schemas/workbench-supersymmetry-material-fluid-runtime-observation-v1.schema.json", "runtime/schemas/workbench-supersymmetry-material-fluid-runtime-pair-owner-v1.schema.json", "runtime/schemas/workbench-supersymmetry-staged-client-compatibility-policy-v1.schema.json", "runtime/schemas/workbench-supersymmetry-staged-material-fluid-pack-v1.schema.json", "runtime/schemas/workbench-supersymmetry-staged-pack-execution-request-v1.schema.json", "runtime/schemas/workbench-supersymmetry-staged-pack-execution-v1.schema.json", "runtime/schemas/workbench-supersymmetry-staged-pack-server-launch-v1.schema.json", "runtime/schemas/workbench-supersymmetry-staged-pack-server-materialization-v1.schema.json", "schemas/workbench-manual-artifact-profile-v1.schema.json", "schemas/workbench-supersymmetry-acquisition-profile-v1.schema.json", "schemas/workbench-supersymmetry-github-pr-provider-v1.schema.json", "source-locks/legacy-forge/source-lock.json", "subsurface/gtceu-2.8.10-v1.json", "worldgen/tools/inspect_recurrent_complex_structure_data.py", "worldgen/worldgen-cockpit-profile-v1.json", "worldgen/worldgen-iteration-profile-v2.json"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]
+
+[project.entry-points."workbench.console_policies"]
+supersymmetry = "workbench_profile_supersymmetry.console:policy"
+
+[project.entry-points."workbench.material_recipe_observers"]
+supersymmetry = "workbench_profile_supersymmetry.material_fluid_recipe_observation"

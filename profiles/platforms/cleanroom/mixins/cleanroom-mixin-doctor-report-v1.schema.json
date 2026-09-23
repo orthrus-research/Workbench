@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/cleanroom-mixin-doctor-report-v1.schema.json",
+  "title": "Cleanroom Mixin Doctor report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "boundaries",
+    "canonicalization_id",
+    "coverage",
+    "findings",
+    "format",
+    "limitations",
+    "policy",
+    "report_id",
+    "schema_version",
+    "summary",
+    "topology_receipt"
+  ],
+  "properties": {
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_lock_v1_mutated",
+        "recurrent_complex_integration_scope",
+        "runtime_application_proved",
+        "static_scan_only"
+      ],
+      "properties": {
+        "candidate_lock_v1_mutated": {"const": false},
+        "recurrent_complex_integration_scope": {
+          "const": "out-of-scope-no-adapter-introduced"
+        },
+        "runtime_application_proved": {"const": false},
+        "static_scan_only": {"const": true}
+      }
+    },
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "coverage": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/coverage"}
+    },
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "format": {"const": "workbench-cleanroom-mixin-doctor-report-v1"},
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "sha256"],
+      "properties": {
+        "policy_id": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^workbench-cleanroom-mixin-doctor-report:sha256:[0-9a-f]{64}$"
+    },
+    "schema_version": {"const": 1},
+    "summary": {"$ref": "#/$defs/summary"},
+    "topology_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "scope_id"],
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-topology-receipt:sha256:[0-9a-f]{64}$"
+        },
+        "scope_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-scope:sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "limitations",
+        "match_count",
+        "rule_id",
+        "scanner_fact",
+        "state"
+      ],
+      "properties": {
+        "condition": {"type": "string", "minLength": 1},
+        "limitations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "match_count": {"type": "integer", "minimum": 0},
+        "rule_id": {"type": "string", "minLength": 1},
+        "scanner_fact": {"type": "string", "minLength": 1},
+        "state": {
+          "enum": ["evaluated", "partially-evaluated", "not-evaluated"]
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_label",
+        "artifact_sha256",
+        "disposition",
+        "finding_id",
+        "locator",
+        "observed",
+        "rationale",
+        "rule_id",
+        "scanner_fact",
+        "severity"
+      ],
+      "properties": {
+        "artifact_label": {"type": "string", "minLength": 1},
+        "artifact_sha256": {"$ref": "#/$defs/sha256"},
+        "disposition": {"enum": ["accept", "review", "reject"]},
+        "finding_id": {
+          "type": "string",
+          "pattern": "^workbench-cleanroom-mixin-doctor-finding:sha256:[0-9a-f]{64}$"
+        },
+        "locator": {"type": "string", "minLength": 1},
+        "observed": {"type": "object"},
+        "rationale": {"type": "string", "minLength": 1},
+        "rule_id": {"type": "string", "minLength": 1},
+        "scanner_fact": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["info", "warning", "error"]}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_count",
+        "coverage_state",
+        "disposition",
+        "evaluated_rule_count",
+        "finding_count",
+        "partial_rule_count",
+        "reject_finding_count",
+        "review_finding_count",
+        "rule_count",
+        "unevaluated_rule_count"
+      ],
+      "properties": {
+        "artifact_count": {"type": "integer", "minimum": 1},
+        "coverage_state": {"enum": ["complete", "partial"]},
+        "disposition": {"enum": ["accept", "review", "reject"]},
+        "evaluated_rule_count": {"type": "integer", "minimum": 0},
+        "finding_count": {"type": "integer", "minimum": 0},
+        "partial_rule_count": {"type": "integer", "minimum": 0},
+        "reject_finding_count": {"type": "integer", "minimum": 0},
+        "review_finding_count": {"type": "integer", "minimum": 0},
+        "rule_count": {"type": "integer", "minimum": 1},
+        "unevaluated_rule_count": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

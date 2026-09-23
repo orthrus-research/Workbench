@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-service-control-v1.schema.json",
+  "title": "Crucible durable service control V1",
+  "$defs": {
+    "emptyArguments": {
+      "type": "object",
+      "maxProperties": 0,
+      "additionalProperties": false
+    },
+    "serviceCapabilitiesResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_ids", "registry_id"],
+      "properties": {
+        "capability_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/capabilityId"
+          }
+        },
+        "registry_id": {
+          "type": "string",
+          "pattern": "^component-capability-registry:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "contextListResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contexts"],
+      "properties": {
+        "contexts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["context_ref_id", "input_binding_id"],
+            "properties": {
+              "context_ref_id": {
+                "$ref": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json#/$defs/contextRefId"
+              },
+              "input_binding_id": {
+                "$ref": "workbench://schemas/crucible/crucible-input-binding-v2.schema.json#/$defs/inputBindingId"
+              }
+            }
+          }
+        }
+      }
+    },
+    "jobCancellationPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalizer",
+        "context_ref_id",
+        "expected_event_id",
+        "expected_event_ordinal",
+        "format",
+        "id",
+        "input_binding_id",
+        "job_id",
+        "kind",
+        "limitations",
+        "next_safe_action",
+        "operation_class",
+        "reason",
+        "schema_version"
+      ],
+      "properties": {
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "context_ref_id": {"type": "string", "pattern": "^context-ref:sha256:[0-9a-f]{64}$"},
+        "expected_event_id": {"type": "string", "pattern": "^job-event:sha256:[0-9a-f]{64}$"},
+        "expected_event_ordinal": {"type": "integer", "minimum": 0},
+        "format": {"const": "workbench-crucible-job-cancellation-plan-v1"},
+        "id": {"type": "string", "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"},
+        "input_binding_id": {"type": "string", "pattern": "^input-binding:sha256:[0-9a-f]{64}$"},
+        "job_id": {"type": "string", "pattern": "^job-v2:[0-9a-f]{32}$"},
+        "kind": {"const": "operation-plan"},
+        "limitations": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "cancellation-is-observed-only-at-safe-boundaries"},
+            {"const": "terminal-outcome-remains-authoritative"}
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "next_safe_action": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "operation_class": {"const": "disposable-runtime-execute"},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "schema_version": {"const": 1}
+      }
+    },
+    "jobEventProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_ordinal",
+        "event_type",
+        "lifecycle_state",
+        "mutation_state"
+      ],
+      "properties": {
+        "event_id": {"type": "string", "pattern": "^job-event:sha256:[0-9a-f]{64}$"},
+        "event_ordinal": {"type": "integer", "minimum": 0},
+        "event_type": {"type": "string", "minLength": 1, "maxLength": 128},
+        "lifecycle_state": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/lifecycleState"
+        },
+        "mutation_state": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/mutationState"
+        }
+      }
+    },
+    "jobEventPageArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "job_submission_id",
+        "last_cursor",
+        "maximum_events",
+        "stream_generation",
+        "subscription_id"
+      ],
+      "properties": {
+        "job_id": {"type": "string", "pattern": "^job-v2:[0-9a-f]{32}$"},
+        "job_submission_id": {"type": "string", "pattern": "^job-submission:sha256:[0-9a-f]{64}$"},
+        "last_cursor": {"type": "integer", "minimum": -1},
+        "maximum_events": {"type": "integer", "minimum": 1, "maximum": 1024},
+        "stream_generation": {"type": "string", "pattern": "^stream-generation-v3:[0-9a-f]{32}$"},
+        "subscription_id": {"type": "string", "pattern": "^subscription-v3:[0-9a-f]{32}$"}
+      }
+    },
+    "jobEventPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "events",
+        "format",
+        "has_more",
+        "minimum_available_cursor",
+        "next_cursor",
+        "schema_version",
+        "stream_generation",
+        "subscription_id"
+      ],
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/jobEventProjection"}
+        },
+        "format": {"const": "workbench-crucible-job-event-page-v1"},
+        "has_more": {"type": "boolean"},
+        "minimum_available_cursor": {"type": "integer", "minimum": 0},
+        "next_cursor": {"type": "integer", "minimum": 0},
+        "schema_version": {"const": 1},
+        "stream_generation": {"type": "string", "pattern": "^stream-generation-v3:[0-9a-f]{32}$"},
+        "subscription_id": {"type": "string", "pattern": "^subscription-v3:[0-9a-f]{32}$"}
+      }
+    }
+  }
+}

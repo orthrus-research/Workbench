@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local Workbench publication evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "source_revision", "git_tree_oid"],
+  "properties": {
+    "format": {"const": "workbench-publication-evidence-v1"},
+    "schema_version": {"const": 1},
+    "source_revision": {"$ref": "#/$defs/oid"},
+    "git_tree_oid": {"$ref": "#/$defs/oid"},
+    "source_scan": {"$ref": "#/$defs/file"},
+    "full_validation": {"$ref": "#/$defs/check"},
+    "artifacts": {
+      "type": "array", "maxItems": 100,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["component", "target", "file", "ownership", "functional", "secret_scan"],
+        "properties": {
+          "component": {"type": "string", "minLength": 1},
+          "target": {"type": "string", "minLength": 1, "maxLength": 200},
+          "file": {"$ref": "#/$defs/file"},
+          "assembly_manifest": {"$ref": "#/$defs/file"},
+          "ownership": {"$ref": "#/$defs/check"},
+          "functional": {"$ref": "#/$defs/check"},
+          "secret_scan": {"$ref": "#/$defs/check"},
+          "host": {"$ref": "#/$defs/check"}
+        }
+      }
+    },
+    "hosted": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "observed_at", "destination_head", "destination_license_sha256", "evidence", "checks"],
+      "properties": {
+        "repository": {"const": "orthrus-research/workbench"},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "destination_head": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/oid"}]},
+        "destination_license_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "evidence": {"$ref": "#/$defs/file"},
+        "checks": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "default_branch_protected": {"type": "boolean"},
+            "required_checks": {"type": "boolean"},
+            "eligible_approval_path": {"type": "boolean"},
+            "independent_review_required": {"type": "boolean"},
+            "tag_namespaces_protected": {"type": "boolean"},
+            "release_environment_protected": {"type": "boolean"},
+            "reviewed_publication_mechanism": {"type": "boolean"},
+            "secret_scanning": {"type": "boolean"},
+            "push_protection": {"type": "boolean"},
+            "private_vulnerability_reporting": {"type": "boolean"},
+            "community_intake_disabled": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "security_reporting": {"$ref": "#/$defs/reporting"},
+    "conduct_reporting": {"$ref": "#/$defs/reporting"},
+    "conduct_policy": {"$ref": "#/$defs/file"},
+    "migration_decision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["destination_head", "strategy", "evidence"],
+      "properties": {
+        "destination_head": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/oid"}]},
+        "strategy": {"enum": ["preserve-existing-public-history", "new-root-empty-destination", "replace-existing-public-history"]},
+        "evidence": {"$ref": "#/$defs/file"}
+      }
+    },
+    "license_decision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_license_sha256", "destination_license_sha256", "intended_spdx", "evidence"],
+      "properties": {
+        "source_license_sha256": {"$ref": "#/$defs/sha256"},
+        "destination_license_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "intended_spdx": {"type": "string", "minLength": 1, "maxLength": 200},
+        "evidence": {"$ref": "#/$defs/file"}
+      }
+    },
+    "approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["actor", "source_author", "mode", "actions", "artifact_sha256", "evidence"],
+      "properties": {
+        "actor": {"type": "string", "minLength": 1, "maxLength": 200},
+        "source_author": {"type": "string", "minLength": 1, "maxLength": 200},
+        "mode": {"enum": ["bootstrap-same-author", "independent"]},
+        "actions": {
+          "type": "array", "uniqueItems": true,
+          "items": {"enum": ["publish-source", "publish-artifacts", "enable-community", "replace-public-history"]}
+        },
+        "artifact_sha256": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/sha256"}},
+        "evidence": {"$ref": "#/$defs/file"}
+      }
+    }
+  },
+  "$defs": {
+    "oid": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "check": {
+      "type": "object", "additionalProperties": false,
+      "required": ["result", "command", "exit_code", "log", "limitations"],
+      "properties": {
+        "result": {"enum": ["pass", "fail", "pending"]},
+        "command": {"type": "array", "maxItems": 100, "items": {"type": "string", "maxLength": 4096}},
+        "exit_code": {"type": ["integer", "null"]},
+        "log": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/file"}]},
+        "limitations": {"type": "array", "maxItems": 100, "items": {"type": "string", "maxLength": 4096}}
+      }
+    },
+    "reporting": {
+      "type": "object", "additionalProperties": false,
+      "required": ["owner", "route", "tested_at", "confidential", "evidence"],
+      "properties": {
+        "owner": {"type": "string", "minLength": 1, "maxLength": 200},
+        "route": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "tested_at": {"type": "string", "format": "date-time"},
+        "confidential": {"type": "boolean"},
+        "evidence": {"$ref": "#/$defs/file"}
+      }
+    }
+  }
+}

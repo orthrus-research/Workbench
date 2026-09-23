@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-groovy-pack-program-report-v1.schema.json",
+  "title": "Workbench Groovy pack program report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "report_id",
+    "operation_class",
+    "authority",
+    "profile",
+    "request",
+    "candidate",
+    "baseline",
+    "comparison",
+    "change_assessment",
+    "runtime_evidence",
+    "summary",
+    "limitations",
+    "horizons"
+  ],
+  "properties": {
+    "format": {"const": "workbench-groovy-pack-program-report-v1"},
+    "schema_version": {"const": 1},
+    "report_id": {"type": "string", "pattern": "^workbench-groovy-pack-program-report:sha256:[0-9a-f]{64}$"},
+    "operation_class": {"const": "read-only"},
+    "authority": {"type": "object"},
+    "profile": {"type": "object"},
+    "request": {"type": "object"},
+    "candidate": {"$ref": "#/$defs/program"},
+    "baseline": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/program"}]},
+    "comparison": {"type": "object"},
+    "change_assessment": {"type": "object"},
+    "runtime_evidence": {"type": "object"},
+    "summary": {
+      "type": "object",
+      "required": ["status", "analysis_state", "candidate_program_id", "files", "source_lines", "effects", "collision_candidates", "incomplete_recipe_candidates", "comparison_state", "change_state", "runtime_state", "attention_reasons"],
+      "properties": {
+        "status": {"enum": ["ready", "attention", "blocked"]},
+        "analysis_state": {"const": "static-candidate"},
+        "candidate_program_id": {"type": "string"},
+        "files": {"type": "integer", "minimum": 0},
+        "source_lines": {"type": "integer", "minimum": 0},
+        "effects": {"type": "integer", "minimum": 0},
+        "collision_candidates": {"type": "integer", "minimum": 0},
+        "incomplete_recipe_candidates": {"type": "integer", "minimum": 0},
+        "comparison_state": {"type": "string"},
+        "change_state": {"type": "string"},
+        "runtime_state": {"type": "string"},
+        "attention_reasons": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "horizons": {"type": "array", "items": {"type": "object"}}
+  },
+  "$defs": {
+    "program": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "program_id", "binding", "run_config", "files", "stages", "symbols", "dependencies", "effects", "collisions", "summary", "coverage", "limitations"],
+      "properties": {
+        "format": {"const": "workbench-groovy-static-program-v1"},
+        "program_id": {"type": "string", "pattern": "^workbench-groovy-static-program:sha256:[0-9a-f]{64}$"},
+        "binding": {"type": "object"},
+        "run_config": {"type": "object"},
+        "files": {"type": "array", "items": {"type": "object"}},
+        "stages": {"type": "array", "items": {"type": "object"}},
+        "symbols": {"type": "object"},
+        "dependencies": {"type": "object"},
+        "effects": {"type": "array", "items": {"type": "object"}},
+        "collisions": {"type": "array", "items": {"type": "object"}},
+        "summary": {"type": "object"},
+        "coverage": {"type": "object"},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

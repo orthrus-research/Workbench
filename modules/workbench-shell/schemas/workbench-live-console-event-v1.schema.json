@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-live-console-event-v1.schema.json",
+  "title": "Workbench live console event V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "event_id",
+    "sequence",
+    "ingested_at",
+    "monotonic_ns",
+    "source_timestamp",
+    "source",
+    "stream",
+    "raw_locator",
+    "kind",
+    "severity",
+    "subsystem",
+    "logger",
+    "thread",
+    "message",
+    "parse_provenance",
+    "classification_basis",
+    "cluster_key",
+    "signal",
+    "outcome_failure",
+    "source_locators",
+    "limitations"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "workbench-live-console-event-v1"
+    },
+    "event_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "ingested_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "monotonic_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_timestamp": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/singleLine"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/identifier"
+    },
+    "stream": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 48,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "raw_locator": {
+      "$ref": "#/$defs/rawLocator"
+    },
+    "kind": {
+      "enum": [
+        "text",
+        "log",
+        "build",
+        "compiler_diagnostic",
+        "mixin",
+        "groovy",
+        "registry",
+        "worldgen",
+        "exception",
+        "stack_frame",
+        "stage"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "trace",
+        "debug",
+        "info",
+        "warning",
+        "error",
+        "fatal",
+        "unknown"
+      ]
+    },
+    "subsystem": {
+      "enum": [
+        "generic",
+        "gradle",
+        "compiler",
+        "minecraft",
+        "cleanroom-fml",
+        "mixin",
+        "cleanmix",
+        "groovy",
+        "registry",
+        "worldgen",
+        "java",
+        "workbench"
+      ]
+    },
+    "logger": {
+      "$ref": "#/$defs/nullableSingleLine"
+    },
+    "thread": {
+      "$ref": "#/$defs/nullableSingleLine"
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 1048576,
+      "pattern": "^[^\\r\\n\\u0000]*$"
+    },
+    "parse_provenance": {
+      "enum": [
+        "raw",
+        "parsed",
+        "heuristic"
+      ]
+    },
+    "classification_basis": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/ruleId"
+      }
+    },
+    "cluster_key": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "signal": {
+      "type": "boolean"
+    },
+    "outcome_failure": {
+      "type": "boolean"
+    },
+    "source_locators": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sourceLocator"
+      }
+    },
+    "limitations": {
+      "$ref": "#/$defs/limitations"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/+@=-]*$"
+    },
+    "singleLine": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "nullableSingleLine": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/singleLine"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "ruleId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/+@=-]*$"
+    },
+    "rawLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact",
+        "byte_start",
+        "byte_end",
+        "line",
+        "chunk",
+        "boundary"
+      ],
+      "properties": {
+        "artifact": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/singleLine"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "byte_start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "byte_end": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chunk": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "boundary": {
+          "enum": [
+            "lf",
+            "crlf",
+            "cr",
+            "limit",
+            "eof"
+          ]
+        }
+      }
+    },
+    "sourceLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "line",
+        "column",
+        "label"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "label": {
+          "$ref": "#/$defs/singleLine"
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/singleLine"
+      }
+    }
+  }
+}

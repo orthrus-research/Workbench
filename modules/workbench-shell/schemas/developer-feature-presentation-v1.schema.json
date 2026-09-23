@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.dev/workbench/schemas/developer-feature-presentation-v1.schema.json",
+  "title": "Workbench developer feature IDE presentation V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actions",
+    "authority_boundary",
+    "collection",
+    "family",
+    "format",
+    "id",
+    "kind",
+    "limitations",
+    "operations",
+    "owner_record",
+    "plan_id",
+    "request",
+    "review",
+    "runtime",
+    "schema_version",
+    "verification",
+    "workspace_uri"
+  ],
+  "properties": {
+    "format": {"const": "workbench-developer-feature-presentation-v1"},
+    "schema_version": {"const": 1},
+    "kind": {"const": "workbench-developer-feature-presentation"},
+    "id": {
+      "type": "string",
+      "pattern": "^workbench-developer-feature-presentation:sha256:[0-9a-f]{64}$"
+    },
+    "family": {
+      "enum": ["material-fluid-recipe", "recipe-change", "quest-for-process"]
+    },
+    "collection": {
+      "enum": ["plans", "receipts", "rollbacks", "recoveries", "runs"]
+    },
+    "workspace_uri": {"type": "string", "pattern": "^file:"},
+    "plan_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "authority_boundary": {"type": "object"},
+    "request": {"type": "object"},
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "review": {"type": "object"},
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/operation"}
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "plan_id", "reason", "schema_version", "state"],
+      "properties": {
+        "format": {"type": "string", "minLength": 1},
+        "schema_version": {"const": 1},
+        "plan_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+        },
+        "state": {"enum": ["ready", "stale"]},
+        "reason": {"type": ["string", "null"]}
+      }
+    },
+    "owner_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["diagnostic_code", "id", "kind", "state", "uri"],
+      "properties": {
+        "diagnostic_code": {"type": ["string", "null"]},
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+        },
+        "kind": {"type": "string", "minLength": 1},
+        "state": {"type": "string", "minLength": 1},
+        "uri": {"type": "string", "pattern": "^file:"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_available", "outcome", "record_id", "requirement", "state"],
+      "properties": {
+        "action_available": {"type": "boolean"},
+        "outcome": {"type": ["string", "null"]},
+        "record_id": {
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "requirement": {"type": ["object", "null"]},
+        "state": {
+          "enum": [
+            "available-not-observed",
+            "required-not-available",
+            "complete",
+            "incomplete"
+          ]
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/action"}
+    }
+  },
+  "$defs": {
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "available", "consent_id", "reason"],
+      "properties": {
+        "action": {
+          "enum": ["apply", "check", "recover", "rollback", "run"]
+        },
+        "available": {"type": "boolean"},
+        "consent_id": {
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "reason": {"type": ["string", "null"]}
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "after_base64",
+        "after_sha256",
+        "after_size",
+        "before_base64",
+        "before_sha256",
+        "before_size",
+        "diff",
+        "operation",
+        "ordinal",
+        "outcome",
+        "path",
+        "role"
+      ],
+      "properties": {
+        "after_base64": {"type": "string"},
+        "after_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "after_size": {"type": "integer", "minimum": 0},
+        "before_base64": {"type": "string"},
+        "before_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "before_size": {"type": "integer", "minimum": 0},
+        "diff": {"type": "string"},
+        "operation": {"enum": ["update"]},
+        "ordinal": {"type": "integer", "minimum": 0},
+        "outcome": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

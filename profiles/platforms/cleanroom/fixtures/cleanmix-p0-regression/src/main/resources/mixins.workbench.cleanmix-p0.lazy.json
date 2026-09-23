@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_11",
+  "target": "@env(DEFAULT)",
+  "package": "dev.workbench.cleanmixp0.mixin",
+  "mixins": [
+    "KnownGapMixins$LazyParentMixin",
+    "KnownGapMixins$LazyChildMixin"
+  ],
+  "injectors": {"defaultRequire": 1}
+}

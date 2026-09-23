@@ -1,0 +1,245 @@
+{
+  "format": "workbench-worldgen-hook-catalog-v1-errata-v1",
+  "schema_version": 1,
+  "overlay_id": "worldgen-hook-catalog-v1-errata:sha256:15edb0f8fc9e91288e22798adb843a8936ec7ce8b16b9e616a943ec1d060e19f",
+  "base_catalog_id": "worldgen-hook-catalog:sha256:a91a820832548e7d6bd19ec1efd92fe55684cf77552d67fd6b2bf86910a999b3",
+  "candidate_lock_sha256": "d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541",
+  "cleanroom_source_revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+  "disposition": "additive-audit-overlay; the identity-bearing V1 catalog remains unchanged",
+  "corrections": [
+    {
+      "hook_ids": [
+        "terraingen.ore.pre",
+        "terraingen.ore.post"
+      ],
+      "field": "callsite",
+      "replacement": "net.minecraft.world.biome.BiomeDecorator#generateOres(World,Random)",
+      "reason": "The exact patch posts OreGenEvent.Pre and Post inside generateOres, not genDecorations.",
+      "source": "patches/minecraft/net/minecraft/world/biome/BiomeDecorator.java.patch"
+    },
+    {
+      "hook_ids": [
+        "i_chunk_generator.populate",
+        "game_registry.generate_world"
+      ],
+      "field": "direct_caller",
+      "replacement": "net.minecraft.world.chunk.Chunk#populate(IChunkGenerator)",
+      "reason": "The protected owned-population method directly calls both operations; the public two-provider overload is the neighbor-readiness router.",
+      "source": "patches/minecraft/net/minecraft/world/chunk/Chunk.java.patch"
+    },
+    {
+      "hook_ids": [
+        "game_registry.generate_world"
+      ],
+      "field": "construction_role",
+      "replacement": "framework-owned-dispatch",
+      "reason": "Mods register IWorldGenerator callbacks. A replacement generator must not invoke the dispatcher itself.",
+      "source": "src/main/java/net/minecraftforge/fml/common/registry/GameRegistry.java"
+    },
+    {
+      "hook_ids": [
+        "world_event.load"
+      ],
+      "field": "callsite",
+      "replacement": "multiple client and server posts, including MinecraftServer startup, DimensionManager hotload, and WorldClient construction",
+      "reason": "DimensionManager#setWorld is not the universal posting site.",
+      "sources": [
+        "patches/minecraft/net/minecraft/server/MinecraftServer.java.patch",
+        "src/main/java/net/minecraftforge/common/DimensionManager.java",
+        "patches/minecraft/net/minecraft/client/multiplayer/WorldClient.java.patch"
+      ]
+    },
+    {
+      "hook_ids": [
+        "world_event.unload"
+      ],
+      "field": "callsite",
+      "replacement": "multiple client and server posts; server DimensionManager posts before removing the world",
+      "reason": "The event has side-specific callsites and ordering, not one universal unload site.",
+      "source": "src/main/java/net/minecraftforge/common/DimensionManager.java"
+    },
+    {
+      "hook_ids": [
+        "biome_provider.init_layers"
+      ],
+      "field": "seam_kind",
+      "replacement": "private-default-initializer plus public getModdedBiomeGenerators helper",
+      "reason": "BiomeProvider(long,WorldType,String) is private in candidate-derived bytecode and is not a supported subclass constructor.",
+      "source": "patches/minecraft/net/minecraft/world/biome/BiomeProvider.java.patch"
+    },
+    {
+      "hook_ids": [
+        "chunk_provider_server.provide_chunk"
+      ],
+      "field": "source_status",
+      "replacement": "unresolved-generated-minecraft-body",
+      "reason": "The bound patch does not contain the provideChunk method body, so it cannot alone prove the load/generate fork.",
+      "source": "patches/minecraft/net/minecraft/world/gen/ChunkProviderServer.java.patch"
+    },
+    {
+      "hook_ids": [
+        "world_type.get_biome_layer",
+        "world_type.get_biome_provider",
+        "world_type.get_chunk_generator"
+      ],
+      "field": "seam_kind",
+      "replacement": "supported-virtual-subclass-seam",
+      "reason": "These methods are construction overrides, not merely generic public API calls.",
+      "source": "patches/minecraft/net/minecraft/world/WorldType.java.patch"
+    },
+    {
+      "hook_ids": [
+        "biome_decorator.gen_decorations",
+        "biome_decorator.generate_ores"
+      ],
+      "field": "roles",
+      "replacement": "protected-subclass-customization and invasive-phase-observation",
+      "reason": "Both protected methods are legitimate exact-candidate override seams as well as useful probe boundaries.",
+      "source": "patches/minecraft/net/minecraft/world/biome/BiomeDecorator.java.patch"
+    }
+  ],
+  "supported_addition_groups": [
+    {
+      "id": "biome.registry",
+      "stage": "registration",
+      "construction_role": "register custom Biome instances during RegistryEvent.Register<Biome>",
+      "seams": [
+        "RegistryEvent.Register<Biome>#getRegistry().register(Biome)",
+        "ForgeRegistries.BIOMES"
+      ],
+      "constraints": [
+        "Biome numeric IDs are capped at 255 in the exact registry declaration.",
+        "Registry names and registration timing are persistent compatibility decisions."
+      ],
+      "sources": [
+        "src/main/java/net/minecraftforge/event/RegistryEvent.java",
+        "src/main/java/net/minecraftforge/fml/common/registry/ForgeRegistries.java",
+        "src/main/java/net/minecraftforge/registries/GameData.java",
+        "patches/minecraft/net/minecraft/world/biome/Biome.java.patch"
+      ]
+    },
+    {
+      "id": "biome.compatibility_taxonomy",
+      "stage": "registration",
+      "construction_role": "publish biome types and selection eligibility to other mods and vanilla-derived generators",
+      "seams": [
+        "BiomeDictionary#addTypes(Biome,Type...)",
+        "BiomeManager#addBiome/removeBiome/getBiomes",
+        "BiomeManager#addSpawnBiome/removeSpawnBiome",
+        "BiomeManager#addVillageBiome/removeVillageBiome",
+        "BiomeManager#addStrongholdBiome/removeStrongholdBiome",
+        "BiomeManager#oceanBiomes"
+      ],
+      "constraints": [
+        "BiomeDictionary requires the biome to be registered first.",
+        "GenLayerBiome, BiomeProvider, and MapGenStronghold snapshot some lists during construction; configure them first.",
+        "BiomeManager.addVillageBiome ignores its boolean canSpawn argument and always adds."
+      ],
+      "sources": [
+        "src/main/java/net/minecraftforge/common/BiomeDictionary.java",
+        "src/main/java/net/minecraftforge/common/BiomeManager.java",
+        "patches/minecraft/net/minecraft/world/gen/layer/GenLayerBiome.java.patch",
+        "patches/minecraft/net/minecraft/world/gen/structure/MapGenStronghold.java.patch"
+      ]
+    },
+    {
+      "id": "biome.virtual_surface",
+      "stage": "surface-decoration-spawn",
+      "construction_role": "customize a biome's surface, decorator, population, and spawn lists",
+      "seams": [
+        "Biome#createBiomeDecorator()",
+        "Biome#getModdedBiomeDecorator(BiomeDecorator)",
+        "Biome#genTerrainBlocks(World,Random,ChunkPrimer,int,int,double)",
+        "Biome#decorate(World,Random,BlockPos)",
+        "Biome#getSpawnableList(EnumCreatureType)"
+      ],
+      "sources": [
+        "patches/minecraft/net/minecraft/world/biome/Biome.java.patch"
+      ]
+    },
+    {
+      "id": "biome_provider.supported_shape",
+      "stage": "biome-allocation",
+      "construction_role": "subclass through protected BiomeProvider() and implement the virtual query contract",
+      "seams": [
+        "BiomeProvider#BiomeProvider()",
+        "BiomeProvider#getModdedBiomeGenerators(WorldType,long,GenLayer[])"
+      ],
+      "constraints": [
+        "Calling getModdedBiomeGenerators is the custom provider's explicit compatibility delivery for WorldTypeEvent.InitBiomeGens.",
+        "The private three-argument default initializer is not a subclass seam."
+      ],
+      "source": "patches/minecraft/net/minecraft/world/biome/BiomeProvider.java.patch"
+    },
+    {
+      "id": "world_selection.spawn_policy",
+      "stage": "world-selection",
+      "construction_role": "select dimension type, generator, provider, initial spawn height, and spawn fuzz",
+      "seams": [
+        "WorldProvider#getDimensionType()",
+        "WorldType#getMinimumSpawnHeight(World)",
+        "WorldType#getSpawnFuzz(WorldServer,MinecraftServer)"
+      ],
+      "sources": [
+        "patches/minecraft/net/minecraft/world/WorldProvider.java.patch",
+        "patches/minecraft/net/minecraft/world/WorldType.java.patch"
+      ]
+    },
+    {
+      "id": "world.runtime_potential_spawns",
+      "stage": "runtime-spawning",
+      "construction_role": "amend or cancel spawn candidates after the generator/biome list is selected",
+      "seams": [
+        "WorldEvent.PotentialSpawns"
+      ],
+      "constraints": [
+        "Entries added for both Forge queries must reuse one globally unique object instance because one consumer compares by identity.",
+        "Cancellation yields no candidates."
+      ],
+      "sources": [
+        "src/main/java/net/minecraftforge/event/world/WorldEvent.java",
+        "patches/minecraft/net/minecraft/world/WorldServer.java.patch"
+      ]
+    }
+  ],
+  "observation_additions": [
+    "MapGenBase#generate(World,int,int,ChunkPrimer)",
+    "MapGenStructure#generateStructure(World,Random,ChunkPos)",
+    "Biome#genTerrainBlocks(World,Random,ChunkPrimer,int,int,double)",
+    "Biome#decorate(World,Random,BlockPos)",
+    "BiomeDecorator#decorate(World,Random,Biome,BlockPos)",
+    "WorldEntitySpawner#performWorldGenSpawning(World,Biome,int,int,int,int,Random)",
+    "returned Chunk biome-array assignment and readout",
+    "selected WorldGenerator subclasses' generate(World,Random,BlockPos)"
+  ],
+  "unsupported_or_unresolved": [
+    {
+      "id": "vanilla_structure_persistence_registration",
+      "state": "unsupported-public-seam",
+      "reason": "MapGenStructureIO.registerStructure is private and registerStructureComponent is package-private. Use an explicitly invasive access technique or separately owned persistence design; do not present this as supported Forge API."
+    },
+    {
+      "id": "generated_minecraft_artifact_lock",
+      "state": "unresolved-authority",
+      "provisional_generated_jar_sha256": "b770831d218c7a08fe9fe3233e6c7d3d4db5f47fb05b8de3bbf3222eaed93b50",
+      "reason": "Candidate-derived bytecode confirms interfaces and access flags provisionally, but its recipe and inputs are not yet candidate-locked and therefore cannot close V1's eight generated-source gaps."
+    }
+  ],
+  "v2_minimum_fields": [
+    "stage",
+    "construction_role",
+    "observation_role",
+    "seam_kind",
+    "authority_level",
+    "owner",
+    "name",
+    "descriptor",
+    "access_flags",
+    "caller_callee_edge",
+    "side_and_dimension_applicability",
+    "delivery_mode",
+    "ordering_and_reentrancy",
+    "source_or_artifact_provenance",
+    "unresolved_state"
+  ]
+}

@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/mixin-transformation-ledger-v1.schema.json",
+  "title": "Workbench Crucible Mixin transformation ledger v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "ledger_id",
+    "session",
+    "launch_state",
+    "observations",
+    "summary",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-crucible-mixin-transformation-ledger-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "ledger_id": {
+      "type": "string",
+      "pattern": "^crucible-mixin-ledger:sha256:[0-9a-f]{64}$"
+    },
+    "session": {
+      "$ref": "#/$defs/session"
+    },
+    "launch_state": {
+      "enum": ["complete", "crashed", "incomplete"]
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "launch_id",
+        "profile_id",
+        "side",
+        "component_receipt_sha256"
+      ],
+      "properties": {
+        "session_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "launch_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "side": {
+          "enum": ["client", "dedicated_server", "integrated_server"]
+        },
+        "component_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "owner_label": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "config": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "mixin": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "target_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "target_member": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "generated_class": {
+          "$ref": "#/$defs/nonempty"
+        }
+      },
+      "minProperties": 1
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source_sha256", "source_record", "limitations"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "artifact_scan",
+            "manifest",
+            "config_lifecycle_probe",
+            "cleanmix_audit",
+            "plugin_callback",
+            "mixin_stage_export",
+            "foundation_final_bytes",
+            "crash_report"
+          ]
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_record": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "stage",
+        "outcome",
+        "phase",
+        "subject",
+        "evidence"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stage": {
+          "enum": [
+            "artifact_discovered",
+            "config_declared",
+            "config_registered",
+            "config_prepared",
+            "apply_started",
+            "plugin_post_apply_seen",
+            "mixin_postprocess_seen",
+            "generated",
+            "final_class_defined",
+            "final_member_attributed",
+            "failure"
+          ]
+        },
+        "outcome": {
+          "enum": ["observed", "failed", "unknown"]
+        },
+        "phase": {
+          "enum": ["PREINIT", "INIT", "DEFAULT", "UNKNOWN"]
+        },
+        "thread": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "wallclock": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "subject": {
+          "$ref": "#/$defs/subject"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "input_bytecode_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "stage_bytecode_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "final_bytecode_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "message": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_count",
+        "stage_counts",
+        "apply_started_count",
+        "final_class_defined_count",
+        "failure_count",
+        "evidence_state"
+      ],
+      "properties": {
+        "observation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stage_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "apply_started_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "final_class_defined_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failure_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_state": {
+          "enum": ["known", "bounded", "conflicted", "incomplete"]
+        }
+      }
+    }
+  }
+}

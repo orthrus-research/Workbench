@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orthrus-research.github.io/workbench/schemas/knowledge-claim-v3.schema.json",
+  "title": "Workbench Atlas claim v3",
+  "type": "object",
+  "required": ["id", "snapshot_id", "subject", "predicate", "value", "value_kind", "status", "source_refs", "evidence", "derivation"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^CLAIM-[A-Z0-9-]+$"},
+    "snapshot_id": {"type": "string"},
+    "subject": {"type": "string"},
+    "predicate": {"type": "string", "minLength": 1},
+    "value": {},
+    "value_kind": {"enum": ["exact", "derived"]},
+    "status": {"enum": ["planned", "researching", "inferred", "verified", "stale"]},
+    "source_refs": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true},
+    "evidence": {
+      "type": "object",
+      "required": ["basis", "record_ids", "generated_fact_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "basis": {"enum": ["pinned-source", "generated-state"]},
+        "record_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "generated_fact_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "derivation": {"type": ["string", "null"]}
+  }
+}

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-profile-cleanroom"
+version = "0.1.1"
+description = "Explicit cleanroom profile adapters and owned resources"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.0,<0.2.0", "workbench-project-intelligence>=0.1.0,<0.2.0", "jsonschema==4.19.2"]
+
+[project.optional-dependencies]
+construction = ["workbench-blueprints>=0.1.1,<0.2.0"]
+
+[project.entry-points."workbench.check_platforms"]
+cleanroom = "workbench_profile_cleanroom.developer_checks"
+
+[project.entry-points."workbench.profiles"]
+cleanroom = "workbench_profile_cleanroom:profile"
+
+[project.entry-points."workbench.axiom_targets"]
+cleanroom = "workbench_profile_cleanroom.axiom"
+
+[project.entry-points."workbench.workspace_home_fixtures"]
+cleanroom = "workbench_profile_cleanroom.fixture_home"
+
+[project.entry-points."workbench.cleanroom_fixture_builds"]
+cleanroom = "workbench_profile_cleanroom.fixture_build"
+
+[tool.setuptools]
+packages = ["workbench_cleanroom_mixin_doctor", "workbench_cleanroom_new_project", "workbench_profile_cleanroom", "workbench_resources.profiles.platforms.cleanroom"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.profiles.platforms.cleanroom" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.profiles.platforms.cleanroom" = ["README.md", "runtime-toolchain.json", "jvm-runtime.json", "jvm-runtime-windows-x64.json", "registry-runtime.json", "native-root-class-space.json", "native-identity-runtime.json", "candidates/0.6.8-alpha/transformer-toolchain-lock-v1.json", "candidates/0.6.8-alpha/qualification-owner-attestation-v1.json", "candidates/0.6.8-alpha/worldgen-prototype-fixture/.gitignore", "candidates/0.6.8-alpha/worldgen-prototype-fixture/README.md", "candidates/0.6.8-alpha/worldgen-prototype-fixture/build.gradle", "candidates/0.6.8-alpha/worldgen-prototype-fixture/examples/groovy/postInit/world_studio_mega_regions.groovy", "candidates/0.6.8-alpha/worldgen-prototype-fixture/gradle.properties", "candidates/0.6.8-alpha/worldgen-prototype-fixture/settings.gradle", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/WorldgenPrototypeMod.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/compat/groovy/WorldStudioGroovyPlugin.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/compat/groovy/WorldStudioPropertyContainer.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/diagnostics/PrototypeDiagnostics.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/diagnostics/WorldgenCausalTrace.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/diagnostics/WorldgenJfrEvents.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/PrototypeChunkGenerator.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/PrototypeFeature.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/PrototypeWorldType.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/WorldStudioBiomeProvider.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/WorldStudioGenLayer.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/WorldStudioTerrain.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/field/FractalValueField.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/hydrology/WatershedEngine.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/plan/WorldStudioPlan.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/plan/WorldStudioPlans.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/resources/mcmod.info", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/main/resources/pack.mcmeta", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/test/java/dev/workbench/worldgenprototype/world/hydrology/WatershedEngineTest.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/src/test/java/dev/workbench/worldgenprototype/world/plan/WorldStudioPlansTest.java", "candidates/0.6.8-alpha/worldgen-prototype-fixture/tests/test_jfr_summary.py", "candidates/0.6.8-alpha/worldgen-prototype-fixture/tests/test_log_comparison.py", "candidates/0.6.8-alpha/worldgen-prototype-fixture/tests/test_log_summary.py", "candidates/0.6.8-alpha/worldgen-prototype-fixture/tests/test_source_contract.py", "candidates/0.6.8-alpha/worldgen-prototype-fixture/tools/compare_world_studio_logs.py", "candidates/0.6.8-alpha/worldgen-prototype-fixture/tools/summarize_world_studio_jfr.py", "candidates/0.6.8-alpha/worldgen-prototype-fixture/tools/summarize_world_studio_log.py", "fixtures/generic-mod-daily-loop/build.gradle", "fixtures/generic-mod-daily-loop/fixture-lock-v1.json", "fixtures/generic-mod-daily-loop/gradle.properties", "fixtures/generic-mod-daily-loop/mixin-mcp-to-srg.srg", "fixtures/generic-mod-daily-loop/settings.gradle", "fixtures/generic-mod-daily-loop/src/main/java/dev/workbench/dailyloop/DailyLoopContent.java", "fixtures/generic-mod-daily-loop/src/main/java/dev/workbench/dailyloop/DailyLoopMod.java", "fixtures/generic-mod-daily-loop/src/main/java/dev/workbench/dailyloop/DailyLoopProbe.java", "fixtures/generic-mod-daily-loop/src/main/java/dev/workbench/dailyloop/DailyLoopProbeCommand.java", "fixtures/generic-mod-daily-loop/src/main/java/dev/workbench/dailyloop/client/ClientProxy.java", "fixtures/generic-mod-daily-loop/src/main/java/dev/workbench/dailyloop/mixin/MixinBlock.java", "fixtures/generic-mod-daily-loop/src/main/java/dev/workbench/dailyloop/proxy/CommonProxy.java", "fixtures/generic-mod-daily-loop/src/main/resources/assets/workbench_daily_loop/blockstates/probe_block.json", "fixtures/generic-mod-daily-loop/src/main/resources/assets/workbench_daily_loop/lang/en_us.lang", "fixtures/generic-mod-daily-loop/src/main/resources/assets/workbench_daily_loop/models/block/probe_block.json", "fixtures/generic-mod-daily-loop/src/main/resources/assets/workbench_daily_loop/models/item/probe_block.json", "fixtures/generic-mod-daily-loop/src/main/resources/mcmod.info", "fixtures/generic-mod-daily-loop/src/main/resources/mixins.workbench_daily_loop.json", "fixtures/generic-mod-daily-loop/src/main/resources/pack.mcmeta", "fixtures/generic-mod-daily-loop/src/test/java/dev/workbench/dailyloop/DailyLoopProbeTest.java", "groovyscript/groovyscript-1.4.3-v1.json", "mixins/cleanroom-mixin-doctor-policy-v1.json", "new-project-kinds/cleanroom-mod-construction-owner-v2.json", "new-project-kinds/cleanroom-mod.json", "provisional.yaml", "schemas/workbench-cleanroom-generic-mod-fixture-lock-v1.schema.json", "schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json", "schemas/workbench-cleanroom-mod-construction-plan-v2.schema.json", "schemas/workbench-cleanroom-mod-construction-request-v2.schema.json", "schemas/workbench-cleanroom-mod-construction-result-v2.schema.json", "schemas/workbench-cleanroom-new-project-kind.schema.json", "src/workbench_cleanroom_mixin_doctor/__init__.py", "src/workbench_cleanroom_mixin_doctor/doctor.py", "src/workbench_cleanroom_new_project/__init__.py", "src/workbench_cleanroom_new_project/cli.py", "src/workbench_cleanroom_new_project/construction.py", "tools/clean_generic_mod_fixture.gradle", "tools/import_cleanmix_audit.py", "tools/import_cleanmix_config_lifecycle.py", "tools/import_cleanmix_defining_loader_discovery_trace.py", "tools/import_cleanmix_runtime_service.py", "tools/import_cleanmix_service_components.py", "tools/import_cleanmix_transformer_chain.py", "tools/import_foundation_final_definitions.py", "tools/import_mixin_service_provider_enumeration.py", "tools/run_cleanmix_p0_matrix.py", "tools/run_cleanmix_x02_investigation.py", "tools/run_generic_mod_fixture_build.py", "tools/run_mixin_doctor.py"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]
+
+[project.entry-points."workbench.event_classifiers"]
+cleanroom = "workbench_profile_cleanroom.events:classify"

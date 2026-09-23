@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/registration-catalog-v1.schema.json",
+  "title": "Workbench registration catalog V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "format",
+    "profile_family_id",
+    "authority_order",
+    "observations",
+    "families",
+    "patterns"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "format": {"const": "workbench-registration-catalog-v1"},
+    "profile_family_id": {"type": "string", "minLength": 1},
+    "authority_order": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "rank", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "rank": {"type": "integer", "minimum": 1},
+          "description": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authority", "repository", "revision", "branch", "observed_date"],
+        "properties": {
+          "authority": {"type": "string"},
+          "repository": {"type": "string", "format": "uri"},
+          "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "branch": {"type": "string", "minLength": 1},
+          "observed_date": {"type": "string", "format": "date"},
+          "census": {"type": "object"}
+        }
+      }
+    },
+    "families": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/family"}
+    },
+    "patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/pattern"}
+    }
+  },
+  "$defs": {
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "description",
+        "lifecycle",
+        "selected_authority",
+        "authority_chain",
+        "companion_surfaces",
+        "active_instance_support",
+        "pattern_keys"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "lifecycle": {"type": "string", "minLength": 1},
+        "selected_authority": {"type": "string", "minLength": 1},
+        "authority_chain": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["authority", "role", "paths", "note"],
+            "properties": {
+              "authority": {"type": "string"},
+              "role": {
+                "enum": ["constructor", "data-definition", "binding-only", "fallback", "absent"]
+              },
+              "paths": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1}
+              },
+              "note": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "companion_surfaces": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "active_instance_support": {
+          "enum": ["ready", "planned", "source-build-required", "observe-only"]
+        },
+        "pattern_keys": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+        }
+      }
+    },
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "family_id",
+        "lifecycle",
+        "renderer",
+        "summary",
+        "authority_spec",
+        "questions",
+        "limitations"
+      ],
+      "properties": {
+        "key": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "label": {"type": "string", "minLength": 1},
+        "family_id": {"type": "string", "minLength": 1},
+        "lifecycle": {"enum": ["experimental", "stable"]},
+        "renderer": {
+          "enum": [
+            "gregtech-material-backed-fluid-v1",
+            "gregtech-machine-recipe-v1",
+            "forge-ore-dictionary-entry-v1"
+          ]
+        },
+        "summary": {"type": "string", "minLength": 1},
+        "authority_spec": {"$ref": "#/$defs/authority_spec"},
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/question"}
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "authority_spec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "pattern_path"],
+          "properties": {
+            "kind": {"const": "convention-patch"},
+            "pattern_path": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "owner_root",
+            "recipe_maps_path",
+            "required_imports",
+            "indentation"
+          ],
+          "properties": {
+            "kind": {"const": "gregtech-postinit-recipe"},
+            "owner_root": {"type": "string", "minLength": 1},
+            "recipe_maps_path": {"type": "string", "minLength": 1},
+            "required_imports": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1}
+            },
+            "indentation": {"type": "string", "pattern": "^ {1,16}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "owner_path", "required_markers"],
+          "properties": {
+            "kind": {"const": "groovyscript-ore-dictionary"},
+            "owner_path": {"type": "string", "minLength": 1},
+            "required_markers": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      ]
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "type", "required", "description"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "label": {"type": "string", "minLength": 1},
+        "type": {
+          "enum": ["string", "color", "path", "choice", "integer", "ingredient", "ingredient-list", "fluid-list"]
+        },
+        "required": {"type": "boolean"},
+        "description": {"type": "string", "minLength": 1},
+        "default": {},
+        "minimum": {"type": "integer"},
+        "maximum": {"type": "integer"},
+        "choices": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "runtime_source": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-groovyscript-platform-profile-v1.schema.json",
+  "title": "Workbench GroovyScript platform profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile_id", "platform_profile_id", "groovyscript", "load_stages", "preprocessors", "class_cache", "limitations"],
+  "properties": {
+    "format": {"const": "workbench-groovyscript-platform-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1},
+    "platform_profile_id": {"type": "string", "minLength": 1},
+    "groovyscript": {
+      "type": "object",
+      "required": ["version", "source_commit"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1},
+        "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "load_stages": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order", "reload", "roles"],
+        "properties": {
+          "order": {"type": "integer"},
+          "reload": {"enum": ["reload-candidate", "restart-required"]},
+          "roles": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    },
+    "preprocessors": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["no_run", "debug_only", "no_reload", "mods_loaded", "side", "packmode"]}
+    },
+    "class_cache": {"type": "object"},
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/mixin-selected-service-components-receipt-v1.schema.json",
+  "title": "Workbench Crucible Mixin Selected Service Components Receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalization_id",
+    "receipt_id",
+    "session",
+    "inputs",
+    "artifacts",
+    "observation",
+    "components",
+    "failures",
+    "health",
+    "summary",
+    "limitations",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {"const": "workbench-crucible-mixin-selected-service-components-receipt-v1"},
+    "schema_version": {"const": 1},
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^crucible-mixin-selected-service-components:sha256:[0-9a-f]{64}$"
+    },
+    "session": {"$ref": "#/$defs/session"},
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_artifact", "candidate_lock", "fixture_result", "launch_log", "raw_trace", "toolchain_lock"],
+      "properties": {
+        "agent_artifact": {"$ref": "#/$defs/file"},
+        "candidate_lock": {"$ref": "#/$defs/file"},
+        "fixture_result": {"$ref": "#/$defs/file"},
+        "launch_log": {"$ref": "#/$defs/file"},
+        "raw_trace": {"$ref": "#/$defs/file"},
+        "toolchain_lock": {"$ref": "#/$defs/file"}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mechanism", "agent_id", "java_version", "target_class", "expected_input_sha256", "observed_input_sha256", "instrumented_output_sha256", "defining_loader_class", "target_code_source_uri", "target_artifact_sha256"],
+      "properties": {
+        "mechanism": {"const": "java_instrument_exact_mixin_service_substitution"},
+        "agent_id": {"$ref": "#/$defs/text"},
+        "java_version": {"$ref": "#/$defs/text"},
+        "target_class": {"$ref": "#/$defs/text"},
+        "expected_input_sha256": {"$ref": "#/$defs/sha256"},
+        "observed_input_sha256": {"$ref": "#/$defs/sha256"},
+        "instrumented_output_sha256": {"$ref": "#/$defs/sha256"},
+        "defining_loader_class": {"$ref": "#/$defs/text"},
+        "target_code_source_uri": {"$ref": "#/$defs/text"},
+        "target_artifact_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "components": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/component"}
+    },
+    "failures": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/failure"}
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "start_health", "end_health", "write_failure"],
+      "properties": {
+        "state": {"enum": ["complete", "failed"]},
+        "start_health": {"const": "starting"},
+        "end_health": {"enum": ["healthy", "failed"]},
+        "write_failure": {"type": "boolean"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component_count", "observed_roles", "missing_roles", "failure_count", "all_required_components_observed"],
+      "properties": {
+        "component_count": {"type": "integer", "minimum": 0, "maximum": 8},
+        "observed_roles": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/role"}},
+        "missing_roles": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/role"}},
+        "failure_count": {"type": "integer", "minimum": 0},
+        "all_required_components_observed": {"type": "boolean"}
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/text"}
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selected_service_components_proved",
+        "configuration_admission_proved",
+        "transformer_order_proved",
+        "mixin_transformation_completion_proved",
+        "final_class_bytes_proved"
+      ],
+      "properties": {
+        "selected_service_components_proved": {"type": "boolean"},
+        "configuration_admission_proved": {"const": false},
+        "transformer_order_proved": {"const": false},
+        "mixin_transformation_completion_proved": {"const": false},
+        "final_class_bytes_proved": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 8192, "pattern": "^[^\\r\\n\\u0000]+$"},
+    "nullableText": {"oneOf": [{"$ref": "#/$defs/text"}, {"type": "null"}]},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "role": {
+      "enum": [
+        "audit_trail",
+        "bytecode_provider",
+        "class_provider",
+        "class_tracker",
+        "logger",
+        "service",
+        "service_classloader",
+        "transformer_provider"
+      ]
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "sha256", "size_bytes"],
+      "properties": {
+        "label": {"$ref": "#/$defs/text"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_id", "launch_id", "profile_id", "side", "candidate_lock_sha256", "toolchain_lock_sha256"],
+      "properties": {
+        "capture_id": {"$ref": "#/$defs/text"},
+        "launch_id": {"$ref": "#/$defs/text"},
+        "profile_id": {"$ref": "#/$defs/text"},
+        "side": {"enum": ["client", "dedicated_server", "integrated_server"]},
+        "candidate_lock_sha256": {"$ref": "#/$defs/sha256"},
+        "toolchain_lock_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_sha256", "size_bytes", "label", "code_source_uri"],
+      "properties": {
+        "artifact_sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "label": {"$ref": "#/$defs/text"},
+        "code_source_uri": {"$ref": "#/$defs/text"}
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "implementation_class",
+        "object_identity",
+        "implementation_loader_class",
+        "implementation_loader_identity",
+        "code_source_uri",
+        "artifact_sha256",
+        "reported_name",
+        "sequence"
+      ],
+      "properties": {
+        "role": {"$ref": "#/$defs/role"},
+        "implementation_class": {"$ref": "#/$defs/text"},
+        "object_identity": {"$ref": "#/$defs/text"},
+        "implementation_loader_class": {"$ref": "#/$defs/text"},
+        "implementation_loader_identity": {"$ref": "#/$defs/text"},
+        "code_source_uri": {"$ref": "#/$defs/text"},
+        "artifact_sha256": {"$ref": "#/$defs/sha256"},
+        "reported_name": {"$ref": "#/$defs/nullableText"},
+        "sequence": {"type": "integer", "minimum": 1}
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "operation", "exception_class", "message", "sequence"],
+      "properties": {
+        "role": {"$ref": "#/$defs/role"},
+        "operation": {"$ref": "#/$defs/text"},
+        "exception_class": {"$ref": "#/$defs/text"},
+        "message": {"$ref": "#/$defs/nullableText"},
+        "sequence": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

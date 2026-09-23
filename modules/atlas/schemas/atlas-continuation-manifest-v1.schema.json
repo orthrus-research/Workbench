@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-continuation-manifest-v1.schema.json",
+  "title": "Supersymmetry Atlas continuation manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "continuation_id",
+    "kind",
+    "status",
+    "segment_index",
+    "parent",
+    "ancestry",
+    "binding",
+    "binding_sha256",
+    "segment_budget",
+    "cumulative_budget",
+    "page_ranges",
+    "frontier",
+    "state",
+    "state_sha256",
+    "result",
+    "result_sha256",
+    "invalidation"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"enum": [1]},
+    "format": {"enum": ["susy-atlas-continuation-manifest-v1"]},
+    "continuation_id": {
+      "type": "string",
+      "pattern": "^atlas-continuation:sha256:[0-9a-f]{64}$"
+    },
+    "kind": {"enum": ["route", "recycling"]},
+    "status": {"enum": ["active", "complete", "invalidated"]},
+    "segment_index": {"type": "integer", "minimum": 0},
+    "parent": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["continuation_id", "manifest_sha256"],
+          "additionalProperties": false,
+          "properties": {
+            "continuation_id": {
+              "type": "string",
+              "pattern": "^atlas-continuation:sha256:[0-9a-f]{64}$"
+            },
+            "manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      ]
+    },
+    "ancestry": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^atlas-continuation:sha256:[0-9a-f]{64}$"
+      }
+    },
+    "binding": {"type": "object"},
+    "binding_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "segment_budget": {
+      "type": "object",
+      "required": ["allocated_work_items", "consumed_work_items"],
+      "additionalProperties": false,
+      "properties": {
+        "allocated_work_items": {"type": "integer", "minimum": 1},
+        "consumed_work_items": {"type": "integer", "minimum": 0}
+      }
+    },
+    "cumulative_budget": {
+      "type": "object",
+      "required": ["consumed_work_items"],
+      "additionalProperties": false,
+      "properties": {
+        "consumed_work_items": {"type": "integer", "minimum": 0}
+      }
+    },
+    "page_ranges": {"type": "array"},
+    "frontier": {"type": "object"},
+    "state": {"type": "object"},
+    "state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "result": {"type": "object"},
+    "result_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "invalidation": {
+      "type": "object",
+      "required": ["valid", "reasons"],
+      "additionalProperties": false,
+      "properties": {
+        "valid": {"type": "boolean"},
+        "reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

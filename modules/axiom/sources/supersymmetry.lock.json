@@ -1,0 +1,874 @@
+{
+  "format": "axiom-source-baseline",
+  "schema_version": 1,
+  "status": "bounded-source-model",
+  "selection_policy": "Resolve latest upstream default branch explicitly, then use immutable commit and pack-pinned dependencies; never float during validation.",
+  "repositories": [
+    {
+      "id": "supersymmetry",
+      "url": "https://github.com/SymmetricDevs/Supersymmetry.git",
+      "selected_ref": "refs/heads/master-ceu",
+      "commit": "3e83cd7bad57bd4c424de4e6cc707ab02fe32f54",
+      "tree": "74330a55fff5af3a30222c071a13ca614938b93b",
+      "commit_time": "2026-09-01T21:27:12-05:00"
+    },
+    {
+      "id": "gtceu",
+      "url": "https://github.com/GregTechCEu/GregTech.git",
+      "selected_ref": "refs/tags/v2.8.10",
+      "commit": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "tree": "a2e4c580930c853c7211ec8fcab4031365464ce9",
+      "commit_time": "2024-07-09T23:15:03-04:00"
+    },
+    {
+      "id": "susy-core",
+      "url": "https://github.com/SymmetricDevs/Susy-Core.git",
+      "selected_ref": "refs/tags/v0.1.118",
+      "commit": "2042c2e4f8b2e5fc9691b1b1e74f0ee11632513a",
+      "tree": "a6d46ddd7c2669f0f7e8856594f3a9f4eb6b480a",
+      "commit_time": "2026-09-01T12:30:41-05:00"
+    },
+    {
+      "id": "groovyscript",
+      "url": "https://github.com/CleanroomMC/GroovyScript.git",
+      "selected_ref": "refs/tags/v1.4.3",
+      "commit": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4",
+      "tree": "d750735d0641286e47121ba52dfb0e6d56ba5a25",
+      "commit_time": "2026-04-14T10:20:31Z"
+    }
+  ],
+  "pack": {
+    "name": "Supersymmetry",
+    "version": "0.1.16.15",
+    "declared_platform_versions": {
+      "forge": "14.23.5.2860",
+      "minecraft": "1.12.2"
+    },
+    "run_config_version": "1.0.0"
+  },
+  "index": {
+    "path": "index.toml",
+    "declared_hash": {
+      "algorithm": "sha256",
+      "value": "257ef89f42af62d59016a704f07982a639c2e3cf6214aca69c371afd1ef777a9"
+    },
+    "observed_hash": {
+      "algorithm": "sha256",
+      "value": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    "observed_bytes": 1,
+    "matches_declared_hash": false,
+    "state": "unresolved-installable-index"
+  },
+  "selected_dependencies": [
+    {
+      "id": "gregtech-ce-unofficial",
+      "manifest": "mods/gregtech-ce-unofficial.pw.toml",
+      "filename": "gregtech-1.12.2-2.8.10-beta.jar",
+      "side": "both",
+      "declared_download_hash": {
+        "algorithm": "sha1",
+        "value": "0c72d4b7b87092d4068c3cb660c95c2c845174c1"
+      },
+      "curseforge": {
+        "file-id": 5519022,
+        "project-id": 557242
+      },
+      "artifact_verified": false,
+      "source_repository": "gtceu"
+    },
+    {
+      "id": "susycore",
+      "manifest": "mods/susycore.pw.toml",
+      "filename": "Susy-Core-0.1.118.jar",
+      "side": "both",
+      "declared_download_hash": {
+        "algorithm": "sha1",
+        "value": "e52c32cfa9ede6d11b0bedff8dc37e2ab82645a5"
+      },
+      "curseforge": {
+        "file-id": 8787221,
+        "project-id": 846224
+      },
+      "artifact_verified": false,
+      "source_repository": "susy-core"
+    },
+    {
+      "id": "groovyscript",
+      "manifest": "mods/groovyscript.pw.toml",
+      "filename": "groovyscript-1.4.3.jar",
+      "side": "both",
+      "declared_download_hash": {
+        "algorithm": "sha1",
+        "value": "48ffe55af9173b3f9ee764f678b6b58d70dab90c"
+      },
+      "curseforge": {
+        "file-id": 7925117,
+        "project-id": 687577
+      },
+      "artifact_verified": false,
+      "source_repository": "groovyscript"
+    },
+    {
+      "id": "gregicality-multiblocks",
+      "manifest": "mods/gregicality-multiblocks.pw.toml",
+      "filename": "GregicalityMultiblocks-1.2.11.jar",
+      "side": "both",
+      "declared_download_hash": {
+        "algorithm": "sha1",
+        "value": "87a13e37bccd8c7a55bc4222ae58f5c8f0c84441"
+      },
+      "curseforge": {
+        "file-id": 5619513,
+        "project-id": 564858
+      },
+      "artifact_verified": false,
+      "source_repository": null
+    },
+    {
+      "id": "gregtech-food-option",
+      "manifest": "mods/gregtech-food-option.pw.toml",
+      "filename": "gregtechfoodoption-1.12.2-1.12.10.jar",
+      "side": "both",
+      "declared_download_hash": {
+        "algorithm": "sha1",
+        "value": "33b3adf6670ebd2c1c10547e8c28e2651da0ac7d"
+      },
+      "curseforge": {
+        "file-id": 8484539,
+        "project-id": 477021
+      },
+      "artifact_verified": false,
+      "source_repository": null
+    },
+    {
+      "id": "supercritical",
+      "manifest": "mods/supercritical.pw.toml",
+      "filename": "Supercritical-0.2.7.jar",
+      "side": "both",
+      "declared_download_hash": {
+        "algorithm": "sha1",
+        "value": "2d7be2d3719bf6e4d99315dcee774726b4eb017e"
+      },
+      "curseforge": {
+        "file-id": 8768402,
+        "project-id": 1185871
+      },
+      "artifact_verified": false,
+      "source_repository": null
+    },
+    {
+      "id": "sussypatches",
+      "manifest": "mods/sussypatches.pw.toml",
+      "filename": "SussyPatches-1.11.6.jar",
+      "side": "both",
+      "declared_download_hash": {
+        "algorithm": "sha1",
+        "value": "019891f472d61d76501a28b3c3e707d27eb65ce7"
+      },
+      "curseforge": {
+        "file-id": 8762573,
+        "project-id": 1319894
+      },
+      "artifact_verified": false,
+      "source_repository": null
+    },
+    {
+      "id": "cleanroom-relauncher",
+      "manifest": "mods/cleanroom-relauncher.pw.toml",
+      "filename": "!cleanroom-relauncher-1.1.3.jar",
+      "side": "client",
+      "declared_download_hash": {
+        "algorithm": "sha1",
+        "value": "da584b9e38fd07294ab8f6c19a3cd382718b3e2a"
+      },
+      "curseforge": {
+        "file-id": 8754029,
+        "project-id": 1214490
+      },
+      "artifact_verified": false,
+      "source_repository": null,
+      "option": {
+        "optional": true,
+        "default": false
+      }
+    }
+  ],
+  "references": [
+    {
+      "id": "material-native-imaterialproperty",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/IMaterialProperty.java",
+      "git_blob": "0a9ea5ca6ac52c68f0747b7e74a318f3c06ac599",
+      "sha256": "a3ad0d2d9fe9ba3807b8d99b0cf73b3d6e93bab87848cd0dab05a246e60eb76d",
+      "line_count": 7,
+      "role": "Native property verification extraction; no registry, flags or fluids"
+    },
+    {
+      "id": "material-native-materialproperties",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/MaterialProperties.java",
+      "git_blob": "b3ea19b4c8b5cc527df6eaba6b200b906ecbf249",
+      "sha256": "3ad2fff16eea35ad7da8463c6aa743695e7c366dd9a169857033a648b2f46a24",
+      "line_count": 91,
+      "role": "Native property verification extraction; no registry, flags or fluids"
+    },
+    {
+      "id": "material-native-propertykey",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/PropertyKey.java",
+      "git_blob": "5dc2234a40e4d267e3eae16cfa31340fc1549a1a",
+      "sha256": "42cb4526c60aff50eb2ac1544c4345f5cacf6b009ecde11161efe19e8bbe40f0",
+      "line_count": 73,
+      "role": "Native property verification extraction; no registry, flags or fluids"
+    },
+    {
+      "id": "material-native-dustproperty",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/DustProperty.java",
+      "git_blob": "55f66933f2c4496ee7b7a7c360308270df842f91",
+      "sha256": "ddf9104fd0330117a45cb9c306fb75843124bd0aa7237b7dc1a737a164268d21",
+      "line_count": 52,
+      "role": "Native property verification extraction; no registry, flags or fluids"
+    },
+    {
+      "id": "material-native-gemproperty",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/GemProperty.java",
+      "git_blob": "90fa2ffb5b57e73641d3c717577089d4c17254ed",
+      "sha256": "989bf9526e5722507596df20833d1b4987e352e27768895d8c8c03107bd8ec20",
+      "line_count": 14,
+      "role": "Native property verification extraction; no registry, flags or fluids"
+    },
+    {
+      "id": "material-native-ingotproperty",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/IngotProperty.java",
+      "git_blob": "79b5d09eb9ebcbae0951b3b89fb04595b8e50167",
+      "sha256": "65384ee96c055a18b75913d13af2c3e38b28371ee0983ace0ed417658ff1d024",
+      "line_count": 85,
+      "role": "Native property verification extraction; no registry, flags or fluids"
+    },
+    {
+      "id": "material-native-material",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/Material.java",
+      "git_blob": "18770e5325cd561ba2121ab21e26394452b88195",
+      "sha256": "46b7cf9c92c06fb3c6db97b06e71f3b826d30d2889f417909418bd406245425e",
+      "line_count": 1176,
+      "role": "Native property verification extraction; no registry, flags or fluids"
+    },
+    {
+      "id": "material-native-imaterialregistrymanager",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/registry/IMaterialRegistryManager.java",
+      "git_blob": "0ae8c557b8f70d6ce1ba9fbdba91a660aaacc607",
+      "sha256": "3f5a405c71bdaccdd31c979f63caeb60b2bb3113c12ea378e285f66cf9b83595",
+      "line_count": 99,
+      "role": "Native property verification extraction; no registry, flags or fluids"
+    },
+    {
+      "id": "pack-manifest",
+      "repository": "supersymmetry",
+      "path": "pack.toml",
+      "git_blob": "b9510a4f0b1f33a10b03c29011f73fbfe22115a2",
+      "sha256": "0ec7ac554894e653bde171f47bb221dce8ba14e0987a6faac77edca5fa4cd15a",
+      "line_count": 13,
+      "role": "Pack label and declared Minecraft/Forge/index metadata"
+    },
+    {
+      "id": "pack-index",
+      "repository": "supersymmetry",
+      "path": "index.toml",
+      "git_blob": "8b137891791fe96927ad78e64b0aad7bded08bdc",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "line_count": 1,
+      "role": "Tracked index bytes; not a valid resolved pack inventory"
+    },
+    {
+      "id": "script-loaders",
+      "repository": "supersymmetry",
+      "path": "groovy/runConfig.json",
+      "git_blob": "89b7834feae6c3ca6f23a761a61e34c9b0935354",
+      "sha256": "067ff8d32a3817fe38604759eca35d69f56bb149466a6ba55f32a82e81f0546f",
+      "line_count": 18,
+      "role": "Loader groups and directory order"
+    },
+    {
+      "id": "script-config",
+      "repository": "supersymmetry",
+      "path": "config/groovyscript.cfg",
+      "git_blob": "6115925a13955026840b83f67f0452a749cc188d",
+      "sha256": "a1e8c8bb74b45120c5fea99f0d75b888dd27280299d759a622ace28ea872a54b",
+      "line_count": 29,
+      "role": "GroovyScript construction policy"
+    },
+    {
+      "id": "map-mutation-api",
+      "repository": "supersymmetry",
+      "path": "groovy/preInit/MetaClassExpansions.groovy",
+      "git_blob": "6de3c27f43d68dc095541085520a6a0cc2cd073c",
+      "sha256": "9cb580085dc57139e24ee83ee3382befff8bcf68bd17d5107828143e19296098",
+      "line_count": 18,
+      "role": "Dynamic RecipeMap metaclass setters"
+    },
+    {
+      "id": "map-definitions",
+      "repository": "supersymmetry",
+      "path": "groovy/prePostInit/Recipemaps.groovy",
+      "git_blob": "4576a4566ac2bc2754d10c57065ebcca76aaeb76",
+      "sha256": "94416a9971e5f0ea5ce8006d49366cf723c72ce883f83006e84a1ec4aa0b283a",
+      "line_count": 128,
+      "role": "Pack aliases for effective recipe maps"
+    },
+    {
+      "id": "map-mutations",
+      "repository": "supersymmetry",
+      "path": "groovy/prePostInit/ModifyRecipeMaps.groovy",
+      "git_blob": "8e6e4966ba87931dc11c8e5aad6fb6520e7a729f",
+      "sha256": "3cc30b09389fdef297f0ad70b157db1f1f88a8f990ed50ece7a194ec3e03bb90",
+      "line_count": 470,
+      "role": "Removal and effective map shape changes"
+    },
+    {
+      "id": "material-flags",
+      "repository": "supersymmetry",
+      "path": "groovy/classes/ChangeFlags.groovy",
+      "git_blob": "11b2872d4d06090197fbf64828d6a8b6531eb1ab",
+      "sha256": "8f6873ca445d4b811d460e5ce4676056efa7f89fdc4894230323b1ea7481036f",
+      "line_count": 653,
+      "role": "Material-generation flag helper"
+    },
+    {
+      "id": "coolant-recipes",
+      "repository": "supersymmetry",
+      "path": "groovy/postInit/chemistry/organic_chemistry/Coolants.groovy",
+      "git_blob": "9b187b1d5857823d3257d0e857c5ef45047a43f1",
+      "sha256": "9267b00ff80b83b4a00caa13276286fd287e6e3583d30ae4d0dd02a0c46ea4af",
+      "line_count": 21,
+      "role": "MIXER and BLENDER construction and capacity case"
+    },
+    {
+      "id": "circuit-recipes",
+      "repository": "supersymmetry",
+      "path": "groovy/postInit/chemistry/ChemistryOverhaul.groovy",
+      "git_blob": "46656bd76865a38048f50f5fb2a63bda4522d0fc",
+      "sha256": "2141ed9a15b944585d255b67f8cc8acf54daea879f1038dcdd8a00121d2de6ce",
+      "line_count": 3633,
+      "role": "Circuit-indexed declarations"
+    },
+    {
+      "id": "helper-generated-recipes",
+      "repository": "supersymmetry",
+      "path": "groovy/globals/Photoresists.groovy",
+      "git_blob": "c59e4ae35bee9b7b6df9309c7892f49a3d61506a",
+      "sha256": "8a665ea6a36f2cc7123fec78871edf4c4d59087540b1c92d13f628cc9549c739",
+      "line_count": 57,
+      "role": "Helper loops and circuit/cleanroom-dependent construction"
+    },
+    {
+      "id": "distillation-source",
+      "repository": "supersymmetry",
+      "path": "groovy/postInit/chemistry/organic_chemistry/carboxyl_derivatives/AcidAnhydrides.groovy",
+      "git_blob": "e7f8b34de40e6da400ed0d0fc52f5cf72bd416e4",
+      "sha256": "95d2da2f99937d0825bba64ea78a0076c3fe675d5c1f8d286d49342c271793be",
+      "line_count": 101,
+      "role": "Ordered fluid outputs for generated distillery variants"
+    },
+    {
+      "id": "ingredient-matching",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/Recipe.java",
+      "git_blob": "d52be1bac096396e6c4b1360c6658d9b1f081f02",
+      "sha256": "03c2030f208cf2c516cd94ae39f06c748aa422876d9fd02cf2c0ee515ee48a0a",
+      "line_count": 785,
+      "role": "Ordered matching and consumption"
+    },
+    {
+      "id": "recipe-building",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/RecipeBuilder.java",
+      "git_blob": "980176fdb5bb092e8c1e2fb853a1e73984179fb3",
+      "sha256": "a25b5be1023ec3acb415340078651d2980db71a3fa655225ae30c41b097872f3",
+      "line_count": 994,
+      "role": "Builder validation, circuit declarations and transformations"
+    },
+    {
+      "id": "recipe-lookup",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/RecipeMap.java",
+      "git_blob": "4c48707b5f3a4742a0b00e69557c7eb79afa8696",
+      "sha256": "13704f9e261dc1c2b37340de321bd3580f70d058fe2a0cb0bebea614270a8de5",
+      "line_count": 1482,
+      "role": "Map validation, compilation and selection"
+    },
+    {
+      "id": "circuit-ingredient",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/ingredients/IntCircuitIngredient.java",
+      "git_blob": "ee259cf24f12c50e99f14acae7f2b7e4b85aae6e",
+      "sha256": "5613c28944757fe91398038a3be80a29ea6a0ff1c4ff33bee1cfe850990888dc",
+      "line_count": 169,
+      "role": "Circuit identity, amount and NBT behavior"
+    },
+    {
+      "id": "ghost-circuits",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/impl/GhostCircuitItemStackHandler.java",
+      "git_blob": "81a2b901f8adbf1cdc9082ce2832e391d7d36820",
+      "sha256": "ead34c56fc8a3fde94edce609b9dac90b431cb0b5c50c782a50f468a3c1e0441",
+      "line_count": 178,
+      "role": "Absent and configured ghost states"
+    },
+    {
+      "id": "machine-registration",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/metatileentities/MetaTileEntities.java",
+      "git_blob": "12e325a63082fdc8fdfd26432807e8e68ebd8b23",
+      "sha256": "ce40b5d06079b4f0bb6bad8ff986fee0203154fdab944152a6343d8d254a42f7",
+      "line_count": 1215,
+      "role": "Registered machine factories"
+    },
+    {
+      "id": "machine-processing",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/impl/AbstractRecipeLogic.java",
+      "git_blob": "a5b8ae1fefcdcdb2db8bbc525a058c20f589f1ed",
+      "sha256": "4c5aebed2da95b3b136bd1c19a975c5631de173675aded010b36bce46d41bd9c",
+      "line_count": 1144,
+      "role": "Cache, eligibility, preparation and progress"
+    },
+    {
+      "id": "distillery-generation",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/builders/UniversalDistillationRecipeBuilder.java",
+      "git_blob": "360087177355b8ef5c4b09470c36e426dc5cd6e4",
+      "sha256": "9eef12542c7de91315d793450a2f1184910464e99dcaa9a2f9fc43435e9f1204",
+      "line_count": 123,
+      "role": "Circuit-indexed derived recipes"
+    },
+    {
+      "id": "susy-map-callbacks",
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/recipes/SuSyRecipeMaps.java",
+      "git_blob": "3c4cfe09ff8e218241c01057a1d0549ff2602cca",
+      "sha256": "28ebc73d46cf808c51a37c9eabec49c5d316232703f5ed3bde95c854914eeadc",
+      "line_count": 682,
+      "role": "Map definitions and construction callbacks"
+    },
+    {
+      "id": "susy-machine-registration",
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/metatileentities/SuSyMetaTileEntities.java",
+      "git_blob": "b0b8438095f5baf36814b7ff81f92eb18670c6f5",
+      "sha256": "017d0bccd8cb25cd5a67912c048762fe0acdad728d288c4e5fffd48af5291508",
+      "line_count": 976,
+      "role": "Pack machine factories, including custom processors"
+    },
+    {
+      "id": "susy-context-rules",
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/util/RecipeCheckUtils.java",
+      "git_blob": "2d93af3934edc722e091766b3a7e99c3c179ccc1",
+      "sha256": "19eeaa39c09cf0e54c212bbaf84989fbe36baf0e9b3cecda5f2cf8e758b443bd",
+      "line_count": 58,
+      "role": "Atmosphere, biome and dimension consumers"
+    },
+    {
+      "id": "susy-catalysts",
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/capability/impl/CatalystRecipeLogic.java",
+      "git_blob": "f56d07c8f8fafc9e2909e055aa75eb1e7e99d410",
+      "sha256": "600bc85bc2126ec3c13dd9766b838524e0718a77dddb2892779b370d56effd4b",
+      "line_count": 132,
+      "role": "Catalyst selection, gates and overclock changes"
+    },
+    {
+      "id": "susy-ball-mill",
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/metatileentities/multi/electric/MetaTileEntityBallMill.java",
+      "git_blob": "a372fc26b4904b2b81fd17ed474b0e7068ca3718",
+      "sha256": "63211d036eef2195dcbb5cdb014104ab0f7e3bd324d0031f2282d45a1aba5e2c",
+      "line_count": 400,
+      "role": "Auxiliary occupied slots and effects before rejection"
+    },
+    {
+      "id": "susy-strand-processing",
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/metatileentities/multi/electric/strand/MetaTileEntityStrandShaper.java",
+      "git_blob": "5a24d416a346cae6abfbfdcfd8fd0a69d9bbb7db",
+      "sha256": "38246c93174a0dc6ba18aaa26f83aa8c9fe933d3bfdb4c5413306022037ada12",
+      "line_count": 330,
+      "role": "Custom non-RecipeMap processing"
+    },
+    {
+      "id": "susy-mixin-selection",
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/mixins/SuSyLateMixinLoader.java",
+      "git_blob": "dc2624f9b761475a4fe5bab88729827c3f6848d9",
+      "sha256": "15b5359adbc06d8ca8231bc4701481c23d04e5d0ab0d1e71d724420ada36b637",
+      "line_count": 46,
+      "role": "Conditional dependency transformation selection"
+    },
+    {
+      "id": "susy-compile-dependencies",
+      "repository": "susy-core",
+      "path": "gradle/deps.versions.toml",
+      "git_blob": "39b21b4c7b48c055b35b99a4a1aa31030bd6e3f5",
+      "sha256": "817e931e70b221d60674c15244540057efb85ececec129ac3a8331250cba8c28",
+      "line_count": 115,
+      "role": "Build dependencies; not a substitute for pack pins"
+    },
+    {
+      "id": "dependency-gregtech-ce-unofficial",
+      "repository": "supersymmetry",
+      "path": "mods/gregtech-ce-unofficial.pw.toml",
+      "git_blob": "cbc269ab1e0150d48ec0002efbda47b90cd3298d",
+      "sha256": "c02a97d59ab1cc726e173bac0c456da17938724fcd124d26329302d8fc2b9b5d",
+      "line_count": 13,
+      "role": "Selected pack dependency metadata, not fetched binary"
+    },
+    {
+      "id": "dependency-susycore",
+      "repository": "supersymmetry",
+      "path": "mods/susycore.pw.toml",
+      "git_blob": "8bb2e306e8b4aa7d38e7b926f44c7c4addd828ca",
+      "sha256": "89f841571405e5675041989d12bb3ba319e5beb92510b4d56ce7a83d1b5df27a",
+      "line_count": 13,
+      "role": "Selected pack dependency metadata, not fetched binary"
+    },
+    {
+      "id": "dependency-groovyscript",
+      "repository": "supersymmetry",
+      "path": "mods/groovyscript.pw.toml",
+      "git_blob": "ee2469c1c3505af0e9f9c4661f256a23282754cb",
+      "sha256": "5a3d4a239e64e44bba1fed8ceaa5c592a81cf8d533db75110afa37a8a7a7dd82",
+      "line_count": 13,
+      "role": "Selected pack dependency metadata, not fetched binary"
+    },
+    {
+      "id": "dependency-gregicality-multiblocks",
+      "repository": "supersymmetry",
+      "path": "mods/gregicality-multiblocks.pw.toml",
+      "git_blob": "ca8b23f997150f2d7b47e31095fd9f9ad7189409",
+      "sha256": "367a687077a1f51527d1af105e2d67e1cd2ff56ec90f3aeb963cc0537a97dd53",
+      "line_count": 13,
+      "role": "Selected pack dependency metadata, not fetched binary"
+    },
+    {
+      "id": "dependency-gregtech-food-option",
+      "repository": "supersymmetry",
+      "path": "mods/gregtech-food-option.pw.toml",
+      "git_blob": "8a87601c63073622d0363c6e50990453f87764cf",
+      "sha256": "ece3ef9a3d14dd4c87a87da01b679a58d9a32115d8edd39cd6f0e80e76f731a7",
+      "line_count": 13,
+      "role": "Selected pack dependency metadata, not fetched binary"
+    },
+    {
+      "id": "dependency-supercritical",
+      "repository": "supersymmetry",
+      "path": "mods/supercritical.pw.toml",
+      "git_blob": "06f3758a3d12f1a9c55be64fa1250cdb6d6b2af7",
+      "sha256": "bc08d603814be5cd8f3e8d28e3e081c100068494c1b6bc48ead302b1e02d0ce0",
+      "line_count": 13,
+      "role": "Selected pack dependency metadata, not fetched binary"
+    },
+    {
+      "id": "dependency-sussypatches",
+      "repository": "supersymmetry",
+      "path": "mods/sussypatches.pw.toml",
+      "git_blob": "5bf32d9c81577580468e266ae8d5c9a69aba1e30",
+      "sha256": "e19935d47466f0f5ab6f55aae1844757ed8fe18fbb0c6f66848633652919dea7",
+      "line_count": 13,
+      "role": "Selected pack dependency metadata, not fetched binary"
+    },
+    {
+      "id": "dependency-cleanroom-relauncher",
+      "repository": "supersymmetry",
+      "path": "mods/cleanroom-relauncher.pw.toml",
+      "git_blob": "09cf57551ba3951902f15bc3084aa7803caaa1ef",
+      "sha256": "a66269ee6ce3493670ccc61afa84720a3baab60ad48e5c98eda649d00cb9e25e",
+      "line_count": 17,
+      "role": "Selected pack dependency metadata, not fetched binary"
+    },
+    {
+      "id": "groovy-run-config",
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/RunConfig.java",
+      "git_blob": "d0e14a4037261de3ba884394caa360f1607f7bbc",
+      "sha256": "438038fc21e0b4be4db169a4a4050a1524abbad833ee42f86c7b3757d9d4ce12",
+      "line_count": 381,
+      "role": "Loader path normalization and cross-stage admission; not full construction qualification"
+    },
+    {
+      "id": "groovy-load-stages",
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/LoadStage.java",
+      "git_blob": "a6fb201655744d2bedcfb59c122c9c103455f299",
+      "sha256": "150180b646bafda8d3258e2c924723b44f8be8bcfb5fcf8a37ed2c3eeb04d591",
+      "line_count": 49,
+      "role": "Native phase ordering and reloadability"
+    },
+    {
+      "id": "axiom-rule-36",
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/SandboxData.java",
+      "git_blob": "0616f687be1e4a38a45a4c7158267d8ca893df6b",
+      "sha256": "d6f009e97cf5724fb26b6958767a8837d60efa4a8a09bd8a11456d2933a80739",
+      "line_count": 189,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-37",
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/mapper/ObjectMappers.java",
+      "git_blob": "08c41ca8989855eb3a58f640ad04cc8ee9a3fe00",
+      "sha256": "e28ef6f2edad2b7a1e95ade0f48aec6df0047bd453f8380e9100d70c64e02377",
+      "line_count": 211,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-38",
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/api/IResourceStack.java",
+      "git_blob": "0a51d99e420c6527b245c1aa72366503411dd3f1",
+      "sha256": "c82d58d43ea0b7883050e1da4f815f1d1c393160d9b8148d8413fe72a5c2884d",
+      "line_count": 27,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-39",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/map/MapItemStackIngredient.java",
+      "git_blob": "d3be9c1bb7bd957830a87fd42367f0bf328969bc",
+      "sha256": "2d13f5286c1fbcd35d99e60896a792f173174227fa3e632d9b377baeb0c54d7c",
+      "line_count": 76,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-40",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/logic/OverclockingLogic.java",
+      "git_blob": "824d69b8c5f2234a6cea40d1f1a8a8e093ec3900",
+      "sha256": "f9c3d1c1143d54ffc04882e9a8bc1212bf2b3b6317a6607cec95acc57c43337f",
+      "line_count": 103,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-41",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/impl/FluidTankList.java",
+      "git_blob": "29594258fb4e2711b147daebbebd19ec43a4aeca",
+      "sha256": "ce8d6c18929c06c1e25a545d5549c9bcb835608f9e58e0630c40eaefb28ec3d9",
+      "line_count": 246,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-42",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/OverlayedFluidHandler.java",
+      "git_blob": "ece86333d6519e03f70d84fd63a54c8ace542a2c",
+      "sha256": "72e343700f08f0c006f06794e838513d919f89f0cdd3fcda1b8d79be0daa3650",
+      "line_count": 173,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-43",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/metatileentity/SimpleMachineMetaTileEntity.java",
+      "git_blob": "d479ec233f07047a1bd592c9907f4bcc0543a82a",
+      "sha256": "1908616b2b5c4b2dbcb0e00ae7c299a6fefc71f09469c5302318f7d81102be2f",
+      "line_count": 578,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-44",
+      "repository": "groovyscript",
+      "path": "gradle.properties",
+      "git_blob": "5936cf83665d26398f9d5e36fdf20c4752db1287",
+      "sha256": "04383730811acc0dbe566885657298ab33bd1f7cd374c4512e5921989c60c240",
+      "line_count": 124,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-45",
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/helper/ingredient/OreDictIngredient.java",
+      "git_blob": "bcd2e0411b742dcb3a18bd7dcfc79ed071fc2e8b",
+      "sha256": "0e0f6f6c4dffe604545c610825db9ac5a3ac8936354f7a94f7c4041103539312",
+      "line_count": 150,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-46",
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/FluidStackMixin.java",
+      "git_blob": "f29faf934d1882c2298e048e398ec384cf39eea9",
+      "sha256": "161b8756853a3e5044d7d5bf3c4b6657de042259bfbef4cc49c4affc4a0eb71a",
+      "line_count": 193,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-47",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/RecipeMaps.java",
+      "git_blob": "cd222d4105b1a76c8715decb86e892e533540e8c",
+      "sha256": "aee1205cb04776b31554285de2d37d61a1d85a1f611277b2d8261a027a4e18ff",
+      "line_count": 1324,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-48",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/GTRecipeInputCache.java",
+      "git_blob": "4e9a68fdf0313c8631d638deeafcebbb0c439d4a",
+      "sha256": "851525f2c02f6cb43ebbafe807d0f6743b8529f11c65aa2588d35c00e4c74ded",
+      "line_count": 170,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-49",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/ingredients/GTRecipeInput.java",
+      "git_blob": "66eb370b53e23655fff6ba481165c0b8569b26a6",
+      "sha256": "7d71d3fafc788c02544bec130d08c3945b4e369925eea551d7dc287a19a3c31a",
+      "line_count": 306,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-50",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/ingredients/GTRecipeItemInput.java",
+      "git_blob": "8fed7a4d4c5477e2feec13547ca0c1ebead15c5b",
+      "sha256": "f0da046da86904bc050b82a73da6932148cf1f8ff13a4debdbfde67d123532d2",
+      "line_count": 247,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-51",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/ingredients/GTRecipeOreInput.java",
+      "git_blob": "a742a23c819b729b0f82bae97aa4f34770250736",
+      "sha256": "d789c4a97035b67d42381e400101e2a1a3a96e78ff0611b3834cd9034efbd0fc",
+      "line_count": 184,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-52",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/ingredients/GTRecipeFluidInput.java",
+      "git_blob": "989d86581f030edfc6866755138625fb81b4aefc",
+      "sha256": "7801c6dcb4c920fba820821200afefdabe5cdda61e390f1cac4bfd99a21afee9",
+      "line_count": 134,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-53",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/GTValues.java",
+      "git_blob": "006f9444117742e6caa5eb17237b3f109084ee7c",
+      "sha256": "f2861c31315f5e556705927a63e7649ef0c6ca1c0a420170af38a99146b15675",
+      "line_count": 205,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-54",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/GTUtility.java",
+      "git_blob": "b4e3c75aeb8fef2c531f716bff84875224c46f62",
+      "sha256": "c79e1d4d62dc2246ab456c931aa7a44340c146951e1b14585fa3f471fe6beaed",
+      "line_count": 865,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-55",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/IMultipleTankHandler.java",
+      "git_blob": "b9e89c71d30bb1984077cbacbf5d85b428af4de0",
+      "sha256": "25b76cea7160745d8432cb4a6ca27cc2320256c7701a9ad62682997bd8739bc6",
+      "line_count": 248,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-56",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/impl/RecipeLogicEnergy.java",
+      "git_blob": "f618b37e2be326fa727d3414c685ab4a5b30b298",
+      "sha256": "b6aa4f170d7c114fcc9ea8729ee067a1e43e4b7de13e4d1ecad03e7f0e37ff4b",
+      "line_count": 49,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-rule-57",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/metatileentity/WorkableTieredMetaTileEntity.java",
+      "git_blob": "5e648be0f608fc15b8bad8c9d337b915de40ccb5",
+      "sha256": "baf78245429170d6695fd9b51c800d7198951c252cee488352de770aac539306",
+      "line_count": 216,
+      "role": "Bounded Axiom implementation rule source; not transitive qualification"
+    },
+    {
+      "id": "axiom-registry-GTControlledRegistry",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/GTControlledRegistry.java",
+      "git_blob": "8ae00d93cbf6352fdd8188faace986344ebaafbd",
+      "sha256": "2d4409ec994ca7eeb7e6747e1f771f484a4a4acba42c7524f0017c6c50d250fd",
+      "line_count": 78,
+      "role": "Native registry lifecycle or fluid registration queue; not complete material and fluid construction"
+    },
+    {
+      "id": "axiom-registry-MaterialRegistry",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/registry/MaterialRegistry.java",
+      "git_blob": "5aed58c764bc023cee68f47d649a37cd3f51dc69",
+      "sha256": "57764e02a83160ac941d5155c27f0b7baeee7c9672f71f2cf0940acf30522f25",
+      "line_count": 46,
+      "role": "Native registry lifecycle or fluid registration queue; not complete material and fluid construction"
+    },
+    {
+      "id": "axiom-registry-MaterialRegistryImpl",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/unification/material/internal/MaterialRegistryImpl.java",
+      "git_blob": "5311166dd2c0de322746e1173f39dc5a61e1e797",
+      "sha256": "a13df098c1b3cf58283317e9afb27a39c7919fbb792d73f1936a7edd0fca0fb8",
+      "line_count": 77,
+      "role": "Native registry lifecycle or fluid registration queue; not complete material and fluid construction"
+    },
+    {
+      "id": "axiom-registry-MaterialRegistryManager",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/unification/material/internal/MaterialRegistryManager.java",
+      "git_blob": "ff26e95cdd2b4a33b8d2cd051a0fa9d71fc44340",
+      "sha256": "d3fb2aba0675e4b2dee5edd23037504d6cfd0504d1cee556670a6091bbd8c76b",
+      "line_count": 152,
+      "role": "Native registry lifecycle or fluid registration queue; not complete material and fluid construction"
+    },
+    {
+      "id": "axiom-registry-FluidStorageImpl",
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/store/FluidStorageImpl.java",
+      "git_blob": "06911df8deb326464d70caa8d67be957ffe47124",
+      "sha256": "19464f7cb915d60bd6e68ec84ac5239668d463ab4a78937d24de677df5535c73",
+      "line_count": 101,
+      "role": "Native registry lifecycle or fluid registration queue; not complete material and fluid construction"
+    }
+  ],
+  "claims": {
+    "source_refs_resolved": true,
+    "referenced_git_blobs_verified": true,
+    "pack_index_verified": false,
+    "mod_binaries_verified": false,
+    "source_binary_equivalence_verified": false,
+    "complete_dependency_coverage": false,
+    "machine_rules_extracted": false,
+    "behavioral_parity_qualified": false
+  },
+  "unresolved": [
+    "Source/artifact equivalence for GTCEu and Susy-Core",
+    "Complete transitive semantic closure of GroovyScript and other active dependencies; GroovyScript source ref itself is resolved",
+    "Authoritative platform composition, configuration and applied mixins for a qualified target",
+    "Reconciled generated pack index if an installable artifact is qualified",
+    "All registered processing families and recipe producers; references here are entry points, not exhaustive coverage"
+  ],
+  "resolved_at_utc": "2026-09-09 02:20:01 UTC"
+}

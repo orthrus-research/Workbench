@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.dev/workbench/schemas/developer-feature-options-projection-v1.schema.json",
+  "title": "Workbench developer feature options projection V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority_boundary",
+    "counts",
+    "family",
+    "format",
+    "id",
+    "kind",
+    "limit",
+    "query",
+    "recipe_maps",
+    "schema_version",
+    "scripts",
+    "source_options",
+    "state",
+    "truncated"
+  ],
+  "properties": {
+    "authority_boundary": {
+      "const": {
+        "construction_authority": "source-owner-options",
+        "owner_record_mutated": false,
+        "profile_support_claimed": false,
+        "release_or_publication_authorized": false
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recipe_maps", "scripts"],
+      "properties": {
+        "recipe_maps": {"$ref": "#/$defs/count"},
+        "scripts": {"$ref": "#/$defs/count"}
+      }
+    },
+    "family": {"enum": ["material-fluid-recipe", "recipe-change"]},
+    "format": {"const": "workbench-developer-feature-options-projection-v1"},
+    "id": {
+      "type": "string",
+      "pattern": "^workbench-developer-feature-options-projection:sha256:[0-9a-f]{64}$"
+    },
+    "kind": {"const": "workbench-developer-feature-options-projection"},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+    "query": {
+      "anyOf": [
+        {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S"},
+        {"type": "null"}
+      ]
+    },
+    "recipe_maps": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["alias", "registry_name"],
+        "properties": {
+          "alias": {"type": "string", "minLength": 1},
+          "registry_name": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "schema_version": {"const": 1},
+    "scripts": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "source_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "schema_version", "state"],
+      "properties": {
+        "format": {
+          "enum": [
+            "workbench-developer-material-fluid-recipe-options-v1",
+            "workbench-supersymmetry-recipe-change-options-v1"
+          ]
+        },
+        "schema_version": {"const": 1},
+        "state": {"const": "experimental"}
+      }
+    },
+    "state": {"const": "available"},
+    "truncated": {"type": "boolean"}
+  },
+  "$defs": {
+    "count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["matched", "returned", "total"],
+      "properties": {
+        "matched": {"type": "integer", "minimum": 0},
+        "returned": {"type": "integer", "minimum": 0, "maximum": 200},
+        "total": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

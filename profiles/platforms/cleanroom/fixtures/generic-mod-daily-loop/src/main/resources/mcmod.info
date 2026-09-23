@@ -1,0 +1,15 @@
+[
+  {
+    "modid": "workbench_daily_loop",
+    "name": "Workbench Cleanroom Daily Loop",
+    "description": "Minimal generic Cleanroom fixture for the Workbench developer loop.",
+    "version": "1.0.0",
+    "mcversion": "1.12.2",
+    "authorList": ["Workbench"],
+    "credits": "CleanroomMC",
+    "url": "",
+    "updateUrl": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-interface-result-v1.schema.json",
+  "title": "Supersymmetry Blueprints core and CLI result envelope v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "command",
+    "status",
+    "exit_code",
+    "run_id",
+    "state",
+    "data",
+    "diagnostics"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-interface-result-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "command": {
+      "enum": [
+        "init",
+        "plan",
+        "simulate",
+        "generate",
+        "apply",
+        "verify",
+        "history",
+        "export-proof"
+      ]
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "rejected"
+      ]
+    },
+    "exit_code": {
+      "enum": [
+        0,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "run_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^blueprints-run:sha256:[0-9a-f]{64}$"
+        }
+      ]
+    },
+    "state": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "enum": [
+            "initialized",
+            "planned",
+            "simulation-failed",
+            "simulated",
+            "released",
+            "application-rejected",
+            "applied",
+            "verification-failed",
+            "verified",
+            "invalidated"
+          ]
+        }
+      ]
+    },
+    "data": {
+      "type": "object"
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "location",
+          "message"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

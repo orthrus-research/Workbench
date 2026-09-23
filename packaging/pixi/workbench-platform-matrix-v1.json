@@ -1,0 +1,183 @@
+{
+  "format": "workbench-platform-matrix-v1",
+  "pixi": {
+    "checksum_manifest_sha256": "cb6be488cb13a92e05f8b3b635d348a933aa00302d75e45441f1f981977d9a46",
+    "checksum_manifest_url": "https://github.com/prefix-dev/pixi/releases/download/v0.75.0/sha256.sum",
+    "release_commit": "3cf61a876877bd64da402b6f707cc9c24c6ff56f",
+    "release_tag": "v0.75.0",
+    "release_url": "https://github.com/prefix-dev/pixi/releases/tag/v0.75.0",
+    "requirement": "==0.75.0",
+    "version": "0.75.0"
+  },
+  "platforms": [
+    {
+      "architecture": "x86-64",
+      "bootstrap": {
+        "archive_format": "tar.gz",
+        "archive_sha256": "bcd825d62905c29b3c754b71f9cdc9d6f119454398f58330f111a7b6a0de0a3f",
+        "asset": "pixi-x86_64-unknown-linux-musl.tar.gz",
+        "available": true,
+        "executable": "pixi",
+        "executable_sha256": "4383aed18b2d5569cf34a19638daf954aa4415cc87ad3a9da9f34059cc4a004c",
+        "url": "https://github.com/prefix-dev/pixi/releases/download/v0.75.0/pixi-x86_64-unknown-linux-musl.tar.gz"
+      },
+      "host_system": "Linux",
+      "implementation": {
+        "compatibility_environment": true,
+        "source_installer": true,
+        "workspace_environment": true
+      },
+      "machine_aliases": [
+        "amd64",
+        "x86_64"
+      ],
+      "minimum_host": {
+        "kind": "glibc",
+        "value": "2.28"
+      },
+      "pixi_platform": "linux-64",
+      "target": "linux-x86-64"
+    },
+    {
+      "architecture": "arm64",
+      "bootstrap": {
+        "archive_format": "tar.gz",
+        "archive_sha256": "6476588859faa7232def49ff590f199390bd93fae3826617596befc52382724f",
+        "asset": "pixi-aarch64-unknown-linux-musl.tar.gz",
+        "available": true,
+        "executable": "pixi",
+        "executable_sha256": "ea8f527789260a91b5b9afe96e226b3769512c7a5ed81a095f3d6e7cbdd95d2c",
+        "url": "https://github.com/prefix-dev/pixi/releases/download/v0.75.0/pixi-aarch64-unknown-linux-musl.tar.gz"
+      },
+      "host_system": "Linux",
+      "implementation": {
+        "compatibility_environment": true,
+        "source_installer": true,
+        "workspace_environment": true
+      },
+      "machine_aliases": [
+        "aarch64",
+        "arm64"
+      ],
+      "minimum_host": {
+        "kind": "glibc",
+        "value": "2.28"
+      },
+      "pixi_platform": "linux-aarch64",
+      "target": "linux-arm64"
+    },
+    {
+      "architecture": "x86-64",
+      "bootstrap": {
+        "archive_format": "zip",
+        "archive_sha256": "0c478f9efcb0f8ba984b21c3fa9f484a3d098fc9a46be896f0ac260939ddeaa9",
+        "asset": "pixi-x86_64-pc-windows-msvc.zip",
+        "available": true,
+        "executable": "pixi.exe",
+        "executable_sha256": "63ec8945eed67b74ead220d1ece1167ac39166ef4f804ee46c37daf7105ec232",
+        "url": "https://github.com/prefix-dev/pixi/releases/download/v0.75.0/pixi-x86_64-pc-windows-msvc.zip"
+      },
+      "host_system": "Windows",
+      "implementation": {
+        "compatibility_environment": true,
+        "source_installer": true,
+        "workspace_environment": true
+      },
+      "machine_aliases": [
+        "amd64",
+        "x86_64"
+      ],
+      "minimum_host": {
+        "kind": "windows",
+        "value": "10.0.26100"
+      },
+      "pixi_platform": "win-64",
+      "target": "windows-x86-64"
+    },
+    {
+      "architecture": "arm64",
+      "bootstrap": {
+        "archive_format": "zip",
+        "archive_sha256": "826d9c588092351d5b15d485fca02cb7df984dbee647bb8a62e1b93c58cdf15d",
+        "asset": "pixi-aarch64-pc-windows-msvc.zip",
+        "available": true,
+        "executable": "pixi.exe",
+        "executable_sha256": "7d42befbf1afd088e2f99f2c1be8fe343918e5ec514f36503ae929451ff9bdfc",
+        "url": "https://github.com/prefix-dev/pixi/releases/download/v0.75.0/pixi-aarch64-pc-windows-msvc.zip"
+      },
+      "host_system": "Windows",
+      "implementation": {
+        "compatibility_environment": false,
+        "source_installer": false,
+        "workspace_environment": false
+      },
+      "machine_aliases": [
+        "aarch64",
+        "arm64"
+      ],
+      "minimum_host": {
+        "kind": "windows",
+        "value": "10.0.26100"
+      },
+      "pixi_platform": "win-arm64",
+      "target": "windows-arm64"
+    },
+    {
+      "architecture": "x86-64",
+      "bootstrap": {
+        "archive_format": "tar.gz",
+        "archive_sha256": "f129e890366ad5502304c8f863cc5585d82143b64731f36bcd1283a27781097e",
+        "asset": "pixi-x86_64-apple-darwin.tar.gz",
+        "available": true,
+        "executable": "pixi",
+        "executable_sha256": "7f475ca1d41ac8cf392e125f5e39a02d910761c253a6e925b331decec09e8056",
+        "url": "https://github.com/prefix-dev/pixi/releases/download/v0.75.0/pixi-x86_64-apple-darwin.tar.gz"
+      },
+      "host_system": "Darwin",
+      "implementation": {
+        "compatibility_environment": true,
+        "source_installer": true,
+        "workspace_environment": true
+      },
+      "machine_aliases": [
+        "amd64",
+        "x86_64"
+      ],
+      "minimum_host": {
+        "kind": "macos",
+        "value": "15.0"
+      },
+      "pixi_platform": "osx-64",
+      "target": "macos-x86-64"
+    },
+    {
+      "architecture": "arm64",
+      "bootstrap": {
+        "archive_format": "tar.gz",
+        "archive_sha256": "52a43f9268f3accb7155cf229937f2f5333559b1333615d610362c6151fded66",
+        "asset": "pixi-aarch64-apple-darwin.tar.gz",
+        "available": true,
+        "executable": "pixi",
+        "executable_sha256": "4c1683c64ef1ed2b36b210310bd0dcff4460b3fb74b59ddca3407c2943d4de15",
+        "url": "https://github.com/prefix-dev/pixi/releases/download/v0.75.0/pixi-aarch64-apple-darwin.tar.gz"
+      },
+      "host_system": "Darwin",
+      "implementation": {
+        "compatibility_environment": true,
+        "source_installer": true,
+        "workspace_environment": true
+      },
+      "machine_aliases": [
+        "aarch64",
+        "arm64"
+      ],
+      "minimum_host": {
+        "kind": "macos",
+        "value": "15.0"
+      },
+      "pixi_platform": "osx-arm64",
+      "target": "macos-arm64"
+    }
+  ],
+  "schema_version": 1
+}

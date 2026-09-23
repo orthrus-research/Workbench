@@ -1,0 +1,35 @@
+{
+  "format": "workbench-component-relationships-v2",
+  "schema_version": 2,
+  "client_entrypoint": "workbench-shell",
+  "required_edges": [
+    [
+      "blueprints",
+      "project-intelligence"
+    ],
+    [
+      "client-intellij-community",
+      "workbench-shell"
+    ],
+    [
+      "client-vscode",
+      "workbench-shell"
+    ],
+    [
+      "workbench-shell",
+      "atlas"
+    ],
+    [
+      "workbench-shell",
+      "blueprints"
+    ],
+    [
+      "workbench-shell",
+      "manuals"
+    ],
+    [
+      "workbench-shell",
+      "project-intelligence"
+    ]
+  ]
+}

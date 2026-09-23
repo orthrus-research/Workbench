@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-subsurface-studio"
+version = "0.1.2"
+description = "Workbench subsurface-studio module"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.0,<0.2.0", "workbench-crucible>=0.1.0,<0.2.0"]
+
+[project.entry-points."workbench.modules"]
+"subsurface-studio" = "workbench_registration_subsurface_studio:module"
+
+[tool.setuptools]
+packages = ["workbench_subsurface_studio", "workbench_resources.modules.subsurface-studio"]
+py-modules = ["workbench_registration_subsurface_studio"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.subsurface-studio" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.modules.subsurface-studio" = ["pyproject.toml", "README.md", "src/**/*.py"]
+
+[tool.workbench]
+module-id = "subsurface-studio"
+requires = ["crucible"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]

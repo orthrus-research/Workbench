@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/effect-change-envelope-v2.schema.json",
+  "title": "Workbench Process Studio Effect Change Envelope V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "envelope_id",
+    "state",
+    "authority",
+    "binding",
+    "expectations",
+    "allow_unlisted_changes",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-process-studio-effect-change-envelope-v2"
+    },
+    "schema_version": {"const": 2},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "envelope_id": {
+      "type": "string",
+      "pattern": "^workbench-process-studio-effect-change-envelope-v2:sha256:[0-9a-f]{64}$"
+    },
+    "state": {"enum": ["open", "closed"]},
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_id",
+        "claim",
+        "causality_authority",
+        "action_authorization"
+      ],
+      "properties": {
+        "owner_id": {"$ref": "#/$defs/nonemptyString"},
+        "claim": {"const": "declared expected structural effects only"},
+        "causality_authority": {"const": "none"},
+        "action_authorization": {"const": "none"}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_snapshot_id",
+        "baseline_capture_id",
+        "context_id",
+        "pack_profile_id",
+        "platform_profile_id",
+        "physical_side",
+        "stage"
+      ],
+      "properties": {
+        "baseline_snapshot_id": {"$ref": "#/$defs/nonemptyString"},
+        "baseline_capture_id": {"$ref": "#/$defs/nonemptyString"},
+        "context_id": {"$ref": "#/$defs/nonemptyString"},
+        "pack_profile_id": {"$ref": "#/$defs/nonemptyString"},
+        "platform_profile_id": {"$ref": "#/$defs/nonemptyString"},
+        "physical_side": {"$ref": "#/$defs/nonemptyString"},
+        "stage": {"$ref": "#/$defs/nonemptyString"}
+      }
+    },
+    "expectations": {
+      "type": "array",
+      "maxItems": 100000,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/expectation"}
+    },
+    "allow_unlisted_changes": {"type": "boolean"},
+    "limitations": {
+      "type": "array",
+      "maxItems": 500000,
+      "items": {"$ref": "#/$defs/nonemptyString"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"state": {"const": "closed"}},
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {"allow_unlisted_changes": {"const": false}}
+      }
+    }
+  ],
+  "$defs": {
+    "nonemptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1048576
+    },
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "strictJson": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        {"type": "string", "maxLength": 1048576},
+        {
+          "type": "array",
+          "maxItems": 500000,
+          "items": {"$ref": "#/$defs/strictJson"}
+        },
+        {
+          "type": "object",
+          "maxProperties": 500000,
+          "additionalProperties": {"$ref": "#/$defs/strictJson"}
+        }
+      ]
+    },
+    "opaqueCorrelation": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/strictJson"}
+    },
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "record_kind",
+        "descriptor_kind",
+        "operation",
+        "correlation",
+        "baseline_semantic_fingerprint",
+        "candidate_semantic_fingerprint"
+      ],
+      "properties": {
+        "family": {"$ref": "#/$defs/nonemptyString"},
+        "record_kind": {
+          "enum": ["registry-observation", "effect-observation"]
+        },
+        "descriptor_kind": {"$ref": "#/$defs/nonemptyString"},
+        "operation": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "correlation": {"$ref": "#/$defs/opaqueCorrelation"},
+        "baseline_semantic_fingerprint": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "candidate_semantic_fingerprint": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"record_kind": {"const": "registry-observation"}},
+            "required": ["record_kind"]
+          },
+          "then": {"properties": {"operation": {"type": "null"}}}
+        },
+        {
+          "if": {
+            "properties": {"record_kind": {"const": "effect-observation"}},
+            "required": ["record_kind"]
+          },
+          "then": {
+            "properties": {
+              "operation": {"$ref": "#/$defs/nonemptyString"}
+            }
+          }
+        }
+      ],
+      "not": {
+        "properties": {
+          "baseline_semantic_fingerprint": {"type": "null"},
+          "candidate_semantic_fingerprint": {"type": "null"}
+        },
+        "required": [
+          "baseline_semantic_fingerprint",
+          "candidate_semantic_fingerprint"
+        ]
+      }
+    }
+  }
+}

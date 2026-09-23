@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-history-manifest-v1.schema.json",
+  "title": "Supersymmetry Blueprints local history manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "run_id",
+    "state",
+    "record_ids",
+    "artifacts",
+    "retention_policy_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-history-manifest-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^blueprints-run:sha256:[0-9a-f]{64}$"
+    },
+    "state": {
+      "enum": [
+        "initialized",
+        "planned",
+        "simulation-failed",
+        "simulated",
+        "released",
+        "application-rejected",
+        "applied",
+        "verification-failed",
+        "verified",
+        "invalidated"
+      ]
+    },
+    "record_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "kind",
+          "sha256",
+          "privacy",
+          "retention_class",
+          "retained"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]*$"
+          },
+          "kind": {
+            "enum": [
+              "manifest",
+              "source",
+              "patch",
+              "log",
+              "build",
+              "world",
+              "evidence"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "privacy": {
+            "enum": [
+              "exportable",
+              "local-private"
+            ]
+          },
+          "retention_class": {
+            "enum": [
+              "compact",
+              "bulky"
+            ]
+          },
+          "retained": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "retention_policy_id": {
+      "const": "BLUEPRINTS-LOCAL-RETENTION-V1"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "axiom.target-policy.v1",
+  "profile": "supersymmetry",
+  "scope": "source-composition",
+  "repositories": {
+    "supersymmetry": {
+      "prefixes": ["groovy/", "config/", "mods/"],
+      "paths": ["pack.toml", "index.toml", "LICENSE"]
+    },
+    "gtceu": {
+      "prefixes": ["src/main/java/", "src/main/resources/", "gradle/"],
+      "paths": ["LICENSE", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradle.properties", "dependencies.gradle"]
+    },
+    "susy-core": {
+      "prefixes": ["src/main/java/", "src/main/resources/", "gradle/", "build-logic/"],
+      "paths": ["LICENSE", "build.gradle.kts", "settings.gradle.kts", "gradle.properties"]
+    },
+    "groovyscript": {
+      "prefixes": ["src/main/java/", "src/main/resources/", "gradle/"],
+      "paths": ["LICENSE", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradle.properties", "buildscript.properties", "dependencies.gradle", "repositories.gradle", "addon.gradle"]
+    }
+  },
+  "scriptRoot": "groovy",
+  "runConfig": "groovy/runConfig.json",
+  "artifactDirectory": "mods/",
+  "qualification": "Source capture is not registry, artifact equivalence, active transformation, or recipe-processing qualification."
+}

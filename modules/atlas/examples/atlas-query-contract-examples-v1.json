@@ -1,0 +1,621 @@
+{
+  "fixture_version": 1,
+  "base_query_instance": {
+    "schema_version": 1,
+    "format": "susy-atlas-query-instance-v1",
+    "query_instance_id": "atlas-query:sha256:bd90c50348ed4cc5883baf2f8dad86a9e7c3022d6d29ee64c91fc81974e9a16a",
+    "question_id": "PLAYER-PRODUCE-MATERIAL-001",
+    "question_definition_sha256": "674ce6e3b014df902d46bdf9441d47bfa2a4b49871807d45c7cff363f6ec29cd",
+    "selector": {
+      "kind": "material",
+      "key_kind": "material-resource-location",
+      "key": "susy:diluted_oil_light"
+    },
+    "snapshot_id": "SNAPSHOT-SUSY-0-1-16-11-9D3AA7AE0",
+    "scopes": [
+      {
+        "profile": "COMMON_FINAL_STATE",
+        "physical_side": "CLIENT"
+      }
+    ],
+    "traversal_options": {
+      "route": {
+        "max_depth": 8,
+        "max_routes": 50,
+        "max_alternatives_per_slot": 25,
+        "include_chanced_outputs": true,
+        "include_procedural_rules": true,
+        "max_visited_nodes": 10000
+      },
+      "recycling": {
+        "max_depth": 4,
+        "max_operations": 250,
+        "max_consumers_per_target": 25,
+        "max_output_alternatives_per_slot": 25,
+        "max_visited_targets": 10000
+      },
+      "construction": {
+        "max_depth": 8,
+        "max_routes": 250,
+        "max_alternatives_per_slot": 25,
+        "max_visited_nodes": 10000,
+        "max_machine_roots": 64
+      }
+    },
+    "authority_requirements": {
+      "required": [
+        "runtime-mechanics"
+      ],
+      "optional": [
+        "curated-interpretation",
+        "pinned-source",
+        "placed-world-observation",
+        "quest-data",
+        "runtime-presentation"
+      ]
+    },
+    "query_policy_id": "ATLAS-QUERY-POLICY-V1",
+    "capability_policy_id": "ATLAS-CAPABILITY-POLICY-V1",
+    "capability_policy_sha256": "cd62518bbfe545b6b28d1acdcc2b50d4f2ace6dacf5caee433ce422a2cee316c"
+  },
+  "query_cases": [
+    {
+      "id": "exact-material",
+      "valid": true,
+      "replace": {}
+    },
+    {
+      "id": "missing-material",
+      "valid": true,
+      "replace": {
+        "selector": {
+          "kind": "material",
+          "key_kind": "material-resource-location",
+          "key": "susy:not_present"
+        }
+      }
+    },
+    {
+      "id": "ambiguous-machine",
+      "valid": true,
+      "replace": {
+        "question_id": "DEVELOPER-DECLARATION-001",
+        "selector": {
+          "kind": "machine",
+          "key_kind": "machine-resource-location",
+          "key": "susy:ambiguous_machine"
+        },
+        "authority_requirements": {
+          "required": [
+            "pinned-source"
+          ],
+          "optional": [
+            "runtime-mechanics"
+          ]
+        }
+      }
+    },
+    {
+      "id": "unavailable-pinned-source",
+      "valid": true,
+      "replace": {
+        "question_id": "DEVELOPER-DECLARATION-001",
+        "authority_requirements": {
+          "required": [
+            "pinned-source"
+          ],
+          "optional": [
+            "runtime-mechanics"
+          ]
+        }
+      }
+    },
+    {
+      "id": "invalid-display-text-selector",
+      "valid": false,
+      "replace": {
+        "selector": {
+          "kind": "material",
+          "display_name": "Diluted Light Oil"
+        }
+      }
+    }
+  ],
+  "result_cases": [
+    {
+      "id": "exact-material",
+      "query_case_id": "exact-material",
+      "resolution": {
+        "status": "resolved",
+        "candidate_count": 1,
+        "targets": [
+          {
+            "profile": "COMMON_FINAL_STATE",
+            "physical_side": "CLIENT",
+            "node_id": "rg:common_final_state_client:material:susy:diluted_oil_light",
+            "node_kind": "material"
+          }
+        ],
+        "profile_gaps": [],
+        "detail": "one exact target resolved in every requested profile scope"
+      },
+      "authorities": [
+        {
+          "basis": "runtime-mechanics",
+          "status": "available",
+          "evidence_ids": [
+            "rg:common_final_state_client:material:susy:diluted_oil_light"
+          ],
+          "detail": "exact target evidence is available from requested mechanical runtime scopes"
+        },
+        {
+          "basis": "runtime-presentation",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the query requests this authority but names no compatible presentation runtime scope"
+        },
+        {
+          "basis": "pinned-source",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: pinned-source"
+        },
+        {
+          "basis": "quest-data",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: quest-data"
+        },
+        {
+          "basis": "curated-interpretation",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: curated-interpretation"
+        },
+        {
+          "basis": "placed-world-observation",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: placed-world-observation"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "rg:common_final_state_client:material:susy:diluted_oil_light",
+          "basis": "runtime-mechanics",
+          "authority": "normalized-runtime-graph",
+          "record_kind": "runtime-node",
+          "record": {
+            "record_type": "node",
+            "id": "rg:common_final_state_client:material:susy:diluted_oil_light",
+            "kind": "material",
+            "scope": {
+              "snapshot_id": "SNAPSHOT-SUSY-0-1-16-11-9D3AA7AE0",
+              "profile": "COMMON_FINAL_STATE",
+              "physical_side": "CLIENT"
+            },
+            "attributes": {}
+          },
+          "record_sha256": "88855978f9c7c85365eb09fd7b68d3eeb06311e0f09fff33f5ce212247d9c457"
+        }
+      ],
+      "capabilities": [
+        {
+          "section": "target",
+          "question_id": "PLAYER-PRODUCE-MATERIAL-001",
+          "target_kind": "material",
+          "status": "supported",
+          "required_authorities": [
+            "runtime-mechanics"
+          ],
+          "available_authorities": [
+            "runtime-mechanics"
+          ],
+          "missing_authorities": [],
+          "evidence_ids": [
+            "rg:common_final_state_client:material:susy:diluted_oil_light"
+          ],
+          "reason_code": "available"
+        },
+        {
+          "section": "routes",
+          "question_id": "PLAYER-PRODUCE-MATERIAL-001",
+          "target_kind": "material",
+          "status": "supported",
+          "required_authorities": [
+            "runtime-mechanics"
+          ],
+          "available_authorities": [
+            "runtime-mechanics"
+          ],
+          "missing_authorities": [],
+          "evidence_ids": [
+            "rg:common_final_state_client:material:susy:diluted_oil_light"
+          ],
+          "reason_code": "available"
+        }
+      ],
+      "result_status": "resolved",
+      "answer": null
+    },
+    {
+      "id": "missing-material",
+      "query_case_id": "missing-material",
+      "resolution": {
+        "status": "missing",
+        "candidate_count": 0,
+        "targets": [],
+        "profile_gaps": [
+          {
+            "profile": "COMMON_FINAL_STATE",
+            "physical_side": "CLIENT"
+          }
+        ],
+        "detail": "the exact key is absent from every requested profile scope"
+      },
+      "authorities": [
+        {
+          "basis": "runtime-mechanics",
+          "status": "not-observed",
+          "evidence_ids": [],
+          "detail": "the requested mechanical runtime scopes contain no exact target observation"
+        },
+        {
+          "basis": "runtime-presentation",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the query requests this authority but names no compatible presentation runtime scope"
+        },
+        {
+          "basis": "pinned-source",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: pinned-source"
+        },
+        {
+          "basis": "quest-data",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: quest-data"
+        },
+        {
+          "basis": "curated-interpretation",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: curated-interpretation"
+        },
+        {
+          "basis": "placed-world-observation",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: placed-world-observation"
+        }
+      ],
+      "evidence": [],
+      "capabilities": [
+        {
+          "section": "target",
+          "question_id": "PLAYER-PRODUCE-MATERIAL-001",
+          "target_kind": "material",
+          "status": "unresolved",
+          "required_authorities": [
+            "runtime-mechanics"
+          ],
+          "available_authorities": [],
+          "missing_authorities": [
+            "runtime-mechanics"
+          ],
+          "evidence_ids": [],
+          "reason_code": "identity-unresolved"
+        },
+        {
+          "section": "routes",
+          "question_id": "PLAYER-PRODUCE-MATERIAL-001",
+          "target_kind": "material",
+          "status": "unresolved",
+          "required_authorities": [
+            "runtime-mechanics"
+          ],
+          "available_authorities": [],
+          "missing_authorities": [
+            "runtime-mechanics"
+          ],
+          "evidence_ids": [],
+          "reason_code": "identity-unresolved"
+        }
+      ],
+      "result_status": "unresolved-identity",
+      "answer": null
+    },
+    {
+      "id": "ambiguous-machine",
+      "query_case_id": "ambiguous-machine",
+      "resolution": {
+        "status": "ambiguous",
+        "candidate_count": 2,
+        "targets": [
+          {
+            "profile": "COMMON_FINAL_STATE",
+            "physical_side": "CLIENT",
+            "node_id": "rg:common_final_state_client:machine:susy:ambiguous_machine:a",
+            "node_kind": "machine"
+          },
+          {
+            "profile": "COMMON_FINAL_STATE",
+            "physical_side": "CLIENT",
+            "node_id": "rg:common_final_state_client:machine:susy:ambiguous_machine:b",
+            "node_kind": "machine"
+          }
+        ],
+        "profile_gaps": [],
+        "detail": "the exact key resolves to multiple nodes in at least one requested profile scope"
+      },
+      "authorities": [
+        {
+          "basis": "runtime-mechanics",
+          "status": "ambiguous",
+          "evidence_ids": [
+            "rg:common_final_state_client:machine:susy:ambiguous_machine:a",
+            "rg:common_final_state_client:machine:susy:ambiguous_machine:b"
+          ],
+          "detail": "exact runtime candidates remain ambiguous in at least one requested scope"
+        },
+        {
+          "basis": "runtime-presentation",
+          "status": "not-requested",
+          "evidence_ids": [],
+          "detail": "the query instance did not request this authority"
+        },
+        {
+          "basis": "pinned-source",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: pinned-source"
+        },
+        {
+          "basis": "quest-data",
+          "status": "not-requested",
+          "evidence_ids": [],
+          "detail": "the query instance did not request this authority"
+        },
+        {
+          "basis": "curated-interpretation",
+          "status": "not-requested",
+          "evidence_ids": [],
+          "detail": "the query instance did not request this authority"
+        },
+        {
+          "basis": "placed-world-observation",
+          "status": "not-requested",
+          "evidence_ids": [],
+          "detail": "the query instance did not request this authority"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "rg:common_final_state_client:machine:susy:ambiguous_machine:a",
+          "basis": "runtime-mechanics",
+          "authority": "normalized-runtime-graph",
+          "record_kind": "runtime-node",
+          "record": {
+            "record_type": "node",
+            "id": "rg:common_final_state_client:machine:susy:ambiguous_machine:a",
+            "kind": "machine",
+            "scope": {
+              "snapshot_id": "SNAPSHOT-SUSY-0-1-16-11-9D3AA7AE0",
+              "profile": "COMMON_FINAL_STATE",
+              "physical_side": "CLIENT"
+            },
+            "attributes": {}
+          },
+          "record_sha256": "7303618aa4b125835a790e3e1956be3d9638ec4771ef79292b9c23516dacf898"
+        },
+        {
+          "id": "rg:common_final_state_client:machine:susy:ambiguous_machine:b",
+          "basis": "runtime-mechanics",
+          "authority": "normalized-runtime-graph",
+          "record_kind": "runtime-node",
+          "record": {
+            "record_type": "node",
+            "id": "rg:common_final_state_client:machine:susy:ambiguous_machine:b",
+            "kind": "machine",
+            "scope": {
+              "snapshot_id": "SNAPSHOT-SUSY-0-1-16-11-9D3AA7AE0",
+              "profile": "COMMON_FINAL_STATE",
+              "physical_side": "CLIENT"
+            },
+            "attributes": {}
+          },
+          "record_sha256": "a9cf3ac606d58aa1290df4962bda235a959079bed847f6826356a517f6cffc16"
+        }
+      ],
+      "capabilities": [
+        {
+          "section": "target",
+          "question_id": "DEVELOPER-DECLARATION-001",
+          "target_kind": "machine",
+          "status": "unresolved",
+          "required_authorities": [
+            "runtime-mechanics"
+          ],
+          "available_authorities": [],
+          "missing_authorities": [
+            "runtime-mechanics"
+          ],
+          "evidence_ids": [
+            "rg:common_final_state_client:machine:susy:ambiguous_machine:a",
+            "rg:common_final_state_client:machine:susy:ambiguous_machine:b"
+          ],
+          "reason_code": "identity-unresolved"
+        },
+        {
+          "section": "declaration",
+          "question_id": "DEVELOPER-DECLARATION-001",
+          "target_kind": "machine",
+          "status": "unresolved",
+          "required_authorities": [
+            "pinned-source"
+          ],
+          "available_authorities": [],
+          "missing_authorities": [
+            "pinned-source"
+          ],
+          "evidence_ids": [
+            "rg:common_final_state_client:machine:susy:ambiguous_machine:a",
+            "rg:common_final_state_client:machine:susy:ambiguous_machine:b"
+          ],
+          "reason_code": "identity-unresolved"
+        },
+        {
+          "section": "ownership",
+          "question_id": "DEVELOPER-DECLARATION-001",
+          "target_kind": "machine",
+          "status": "unresolved",
+          "required_authorities": [
+            "pinned-source"
+          ],
+          "available_authorities": [],
+          "missing_authorities": [
+            "pinned-source"
+          ],
+          "evidence_ids": [
+            "rg:common_final_state_client:machine:susy:ambiguous_machine:a",
+            "rg:common_final_state_client:machine:susy:ambiguous_machine:b"
+          ],
+          "reason_code": "identity-unresolved"
+        }
+      ],
+      "result_status": "ambiguous",
+      "answer": null
+    },
+    {
+      "id": "unavailable-pinned-source",
+      "query_case_id": "unavailable-pinned-source",
+      "resolution": {
+        "status": "resolved",
+        "candidate_count": 1,
+        "targets": [
+          {
+            "profile": "COMMON_FINAL_STATE",
+            "physical_side": "CLIENT",
+            "node_id": "rg:common_final_state_client:material:susy:diluted_oil_light",
+            "node_kind": "material"
+          }
+        ],
+        "profile_gaps": [],
+        "detail": "one exact target resolved in every requested profile scope"
+      },
+      "authorities": [
+        {
+          "basis": "runtime-mechanics",
+          "status": "available",
+          "evidence_ids": [
+            "rg:common_final_state_client:material:susy:diluted_oil_light"
+          ],
+          "detail": "exact target evidence is available from requested mechanical runtime scopes"
+        },
+        {
+          "basis": "runtime-presentation",
+          "status": "not-requested",
+          "evidence_ids": [],
+          "detail": "the query instance did not request this authority"
+        },
+        {
+          "basis": "pinned-source",
+          "status": "unavailable",
+          "evidence_ids": [],
+          "detail": "the requested authority input was not supplied: pinned-source"
+        },
+        {
+          "basis": "quest-data",
+          "status": "not-requested",
+          "evidence_ids": [],
+          "detail": "the query instance did not request this authority"
+        },
+        {
+          "basis": "curated-interpretation",
+          "status": "not-requested",
+          "evidence_ids": [],
+          "detail": "the query instance did not request this authority"
+        },
+        {
+          "basis": "placed-world-observation",
+          "status": "not-requested",
+          "evidence_ids": [],
+          "detail": "the query instance did not request this authority"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "rg:common_final_state_client:material:susy:diluted_oil_light",
+          "basis": "runtime-mechanics",
+          "authority": "normalized-runtime-graph",
+          "record_kind": "runtime-node",
+          "record": {
+            "record_type": "node",
+            "id": "rg:common_final_state_client:material:susy:diluted_oil_light",
+            "kind": "material",
+            "scope": {
+              "snapshot_id": "SNAPSHOT-SUSY-0-1-16-11-9D3AA7AE0",
+              "profile": "COMMON_FINAL_STATE",
+              "physical_side": "CLIENT"
+            },
+            "attributes": {}
+          },
+          "record_sha256": "88855978f9c7c85365eb09fd7b68d3eeb06311e0f09fff33f5ce212247d9c457"
+        }
+      ],
+      "capabilities": [
+        {
+          "section": "target",
+          "question_id": "DEVELOPER-DECLARATION-001",
+          "target_kind": "material",
+          "status": "supported",
+          "required_authorities": [
+            "runtime-mechanics"
+          ],
+          "available_authorities": [
+            "runtime-mechanics"
+          ],
+          "missing_authorities": [],
+          "evidence_ids": [
+            "rg:common_final_state_client:material:susy:diluted_oil_light"
+          ],
+          "reason_code": "available"
+        },
+        {
+          "section": "declaration",
+          "question_id": "DEVELOPER-DECLARATION-001",
+          "target_kind": "material",
+          "status": "unavailable",
+          "required_authorities": [
+            "pinned-source"
+          ],
+          "available_authorities": [],
+          "missing_authorities": [
+            "pinned-source"
+          ],
+          "evidence_ids": [],
+          "reason_code": "required-authority-unavailable"
+        },
+        {
+          "section": "ownership",
+          "question_id": "DEVELOPER-DECLARATION-001",
+          "target_kind": "material",
+          "status": "unavailable",
+          "required_authorities": [
+            "pinned-source"
+          ],
+          "available_authorities": [],
+          "missing_authorities": [
+            "pinned-source"
+          ],
+          "evidence_ids": [],
+          "reason_code": "required-authority-unavailable"
+        }
+      ],
+      "result_status": "unresolved-evidence",
+      "answer": null
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "format": "workbench-supersymmetry-cleanroom-runtime-compatibility-shims-v1",
+  "schema_version": 1,
+  "shims": [
+    {
+      "activation": {
+        "armed_by": "FMLServerStoppingEvent",
+        "capture_property_gate": "workbench.runtimeGraph.enabled",
+        "compatibility_only_property_gate": "workbench.runtimeGraph.compatibility_only",
+        "launch_binding_properties": [
+          "workbench.runtimeGraph.shutdown_compatibility_id",
+          "workbench.runtimeGraph.shutdown_compatibility_manifest_sha256",
+          "workbench.runtimeGraph.shutdown_compatibility_launch_sha256"
+        ],
+        "ordinary_dimension_unloads_affected": false
+      },
+      "behavior": {
+        "after_callbacks": "remove-only-the-identical-collection-inserted-by-this-bridge-at-lowest-priority",
+        "before_callbacks": "supply-empty-current-world-ticket-collection-at-high-priority-when-absent",
+        "capture_state_affected": false,
+        "forge_cleanup_priority": "HIGHEST",
+        "third_party_callback_priority": "NORMAL"
+      },
+      "failure_binding": {
+        "exception": "java.lang.NullPointerException at ForgeChunkManager.requestTicket:746 during WorldEvent.Unload",
+        "forge_version": "14.23.5.2864",
+        "universal_mod_core": {
+          "filename": "UniversalModCore-1.12.2-forge-1.2.2-3d12767.jar",
+          "sha256": "c2f71ad972320457cc37bacc999a46900964597df00ecc922f7649628560d823",
+          "source_revision": "3d12767a2cd458da58416b3cb584f1b7fd003412"
+        }
+      },
+      "implementation_class": "dev.workbench.crucible.runtimegraph.UniversalModCoreShutdownCompatibility",
+      "profile_state": "provisional",
+      "shim_id": "universal-mod-core-clean-shutdown-v1"
+    }
+  ]
+}

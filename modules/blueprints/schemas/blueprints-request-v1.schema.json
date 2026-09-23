@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-request-v1.schema.json",
+  "title": "Supersymmetry Blueprints canonical request v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "request_id",
+    "sequence",
+    "feature_family",
+    "intent",
+    "parameters",
+    "requested_variants",
+    "output_mode",
+    "target",
+    "consent"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-request-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^blueprints-request:sha256:[0-9a-f]{64}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "feature_family": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "intent": {
+      "type": "object",
+      "required": [
+        "operation",
+        "target_key",
+        "desired_outcome"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "enum": [
+            "create",
+            "update",
+            "reconcile"
+          ]
+        },
+        "target_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "desired_outcome": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "value": {
+            "type": [
+              "string",
+              "integer",
+              "number",
+              "boolean",
+              "object",
+              "array",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "requested_variants": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    },
+    "output_mode": {
+      "enum": [
+        "instructions",
+        "patch-bundle",
+        "direct-apply"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "target_state_id",
+        "repository_id",
+        "revision",
+        "worktree"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "target_state_id": {
+          "type": "string",
+          "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+        },
+        "repository_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "worktree": {
+          "type": "object",
+          "required": [
+            "dirty",
+            "manifest_sha256"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "dirty": {
+              "type": "boolean"
+            },
+            "manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "required": [
+        "accept_compliant_revision",
+        "allow_direct_apply"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "accept_compliant_revision": {
+          "type": "boolean"
+        },
+        "allow_direct_apply": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

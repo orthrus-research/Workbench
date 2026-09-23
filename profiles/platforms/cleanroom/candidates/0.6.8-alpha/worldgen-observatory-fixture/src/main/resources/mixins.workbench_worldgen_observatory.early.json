@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_25",
+  "package": "dev.workbench.worldgenobservatory.probe.mixin",
+  "plugin": "dev.workbench.worldgenobservatory.probe.ProbeMixinPlugin",
+  "refmap": "mixins.workbench_worldgen_observatory.early-refmap.json",
+  "mixins": [
+    "ASMEventHandlerAccess",
+    "MixinChunkProviderServer",
+    "MixinChunk",
+    "MixinChunkPrimer",
+    "MixinWorld",
+    "MixinEventBus"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

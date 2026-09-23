@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/schemas/workbench-suite-preview-build-v1.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": { "$ref": "#/$defs/file" },
+      "minItems": 3,
+      "type": "array"
+    },
+    "build_contract": {
+      "additionalProperties": false,
+      "properties": {
+        "path": { "const": "modules/workbench-shell/data/workbench-build-paths-v1.json" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "required": ["path", "sha256"],
+      "type": "object"
+    },
+    "build_path": { "const": "host-suite-public" },
+    "claims": {
+      "additionalProperties": false,
+      "properties": {
+        "native_host_qualified": { "const": false },
+        "publication_authorized": { "const": false },
+        "release_qualified": { "const": false },
+        "support_claimed": { "const": false }
+      },
+      "required": [
+        "native_host_qualified",
+        "publication_authorized",
+        "release_qualified",
+        "support_claimed"
+      ],
+      "type": "object"
+    },
+    "client_manifest_id": {
+      "pattern": "^workbench-developer-clients:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "core": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_identity": {
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "package_manifest_id": {
+          "pattern": "^workbench-package-manifest:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "version": { "minLength": 1, "type": "string" }
+      },
+      "required": ["artifact_identity", "package_manifest_id", "version"],
+      "type": "object"
+    },
+    "format": { "const": "workbench-suite-preview-build-v1" },
+    "host_target": {
+      "enum": [
+        "linux-arm64",
+        "linux-x86-64",
+        "macos-arm64",
+        "macos-x86-64",
+        "windows-arm64",
+        "windows-x86-64"
+      ]
+    },
+    "receipt_id": {
+      "pattern": "^workbench-suite-preview-build:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "records": {
+      "items": { "$ref": "#/$defs/file" },
+      "minItems": 2,
+      "type": "array"
+    },
+    "schema_version": { "const": 1 },
+    "source": {
+      "additionalProperties": false,
+      "properties": {
+        "dirty": { "type": "boolean" },
+        "revision": { "pattern": "^[0-9a-f]{40}$", "type": "string" }
+      },
+      "required": ["dirty", "revision"],
+      "type": "object"
+    },
+    "validation": {
+      "additionalProperties": false,
+      "properties": {
+        "command": { "const": "python validation/validate.py" },
+        "result": { "enum": ["not-run", "passed"] }
+      },
+      "required": ["command", "result"],
+      "type": "object"
+    }
+  },
+  "required": [
+    "artifacts",
+    "build_contract",
+    "build_path",
+    "claims",
+    "client_manifest_id",
+    "core",
+    "format",
+    "host_target",
+    "receipt_id",
+    "records",
+    "schema_version",
+    "source",
+    "validation"
+  ],
+  "type": "object",
+  "$defs": {
+    "file": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$",
+          "type": "string"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size": { "minimum": 1, "type": "integer" }
+      },
+      "required": ["id", "path", "sha256", "size"],
+      "type": "object"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "normal": { "model": "workbench_daily_loop:probe_block" },
+    "inventory": { "model": "workbench_daily_loop:probe_block" }
+  }
+}

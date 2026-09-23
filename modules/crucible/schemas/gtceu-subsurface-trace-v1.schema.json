@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/gtceu-subsurface-trace-v1.schema.json",
+  "title": "Workbench Crucible GTCEu subsurface trace V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "trace_id",
+    "canonicalization_id",
+    "adapter_profile",
+    "capture",
+    "coverage",
+    "deposits",
+    "decisions",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {"const": "workbench-crucible-gtceu-subsurface-trace-v1"},
+    "schema_version": {"const": 1},
+    "trace_id": {"type": "string", "pattern": "^crucible-gtceu-subsurface:sha256:[0-9a-f]{64}$"},
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "adapter_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "inventory_id", "impact_inventory_id"],
+      "properties": {
+        "id": {"const": "gtceu-1.12.2-2.8.10-subsurface-trace-v1"},
+        "inventory_id": {"type": "string", "pattern": "^crucible-gtceu-worldgen:sha256:[0-9a-f]{64}$"},
+        "impact_inventory_id": {"type": "string", "pattern": "^crucible-gtceu-worldgen-impact:sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "state", "runtime_artifact_set_sha256", "world_seed", "dimension_id", "chunk_window"],
+      "properties": {
+        "run_id": {"type": "string", "minLength": 1},
+        "state": {"enum": ["complete", "partial", "incomplete"]},
+        "runtime_artifact_set_sha256": {"$ref": "#/$defs/sha256"},
+        "world_seed": {"type": ["integer", "string"]},
+        "dimension_id": {"type": "integer"},
+        "chunk_window": {"$ref": "#/$defs/window"}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected_definitions_complete", "position_decisions_complete", "truncated", "selector"],
+      "properties": {
+        "selected_definitions_complete": {"type": "boolean"},
+        "position_decisions_complete": {"type": "boolean"},
+        "truncated": {"type": "boolean"},
+        "selector": {"type": "string", "minLength": 1}
+      }
+    },
+    "deposits": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {"$ref": "#/$defs/deposit"}
+    },
+    "decisions": {
+      "type": "array",
+      "maxItems": 250000,
+      "items": {"$ref": "#/$defs/decision"}
+    },
+    "boundaries": {
+      "const": {
+        "atlas_interpretation_performed": false,
+        "bedrock_fluid_cells_included": false,
+        "final_state_included": false,
+        "gregtech_version_specific": true,
+        "strata_remains_final_state_source": true
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_chunk_x", "min_chunk_z", "chunk_size_x", "chunk_size_z", "halo_chunks"],
+      "properties": {
+        "min_chunk_x": {"type": "integer"},
+        "min_chunk_z": {"type": "integer"},
+        "chunk_size_x": {"type": "integer", "minimum": 1},
+        "chunk_size_z": {"type": "integer", "minimum": 1},
+        "halo_chunks": {"type": "integer", "minimum": 0}
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": {"type": "integer"},
+        "y": {"type": "integer", "minimum": 0, "maximum": 255},
+        "z": {"type": "integer"}
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_x", "min_y", "min_z", "max_x", "max_y", "max_z"],
+      "properties": {
+        "min_x": {"type": "integer"},
+        "min_y": {"type": "integer", "minimum": 0, "maximum": 255},
+        "min_z": {"type": "integer"},
+        "max_x": {"type": "integer"},
+        "max_y": {"type": "integer", "minimum": 0, "maximum": 255},
+        "max_z": {"type": "integer"}
+      }
+    },
+    "deposit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deposit_instance_id", "definition_path", "grid_x", "grid_z", "selection_ordinal", "effective_weight", "priority", "count_as_vein", "center", "bounds", "rng", "cache", "placement"],
+      "properties": {
+        "deposit_instance_id": {"type": "string", "minLength": 1},
+        "definition_path": {"type": "string", "pattern": "^worldgen/vein/.+\\.json$"},
+        "grid_x": {"type": "integer"},
+        "grid_z": {"type": "integer"},
+        "selection_ordinal": {"type": "integer", "minimum": 0},
+        "effective_weight": {"type": "integer"},
+        "priority": {"type": "integer"},
+        "count_as_vein": {"type": "boolean"},
+        "center": {"$ref": "#/$defs/position"},
+        "bounds": {"$ref": "#/$defs/bounds"},
+        "rng": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["algorithm", "seed_material_sha256", "lane"],
+          "properties": {
+            "algorithm": {"type": "string", "minLength": 1},
+            "seed_material_sha256": {"$ref": "#/$defs/sha256"},
+            "lane": {"type": "string", "minLength": 1}
+          }
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hit", "epoch"],
+          "properties": {
+            "hit": {"type": "boolean"},
+            "epoch": {"type": ["string", "integer"]}
+          }
+        },
+        "placement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["candidate_count", "density_rejected_count", "host_rejected_count", "other_rejected_count", "successful_write_count"],
+          "properties": {
+            "candidate_count": {"type": "integer", "minimum": 0},
+            "density_rejected_count": {"type": "integer", "minimum": 0},
+            "host_rejected_count": {"type": "integer", "minimum": 0},
+            "other_rejected_count": {"type": "integer", "minimum": 0},
+            "successful_write_count": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "deposit_instance_id", "position", "outcome", "reason", "before_state", "after_state", "write_chain_id"],
+      "properties": {
+        "decision_id": {"type": "string", "minLength": 1},
+        "deposit_instance_id": {"type": "string", "minLength": 1},
+        "position": {"$ref": "#/$defs/position"},
+        "outcome": {"enum": ["density-rejected", "host-rejected", "write-failed", "written"]},
+        "reason": {"type": "string", "minLength": 1},
+        "before_state": {"type": ["string", "null"]},
+        "after_state": {"type": ["string", "null"]},
+        "write_chain_id": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

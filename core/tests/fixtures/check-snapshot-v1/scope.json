@@ -1,0 +1,7 @@
+{
+  "name": "fixture-native-scope",
+  "sections": {
+    "recipes": true,
+    "values": true
+  }
+}

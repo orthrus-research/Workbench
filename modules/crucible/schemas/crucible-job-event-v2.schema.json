@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-job-event-v2.schema.json",
+  "title": "Workbench Crucible append-only job event V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind", "format", "schema_version", "schema_id", "canonicalizer", "id",
+    "job_id", "job_submission_id", "context_ref_id", "input_binding_id", "event_ordinal",
+    "previous_event_id", "event_type", "lifecycle_state", "mutation_state",
+    "attempt_record_id", "attempt_id", "session_record_id", "session_id",
+    "process_identity_record_id", "process_instance_id", "occurred_at", "actor_id",
+    "evidence_eligible", "body"
+  ],
+  "properties": {
+    "kind": {"const": "job-event"},
+    "format": {"const": "workbench-crucible-job-event-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-job-event-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobEventId"},
+    "job_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobId"},
+    "job_submission_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobSubmissionId"},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/contextRefId"},
+    "input_binding_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/inputBindingId"},
+    "event_ordinal": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nonNegativeInteger"},
+    "previous_event_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableJobEventId"},
+    "event_type": {
+      "enum": [
+        "queued", "attempt-starting", "running", "resource-claim-acquired",
+        "resource-claim-released", "progress", "cancellation-requested",
+        "cancellation-observed", "mutation-state-changed", "process-bound",
+        "process-exited", "recovery-classified", "retrying", "orphaned", "terminal-ready"
+      ]
+    },
+    "lifecycle_state": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/lifecycleState"},
+    "mutation_state": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/mutationState"},
+    "attempt_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableJobAttemptRecordId"},
+    "attempt_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableAttemptId"},
+    "session_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableRuntimeSessionRecordId"},
+    "session_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableSessionId"},
+    "process_identity_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableProcessIdentityRecordId"},
+    "process_instance_id": {
+      "oneOf": [
+        {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/processInstanceId"},
+        {"type": "null"}
+      ]
+    },
+    "occurred_at": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/timestamp"},
+    "actor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/actorId"},
+    "evidence_eligible": {"const": false},
+    "body": {
+      "oneOf": [
+        {"$ref": "#/$defs/queuedBody"},
+        {"$ref": "#/$defs/attemptStartingBody"},
+        {"$ref": "#/$defs/runningBody"},
+        {"$ref": "#/$defs/resourceClaimAcquiredBody"},
+        {"$ref": "#/$defs/resourceClaimReleasedBody"},
+        {"$ref": "#/$defs/progressBody"},
+        {"$ref": "#/$defs/cancellationRequestedBody"},
+        {"$ref": "#/$defs/cancellationObservedBody"},
+        {"$ref": "#/$defs/mutationStateChangedBody"},
+        {"$ref": "#/$defs/processBoundBody"},
+        {"$ref": "#/$defs/processExitedBody"},
+        {"$ref": "#/$defs/recoveryClassifiedBody"},
+        {"$ref": "#/$defs/retryingBody"},
+        {"$ref": "#/$defs/orphanedBody"},
+        {"$ref": "#/$defs/terminalReadyBody"}
+      ]
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"event_type": {"const": "queued"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/queuedBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "attempt-starting"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/attemptStartingBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "running"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/runningBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "resource-claim-acquired"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/resourceClaimAcquiredBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "resource-claim-released"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/resourceClaimReleasedBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "progress"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/progressBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "cancellation-requested"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/cancellationRequestedBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "cancellation-observed"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/cancellationObservedBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "mutation-state-changed"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/mutationStateChangedBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "process-bound"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/processBoundBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "process-exited"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/processExitedBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "recovery-classified"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/recoveryClassifiedBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "retrying"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/retryingBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "orphaned"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/orphanedBody"}}}},
+    {"if": {"properties": {"event_type": {"const": "terminal-ready"}}}, "then": {"properties": {"body": {"$ref": "#/$defs/terminalReadyBody"}}}}
+  ],
+  "$defs": {
+    "queuedBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "queue_policy_id", "priority", "not_before"],
+      "properties": {
+        "body_kind": {"const": "queued"},
+        "queue_policy_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/policyId"},
+        "priority": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nonNegativeInteger"},
+        "not_before": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableTimestamp"}
+      }
+    },
+    "attemptStartingBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "attempt_reason"],
+      "properties": {
+        "body_kind": {"const": "attempt-starting"},
+        "attempt_reason": {"enum": ["initial", "retry-after-failure", "retry-after-crash", "manual-retry", "recovery-adoption"]}
+      }
+    },
+    "runningBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "readiness_observation_id"],
+      "properties": {
+        "body_kind": {"const": "running"},
+        "readiness_observation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/readinessObservationId"}
+      }
+    },
+    "resourceClaimAcquiredBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "resource_claim_id", "claim_key", "resource_class", "scope_id", "mode", "quantity", "unit", "limit_kind", "expires_at", "lease_authoritative"],
+      "properties": {
+        "body_kind": {"const": "resource-claim-acquired"},
+        "resource_claim_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/resourceClaimId"},
+        "claim_key": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+        "resource_class": {"enum": ["cpu", "memory", "io", "process", "store-writer", "world-writer", "network", "gpu", "custom"]},
+        "scope_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+        "mode": {"enum": ["shared", "exclusive"]},
+        "quantity": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/positiveInteger"},
+        "unit": {"enum": ["slots", "bytes", "millicores", "processes", "operations"]},
+        "limit_kind": {"enum": ["hard", "soft"]},
+        "expires_at": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableTimestamp"},
+        "lease_authoritative": {"const": false}
+      }
+    },
+    "resourceClaimReleasedBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "resource_claim_id", "release_reason", "release_observation_id"],
+      "properties": {
+        "body_kind": {"const": "resource-claim-released"},
+        "resource_claim_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/resourceClaimId"},
+        "release_reason": {"enum": ["completed", "cancelled", "failed", "expired", "reconciled"]},
+        "release_observation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/resourceReleaseObservationId"}
+      }
+    },
+    "progressBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "phase", "completed", "total", "unit", "message", "mutation_started"],
+      "properties": {
+        "body_kind": {"const": "progress"},
+        "phase": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+        "completed": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nonNegativeInteger"},
+        "total": {
+          "oneOf": [
+            {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nonNegativeInteger"},
+            {"type": "null"}
+          ]
+        },
+        "unit": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+        "message": {
+          "oneOf": [
+            {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticText"},
+            {"type": "null"}
+          ]
+        },
+        "mutation_started": {"type": "boolean"}
+      }
+    },
+    "cancellationRequestedBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "cancellation_request_id", "expected_event_id", "expected_event_ordinal", "reason", "requested_by_actor_id"],
+      "properties": {
+        "body_kind": {"const": "cancellation-requested"},
+        "cancellation_request_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/cancellationRequestId"},
+        "expected_event_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobEventId"},
+        "expected_event_ordinal": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nonNegativeInteger"},
+        "reason": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticText"},
+        "requested_by_actor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/actorId"}
+      }
+    },
+    "cancellationObservedBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "cancellation_request_id", "request_event_id", "observation_point", "disposition"],
+      "properties": {
+        "body_kind": {"const": "cancellation-observed"},
+        "cancellation_request_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/cancellationRequestId"},
+        "request_event_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobEventId"},
+        "observation_point": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+        "disposition": {"enum": ["stopping-before-mutation", "stopping-after-mutation", "too-late-terminal", "cannot-prove"]}
+      }
+    },
+    "mutationStateChangedBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "from_state", "to_state", "mutation_observation_id"],
+      "properties": {
+        "body_kind": {"const": "mutation-state-changed"},
+        "from_state": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/mutationState"},
+        "to_state": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/mutationState"},
+        "mutation_observation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/mutationObservationId"}
+      }
+    },
+    "processBoundBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "binding_method"],
+      "properties": {
+        "body_kind": {"const": "process-bound"},
+        "binding_method": {"enum": ["launched", "adopted-after-exact-reconciliation"]}
+      }
+    },
+    "processExitedBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "exit_code", "signal", "termination_observation_id"],
+      "properties": {
+        "body_kind": {"const": "process-exited"},
+        "exit_code": {
+          "oneOf": [
+            {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
+            {"type": "null"}
+          ]
+        },
+        "signal": {
+          "oneOf": [
+            {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+            {"type": "null"}
+          ]
+        },
+        "termination_observation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/terminationObservationId"}
+      }
+    },
+    "recoveryClassifiedBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "recovery_id", "classification", "prior_process_identity_id", "live_process_revalidated", "residue_object_descriptor_id", "manifest_object_descriptor_id", "reference_event_id", "required_action", "recovery_decision_id"],
+      "properties": {
+        "body_kind": {"const": "recovery-classified"},
+        "recovery_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/recoveryId"},
+        "classification": {"enum": ["no-mutation-began", "create-new-residue", "manifest-published-ref-unmoved", "ref-committed", "exact-process-still-live", "external-mutation-unproven", "terminal-corrupt-or-incomplete"]},
+        "prior_process_identity_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableProcessIdentityRecordId"},
+        "live_process_revalidated": {"type": "boolean"},
+        "residue_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableObjectDescriptorId"},
+        "manifest_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableObjectDescriptorId"},
+        "reference_event_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableReferenceEventId"},
+        "required_action": {"enum": ["resume", "retry-new-attempt", "clean-residue", "verify-reference", "manual-reconcile", "seal-terminal"]},
+        "recovery_decision_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/recoveryDecisionId"}
+      }
+    },
+    "retryingBody": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "body_kind", "retry_decision_id", "next_attempt_record_id",
+        "next_attempt_id", "next_attempt_ordinal"
+      ],
+      "properties": {
+        "body_kind": {"const": "retrying"},
+        "retry_decision_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/retryDecisionId"},
+        "next_attempt_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobAttemptRecordId"},
+        "next_attempt_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/attemptId"},
+        "next_attempt_ordinal": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/positiveInteger"}
+      }
+    },
+    "orphanedBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "last_known_process_identity_id", "orphan_reason"],
+      "properties": {
+        "body_kind": {"const": "orphaned"},
+        "last_known_process_identity_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableProcessIdentityRecordId"},
+        "orphan_reason": {"enum": ["service-crash", "host-restart", "process-lost", "custody-lost", "lease-expired"]}
+      }
+    },
+    "terminalReadyBody": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_kind", "terminal_outcome", "result_object_descriptor_id", "failure_object_descriptor_id"],
+      "properties": {
+        "body_kind": {"const": "terminal-ready"},
+        "terminal_outcome": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/terminalOutcome"},
+        "result_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableObjectDescriptorId"},
+        "failure_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableObjectDescriptorId"}
+      },
+      "oneOf": [
+        {"required": ["result_object_descriptor_id"], "properties": {"result_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"}, "failure_object_descriptor_id": {"type": "null"}}},
+        {"required": ["failure_object_descriptor_id"], "properties": {"result_object_descriptor_id": {"type": "null"}, "failure_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"}}}
+      ],
+      "allOf": [
+        {
+          "if": {"properties": {"terminal_outcome": {"const": "succeeded"}}},
+          "then": {"properties": {"result_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"}, "failure_object_descriptor_id": {"type": "null"}}},
+          "else": {"properties": {"result_object_descriptor_id": {"type": "null"}, "failure_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"}}}
+        }
+      ]
+    }
+  }
+}

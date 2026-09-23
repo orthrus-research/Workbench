@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.cleanroommc.dev/schemas/workbench-supersymmetry-acquisition-profile-v1.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "channels": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "aliases": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "checkout_branch": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "remote_ref": {
+            "pattern": "^refs/heads/[A-Za-z0-9][A-Za-z0-9._/-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "aliases",
+          "remote_ref",
+          "checkout_branch"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "default_channel": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "display_name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "format": {
+      "const": "workbench-project-acquisition-profile-v1"
+    },
+    "profile_id": {
+      "const": "workbench-pack:supersymmetry:acquisition-v1"
+    },
+    "project_id": {
+      "const": "supersymmetry"
+    },
+    "remote": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "git"
+        },
+        "provider": {
+          "const": "github"
+        },
+        "pull_request_ref_template": {
+          "const": "refs/pull/{number}/head"
+        },
+        "url": {
+          "const": "https://github.com/SymmetricDevs/Supersymmetry.git"
+        }
+      },
+      "required": [
+        "kind",
+        "url",
+        "provider",
+        "pull_request_ref_template"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "workspace": {
+      "additionalProperties": false,
+      "properties": {
+        "required_paths": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "file",
+                  "directory"
+                ]
+              },
+              "path": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "kind"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "required_paths"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "format",
+    "schema_version",
+    "profile_id",
+    "project_id",
+    "display_name",
+    "remote",
+    "default_channel",
+    "channels",
+    "workspace"
+  ],
+  "title": "Workbench Supersymmetry acquisition profile V1",
+  "type": "object"
+}

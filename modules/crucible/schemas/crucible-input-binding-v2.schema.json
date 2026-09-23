@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-input-binding-v2.schema.json",
+  "title": "Workbench Crucible InputBinding V2",
+  "$defs": {
+    "inputBindingId": {
+      "type": "string",
+      "pattern": "^input-binding:sha256:[0-9a-f]{64}$"
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "context_ref_id",
+    "evidence_set_bindings",
+    "graph_bindings",
+    "graph_set_bindings",
+    "recipe_bindings",
+    "schema_bindings",
+    "ontology_bindings",
+    "adapter_bindings",
+    "policy_bindings",
+    "index_bindings"
+  ],
+  "properties": {
+    "kind": {"const": "input-binding"},
+    "format": {"const": "workbench-crucible-input-binding-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-input-binding-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {"$ref": "#/$defs/inputBindingId"},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json#/$defs/contextRefId"},
+    "evidence_set_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/evidenceSetBinding"}
+    },
+    "graph_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/graphBinding"}
+    },
+    "graph_set_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/graphSetBinding"}
+    },
+    "recipe_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/recipeBinding"}
+    },
+    "schema_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/schemaBinding"}
+    },
+    "ontology_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/ontologyBinding"}
+    },
+    "adapter_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/adapterBinding"}
+    },
+    "policy_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/policyBinding"}
+    },
+    "index_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/indexBinding"}
+    }
+  }
+}

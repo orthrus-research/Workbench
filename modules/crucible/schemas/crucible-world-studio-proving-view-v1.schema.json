@@ -1,0 +1,467 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-world-studio-proving-view-v1.schema.json",
+  "title": "Crucible World Studio proving view V1",
+  "$defs": {
+    "contentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "nullableCategoryId": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[a-z][a-z0-9.-]*$"},
+        {"type": "null"}
+      ]
+    },
+    "nullableGraphRecordId": {
+      "oneOf": [
+        {"type": "string", "pattern": "^graph-record:sha256:[0-9a-f]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "nullableGraphSetId": {
+      "oneOf": [
+        {"type": "string", "pattern": "^graph-set-revision:sha256:[0-9a-f]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "simpleQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query"],
+      "properties": {
+        "query": {
+          "enum": [
+            "capture-health",
+            "known-absence",
+            "stale-pattern-conflicts"
+          ]
+        }
+      }
+    },
+    "drilldownQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category_id", "query"],
+      "properties": {
+        "category_id": {"const": "atlas.worldgen.realized.v1"},
+        "query": {"const": "drilldown"}
+      }
+    },
+    "siteQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category_id", "chunk", "query", "resolution_id"],
+      "properties": {
+        "category_id": {"const": "crucible.worldgen.occurrence.v1"},
+        "chunk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "z"],
+          "properties": {
+            "x": {"type": "integer"},
+            "z": {"type": "integer"}
+          }
+        },
+        "query": {"const": "site"},
+        "resolution_id": {"const": "worldgen.exact.v1"}
+      }
+    },
+    "query": {
+      "oneOf": [
+        {"$ref": "#/$defs/simpleQuery"},
+        {"$ref": "#/$defs/drilldownQuery"},
+        {"$ref": "#/$defs/siteQuery"}
+      ]
+    },
+    "nullableQuery": {
+      "oneOf": [
+        {"$ref": "#/$defs/query"},
+        {"type": "null"}
+      ]
+    },
+    "rowProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category_id",
+        "graph_record_id",
+        "graph_revision_ids",
+        "record_canonical_json",
+        "row_id"
+      ],
+      "properties": {
+        "category_id": {"$ref": "#/$defs/nullableCategoryId"},
+        "graph_record_id": {"$ref": "#/$defs/nullableGraphRecordId"},
+        "graph_revision_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^graph-revision:sha256:[0-9a-f]{64}$"
+          },
+          "uniqueItems": true
+        },
+        "record_canonical_json": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 1048576
+        },
+        "row_id": {
+          "type": "string",
+          "pattern": "^world-studio-view-row:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "queryProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "graph_set_revision_id",
+        "query",
+        "query_result_id",
+        "raw_archive_open_count",
+        "rows",
+        "schema_version",
+        "truncated"
+      ],
+      "properties": {
+        "format": {"const": "workbench-world-studio-query-projection-v1"},
+        "graph_set_revision_id": {
+          "type": "string",
+          "pattern": "^graph-set-revision:sha256:[0-9a-f]{64}$"
+        },
+        "query": {"$ref": "#/$defs/query"},
+        "query_result_id": {
+          "type": "string",
+          "pattern": "^worldgen-query-result:sha256:[0-9a-f]{64}$"
+        },
+        "raw_archive_open_count": {"const": 0},
+        "rows": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/rowProjection"},
+          "maxItems": 256
+        },
+        "schema_version": {"const": 1},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "nullableQueryProjection": {
+      "oneOf": [
+        {"$ref": "#/$defs/queryProjection"},
+        {"type": "null"}
+      ]
+    },
+    "actionGateProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "context_ref_id",
+        "disposition",
+        "input_binding_id",
+        "policy_sha256",
+        "receipt_canonical_json",
+        "receipt_id"
+      ],
+      "properties": {
+        "action": {"const": "read-query-visualize"},
+        "context_ref_id": {
+          "type": "string",
+          "pattern": "^context-ref:sha256:[0-9a-f]{64}$"
+        },
+        "disposition": {"const": "allow"},
+        "input_binding_id": {
+          "type": "string",
+          "pattern": "^input-binding:sha256:[0-9a-f]{64}$"
+        },
+        "policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "receipt_canonical_json": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 65536
+        },
+        "receipt_id": {
+          "type": "string",
+          "pattern": "^worldgen-action-gate-receipt:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "authorityOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category_id", "owner"],
+      "properties": {
+        "category_id": {"type": "string", "pattern": "^[a-z][a-z0-9.-]*$"},
+        "owner": {"enum": ["Atlas", "Crucible"]}
+      }
+    },
+    "profileSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_kind",
+        "profile_revision_id",
+        "support_decision_ids",
+        "support_state"
+      ],
+      "properties": {
+        "profile_kind": {
+          "enum": ["pack-profile-revision", "platform-profile-revision"]
+        },
+        "profile_revision_id": {
+          "type": "string",
+          "pattern": "^(pack|platform)-profile-revision:sha256:[0-9a-f]{64}$"
+        },
+        "support_decision_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^support-decision:sha256:[0-9a-f]{64}$"
+          },
+          "uniqueItems": true
+        },
+        "support_state": {"enum": ["experimental", "provisional"]}
+      }
+    },
+    "policyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "policy_id"],
+      "properties": {
+        "input_key": {"type": "string", "pattern": "^[a-z][a-z0-9.-]*$"},
+        "policy_id": {
+          "type": "string",
+          "pattern": "^policy:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "authorityInputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_ref_canonical_json",
+        "context_ref_id",
+        "input_binding_canonical_json",
+        "input_binding_id",
+        "policy_bindings",
+        "profile_support"
+      ],
+      "properties": {
+        "context_ref_canonical_json": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 1048576
+        },
+        "context_ref_id": {
+          "type": "string",
+          "pattern": "^context-ref:sha256:[0-9a-f]{64}$"
+        },
+        "input_binding_canonical_json": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 1048576
+        },
+        "input_binding_id": {
+          "type": "string",
+          "pattern": "^input-binding:sha256:[0-9a-f]{64}$"
+        },
+        "policy_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/policyBinding"},
+          "uniqueItems": true
+        },
+        "profile_support": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"$ref": "#/$defs/profileSupport"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "added_row_ids",
+        "current_query_result_id",
+        "prior_query_result_id",
+        "removed_row_ids",
+        "shared_row_ids"
+      ],
+      "properties": {
+        "added_row_ids": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^world-studio-view-row:sha256:[0-9a-f]{64}$"},
+          "uniqueItems": true
+        },
+        "current_query_result_id": {
+          "type": "string",
+          "pattern": "^worldgen-query-result:sha256:[0-9a-f]{64}$"
+        },
+        "prior_query_result_id": {
+          "type": "string",
+          "pattern": "^worldgen-query-result:sha256:[0-9a-f]{64}$"
+        },
+        "removed_row_ids": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^world-studio-view-row:sha256:[0-9a-f]{64}$"},
+          "uniqueItems": true
+        },
+        "shared_row_ids": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^world-studio-view-row:sha256:[0-9a-f]{64}$"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "nullableDiff": {
+      "oneOf": [
+        {"$ref": "#/$defs/diff"},
+        {"type": "null"}
+      ]
+    },
+    "visualizationGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category_id", "row_ids"],
+      "properties": {
+        "category_id": {"$ref": "#/$defs/nullableCategoryId"},
+        "row_ids": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^world-studio-view-row:sha256:[0-9a-f]{64}$"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["groups", "kind", "query_result_id"],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/visualizationGroup"}
+        },
+        "kind": {"const": "authority-linked-record-list"},
+        "query_result_id": {
+          "type": "string",
+          "pattern": "^worldgen-query-result:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "nullablePresentation": {
+      "oneOf": [
+        {"$ref": "#/$defs/presentation"},
+        {"type": "null"}
+      ]
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_gate_receipt_id",
+        "comparison_graph_set_revision_id",
+        "comparison_query",
+        "context_ref_id",
+        "format",
+        "graph_set_revision_id",
+        "input_binding_id",
+        "operation",
+        "proof_index_id",
+        "query",
+        "schema_version"
+      ],
+      "properties": {
+        "action_gate_receipt_id": {"type": "string", "pattern": "^worldgen-action-gate-receipt:sha256:[0-9a-f]{64}$"},
+        "comparison_graph_set_revision_id": {"$ref": "#/$defs/nullableGraphSetId"},
+        "comparison_query": {"$ref": "#/$defs/nullableQuery"},
+        "context_ref_id": {"type": "string", "pattern": "^context-ref:sha256:[0-9a-f]{64}$"},
+        "format": {"const": "workbench-world-studio-proving-request-v1"},
+        "graph_set_revision_id": {"type": "string", "pattern": "^graph-set-revision:sha256:[0-9a-f]{64}$"},
+        "input_binding_id": {"type": "string", "pattern": "^input-binding:sha256:[0-9a-f]{64}$"},
+        "operation": {"enum": ["query", "diff", "visualization"]},
+        "proof_index_id": {"type": "string", "pattern": "^worldgen-w01-proof-index:sha256:[0-9a-f]{64}$"},
+        "query": {"$ref": "#/$defs/query"},
+        "schema_version": {"const": 1}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_gate",
+        "authority_inputs",
+        "authority_owners",
+        "canonicalizer",
+        "comparison_graph_set_revision_id",
+        "comparison_query_result",
+        "context_ref_id",
+        "diff",
+        "format",
+        "graph_set_revision_id",
+        "id",
+        "input_binding_id",
+        "kind",
+        "limitations",
+        "operation",
+        "presentation",
+        "profile_state",
+        "proof_index_id",
+        "query_result",
+        "schema_version",
+        "semantic_admission_id",
+        "support_decision_id",
+        "support_state"
+      ],
+      "properties": {
+        "action_gate": {"$ref": "#/$defs/actionGateProjection"},
+        "authority_inputs": {"$ref": "#/$defs/authorityInputs"},
+        "authority_owners": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/authorityOwner"},
+          "uniqueItems": true
+        },
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "comparison_graph_set_revision_id": {"$ref": "#/$defs/nullableGraphSetId"},
+        "comparison_query_result": {"$ref": "#/$defs/nullableQueryProjection"},
+        "context_ref_id": {"type": "string", "pattern": "^context-ref:sha256:[0-9a-f]{64}$"},
+        "diff": {"$ref": "#/$defs/nullableDiff"},
+        "format": {"const": "workbench-world-studio-proving-view-result-v1"},
+        "graph_set_revision_id": {"type": "string", "pattern": "^graph-set-revision:sha256:[0-9a-f]{64}$"},
+        "id": {"type": "string", "pattern": "^world-studio-proving-view-result:sha256:[0-9a-f]{64}$"},
+        "input_binding_id": {"type": "string", "pattern": "^input-binding:sha256:[0-9a-f]{64}$"},
+        "kind": {"const": "world-studio-proving-view-result"},
+        "limitations": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "exact-w01-bounded-worldgen-envelope",
+              "verified-experimental-not-tested-supported",
+              "no-construction-or-protected-world-authority"
+            ]
+          }
+        },
+        "operation": {"enum": ["query", "diff", "visualization"]},
+        "presentation": {"$ref": "#/$defs/nullablePresentation"},
+        "profile_state": {"const": "experimental-draft"},
+        "proof_index_id": {"type": "string", "pattern": "^worldgen-w01-proof-index:sha256:[0-9a-f]{64}$"},
+        "query_result": {"$ref": "#/$defs/queryProjection"},
+        "schema_version": {"const": 1},
+        "semantic_admission_id": {"type": "null"},
+        "support_decision_id": {"type": "null"},
+        "support_state": {"const": "experimental-unadmitted"}
+      }
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/request"},
+    {"$ref": "#/$defs/result"}
+  ]
+}

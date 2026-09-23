@@ -1,0 +1,14 @@
+{
+  "contract": "atlas/recipe-reload-diagnostic-v1.md",
+  "comparison": {
+    "function": "compare_recipe_reload_diagnostics",
+    "report_format": "workbench-supersymmetry-groovy-conflict-group-comparison-v1"
+  },
+  "format": "workbench-runtime-recipe-reload-diagnostic-profile-v1",
+  "maturity": "experimental",
+  "observer": "atlas/src/recipe_reload_diagnostic.py",
+  "pack_profile_id": "workbench-pack:supersymmetry",
+  "profile_id": "workbench-pack:supersymmetry:recipe-reload-diagnostic-v1",
+  "report_format": "workbench-supersymmetry-recipe-reload-diagnostic-v1",
+  "schema_version": 1
+}

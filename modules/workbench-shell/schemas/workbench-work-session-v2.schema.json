@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-work-session-v2.schema.json",
+  "title": "Workbench cross-frontend Work Session V2 immutable header",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "schema_version",
+    "session_id",
+    "session_record_id",
+    "created_at",
+    "label",
+    "task",
+    "workspace",
+    "identities",
+    "retention"
+  ],
+  "properties": {
+    "format_version": {"const": "workbench-work-session-v2"},
+    "schema_version": {"const": 2},
+    "session_id": {"pattern": "^work-session-v2-[0-9a-f]{32}$", "type": "string"},
+    "session_record_id": {"pattern": "^work-session-record:sha256:[0-9a-f]{64}$", "type": "string"},
+    "created_at": {"format": "date-time", "type": "string"},
+    "label": {"oneOf": [{"maxLength": 1024, "minLength": 1, "type": "string"}, {"type": "null"}]},
+    "task": {"$ref": "#/$defs/task"},
+    "workspace": {"$ref": "#/$defs/workspace"},
+    "identities": {"$ref": "#/$defs/identities"},
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["journal", "summary", "append_only", "summary_disposable"],
+      "properties": {
+        "journal": {"const": "journal-v1"},
+        "summary": {"const": "summary-v1.json"},
+        "append_only": {"const": true},
+        "summary_disposable": {"const": true}
+      }
+    }
+  },
+  "$defs": {
+    "identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/+@=-]*$"
+    },
+    "nullableIdentity": {
+      "oneOf": [{"$ref": "#/$defs/identity"}, {"type": "null"}]
+    },
+    "ownerRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_id",
+        "record_id",
+        "record_kind",
+        "uri",
+        "digest",
+        "last_verified_state",
+        "verified_at"
+      ],
+      "properties": {
+        "owner_id": {"$ref": "#/$defs/identity"},
+        "record_id": {"$ref": "#/$defs/identity"},
+        "record_kind": {"$ref": "#/$defs/identity"},
+        "uri": {"format": "uri", "maxLength": 8192, "minLength": 3, "type": "string"},
+        "digest": {"$ref": "#/$defs/nullableIdentity"},
+        "last_verified_state": {"$ref": "#/$defs/nullableIdentity"},
+        "verified_at": {"oneOf": [{"format": "date-time", "type": "string"}, {"type": "null"}]}
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "owner_id", "label", "owner_record_ref"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/identity"},
+        "owner_id": {"$ref": "#/$defs/identity"},
+        "label": {"oneOf": [{"maxLength": 1024, "minLength": 1, "type": "string"}, {"type": "null"}]},
+        "owner_record_ref": {"oneOf": [{"$ref": "#/$defs/ownerRef"}, {"type": "null"}]}
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_id", "canonical_root", "root_uri", "source_revision", "dirty_fingerprint"],
+      "properties": {
+        "identity_id": {"$ref": "#/$defs/identity"},
+        "canonical_root": {"maxLength": 8192, "minLength": 1, "type": "string"},
+        "root_uri": {"format": "uri", "maxLength": 8192, "type": "string"},
+        "source_revision": {"$ref": "#/$defs/nullableIdentity"},
+        "dirty_fingerprint": {"$ref": "#/$defs/nullableIdentity"}
+      }
+    },
+    "identities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["core_id", "catalog_id", "host_adapter_id", "platform_profile_id", "pack_profile_id"],
+      "properties": {
+        "core_id": {"$ref": "#/$defs/identity"},
+        "catalog_id": {"$ref": "#/$defs/identity"},
+        "host_adapter_id": {"$ref": "#/$defs/identity"},
+        "platform_profile_id": {"anyOf": [{"$ref": "#/$defs/identity"}, {"type": "null"}]},
+        "pack_profile_id": {"$ref": "#/$defs/nullableIdentity"},
+        "developer_selection": {"type":"object","additionalProperties":false,"required":["pack_uri","pack_profile","platform_profile","variant","mod_uri"],"properties":{"pack_uri":{"type":"string","minLength":1},"pack_profile":{"type":"string","minLength":1},"platform_profile":{"type":"string","minLength":1},"variant":{"type":"string","minLength":1},"mod_uri":{"type":["string","null"]}}}
+      }
+    }
+  }
+}

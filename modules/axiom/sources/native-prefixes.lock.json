@@ -1,0 +1,96 @@
+{
+  "schema": "axiom.native-prefix-source-lock.v1",
+  "revisions": {
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b"
+  },
+  "references": [
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/ore/OrePrefix.java",
+      "gitBlob": "0a159028f1de81541aa63e6fd7e0f8e9576e18e7",
+      "sha256": "867b5eaf5955db119381242b91c37633650f61d499ab86387f0042a4257592a1"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/ore/IOreRegistrationHandler.java",
+      "gitBlob": "be4acc37f9216c7f182b63dcb510a382268aec03",
+      "sha256": "863a22c43077f39ec7cdc9ef20a9f3c633d8b03260279a26e2867a948e6204f0"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/function/TriConsumer.java",
+      "gitBlob": "7a240998797690f547862996abe5942e9217c243",
+      "sha256": "470bfb7441cc0ad63e1f0d4559a5aecb66c54e20616e74bb329b7913341097c4"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/MarkerMaterials.java",
+      "gitBlob": "566ad41f840b4735cfcde8208cdd4a4439d1f2af",
+      "sha256": "9572a48ca16c92d3cc93db275d04a02eb1b33da556b305c76f047a793b4a3304"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/info/MaterialIconType.java",
+      "gitBlob": "23d4589d3b5c41cf08ba6ac919ef9eef1dd5be11",
+      "sha256": "5cc6cd0677d0ecc6de3b3a7b352ec2d527fe315f25d561e245a3275de85440a6"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/GTValues.java",
+      "gitBlob": "006f9444117742e6caa5eb17237b3f109084ee7c",
+      "sha256": "f2861c31315f5e556705927a63e7649ef0c6ca1c0a420170af38a99146b15675"
+    }
+  ],
+  "fixtureMetadata": {
+    "materialFields": [
+      "Andesite",
+      "Basalt",
+      "Blaze",
+      "Bone",
+      "BorosilicateGlass",
+      "Brick",
+      "CertusQuartz",
+      "Charcoal",
+      "Clay",
+      "Coal",
+      "Concrete",
+      "Diamond",
+      "Diorite",
+      "Emerald",
+      "EnderEye",
+      "EnderPearl",
+      "Endstone",
+      "Flint",
+      "Glass",
+      "Glowstone",
+      "Gold",
+      "Granite",
+      "GraniteBlack",
+      "GraniteRed",
+      "Gunpowder",
+      "Ice",
+      "Iron",
+      "Lapis",
+      "Lapotron",
+      "Marble",
+      "NetherQuartz",
+      "NetherStar",
+      "Netherrack",
+      "Obsidian",
+      "Oilsands",
+      "Paper",
+      "RawRubber",
+      "Redstone",
+      "Rubber",
+      "SiliconDioxide",
+      "Steel",
+      "Stone",
+      "Sugar",
+      "TreatedWood",
+      "Wheat",
+      "Wood"
+    ],
+    "prefixDeclarations": 101,
+    "iconDeclarations": 65
+  }
+}

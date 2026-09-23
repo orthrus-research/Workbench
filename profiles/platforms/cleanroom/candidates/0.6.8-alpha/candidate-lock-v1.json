@@ -1,0 +1,28 @@
+{
+  "candidate_id": "workbench-platform:cleanroom:0.6.8-alpha+mc-1.12.2+forge-14.23.5.2864+mcp-9.42-stable_39",
+  "cleanroom": {
+    "release": {
+      "sha256": "64e4d8af4f117224f7b69efb5e270f75b05feef7fd034fcce185ae2e5b5ec9eb",
+      "size": 58129,
+      "url": "https://github.com/CleanroomMC/Cleanroom/releases/download/0.6.8-alpha/cleanroom-0.6.8-alpha.zip"
+    },
+    "source_repository": "https://github.com/CleanroomMC/Cleanroom.git",
+    "source_revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+    "version": "0.6.8-alpha"
+  },
+  "forge": {
+    "version": "14.23.5.2864"
+  },
+  "format": "workbench-cleanroom-candidate-lock-v1",
+  "mappings": {
+    "channel": "stable",
+    "coordinate": "stable_39",
+    "mcp_version": "9.42",
+    "version": "39"
+  },
+  "minecraft": {
+    "version": "1.12.2"
+  },
+  "maturity": "experimental",
+  "schema_version": 1
+}

@@ -1,0 +1,49 @@
+{
+  "channels": [
+    {
+      "aliases": [
+        "latest",
+        "master-ceu"
+      ],
+      "checkout_branch": "master-ceu",
+      "id": "current",
+      "remote_ref": "refs/heads/master-ceu"
+    }
+  ],
+  "default_channel": "current",
+  "display_name": "Supersymmetry",
+  "format": "workbench-project-acquisition-profile-v1",
+  "profile_id": "workbench-pack:supersymmetry:acquisition-v1",
+  "project_id": "supersymmetry",
+  "remote": {
+    "kind": "git",
+    "provider": "github",
+    "pull_request_ref_template": "refs/pull/{number}/head",
+    "url": "https://github.com/SymmetricDevs/Supersymmetry.git"
+  },
+  "schema_version": 1,
+  "workspace": {
+    "required_paths": [
+      {
+        "kind": "file",
+        "path": "pack.toml"
+      },
+      {
+        "kind": "file",
+        "path": "index.toml"
+      },
+      {
+        "kind": "directory",
+        "path": "config"
+      },
+      {
+        "kind": "directory",
+        "path": "groovy"
+      },
+      {
+        "kind": "directory",
+        "path": "mods"
+      }
+    ]
+  }
+}

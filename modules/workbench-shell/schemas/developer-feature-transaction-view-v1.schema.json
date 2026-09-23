@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.dev/workbench/schemas/developer-feature-transaction-view-v1.schema.json",
+  "title": "Workbench developer feature transaction view V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actions",
+    "current_effective_state",
+    "family",
+    "format",
+    "id",
+    "kind",
+    "limitations",
+    "operations",
+    "plan_freshness",
+    "plan_id",
+    "records",
+    "schema_version",
+    "workspace_match",
+    "workspace_uri"
+  ],
+  "properties": {
+    "format": {"const": "workbench-developer-feature-transaction-view-v1"},
+    "schema_version": {"const": 1},
+    "kind": {"const": "workbench-developer-feature-transaction-view"},
+    "id": {
+      "type": "string",
+      "pattern": "^workbench-developer-feature-transaction-view:sha256:[0-9a-f]{64}$"
+    },
+    "family": {
+      "enum": ["material-fluid-recipe", "recipe-change", "quest-for-process"]
+    },
+    "workspace_uri": {"type": "string", "pattern": "^file:"},
+    "plan_id": {"$ref": "#/$defs/content_id"},
+    "current_effective_state": {
+      "enum": [
+        "applied",
+        "drifted",
+        "interrupted",
+        "matches-after-without-receipt",
+        "mixed",
+        "planned",
+        "restored",
+        "unavailable"
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/operation"}
+    },
+    "workspace_match": {"$ref": "#/$defs/workspace_match"},
+    "plan_freshness": {"$ref": "#/$defs/verification"},
+    "records": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {"$ref": "#/$defs/record"}
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/action"}
+    }
+  },
+  "$defs": {
+    "content_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "after_sha256",
+        "after_size",
+        "before_sha256",
+        "before_size",
+        "diff",
+        "ordinal",
+        "path",
+        "role"
+      ],
+      "properties": {
+        "after_sha256": {"$ref": "#/$defs/digest"},
+        "after_size": {"type": "integer", "minimum": 0},
+        "before_sha256": {"$ref": "#/$defs/digest"},
+        "before_size": {"type": "integer", "minimum": 0},
+        "diff": {"type": "string"},
+        "ordinal": {"type": "integer", "minimum": 0},
+        "path": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1}
+      }
+    },
+    "workspace_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actual_sha256", "actual_size", "ordinal", "path", "reason", "state"],
+      "properties": {
+        "actual_sha256": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "actual_size": {"type": ["integer", "null"], "minimum": 0},
+        "ordinal": {"type": "integer", "minimum": 0},
+        "path": {"type": "string", "minLength": 1},
+        "reason": {"type": ["string", "null"]},
+        "state": {"enum": ["matches-before", "matches-after", "drifted"]}
+      }
+    },
+    "workspace_match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operations", "reason", "state"],
+      "properties": {
+        "operations": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/workspace_operation"}
+        },
+        "reason": {"type": ["string", "null"]},
+        "state": {"enum": ["matches-before", "matches-after", "mixed", "drifted", "unavailable"]}
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "plan_id", "reason", "schema_version", "state"],
+      "properties": {
+        "format": {"type": "string", "minLength": 1},
+        "schema_version": {"const": 1},
+        "plan_id": {"$ref": "#/$defs/content_id"},
+        "reason": {"type": ["string", "null"]},
+        "state": {"enum": ["ready", "stale"]}
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collection",
+        "diagnostic_code",
+        "family",
+        "operation_count",
+        "plan_id",
+        "record_id",
+        "record_kind",
+        "record_state",
+        "reference",
+        "uri",
+        "verification_state",
+        "workspace_uri"
+      ],
+      "properties": {
+        "collection": {"enum": ["plans", "receipts", "rollbacks", "recoveries", "runs"]},
+        "diagnostic_code": {"type": ["string", "null"]},
+        "family": {"enum": ["material-fluid-recipe", "recipe-change", "quest-for-process"]},
+        "operation_count": {"type": "integer", "minimum": 1},
+        "plan_id": {"$ref": "#/$defs/content_id"},
+        "record_id": {"$ref": "#/$defs/content_id"},
+        "record_kind": {
+          "enum": [
+            "workbench-developer-material-fluid-recipe-plan",
+            "workbench-supersymmetry-recipe-change-plan",
+            "workbench-developer-source-feature-plan",
+            "workbench-developer-material-fluid-recipe-receipt",
+            "workbench-supersymmetry-recipe-change-receipt",
+            "workbench-developer-source-feature-receipt",
+            "workbench-developer-material-fluid-recipe-rollback",
+            "workbench-supersymmetry-recipe-change-rollback",
+            "workbench-developer-source-feature-rollback",
+            "workbench-developer-material-fluid-recipe-recovery",
+            "workbench-supersymmetry-recipe-change-recovery",
+            "workbench-developer-source-feature-recovery",
+            "workbench-developer-material-fluid-recipe-run",
+            "workbench-developer-recipe-change-runtime-comparison"
+          ]
+        },
+        "record_state": {
+          "enum": [
+            "applied",
+            "complete",
+            "experimental-ready",
+            "experimental-ready-runtime-unverified",
+            "incomplete",
+            "rejected",
+            "restored",
+            "review-required"
+          ]
+        },
+        "reference": {"$ref": "#/$defs/content_id"},
+        "uri": {"type": "string", "pattern": "^file:"},
+        "verification_state": {"enum": ["ready", "stale"]},
+        "workspace_uri": {"type": "string", "pattern": "^file:"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "family": {"const": "material-fluid-recipe"},
+            "collection": {"const": "plans"},
+            "record_kind": {"const": "workbench-developer-material-fluid-recipe-plan"},
+            "record_state": {"const": "experimental-ready"}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "material-fluid-recipe"},
+            "collection": {"const": "receipts"},
+            "record_kind": {"const": "workbench-developer-material-fluid-recipe-receipt"},
+            "record_state": {"enum": ["applied", "rejected"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "material-fluid-recipe"},
+            "collection": {"const": "rollbacks"},
+            "record_kind": {"const": "workbench-developer-material-fluid-recipe-rollback"},
+            "record_state": {"enum": ["restored", "rejected"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "material-fluid-recipe"},
+            "collection": {"const": "recoveries"},
+            "record_kind": {"const": "workbench-developer-material-fluid-recipe-recovery"},
+            "record_state": {"enum": ["applied", "restored", "review-required"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "material-fluid-recipe"},
+            "collection": {"const": "runs"},
+            "record_kind": {"const": "workbench-developer-material-fluid-recipe-run"},
+            "record_state": {"enum": ["complete", "incomplete"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "recipe-change"},
+            "collection": {"const": "plans"},
+            "record_kind": {"const": "workbench-supersymmetry-recipe-change-plan"},
+            "record_state": {"const": "experimental-ready"}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "recipe-change"},
+            "collection": {"const": "receipts"},
+            "record_kind": {"const": "workbench-supersymmetry-recipe-change-receipt"},
+            "record_state": {"enum": ["applied", "rejected"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "recipe-change"},
+            "collection": {"const": "rollbacks"},
+            "record_kind": {"const": "workbench-supersymmetry-recipe-change-rollback"},
+            "record_state": {"enum": ["restored", "rejected"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "recipe-change"},
+            "collection": {"const": "recoveries"},
+            "record_kind": {"const": "workbench-supersymmetry-recipe-change-recovery"},
+            "record_state": {"enum": ["applied", "restored", "review-required"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "recipe-change"},
+            "collection": {"const": "runs"},
+            "record_kind": {"const": "workbench-developer-recipe-change-runtime-comparison"},
+            "record_state": {"enum": ["complete", "incomplete"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "quest-for-process"},
+            "collection": {"const": "plans"},
+            "record_kind": {"const": "workbench-developer-source-feature-plan"},
+            "record_state": {"const": "experimental-ready-runtime-unverified"}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "quest-for-process"},
+            "collection": {"const": "receipts"},
+            "record_kind": {"const": "workbench-developer-source-feature-receipt"},
+            "record_state": {"enum": ["applied", "rejected"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "quest-for-process"},
+            "collection": {"const": "rollbacks"},
+            "record_kind": {"const": "workbench-developer-source-feature-rollback"},
+            "record_state": {"enum": ["restored", "rejected"]}
+          }
+        },
+        {
+          "properties": {
+            "family": {"const": "quest-for-process"},
+            "collection": {"const": "recoveries"},
+            "record_kind": {"const": "workbench-developer-source-feature-recovery"},
+            "record_state": {"enum": ["applied", "restored", "review-required"]}
+          }
+        }
+      ]
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "available", "consent_id", "reason", "record_id"],
+      "properties": {
+        "action": {"enum": ["check", "apply", "rollback", "recover"]},
+        "available": {"type": "boolean"},
+        "consent_id": {"anyOf": [{"$ref": "#/$defs/content_id"}, {"type": "null"}]},
+        "reason": {"type": ["string", "null"]},
+        "record_id": {"anyOf": [{"$ref": "#/$defs/content_id"}, {"type": "null"}]}
+      }
+    }
+  }
+}

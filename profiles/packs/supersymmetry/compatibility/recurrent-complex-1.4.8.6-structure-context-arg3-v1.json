@@ -1,0 +1,15 @@
+{
+  "format": "workbench-runtime-compatibility-patch-v1",
+  "schema_version": 1,
+  "patch_id": "workbench-pack:supersymmetry:recurrent-complex-1.4.8.6-structure-context-arg3-v1",
+  "description": "Experimental disposable bridge for SusyCore 0.1.111's arg3 selector against Recurrent Complex 1.4.8.6.",
+  "target": {
+    "path": ".minecraft/mods/RecurrentComplex-1.4.8.6.jar",
+    "sha256": "253226e6c7efe61ae255df0cc2e19d1420945cb7e86f7cd79f51d5db10fd9de8",
+    "entry": "ivorius/reccomplex/world/gen/feature/structure/context/StructureSpawnContext.class",
+    "entry_sha256": "3690b5852458c0dac37e5ef4fdb5ab38faee7bbea94351bae41211dea7902be1",
+    "find_utf8": "flag",
+    "replace_utf8": "arg3",
+    "expected_matches": 1
+  }
+}

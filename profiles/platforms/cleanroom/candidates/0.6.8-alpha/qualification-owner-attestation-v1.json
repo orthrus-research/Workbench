@@ -1,0 +1,33 @@
+{
+  "declaration_id": "cleanroom-platform-b00-qualification-candidate-v1",
+  "declared_values": {
+    "candidate_lock_ref": {
+      "path": "profiles/platforms/cleanroom/candidates/0.6.8-alpha/candidate-lock-v1.json",
+      "schema_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-candidate-lock-v1.schema.json",
+      "schema_sha256": "sha256:847e6b0c0b3178e775bc9d537a41a8a5cddb0b35984743c1a7bb4c7f410fe6d7",
+      "sha256": "sha256:d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541"
+    },
+    "decision": "qualification-candidate",
+    "identity": {
+      "digest": "sha256:d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541",
+      "profile_id": "workbench-platform:cleanroom:0.6.8-alpha+mc-1.12.2+forge-14.23.5.2864+mcp-9.42-stable_39",
+      "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+      "type": "platform-profile"
+    },
+    "maturity": "experimental"
+  },
+  "format": "workbench-v2-boundary-owner-declaration-v1",
+  "identity_ids": [
+    "profile.cleanroom"
+  ],
+  "limitations": [
+    "This owner declaration selects exact candidate-lock bytes as an experimental B00 input; it does not make the Cleanroom profile stable or supported.",
+    "Physical client, dedicated-server, debugger, cancellation, recovery, and packaged-surface qualification remain outstanding.",
+    "Successful execution of the generic fixture does not establish compatibility for arbitrary Minecraft mods or modpacks.",
+    "Supersymmetry checkout, profile, intent, action-policy, and release qualification remain separately owner-bound.",
+    "This platform-owner declaration does not authorize a Workbench V2 candidate, distribution, or release."
+  ],
+  "owner_id": "cleanroom-platform-profile",
+  "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+  "schema_version": 1
+}

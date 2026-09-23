@@ -1,0 +1,111 @@
+<idea-plugin>
+    <id>dev.cleanroommc.workbench</id>
+    <name>Workbench for Minecraft</name>
+    <vendor url="https://github.com/orthrus-research/workbench">Orthrus Research</vendor>
+    <idea-version since-build="262" until-build="262.*"/>
+
+    <description><![CDATA[
+      <p>Review Minecraft modpack changes and run local development checks from IntelliJ.</p>
+      <p>Workbench explains what changed, shows the files involved, and asks before
+      running anything that can modify your project.</p>
+      <ul>
+        <li>Review one GitHub pull request's Supersymmetry recipe changes without switching branches.</li>
+        <li>See project checks and suggested next actions in Workbench Home.</li>
+        <li>Inspect retained file changes in IntelliJ's native diff viewer.</li>
+        <li>Run the core-owned setup wizard in a visible console.</li>
+      </ul>
+      <p>Requires the Workbench CLI and one local IntelliJ project.</p>
+    ]]></description>
+    <change-notes><![CDATA[
+      <ul>
+        <li>Added first-run CLI and setup readiness checks.</li>
+        <li>Added native wheelhouse installation guidance and an explicit setup/repair entry point.</li>
+        <li>Added a native PR Recipe Review flow with exact provider planning, consent, findings, files, and attention.</li>
+        <li>Rewrote Marketplace information in plain English.</li>
+      </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="Workbench" displayType="BALLOON" isLogByDefault="true"/>
+        <toolWindow id="Workbench Home"
+                    anchor="left"
+                    factoryClass="dev.cleanroommc.workbench.intellij.community.WorkspaceHomeToolWindowFactory"/>
+        <toolWindow id="Workbench Records"
+                    anchor="right"
+                    factoryClass="dev.cleanroommc.workbench.intellij.community.WorkbenchRecordsToolWindowFactory"/>
+        <toolWindow id="Recipe Impact"
+                    anchor="right"
+                    factoryClass="dev.cleanroommc.workbench.intellij.community.RecipeImpactToolWindowFactory"/>
+        <toolWindow id="Recipe Review"
+                    anchor="right"
+                    factoryClass="dev.cleanroommc.workbench.intellij.community.RecipeReviewToolWindowFactory"/>
+    </extensions>
+
+    <actions>
+        <group id="Workbench.ActionGroup" text="Workbench" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="Workbench.RunSavedChecks"
+                    class="dev.cleanroommc.workbench.intellij.community.RunSavedChecksAction"
+                    text="Run Checks on Saved Changes…"
+                    description="Explicitly check an exact saved candidate in a disposable native runtime"/>
+            <action id="Workbench.ReviewLocalChanges"
+                    class="dev.cleanroommc.workbench.intellij.community.ReviewLocalChangesAction"
+                    text="Review Saved Local Changes…"
+                    description="Review developer-authored saved changes against an exact local baseline, without construction or runtime execution"/>
+            <action id="Workbench.NavigateSource"
+                    class="dev.cleanroommc.workbench.intellij.community.NavigateSourceAction"
+                    text="Navigate Source Declarations…"
+                    description="Find a recipe, material, or quest in one explicit Work Session and open its verified source location"/>
+            <action id="Workbench.OpenWorkspaceHome"
+                    class="dev.cleanroommc.workbench.intellij.community.OpenWorkspaceHomeAction"
+                    text="Open Workspace Home"
+                    description="Show the ordered actions and blocked reasons returned by workbench open for this project"/>
+            <action id="Workbench.ConfigureInstalledCore"
+                    class="dev.cleanroommc.workbench.intellij.community.ConfigureInstalledCoreAction"
+                    text="Configure Core Executable…"
+                    description="Choose the independently installed Workbench executable"/>
+            <action id="Workbench.OpenInstallationHelp"
+                    class="dev.cleanroommc.workbench.intellij.community.OpenInstallationHelpAction"
+                    text="CLI Installation Help…"
+                    description="Show the shipped Pixi installation steps and executable recovery choices"/>
+            <action id="Workbench.OpenSetup"
+                    class="dev.cleanroommc.workbench.intellij.community.OpenWorkbenchSetupAction"
+                    text="Set Up or Repair Environment…"
+                    description="Check this environment and review the core-owned setup plan before installing dependencies"/>
+            <action id="Workbench.QualifyProject"
+                    class="dev.cleanroommc.workbench.intellij.community.OpenProjectQualificationAction"
+                    text="Qualify This Pack…"
+                    description="Check whether this pack matches the Supersymmetry profile and optionally save that association."/>
+            <action id="Workbench.ReviewRecipes"
+                    class="dev.cleanroommc.workbench.intellij.community.OpenRecipeReviewAction"
+                    text="Review Pull Request Recipes…"
+                    description="Plan and review one GitHub pull request's Supersymmetry recipe changes without switching branches"/>
+            <action id="Workbench.OpenDeveloperTools"
+                    class="dev.cleanroommc.workbench.intellij.community.OpenDeveloperToolsAction"
+                    text="Open Command Center…"
+                    description="Browse the installed core's complete live command catalog and run one digest-bound reviewed action"/>
+            <action id="Workbench.OpenRetainedRecords"
+                    class="dev.cleanroommc.workbench.intellij.community.OpenRetainedRecordsAction"
+                    text="Retained Blueprint Records…"
+                    description="Review current transaction state, retained lineage, owner-validated operations, and exact native before/after diffs"/>
+            <action id="Workbench.OpenRecipeImpact"
+                    class="dev.cleanroommc.workbench.intellij.community.OpenRecipeImpactAction"
+                    text="Atlas Recipe Impact…"
+                    description="Inspect bounded candidate exposure for one exact observed recipe in an explicit verified graph"/>
+            <action id="Workbench.BrowseAtlasRecipes"
+                    class="dev.cleanroommc.workbench.intellij.community.BrowseAtlasRecipesAction"
+                    text="Search Atlas Recipes…"
+                    description="Explore captured items, fluids, recipes and their exact relationship pages"/>
+            <action id="Workbench.ReopenFeatureStudioJob"
+                    class="dev.cleanroommc.workbench.intellij.community.ReopenFeatureStudioJobAction"
+                    text="Reopen Feature Studio Job…"
+                    description="Reopen one exact durable Feature Studio job through the installed core"/>
+            <action id="Workbench.RunMaterialFluidRecipe"
+                    class="dev.cleanroommc.workbench.intellij.community.RunMaterialFluidRecipeAction"
+                    text="Run Reviewed Material/Fluid Recipe in Cleanroom…"
+                    description="Run one exact reviewed material/fluid recipe plan in a disposable Cleanroom client"/>
+        </group>
+    </actions>
+</idea-plugin>

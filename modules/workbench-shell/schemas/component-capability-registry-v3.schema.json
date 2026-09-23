@@ -1,0 +1,1047 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/component-capability-registry-v3.schema.json",
+  "title": "Workbench component capability and handler registry V3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "registry_id",
+    "registry_generation",
+    "service_distribution_id",
+    "providers",
+    "components",
+    "capability_descriptors",
+    "descriptor_authority_admissions",
+    "profile_policy_admissions",
+    "handler_registrations",
+    "legacy_v2_gateway"
+  ],
+  "properties": {
+    "format": {"const": "workbench-component-capability-registry-v3"},
+    "schema_version": {"const": 3},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "registry_id": {
+      "type": "string",
+      "pattern": "^component-capability-registry:sha256:[0-9a-f]{64}$"
+    },
+    "registry_generation": {"$ref": "#/$defs/positiveInteger"},
+    "service_distribution_id": {"$ref": "#/$defs/serviceDistributionId"},
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/provider"}
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/component"}
+    },
+    "capability_descriptors": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/capabilityDescriptor"}
+    },
+    "descriptor_authority_admissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/descriptorAuthorityAdmission"}
+    },
+    "profile_policy_admissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/profilePolicyAdmission"}
+    },
+    "handler_registrations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/handlerRegistration"}
+    },
+    "legacy_v2_gateway": {"$ref": "#/$defs/legacyV2Gateway"}
+  },
+  "$defs": {
+    "positiveInteger": {"type": "integer", "minimum": 1},
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "serviceDistributionId": {
+      "type": "string",
+      "pattern": "^service-distribution:sha256:[0-9a-f]{64}$"
+    },
+    "distributionId": {
+      "type": "string",
+      "pattern": "^distribution:sha256:[0-9a-f]{64}$"
+    },
+    "nullableDistributionId": {
+      "oneOf": [
+        {"$ref": "#/$defs/distributionId"},
+        {"type": "null"}
+      ]
+    },
+    "sourceTreeId": {
+      "type": "string",
+      "pattern": "^source-tree:sha256:[0-9a-f]{64}$"
+    },
+    "nullableSourceTreeId": {
+      "oneOf": [
+        {"$ref": "#/$defs/sourceTreeId"},
+        {"type": "null"}
+      ]
+    },
+    "dependencyLockId": {
+      "type": "string",
+      "pattern": "^dependency-lock:sha256:[0-9a-f]{64}$"
+    },
+    "nullableDependencyLockId": {
+      "oneOf": [
+        {"$ref": "#/$defs/dependencyLockId"},
+        {"type": "null"}
+      ]
+    },
+    "compatibilityContractId": {
+      "type": "string",
+      "pattern": "^compatibility-contract:sha256:[0-9a-f]{64}$"
+    },
+    "nullableCompatibilityContractId": {
+      "oneOf": [
+        {"$ref": "#/$defs/compatibilityContractId"},
+        {"type": "null"}
+      ]
+    },
+    "healthReceiptId": {
+      "type": "string",
+      "pattern": "^health-receipt:sha256:[0-9a-f]{64}$"
+    },
+    "conformanceCaseId": {
+      "$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/conformanceCaseId"
+    },
+    "recordRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_kind", "record_id"],
+      "properties": {
+        "record_kind": {"$ref": "#/$defs/semanticIdentifier"},
+        "record_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+        }
+      },
+      "$comment": "Composition rejects a record_id whose content-ID prefix does not equal record_kind."
+    },
+    "capabilityId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/capabilityId"
+    },
+    "handlerId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/handlerId"
+    },
+    "implementationId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/implementationId"
+    },
+    "semanticIdentifier": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"
+    },
+    "schemaId": {
+      "type": "string",
+      "pattern": "^workbench://schemas/[A-Za-z0-9._/-]+\\.schema\\.json(?:#/[A-Za-z0-9_.$/~-]+)?$"
+    },
+    "nullableSchemaId": {
+      "oneOf": [
+        {"$ref": "#/$defs/schemaId"},
+        {"type": "null"}
+      ]
+    },
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "providerId": {
+      "type": "string",
+      "pattern": "^provider:sha256:[0-9a-f]{64}$"
+    },
+    "componentId": {
+      "type": "string",
+      "pattern": "^component:sha256:[0-9a-f]{64}$"
+    },
+    "authorityId": {
+      "type": "string",
+      "pattern": "^authority:sha256:[0-9a-f]{64}$"
+    },
+    "authorityAdapterId": {
+      "type": "string",
+      "pattern": "^authority-adapter:sha256:[0-9a-f]{64}$"
+    },
+    "ownerRevisionId": {
+      "type": "string",
+      "pattern": "^owner-revision:sha256:[0-9a-f]{64}$"
+    },
+    "capabilityAuthorityAttestationId": {
+      "type": "string",
+      "pattern": "^capability-authority-attestation:sha256:[0-9a-f]{64}$"
+    },
+    "profilePolicyAttestationId": {
+      "type": "string",
+      "pattern": "^profile-policy-attestation:sha256:[0-9a-f]{64}$"
+    },
+    "profileAdapterId": {
+      "type": "string",
+      "pattern": "^profile-adapter:sha256:[0-9a-f]{64}$"
+    },
+    "nullableProfileAdapterId": {
+      "oneOf": [
+        {"$ref": "#/$defs/profileAdapterId"},
+        {"type": "null"}
+      ]
+    },
+    "authorityBinding": {
+      "$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/authorityBinding"
+    },
+    "nullableAuthorityBinding": {
+      "oneOf": [
+        {"$ref": "#/$defs/authorityBinding"},
+        {"type": "null"}
+      ]
+    },
+    "policyId": {
+      "type": "string",
+      "pattern": "^policy:sha256:[0-9a-f]{64}$"
+    },
+    "nullablePolicyId": {
+      "oneOf": [
+        {"$ref": "#/$defs/policyId"},
+        {"type": "null"}
+      ]
+    },
+    "profileRevisionRef": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile_kind", "profile_revision_id"],
+          "properties": {
+            "profile_kind": {"const": "platform-profile-revision"},
+            "profile_revision_id": {
+              "$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/platformProfileRevisionId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile_kind", "profile_revision_id"],
+          "properties": {
+            "profile_kind": {"const": "pack-profile-revision"},
+            "profile_revision_id": {
+              "$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/packProfileRevisionId"
+            }
+          }
+        }
+      ]
+    },
+    "publicEntrypoint": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)*:[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "invocationMode": {
+      "enum": ["embedded", "local-endpoint", "stdio", "cli", "batch"]
+    },
+    "protocolMethod": {
+      "enum": [
+        "service/capabilities",
+        "service/health",
+        "service/shutdown",
+        "context/list",
+        "context/get",
+        "context/resolve",
+        "context/register",
+        "object/stat",
+        "object/read",
+        "evidence/planAdmission",
+        "evidence/commitAdmission",
+        "evidence/get",
+        "evidence/history",
+        "graph/materialize",
+        "graph/get",
+        "graph/query",
+        "graph/diff",
+        "graph/impact",
+        "graph/subscribe",
+        "operation/plan",
+        "operation/commit",
+        "job/get",
+        "job/list",
+        "job/cancel",
+        "job/subscribe",
+        "runtime/plan",
+        "runtime/start",
+        "runtime/stop",
+        "runtime/status",
+        "runtime/instrument",
+        "session/get",
+        "session/events",
+        "session/subscribe",
+        "session/export"
+      ]
+    },
+    "operationClass": {
+      "enum": [
+        "inspect",
+        "query",
+        "compare",
+        "visualize",
+        "experimental-materialize",
+        "disposable-runtime-execute",
+        "developer-world-mutate",
+        "stable-construct",
+        "publish-or-release"
+      ]
+    },
+    "supportState": {
+      "enum": [
+        "experimental",
+        "provisional",
+        "tested-supported",
+        "unsupported"
+      ]
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "severity", "code", "message", "related_records"],
+      "properties": {
+        "ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "severity": {"enum": ["info", "warning", "error", "critical"]},
+        "code": {"$ref": "#/$defs/semanticIdentifier"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "related_records": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/recordRef"}
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_format",
+        "canonicalizer",
+        "provider_id",
+        "provider_key",
+        "distribution_id",
+        "source_tree_id",
+        "dependency_lock_id",
+        "package_name",
+        "package_version"
+      ],
+      "properties": {
+        "provider_format": {"const": "workbench-capability-provider-v3"},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "provider_id": {"$ref": "#/$defs/providerId"},
+        "provider_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "distribution_id": {"$ref": "#/$defs/nullableDistributionId"},
+        "source_tree_id": {"$ref": "#/$defs/nullableSourceTreeId"},
+        "dependency_lock_id": {"$ref": "#/$defs/nullableDependencyLockId"},
+        "package_name": {
+          "oneOf": [
+            {"type": "string", "minLength": 1, "maxLength": 256},
+            {"type": "null"}
+          ]
+        },
+        "package_version": {
+          "oneOf": [
+            {"$ref": "#/$defs/semanticVersion"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "distribution_id": {"$ref": "#/$defs/distributionId"},
+            "source_tree_id": {"type": "null"},
+            "dependency_lock_id": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "distribution_id": {"type": "null"},
+            "source_tree_id": {"$ref": "#/$defs/sourceTreeId"},
+            "dependency_lock_id": {"$ref": "#/$defs/dependencyLockId"}
+          }
+        }
+      ]
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_format",
+        "canonicalizer",
+        "component_id",
+        "component_key",
+        "component_kind",
+        "provider_id",
+        "semantic_authority_id",
+        "authority_adapter_id",
+        "semantic_authority_binding",
+        "public_contract_schema_ids",
+        "depends_on_component_ids"
+      ],
+      "properties": {
+        "component_format": {"const": "workbench-capability-component-v3"},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "component_id": {"$ref": "#/$defs/componentId"},
+        "component_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "component_kind": {
+          "enum": [
+            "host",
+            "application-service",
+            "kernel",
+            "authority",
+            "profile",
+            "teaching",
+            "client"
+          ]
+        },
+        "provider_id": {"$ref": "#/$defs/providerId"},
+        "semantic_authority_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/authorityId"},
+            {"type": "null"}
+          ]
+        },
+        "authority_adapter_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/authorityAdapterId"},
+            {"type": "null"}
+          ]
+        },
+        "semantic_authority_binding": {"$ref": "#/$defs/nullableAuthorityBinding"},
+        "public_contract_schema_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/schemaId"}
+        },
+        "depends_on_component_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/componentId"}
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "semantic_authority_id": {"$ref": "#/$defs/authorityId"},
+            "authority_adapter_id": {"$ref": "#/$defs/authorityAdapterId"},
+            "semantic_authority_binding": {"$ref": "#/$defs/authorityBinding"}
+          }
+        },
+        {
+          "properties": {
+            "semantic_authority_id": {"type": "null"},
+            "authority_adapter_id": {"type": "null"},
+            "semantic_authority_binding": {"type": "null"}
+          }
+        }
+      ]
+    },
+    "methodBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_method",
+        "request_value_scope",
+        "request_schema_id",
+        "plan_schema_id",
+        "progress_schema_id",
+        "result_schema_id",
+        "failure_schema_id"
+      ],
+      "properties": {
+        "protocol_method": {"$ref": "#/$defs/protocolMethod"},
+        "request_value_scope": {"enum": ["arguments", "params"]},
+        "request_schema_id": {"$ref": "#/$defs/schemaId"},
+        "plan_schema_id": {"$ref": "#/$defs/nullableSchemaId"},
+        "progress_schema_id": {"$ref": "#/$defs/nullableSchemaId"},
+        "result_schema_id": {"$ref": "#/$defs/schemaId"},
+        "failure_schema_id": {"$ref": "#/$defs/schemaId"}
+      }
+    },
+    "recordFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_record_kinds", "produced_record_kinds"],
+      "properties": {
+        "required_record_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/semanticIdentifier"}
+        },
+        "produced_record_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/semanticIdentifier"}
+        }
+      }
+    },
+    "contextApplicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_binding",
+        "required_context_fields",
+        "input_binding",
+        "scope_compatibility_policy_id",
+        "scope_compatibility_authority"
+      ],
+      "properties": {
+        "context_binding": {"enum": ["none", "optional", "required"]},
+        "required_context_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/semanticIdentifier"}
+        },
+        "input_binding": {"enum": ["none", "optional", "required"]},
+        "scope_compatibility_policy_id": {"$ref": "#/$defs/nullablePolicyId"},
+        "scope_compatibility_authority": {"$ref": "#/$defs/nullableAuthorityBinding"}
+      },
+      "if": {"properties": {"context_binding": {"const": "none"}}},
+      "then": {
+        "properties": {
+          "required_context_fields": {"maxItems": 0},
+          "scope_compatibility_policy_id": {"type": "null"},
+          "scope_compatibility_authority": {"type": "null"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"scope_compatibility_policy_id": {"type": "null"}}},
+          "then": {"properties": {"scope_compatibility_authority": {"type": "null"}}},
+          "else": {"properties": {"scope_compatibility_authority": {"$ref": "#/$defs/authorityBinding"}}}
+        },
+        {
+          "if": {"properties": {"context_binding": {"const": "required"}}},
+          "then": {"properties": {"required_context_fields": {"minItems": 1}}}
+        }
+      ]
+    },
+    "operationContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_class",
+        "side_effect_classes",
+        "preview",
+        "consent",
+        "idempotency",
+        "freshness_checks"
+      ],
+      "properties": {
+        "operation_class": {"$ref": "#/$defs/operationClass"},
+        "side_effect_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "none",
+              "store-read",
+              "store-append",
+              "reference-update",
+              "managed-target-create",
+              "runtime-process",
+              "instrumentation",
+              "world-mutation",
+              "external-export"
+            ]
+          }
+        },
+        "preview": {"enum": ["none", "optional", "required"]},
+        "consent": {
+          "enum": ["none", "acknowledge", "explicit-plan", "exact-confirmation"]
+        },
+        "idempotency": {
+          "enum": ["none", "keyed-replay", "keyed-new-attempt", "content-deterministic"]
+        },
+        "freshness_checks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "context",
+              "input-binding",
+              "expected-heads",
+              "profile-support",
+              "action-gate",
+              "physical-binding",
+              "writer-lease"
+            ]
+          }
+        }
+      }
+    },
+    "asyncBehavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["progress", "cancellation", "continuation", "subscription"],
+      "properties": {
+        "progress": {"enum": ["none", "ephemeral", "durable-job-events"]},
+        "cancellation": {
+          "enum": ["unsupported", "before-mutation", "safe-boundaries", "process-supervised"]
+        },
+        "continuation": {"enum": ["none", "canonical"]},
+        "subscription": {"enum": ["none", "resumable", "lossy-declared"]}
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["budget_key", "unit", "limit"],
+      "properties": {
+        "budget_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "unit": {
+          "enum": ["bytes", "milliseconds", "records", "objects", "pages", "events", "slots"]
+        },
+        "limit": {"$ref": "#/$defs/positiveInteger"}
+      }
+    },
+    "resourceContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource_class", "claims", "default_budgets", "backpressure"],
+      "properties": {
+        "resource_class": {"$ref": "#/$defs/semanticIdentifier"},
+        "claims": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/semanticIdentifier"}
+        },
+        "default_budgets": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/budget"}
+        },
+        "backpressure": {
+          "enum": [
+            "pause-producer",
+            "spill-bounded",
+            "reject-before-mutation",
+            "cancel-safe-boundary",
+            "retain-incomplete-with-ranges"
+          ]
+        }
+      }
+    },
+    "profileContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicability_mode",
+        "profile_adapter_id",
+        "profile_validation_entrypoint",
+        "profile_revision_refs",
+        "applicability_policy_id",
+        "applicability_authority",
+        "required_support_states",
+        "support_predicate_policy_id",
+        "support_predicate_authority",
+        "unsupported_result",
+        "action_gate_policy_id",
+        "action_gate_authority"
+      ],
+      "properties": {
+        "applicability_mode": {
+          "enum": ["profile-independent", "explicit-revisions", "owner-predicate"]
+        },
+        "profile_adapter_id": {"$ref": "#/$defs/nullableProfileAdapterId"},
+        "profile_validation_entrypoint": {
+          "oneOf": [
+            {"$ref": "#/$defs/publicEntrypoint"},
+            {"type": "null"}
+          ]
+        },
+        "profile_revision_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/profileRevisionRef"}
+        },
+        "applicability_policy_id": {"$ref": "#/$defs/nullablePolicyId"},
+        "applicability_authority": {"$ref": "#/$defs/nullableAuthorityBinding"},
+        "required_support_states": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/supportState"}
+        },
+        "support_predicate_policy_id": {"$ref": "#/$defs/nullablePolicyId"},
+        "support_predicate_authority": {"$ref": "#/$defs/nullableAuthorityBinding"},
+        "unsupported_result": {"enum": ["unavailable", "blocked"]},
+        "action_gate_policy_id": {"$ref": "#/$defs/nullablePolicyId"},
+        "action_gate_authority": {"$ref": "#/$defs/nullableAuthorityBinding"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "applicability_mode": {"const": "profile-independent"},
+            "profile_adapter_id": {"type": "null"},
+            "profile_validation_entrypoint": {"type": "null"},
+            "profile_revision_refs": {"maxItems": 0},
+            "applicability_policy_id": {"type": "null"},
+            "applicability_authority": {"type": "null"},
+            "required_support_states": {"maxItems": 0},
+            "support_predicate_policy_id": {"type": "null"},
+            "support_predicate_authority": {"type": "null"},
+            "action_gate_policy_id": {"type": "null"},
+            "action_gate_authority": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "applicability_mode": {"const": "explicit-revisions"},
+            "profile_adapter_id": {"$ref": "#/$defs/profileAdapterId"},
+            "profile_validation_entrypoint": {"$ref": "#/$defs/publicEntrypoint"},
+            "profile_revision_refs": {"minItems": 1},
+            "applicability_policy_id": {"type": "null"},
+            "applicability_authority": {"type": "null"},
+            "required_support_states": {"minItems": 1},
+            "support_predicate_policy_id": {"$ref": "#/$defs/policyId"},
+            "support_predicate_authority": {"$ref": "#/$defs/authorityBinding"}
+          }
+        },
+        {
+          "properties": {
+            "applicability_mode": {"const": "owner-predicate"},
+            "profile_adapter_id": {"$ref": "#/$defs/profileAdapterId"},
+            "profile_validation_entrypoint": {"$ref": "#/$defs/publicEntrypoint"},
+            "applicability_policy_id": {"$ref": "#/$defs/policyId"},
+            "applicability_authority": {"$ref": "#/$defs/authorityBinding"},
+            "required_support_states": {"minItems": 1},
+            "support_predicate_policy_id": {"$ref": "#/$defs/policyId"},
+            "support_predicate_authority": {"$ref": "#/$defs/authorityBinding"}
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {"properties": {"action_gate_policy_id": {"type": "null"}}},
+          "then": {"properties": {"action_gate_authority": {"type": "null"}}},
+          "else": {
+            "properties": {"action_gate_authority": {"$ref": "#/$defs/authorityBinding"}}
+          }
+        }
+      ]
+    },
+    "capabilityDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "descriptor_format",
+        "canonicalizer",
+        "capability_key",
+        "capability_id",
+        "semantic_version",
+        "owner_component_id",
+        "semantic_authority_id",
+        "semantic_authority_binding",
+        "provider_id",
+        "handler_id",
+        "public_entrypoint",
+        "handler_implementation_id",
+        "method_bindings",
+        "record_flow",
+        "context_applicability",
+        "operation",
+        "invocation_modes",
+        "async_behavior",
+        "resources",
+        "profile",
+        "maturity"
+      ],
+      "properties": {
+        "descriptor_format": {"const": "workbench-capability-descriptor-v3"},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "capability_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "semantic_version": {"$ref": "#/$defs/semanticVersion"},
+        "owner_component_id": {"$ref": "#/$defs/componentId"},
+        "semantic_authority_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/authorityId"},
+            {"type": "null"}
+          ]
+        },
+        "semantic_authority_binding": {"$ref": "#/$defs/nullableAuthorityBinding"},
+        "provider_id": {"$ref": "#/$defs/providerId"},
+        "handler_id": {"$ref": "#/$defs/handlerId"},
+        "public_entrypoint": {"$ref": "#/$defs/publicEntrypoint"},
+        "handler_implementation_id": {"$ref": "#/$defs/implementationId"},
+        "method_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/methodBinding"}
+        },
+        "record_flow": {"$ref": "#/$defs/recordFlow"},
+        "context_applicability": {"$ref": "#/$defs/contextApplicability"},
+        "operation": {"$ref": "#/$defs/operationContract"},
+        "invocation_modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/invocationMode"}
+        },
+        "async_behavior": {"$ref": "#/$defs/asyncBehavior"},
+        "resources": {"$ref": "#/$defs/resourceContract"},
+        "profile": {"$ref": "#/$defs/profileContract"},
+        "maturity": {"enum": ["experimental", "preview", "supported", "deprecated"]}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "semantic_authority_id": {"$ref": "#/$defs/authorityId"},
+            "semantic_authority_binding": {"$ref": "#/$defs/authorityBinding"}
+          }
+        },
+        {
+          "properties": {
+            "semantic_authority_id": {"type": "null"},
+            "semantic_authority_binding": {"type": "null"}
+          }
+        }
+      ]
+    },
+    "capabilityAuthorityAttestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "canonicalizer",
+        "attestation_id",
+        "capability_id",
+        "authority_binding",
+        "admission_policy_id",
+        "decision"
+      ],
+      "properties": {
+        "format": {"const": "workbench-capability-authority-attestation-v3"},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "attestation_id": {"$ref": "#/$defs/capabilityAuthorityAttestationId"},
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "authority_binding": {"$ref": "#/$defs/authorityBinding"},
+        "admission_policy_id": {"$ref": "#/$defs/policyId"},
+        "decision": {"const": "approved"}
+      }
+    },
+    "descriptorAuthorityAdmission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "authority_binding",
+        "authority_validation_entrypoint",
+        "attestation"
+      ],
+      "properties": {
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "authority_binding": {"$ref": "#/$defs/authorityBinding"},
+        "authority_validation_entrypoint": {"$ref": "#/$defs/publicEntrypoint"},
+        "attestation": {"$ref": "#/$defs/capabilityAuthorityAttestation"}
+      }
+    },
+    "profilePolicyAttestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "canonicalizer",
+        "attestation_id",
+        "capability_id",
+        "profile_revision_ref",
+        "profile_authority",
+        "support_predicate_policy_id",
+        "action_gate_policy_id",
+        "decision"
+      ],
+      "properties": {
+        "format": {"const": "workbench-profile-policy-attestation-v3"},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "attestation_id": {"$ref": "#/$defs/profilePolicyAttestationId"},
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "profile_revision_ref": {"$ref": "#/$defs/profileRevisionRef"},
+        "profile_authority": {"$ref": "#/$defs/authorityBinding"},
+        "support_predicate_policy_id": {"$ref": "#/$defs/policyId"},
+        "action_gate_policy_id": {"$ref": "#/$defs/nullablePolicyId"},
+        "decision": {"const": "approved"}
+      }
+    },
+    "profilePolicyAdmission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "profile_revision_ref",
+        "profile_authority",
+        "profile_adapter_id",
+        "profile_validation_entrypoint",
+        "attestation"
+      ],
+      "properties": {
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "profile_revision_ref": {"$ref": "#/$defs/profileRevisionRef"},
+        "profile_authority": {"$ref": "#/$defs/authorityBinding"},
+        "profile_adapter_id": {"$ref": "#/$defs/profileAdapterId"},
+        "profile_validation_entrypoint": {"$ref": "#/$defs/publicEntrypoint"},
+        "attestation": {"$ref": "#/$defs/profilePolicyAttestation"}
+      }
+    },
+    "handlerRegistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registration_format",
+        "canonicalizer",
+        "registration_id",
+        "capability_id",
+        "handler_id",
+        "provider_id",
+        "public_entrypoint",
+        "handler_implementation_id",
+        "method_bindings",
+        "invocation_modes",
+        "state",
+        "reasons",
+        "conformance_case_ids",
+        "health_receipt_ids"
+      ],
+      "properties": {
+        "registration_format": {"const": "workbench-handler-registration-v3"},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "registration_id": {
+          "type": "string",
+          "pattern": "^handler-registration:sha256:[0-9a-f]{64}$"
+        },
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "handler_id": {"$ref": "#/$defs/handlerId"},
+        "provider_id": {"$ref": "#/$defs/providerId"},
+        "public_entrypoint": {"$ref": "#/$defs/publicEntrypoint"},
+        "handler_implementation_id": {"$ref": "#/$defs/implementationId"},
+        "method_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/methodBinding"}
+        },
+        "invocation_modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/invocationMode"}
+        },
+        "state": {"enum": ["available", "degraded", "unavailable", "blocked"]},
+        "reasons": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/reason"}
+        },
+        "conformance_case_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/conformanceCaseId"}
+        },
+        "health_receipt_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/healthReceiptId"}
+        }
+      }
+    },
+    "legacyMethodMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "legacy_method",
+        "disposition",
+        "capability_id",
+        "compatibility_contract_id",
+        "reason"
+      ],
+      "properties": {
+        "legacy_method": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]*(?:/[A-Za-z][A-Za-z0-9]*)*$"
+        },
+        "disposition": {"enum": ["shared-handler", "retained-legacy-path", "unavailable"]},
+        "capability_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/capabilityId"},
+            {"type": "null"}
+          ]
+        },
+        "compatibility_contract_id": {"$ref": "#/$defs/nullableCompatibilityContractId"},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 1024}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "disposition": {"const": "shared-handler"},
+            "capability_id": {"$ref": "#/$defs/capabilityId"},
+            "compatibility_contract_id": {"$ref": "#/$defs/compatibilityContractId"}
+          }
+        },
+        {
+          "properties": {
+            "disposition": {"const": "retained-legacy-path"},
+            "capability_id": {"type": "null"},
+            "compatibility_contract_id": {"$ref": "#/$defs/compatibilityContractId"}
+          }
+        },
+        {
+          "properties": {
+            "disposition": {"const": "unavailable"},
+            "capability_id": {"type": "null"},
+            "compatibility_contract_id": {"type": "null"}
+          }
+        }
+      ]
+    },
+    "legacyV2Gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "disposition",
+        "protocol_major",
+        "framing",
+        "method_mappings",
+        "excluded_v3_features"
+      ],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "disposition": {"const": "partial-historical-compatibility-gateway"},
+        "protocol_major": {"const": 2},
+        "framing": {"const": "content-length-jsonrpc-2.0"},
+        "method_mappings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/legacyMethodMapping"}
+        },
+        "excluded_v3_features": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "contexts"},
+            {"const": "object-range-reads"},
+            {"const": "durable-jobs"},
+            {"const": "progress-and-cancellation"},
+            {"const": "continuations"},
+            {"const": "subscriptions"}
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6
+        }
+      }
+    }
+  }
+}

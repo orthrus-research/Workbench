@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-evidence-set-revision-v2.schema.json",
+  "title": "Workbench Crucible evidence-set revision V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "authority_owner",
+    "context_ref_id",
+    "parent_evidence_set_revision_ids",
+    "merge_recipe_id",
+    "ledger_heads",
+    "admission_selection_policy_id",
+    "effective_admission_count",
+    "effective_admission_root",
+    "admission_partitions",
+    "effective_evidence_count",
+    "effective_evidence_root",
+    "evidence_partitions",
+    "scope_selector_id",
+    "history_roots",
+    "coverage",
+    "limitations",
+    "evidence_frontier_object_descriptor_id",
+    "semantic_root"
+  ],
+  "properties": {
+    "kind": {"const": "evidence-set-revision"},
+    "format": {"const": "workbench-crucible-evidence-set-revision-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-evidence-set-revision-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {
+      "type": "string",
+      "pattern": "^evidence-set-revision:sha256:[0-9a-f]{64}$"
+    },
+    "authority_owner": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorityBinding"},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/contextRefId"},
+    "parent_evidence_set_revision_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceSetRevisionId"}
+    },
+    "merge_recipe_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableMergeRecipeId"},
+    "ledger_heads": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ledger_namespace", "head_record_id", "ordinal"],
+        "properties": {
+          "ledger_namespace": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+          "head_record_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/ledgerEntryId"},
+          "ordinal": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nonNegativeInteger"}
+        }
+      }
+    },
+    "admission_selection_policy_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+    "effective_admission_count": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nonNegativeInteger"},
+    "effective_admission_root": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableSha256"},
+    "admission_partitions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/membershipPartition"}
+    },
+    "effective_evidence_count": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nonNegativeInteger"},
+    "effective_evidence_root": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableSha256"},
+    "evidence_partitions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/membershipPartition"}
+    },
+    "scope_selector_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/selectorId"},
+    "history_roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rejected", "quarantined", "superseded", "conflicted"],
+      "properties": {
+        "rejected": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableSha256"},
+        "quarantined": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableSha256"},
+        "superseded": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableSha256"},
+        "conflicted": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableSha256"}
+      }
+    },
+    "coverage": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/coverage"},
+    "limitations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/limitation"}
+    },
+    "evidence_frontier_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableObjectDescriptorId"},
+    "semantic_root": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/sha256"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"parent_evidence_set_revision_ids": {"maxItems": 1}}},
+      "then": {"properties": {"merge_recipe_id": {"type": "null"}}},
+      "else": {"properties": {"merge_recipe_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/mergeRecipeId"}}}
+    },
+    {
+      "if": {"properties": {"effective_admission_count": {"const": 0}}},
+      "then": {
+        "properties": {
+          "effective_admission_root": {"type": "null"},
+          "admission_partitions": {"maxItems": 0}
+        }
+      },
+      "else": {
+        "properties": {
+          "effective_admission_root": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/sha256"},
+          "admission_partitions": {"minItems": 1}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"effective_evidence_count": {"const": 0}}},
+      "then": {
+        "properties": {
+          "effective_evidence_root": {"type": "null"},
+          "evidence_partitions": {"maxItems": 0}
+        }
+      },
+      "else": {
+        "properties": {
+          "effective_evidence_root": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/sha256"},
+          "evidence_partitions": {"minItems": 1}
+        }
+      }
+    }
+  ]
+}

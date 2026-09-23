@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-subsurface-studio-result-v1.schema.json",
+  "title": "Workbench GTCEu Subsurface Studio result V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "result_id",
+    "read_only",
+    "operation",
+    "status",
+    "profile",
+    "scope",
+    "sources",
+    "result",
+    "uncertainty",
+    "limitations",
+    "navigation"
+  ],
+  "properties": {
+    "format": {"const": "workbench-gtceu-subsurface-studio-result-v1"},
+    "schema_version": {"const": 1},
+    "result_id": {"type": "string", "pattern": "^workbench-subsurface-result:sha256:[0-9a-f]{64}$"},
+    "read_only": {"const": true},
+    "operation": {"enum": ["summary", "layers", "map", "explain", "section", "definitions", "fluids", "compare"]},
+    "status": {"enum": ["answered", "ambiguous", "partial", "not-found", "incomparable"]},
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "pack_profile", "sha256"],
+      "properties": {
+        "profile_id": {"type": "string"},
+        "pack_profile": {"type": "string"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["world_seed", "dimension_id", "chunk_window"],
+      "properties": {
+        "world_seed": {"type": ["integer", "string"]},
+        "dimension_id": {"type": "integer"},
+        "chunk_window": {"$ref": "#/$defs/window"}
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 3,
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "result": {"type": "object"},
+    "uncertainty": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "limitations": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "navigation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "label", "target"],
+        "properties": {
+          "kind": {"type": "string"},
+          "label": {"type": "string"},
+          "target": {"type": "string"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_chunk_x", "min_chunk_z", "chunk_size_x", "chunk_size_z", "halo_chunks"],
+      "properties": {
+        "min_chunk_x": {"type": "integer"},
+        "min_chunk_z": {"type": "integer"},
+        "chunk_size_x": {"type": "integer", "minimum": 1, "maximum": 1024},
+        "chunk_size_z": {"type": "integer", "minimum": 1, "maximum": 1024},
+        "halo_chunks": {"type": "integer", "minimum": 0}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "kind", "authority", "state", "sha256", "size_bytes", "path", "limitations"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "authority": {"type": "string", "minLength": 1},
+        "state": {"enum": ["declared", "observed-final", "observed-controlled", "unavailable"]},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "size_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "path": {"type": ["string", "null"]},
+        "limitations": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    }
+  }
+}

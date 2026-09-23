@@ -1,0 +1,1693 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/project-intelligence/mixin-component-topology-receipt-v1.schema.json",
+  "title": "Workbench Project Intelligence Mixin component topology receipt v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "receipt_id",
+    "canonicalization_id",
+    "producer",
+    "scope",
+    "artifacts",
+    "components",
+    "configurations",
+    "registrations",
+    "mixin_bindings",
+    "compatibility_epochs",
+    "evidence",
+    "findings",
+    "summary",
+    "boundaries"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "workbench-project-intelligence-mixin-component-topology-receipt-v1"
+    },
+    "contract_id": {
+      "const": "WORKBENCH-PROJECT-INTELLIGENCE-MIXIN-COMPONENT-TOPOLOGY-RECEIPT-V1"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^workbench-mixin-topology-receipt:sha256:[0-9a-f]{64}$"
+    },
+    "canonicalization_id": {
+      "const": "workbench-canonical-json-v1"
+    },
+    "producer": {
+      "$ref": "#/$defs/producer"
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    },
+    "configurations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/configuration"
+      }
+    },
+    "registrations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/registration"
+      }
+    },
+    "mixin_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/mixinBinding"
+      }
+    },
+    "compatibility_epochs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/compatibilityEpoch"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "boundaries": {
+      "$ref": "#/$defs/boundaries"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gitObjectId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "qualifiedId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]*:[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableGitObjectId": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/gitObjectId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stringSet": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "evidenceIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^workbench-mixin-evidence:sha256:[0-9a-f]{64}$"
+      }
+    },
+    "producer": {
+      "type": "object",
+      "required": [
+        "tool_id",
+        "tool_version",
+        "policy_id",
+        "policy_sha256",
+        "input_set_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tool_id": {
+          "$ref": "#/$defs/qualifiedId"
+        },
+        "tool_version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "policy_id": {
+          "$ref": "#/$defs/qualifiedId"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "candidateLockV1": {
+      "type": "object",
+      "required": [
+        "candidate_id",
+        "format",
+        "schema_version",
+        "file_sha256",
+        "locator"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "format": {
+          "const": "workbench-cleanroom-candidate-lock-v1"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "locator": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "scope_id",
+        "scope_kind",
+        "candidate_lock_v1",
+        "artifact_set_sha256",
+        "configuration_set_sha256",
+        "physical_side",
+        "runtime_java",
+        "mapping_namespace"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "scope_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-scope:sha256:[0-9a-f]{64}$"
+        },
+        "scope_kind": {
+          "enum": [
+            "platform-candidate",
+            "project-build",
+            "runtime-session",
+            "offline-artifact-set"
+          ]
+        },
+        "candidate_lock_v1": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/candidateLockV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_set_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "physical_side": {
+          "enum": [
+            "CLIENT",
+            "DEDICATED_SERVER",
+            "OFFLINE",
+            "UNRESOLVED"
+          ]
+        },
+        "runtime_java": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "mapping_namespace": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scope_kind": {
+                "enum": [
+                  "platform-candidate",
+                  "runtime-session"
+                ]
+              }
+            },
+            "required": [
+              "scope_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "candidate_lock_v1": {
+                "$ref": "#/$defs/candidateLockV1"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "versionClaim": {
+      "type": "object",
+      "required": [
+        "namespace",
+        "value",
+        "state",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "value": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "state": {
+          "enum": [
+            "observed-manifest",
+            "published-metadata",
+            "source-declared",
+            "runtime-reported",
+            "derived-bounded",
+            "unresolved"
+          ]
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidenceIds"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unresolved"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/nonEmptyString"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sourceBinding": {
+      "type": "object",
+      "required": [
+        "state",
+        "repository",
+        "revision",
+        "tree"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "exact-revision",
+            "declared-only",
+            "unavailable",
+            "not-applicable"
+          ]
+        },
+        "repository": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "revision": {
+          "$ref": "#/$defs/nullableGitObjectId"
+        },
+        "tree": {
+          "$ref": "#/$defs/nullableGitObjectId"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "exact-revision"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "repository": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "revision": {
+                "$ref": "#/$defs/gitObjectId"
+              },
+              "tree": {
+                "$ref": "#/$defs/gitObjectId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "artifact_id",
+        "artifact_kind",
+        "file_name",
+        "sha256",
+        "size",
+        "coordinate_state",
+        "coordinate",
+        "source_binding",
+        "version_claims",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-artifact:sha256:[0-9a-f]{64}$"
+        },
+        "artifact_kind": {
+          "enum": [
+            "jar",
+            "zip",
+            "directory",
+            "classpath-root",
+            "module",
+            "source-tree",
+            "other"
+          ]
+        },
+        "file_name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "coordinate_state": {
+          "enum": [
+            "resolved",
+            "declared-only",
+            "unresolved",
+            "not-applicable"
+          ]
+        },
+        "coordinate": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "source_binding": {
+          "$ref": "#/$defs/sourceBinding"
+        },
+        "version_claims": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/versionClaim"
+          }
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidenceIds"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "coordinate_state": {
+                "enum": [
+                  "resolved",
+                  "declared-only"
+                ]
+              }
+            },
+            "required": [
+              "coordinate_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "coordinate": {
+                "$ref": "#/$defs/nonEmptyString"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "coordinate": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "componentImplementation": {
+      "type": "object",
+      "required": [
+        "class_name",
+        "entry_path",
+        "entry_sha256",
+        "service_interface"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "class_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "entry_path": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "entry_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "service_interface": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "required": [
+        "component_id",
+        "artifact_id",
+        "component_kind",
+        "logical_name",
+        "identity_state",
+        "implementation",
+        "version_claims",
+        "capabilities",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "component_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-component:sha256:[0-9a-f]{64}$"
+        },
+        "artifact_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-artifact:sha256:[0-9a-f]{64}$"
+        },
+        "component_kind": {
+          "enum": [
+            "mixin-runtime",
+            "host-loader",
+            "mixin-service",
+            "global-property-service",
+            "platform-agent",
+            "transformer",
+            "mixin-config",
+            "mixin-class",
+            "config-plugin",
+            "connector",
+            "injection-point",
+            "dynamic-selector",
+            "reference-mapper",
+            "annotation-processor",
+            "java-agent",
+            "audit-trail",
+            "other"
+          ]
+        },
+        "logical_name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "identity_state": {
+          "enum": [
+            "exact-entry",
+            "artifact-bound",
+            "declared-only",
+            "unresolved"
+          ]
+        },
+        "implementation": {
+          "$ref": "#/$defs/componentImplementation"
+        },
+        "version_claims": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/versionClaim"
+          }
+        },
+        "capabilities": {
+          "$ref": "#/$defs/stringSet"
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidenceIds"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "identity_state": {
+                "const": "exact-entry"
+              }
+            },
+            "required": [
+              "identity_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "implementation": {
+                "properties": {
+                  "entry_path": {
+                    "$ref": "#/$defs/nonEmptyString"
+                  },
+                  "entry_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "resourceIdentity": {
+      "type": "object",
+      "required": [
+        "state",
+        "path",
+        "sha256",
+        "size"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "exact",
+            "declared-only",
+            "missing",
+            "unresolved",
+            "not-applicable"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "exact"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "missing",
+                  "not-applicable"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sha256": {
+                "type": "null"
+              },
+              "size": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ownerIdentity": {
+      "type": "object",
+      "required": [
+        "state",
+        "raw_id",
+        "canonical_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "exact-source-id",
+            "canonicalized-source-id",
+            "fallback-container-name",
+            "declared-only",
+            "unresolved"
+          ]
+        },
+        "raw_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "canonical_id": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "phase": {
+      "enum": [
+        "PREINIT",
+        "INIT",
+        "DEFAULT",
+        "CUSTOM",
+        "UNSPECIFIED",
+        "UNRESOLVED"
+      ]
+    },
+    "refmap": {
+      "type": "object",
+      "required": [
+        "state",
+        "resource",
+        "resource_sha256",
+        "wrapper_component_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "exact",
+            "declared-only",
+            "default-resource",
+            "disabled",
+            "missing",
+            "unresolved",
+            "not-applicable"
+          ]
+        },
+        "resource": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "resource_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "wrapper_component_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^workbench-mixin-component:sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "exact"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "resource": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "resource_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "configuration": {
+      "type": "object",
+      "required": [
+        "configuration_id",
+        "component_id",
+        "resource",
+        "owner",
+        "declared_phase",
+        "custom_phase_name",
+        "required",
+        "priority",
+        "mixin_priority",
+        "mixin_package",
+        "minimum_runtime_version",
+        "required_features",
+        "plugin_component_id",
+        "refmap",
+        "semantic_options_sha256",
+        "registration_ids",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "configuration_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-configuration:sha256:[0-9a-f]{64}$"
+        },
+        "component_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-component:sha256:[0-9a-f]{64}$"
+        },
+        "resource": {
+          "$ref": "#/$defs/resourceIdentity"
+        },
+        "owner": {
+          "$ref": "#/$defs/ownerIdentity"
+        },
+        "declared_phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "custom_phase_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "required": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "priority": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mixin_priority": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mixin_package": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "minimum_runtime_version": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "required_features": {
+          "$ref": "#/$defs/stringSet"
+        },
+        "plugin_component_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^workbench-mixin-component:sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "refmap": {
+          "$ref": "#/$defs/refmap"
+        },
+        "semantic_options_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "registration_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^workbench-mixin-registration:sha256:[0-9a-f]{64}$"
+          }
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidenceIds"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "declared_phase": {
+                "const": "CUSTOM"
+              }
+            },
+            "required": [
+              "declared_phase"
+            ]
+          },
+          "then": {
+            "properties": {
+              "custom_phase_name": {
+                "$ref": "#/$defs/nonEmptyString"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "custom_phase_name": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "endpoint": {
+      "type": "object",
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "artifact",
+            "component",
+            "configuration",
+            "mixin-binding",
+            "runtime-phase",
+            "transformer-chain",
+            "other"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "registration": {
+      "type": "object",
+      "required": [
+        "registration_id",
+        "registration_kind",
+        "source",
+        "target",
+        "declaration_state",
+        "runtime_state",
+        "phase",
+        "ordinal",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "registration_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-registration:sha256:[0-9a-f]{64}$"
+        },
+        "registration_kind": {
+          "enum": [
+            "service-provider",
+            "manifest-config",
+            "manifest-connector",
+            "programmatic-config",
+            "config-plugin",
+            "config-mixin",
+            "config-injection-point",
+            "config-dynamic-selector",
+            "config-refmap-wrapper",
+            "phase-transition",
+            "transformer-chain",
+            "java-agent",
+            "other"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "target": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "declaration_state": {
+          "enum": [
+            "declared-exact",
+            "discovered",
+            "derived-bounded",
+            "unresolved"
+          ]
+        },
+        "runtime_state": {
+          "enum": [
+            "not-observed",
+            "loaded",
+            "active",
+            "inactive",
+            "failed",
+            "unresolved"
+          ]
+        },
+        "phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "ordinal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidenceIds"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "class_name",
+        "member_name",
+        "member_descriptor",
+        "resolution_state"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "class_name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "member_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "member_descriptor": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "resolution_state": {
+          "enum": [
+            "declared",
+            "resolved-exact",
+            "ambiguous",
+            "missing",
+            "unresolved"
+          ]
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "required": [
+        "kind",
+        "value",
+        "state"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "value": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "state": {
+          "enum": [
+            "declared",
+            "remapped-exact",
+            "matched-runtime",
+            "ambiguous",
+            "missing",
+            "unresolved"
+          ]
+        }
+      }
+    },
+    "mixinBinding": {
+      "type": "object",
+      "required": [
+        "binding_id",
+        "configuration_id",
+        "mixin_component_id",
+        "target",
+        "operation_kind",
+        "selector",
+        "phase",
+        "priority",
+        "order_state",
+        "application_state",
+        "application_ordinal",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "binding_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-binding:sha256:[0-9a-f]{64}$"
+        },
+        "configuration_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-configuration:sha256:[0-9a-f]{64}$"
+        },
+        "mixin_component_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-component:sha256:[0-9a-f]{64}$"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "operation_kind": {
+          "enum": [
+            "merge",
+            "overwrite",
+            "inject",
+            "redirect",
+            "modify-arg",
+            "modify-args",
+            "modify-variable",
+            "modify-constant",
+            "accessor",
+            "invoker",
+            "synthetic",
+            "unknown",
+            "other"
+          ]
+        },
+        "selector": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/selector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phase": {
+          "$ref": "#/$defs/phase"
+        },
+        "priority": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "order_state": {
+          "enum": [
+            "declared-priority",
+            "observed-ordinal",
+            "partial",
+            "unresolved"
+          ]
+        },
+        "application_state": {
+          "enum": [
+            "declared",
+            "phase-ineligible",
+            "eligible",
+            "prepared",
+            "apply-entered",
+            "applied",
+            "skipped",
+            "failed",
+            "not-observed",
+            "unresolved"
+          ]
+        },
+        "application_ordinal": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidenceIds"
+        }
+      }
+    },
+    "compatibilityEpoch": {
+      "type": "object",
+      "required": [
+        "compatibility_id",
+        "subject_kind",
+        "subject_id",
+        "scope_kind",
+        "scope_key",
+        "metadata_resource",
+        "declared_epoch",
+        "effective_epoch",
+        "latest_supported_epoch",
+        "fallback_epoch",
+        "resolution_state",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "compatibility_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compatibility:sha256:[0-9a-f]{64}$"
+        },
+        "subject_kind": {
+          "enum": [
+            "artifact",
+            "component",
+            "configuration",
+            "mixin-binding"
+          ]
+        },
+        "subject_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "scope_kind": {
+          "enum": [
+            "artifact-default",
+            "configuration",
+            "mixin-class",
+            "member"
+          ]
+        },
+        "scope_key": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "metadata_resource": {
+          "$ref": "#/$defs/resourceIdentity"
+        },
+        "declared_epoch": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "effective_epoch": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "latest_supported_epoch": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "fallback_epoch": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "resolution_state": {
+          "enum": [
+            "exact-metadata",
+            "member-override",
+            "mixin-inherited",
+            "processor-default",
+            "runtime-fallback",
+            "invalid-metadata",
+            "absent-metadata",
+            "not-applicable",
+            "unresolved"
+          ]
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidenceIds"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "evidence_id",
+        "evidence_kind",
+        "collection_state",
+        "admission_state",
+        "truth_scope",
+        "locator",
+        "content_sha256",
+        "size",
+        "source_ids",
+        "limitations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-evidence:sha256:[0-9a-f]{64}$"
+        },
+        "evidence_kind": {
+          "enum": [
+            "artifact-bytes",
+            "jar-entry-bytes",
+            "manifest",
+            "service-provider-file",
+            "mixin-config-resource",
+            "compatibility-metadata",
+            "refmap",
+            "published-metadata",
+            "source-span",
+            "runtime-event",
+            "runtime-query",
+            "log",
+            "intermediate-bytecode",
+            "final-bytecode-fingerprint",
+            "other"
+          ]
+        },
+        "collection_state": {
+          "enum": [
+            "exact",
+            "observed",
+            "derived",
+            "partial",
+            "missing",
+            "rejected"
+          ]
+        },
+        "admission_state": {
+          "enum": [
+            "admitted",
+            "supporting-only",
+            "rejected"
+          ]
+        },
+        "truth_scope": {
+          "enum": [
+            "artifact-identity",
+            "static-declaration",
+            "runtime-occurrence",
+            "comparison-only",
+            "diagnostic-only"
+          ]
+        },
+        "locator": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "source_ids": {
+          "$ref": "#/$defs/stringSet"
+        },
+        "limitations": {
+          "$ref": "#/$defs/stringSet"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "collection_state": {
+                "const": "exact"
+              }
+            },
+            "required": [
+              "collection_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "content_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "collection_state": {
+                "const": "missing"
+              }
+            },
+            "required": [
+              "collection_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "content_sha256": {
+                "type": "null"
+              },
+              "size": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evidence_kind": {
+                "enum": [
+                  "log",
+                  "intermediate-bytecode"
+                ]
+              }
+            },
+            "required": [
+              "evidence_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "admission_state": {
+                "const": "supporting-only"
+              },
+              "truth_scope": {
+                "const": "diagnostic-only"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "admission_state": {
+                "const": "admitted"
+              }
+            },
+            "required": [
+              "admission_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "truth_scope": {
+                "not": {
+                  "const": "diagnostic-only"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "finding_id",
+        "finding_kind",
+        "severity",
+        "state",
+        "subject_ids",
+        "statement",
+        "evidence_ids",
+        "limitations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-finding:sha256:[0-9a-f]{64}$"
+        },
+        "finding_kind": {
+          "enum": [
+            "identity",
+            "topology",
+            "compatibility",
+            "conflict",
+            "diagnostic",
+            "packaging",
+            "coverage",
+            "mismatch",
+            "unresolved",
+            "other"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "state": {
+          "enum": [
+            "observed-exact",
+            "derived-bounded",
+            "declared-only",
+            "unresolved",
+            "contradicted",
+            "rejected"
+          ]
+        },
+        "subject_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "statement": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidenceIds"
+        },
+        "limitations": {
+          "$ref": "#/$defs/stringSet"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "receipt_state",
+        "topology_state",
+        "runtime_observation_state",
+        "compatibility_state",
+        "artifact_count",
+        "component_count",
+        "configuration_count",
+        "registration_count",
+        "mixin_binding_count",
+        "compatibility_epoch_count",
+        "evidence_count",
+        "finding_count",
+        "unresolved_count",
+        "contradiction_count",
+        "limitations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "receipt_state": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "rejected"
+          ]
+        },
+        "topology_state": {
+          "enum": [
+            "complete",
+            "partial",
+            "unresolved",
+            "rejected"
+          ]
+        },
+        "runtime_observation_state": {
+          "enum": [
+            "not-observed",
+            "partial",
+            "observed-bounded",
+            "rejected"
+          ]
+        },
+        "compatibility_state": {
+          "enum": [
+            "complete",
+            "partial",
+            "not-applicable",
+            "unresolved",
+            "rejected"
+          ]
+        },
+        "artifact_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "component_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "configuration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "registration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mixin_binding_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatibility_epoch_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "finding_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contradiction_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "required": [
+        "candidate_lock_v1_role",
+        "candidate_lock_v1_mutated",
+        "static_declaration_proves_runtime_application",
+        "apply_begin_proves_apply_completion",
+        "logs_are_final_truth",
+        "intermediate_bytecode_is_final_truth",
+        "content_address_is_signature",
+        "atlas_remains_interpretation_authority"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "candidate_lock_v1_role": {
+          "const": "exact-external-binding"
+        },
+        "candidate_lock_v1_mutated": {
+          "const": false
+        },
+        "static_declaration_proves_runtime_application": {
+          "const": false
+        },
+        "apply_begin_proves_apply_completion": {
+          "const": false
+        },
+        "logs_are_final_truth": {
+          "const": false
+        },
+        "intermediate_bytecode_is_final_truth": {
+          "const": false
+        },
+        "content_address_is_signature": {
+          "const": false
+        },
+        "atlas_remains_interpretation_authority": {
+          "const": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/bounded-effect-snapshot-projection-v2.schema.json",
+  "title": "Workbench Process Studio Effect Snapshot Projection V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "projection_id",
+    "authority",
+    "binding",
+    "records",
+    "summary",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-process-studio-effect-snapshot-projection-v2"
+    },
+    "schema_version": {"const": 2},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "projection_id": {
+      "type": "string",
+      "pattern": "^workbench-process-studio-effect-snapshot-projection-v2:sha256:[0-9a-f]{64}$"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "claim",
+        "runtime_authority",
+        "semantic_authority",
+        "causality_authority",
+        "construction_authority",
+        "action_authorization"
+      ],
+      "properties": {
+        "owner": {"const": "Process Studio"},
+        "claim": {
+          "const": "closed projection of admitted snapshot records through bound family adapters"
+        },
+        "runtime_authority": {"const": "none"},
+        "semantic_authority": {"const": "family-adapters"},
+        "causality_authority": {"const": "none"},
+        "construction_authority": {"const": "none"},
+        "action_authorization": {"const": "none"}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_snapshot_id",
+        "source_capture_id",
+        "declared_change_envelope_id",
+        "context_id",
+        "pack_profile_id",
+        "platform_profile_id",
+        "physical_side",
+        "stage",
+        "coverage",
+        "adapters",
+        "bounds"
+      ],
+      "properties": {
+        "source_snapshot_id": {"$ref": "#/$defs/nonemptyString"},
+        "source_capture_id": {"$ref": "#/$defs/nonemptyString"},
+        "declared_change_envelope_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/envelopeId"},
+            {"type": "null"}
+          ]
+        },
+        "context_id": {"$ref": "#/$defs/nonemptyString"},
+        "pack_profile_id": {"$ref": "#/$defs/nonemptyString"},
+        "platform_profile_id": {"$ref": "#/$defs/nonemptyString"},
+        "physical_side": {"$ref": "#/$defs/nonemptyString"},
+        "stage": {"$ref": "#/$defs/nonemptyString"},
+        "coverage": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/coverage"}
+        },
+        "adapters": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/adapter"}
+        },
+        "bounds": {"$ref": "#/$defs/bounds"}
+      }
+    },
+    "records": {
+      "type": "array",
+      "maxItems": 500000,
+      "items": {"$ref": "#/$defs/projectedRecord"}
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_records", "projected", "unresolved"],
+      "properties": {
+        "source_records": {"$ref": "#/$defs/count"},
+        "projected": {"$ref": "#/$defs/count"},
+        "unresolved": {"$ref": "#/$defs/count"}
+      }
+    },
+    "limitations": {
+      "const": [
+        "The projection preserves source record identity but is not a new runtime observation.",
+        "Correlation and fingerprints are opaque family-adapter outputs; Process Studio does not reinterpret them.",
+        "Shape validation alone does not establish that a projection came from its named source snapshot.",
+        "This fixture slice does not authenticate the input owner, provenance, or runtime custody."
+      ]
+    }
+  },
+  "$defs": {
+    "nonemptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1048576
+    },
+    "count": {"type": "integer", "minimum": 0, "maximum": 500000},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "envelopeId": {
+      "type": "string",
+      "pattern": "^workbench-process-studio-effect-change-envelope-v2:sha256:[0-9a-f]{64}$"
+    },
+    "strictJson": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        {"type": "string", "maxLength": 1048576},
+        {
+          "type": "array",
+          "maxItems": 500000,
+          "items": {"$ref": "#/$defs/strictJson"}
+        },
+        {
+          "type": "object",
+          "maxProperties": 500000,
+          "additionalProperties": {"$ref": "#/$defs/strictJson"}
+        }
+      ]
+    },
+    "opaqueCorrelation": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/strictJson"}
+    },
+    "adapterMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "semantic_owner_id",
+        "adapter_id",
+        "semantic_version",
+        "correlation_policy_id",
+        "fingerprint_policy_id"
+      ],
+      "properties": {
+        "family": {"$ref": "#/$defs/nonemptyString"},
+        "semantic_owner_id": {"$ref": "#/$defs/nonemptyString"},
+        "adapter_id": {"$ref": "#/$defs/nonemptyString"},
+        "semantic_version": {"$ref": "#/$defs/nonemptyString"},
+        "correlation_policy_id": {"$ref": "#/$defs/nonemptyString"},
+        "fingerprint_policy_id": {"$ref": "#/$defs/nonemptyString"}
+      }
+    },
+    "adapter": {"$ref": "#/$defs/adapterMetadata"},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "semantic_owner_id",
+        "adapter_id",
+        "semantic_version",
+        "correlation_policy_id",
+        "fingerprint_policy_id",
+        "state"
+      ],
+      "properties": {
+        "family": {"$ref": "#/$defs/nonemptyString"},
+        "semantic_owner_id": {"$ref": "#/$defs/nonemptyString"},
+        "adapter_id": {"$ref": "#/$defs/nonemptyString"},
+        "semantic_version": {"$ref": "#/$defs/nonemptyString"},
+        "correlation_policy_id": {"$ref": "#/$defs/nonemptyString"},
+        "fingerprint_policy_id": {"$ref": "#/$defs/nonemptyString"},
+        "state": {
+          "enum": [
+            "complete",
+            "partial",
+            "not-observed",
+            "unavailable",
+            "failed"
+          ]
+        }
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_comparisons",
+        "max_envelope_expectations",
+        "max_input_bytes",
+        "max_records_per_snapshot"
+      ],
+      "properties": {
+        "max_comparisons": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500000
+        },
+        "max_envelope_expectations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "max_input_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        },
+        "max_records_per_snapshot": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500000
+        }
+      }
+    },
+    "projectedRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_record_id",
+        "family",
+        "semantic_owner_id",
+        "adapter_id",
+        "semantic_version",
+        "correlation_policy_id",
+        "fingerprint_policy_id",
+        "record_kind",
+        "descriptor_kind",
+        "operation",
+        "correlation",
+        "semantic_fingerprint",
+        "projection_state",
+        "issue"
+      ],
+      "properties": {
+        "source_record_id": {"$ref": "#/$defs/nonemptyString"},
+        "family": {"$ref": "#/$defs/nonemptyString"},
+        "semantic_owner_id": {"$ref": "#/$defs/nonemptyString"},
+        "adapter_id": {"$ref": "#/$defs/nonemptyString"},
+        "semantic_version": {"$ref": "#/$defs/nonemptyString"},
+        "correlation_policy_id": {"$ref": "#/$defs/nonemptyString"},
+        "fingerprint_policy_id": {"$ref": "#/$defs/nonemptyString"},
+        "record_kind": {
+          "enum": ["registry-observation", "effect-observation"]
+        },
+        "descriptor_kind": {"$ref": "#/$defs/nonemptyString"},
+        "operation": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "correlation": {
+          "oneOf": [
+            {"$ref": "#/$defs/opaqueCorrelation"},
+            {"type": "null"}
+          ]
+        },
+        "semantic_fingerprint": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "projection_state": {"enum": ["projected", "unresolved"]},
+        "issue": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 1048576
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"record_kind": {"const": "registry-observation"}},
+            "required": ["record_kind"]
+          },
+          "then": {"properties": {"operation": {"type": "null"}}}
+        },
+        {
+          "if": {
+            "properties": {"record_kind": {"const": "effect-observation"}},
+            "required": ["record_kind"]
+          },
+          "then": {
+            "properties": {
+              "operation": {"$ref": "#/$defs/nonemptyString"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"projection_state": {"const": "projected"}},
+            "required": ["projection_state"]
+          },
+          "then": {
+            "properties": {
+              "correlation": {"$ref": "#/$defs/opaqueCorrelation"},
+              "semantic_fingerprint": {"$ref": "#/$defs/sha256"},
+              "issue": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"projection_state": {"const": "unresolved"}},
+            "required": ["projection_state"]
+          },
+          "then": {
+            "properties": {
+              "correlation": {"type": "null"},
+              "semantic_fingerprint": {"type": "null"},
+              "issue": {"$ref": "#/$defs/nonemptyString"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

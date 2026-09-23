@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.dev/workbench/schemas/workbench-manual-artifact-profile-v1.schema.json",
+  "title": "Workbench manual artifact profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile_id", "project_id", "seed_layout", "artifacts"],
+  "properties": {
+    "format": {"const": "workbench-manual-artifact-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1},
+    "project_id": {"type": "string", "minLength": 1},
+    "seed_layout": {"const": "minecraft-root"},
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "display_name",
+          "metadata_path",
+          "filename",
+          "output_path",
+          "hash_format",
+          "hash",
+          "project_id",
+          "file_id",
+          "download_page_url"
+        ],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"},
+          "display_name": {"type": "string", "minLength": 1},
+          "metadata_path": {"$ref": "#/$defs/path"},
+          "filename": {"type": "string", "minLength": 1, "pattern": "^[^/\\\\]+$"},
+          "output_path": {"$ref": "#/$defs/path"},
+          "hash_format": {"enum": ["sha1", "sha256", "sha512"]},
+          "hash": {"type": "string", "pattern": "^[0-9a-f]+$"},
+          "project_id": {"type": "integer", "minimum": 1},
+          "file_id": {"type": "integer", "minimum": 1},
+          "download_page_url": {"type": "string", "pattern": "^https://www\\.curseforge\\.com/"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\).+$"
+    }
+  }
+}

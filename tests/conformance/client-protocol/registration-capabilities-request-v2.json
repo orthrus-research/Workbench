@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "registration-capabilities-1",
+  "method": "registration/capabilities",
+  "params": {}
+}

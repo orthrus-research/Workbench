@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-feature-change-runtime-matrix-v1.schema.json",
+  "title": "Workbench feature change A/A and A/B runtime matrix V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "matrix_id", "change_id", "plan_id",
+    "outcome", "controls_passed", "cases", "source", "evidence_domains"
+  ],
+  "properties": {
+    "format": {"const": "workbench-feature-change-runtime-matrix-v1"},
+    "schema_version": {"const": 1},
+    "matrix_id": {
+      "type": "string",
+      "pattern": "^workbench-feature-change-runtime-matrix:sha256:[0-9a-f]{64}$"
+    },
+    "change_id": {
+      "type": "string",
+      "pattern": "^workbench-feature-change:sha256:[0-9a-f]{64}$"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "outcome": {"enum": ["passed", "no-go"]},
+    "controls_passed": {"type": "boolean"},
+    "cases": {
+      "type": "array", "minItems": 2, "maxItems": 6,
+      "items": {"$ref": "#/$defs/pairResult"}
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["initial", "final"],
+      "properties": {
+        "initial": {"type": "object"},
+        "final": {"type": "object"}
+      }
+    },
+    "evidence_domains": {
+      "const": {
+        "construction": "blueprints-profile-plan",
+        "runtime": "owner-pair-results",
+        "support": "unchanged"
+      }
+    }
+  },
+  "$defs": {
+    "pairResult": {
+      "type": "object",
+      "required": [
+        "format", "request_id", "side", "comparison", "order", "state",
+        "outcome", "comparison_state", "observations", "cleanup", "owner_refs",
+        "composition_passed"
+      ],
+      "properties": {
+        "format": {"const": "workbench-feature-runtime-pair-result-v1"},
+        "request_id": {
+          "type": "string",
+          "pattern": "^workbench-feature-runtime-pair-request:sha256:[0-9a-f]{64}$"
+        },
+        "side": {"enum": ["client", "server"]},
+        "comparison": {"enum": ["aa", "ab", "post-apply", "post-rollback"]},
+        "order": {"enum": ["baseline-first", "candidate-first"]},
+        "state": {"enum": ["complete", "incomplete", "failed"]},
+        "outcome": {"enum": ["passed", "failed", "incomplete"]},
+        "comparison_state": {"type": "string", "minLength": 1},
+        "observations": {"type": "array", "minItems": 2, "maxItems": 2},
+        "cleanup": {"type": "object"},
+        "owner_refs": {"type": "array", "maxItems": 64},
+        "composition_passed": {"type": "boolean"},
+        "owner_error": {"type": "string", "minLength": 1, "maxLength": 1024}
+      },
+      "additionalProperties": false
+    }
+  }
+}

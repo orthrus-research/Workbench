@@ -1,0 +1,54 @@
+{
+  "bounds": {
+    "max_diagnostics": 10000,
+    "max_files": 512,
+    "max_header_bytes": 65536,
+    "max_message_bytes": 16777216,
+    "max_transcript_messages": 65536,
+    "max_runtime_artifact_bytes": 536870912,
+    "max_runtime_artifacts": 1024,
+    "max_source_bytes": 4194304,
+    "max_total_source_bytes": 134217728
+  },
+  "canary": {
+    "prefix": "def __workbench_diagnostic_canary__ = )\n",
+    "required_severity": 1
+  },
+  "format": "workbench-groovyscript-language-service-profile-v1",
+  "groovyscript": {
+    "artifact_filename": "groovyscript-1.4.3.jar",
+    "artifact_sha256": "07617b7ce9170a857199bd61d730a0db3af2685cf83d31734a2d4b628fda7533",
+    "artifact_size": 16954096,
+    "source_commit": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4",
+    "version": "1.4.3"
+  },
+  "limitations": [
+    "GroovyScript 1.4.3 exposes the language server only from a running physical client.",
+    "The embedded language server stops at Groovy canonicalization; it does not execute scripts or prove effective registry state.",
+    "The upstream protocol has no endpoint identity challenge, so a TCP connection is not cryptographically bound to the inventoried runtime or JVM.",
+    "The upstream diagnostic publisher reports SyntaxErrorMessage rows and may omit other Groovy compiler message families.",
+    "The language-server compilation unit does not model loader execution order, preprocessor exclusion, reload idempotence, or saved-world compatibility."
+  ],
+  "platform_profile_id": "workbench-platform:cleanroom:groovyscript:1.4.3",
+  "profile_id": "workbench-platform:cleanroom:groovyscript:1.4.3-language-service-v1",
+  "runtime_layout": {
+    "artifact_relative_path": "mods/groovyscript-1.4.3.jar",
+    "cache_directory": "cache/groovy",
+    "groovy_directory": "groovy",
+    "mods_directory": "mods",
+    "run_config": "groovy/runConfig.json"
+  },
+  "schema_version": 1,
+  "server": {
+    "compilation_phase": "canonicalization",
+    "compile_trigger": "textDocument/documentSymbol",
+    "default_host": "127.0.0.1",
+    "default_port": 25564,
+    "diagnostic_method": "textDocument/publishDiagnostics",
+    "endpoint_identity_protocol": "unavailable",
+    "runtime_side": "client",
+    "start_property": "-Dgroovyscript.run_ls=true",
+    "text_document_sync": "full",
+    "transport": "lsp-jsonrpc-tcp"
+  }
+}

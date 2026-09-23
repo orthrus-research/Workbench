@@ -1,0 +1,358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/profiles/cleanroom/workbench-cleanroom-mod-construction-result-v2.schema.json",
+  "title": "Cleanroom mod fresh-project construction result V2",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "file": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$",
+          "type": "string"
+        },
+        "sha256": {"$ref": "#/$defs/digest"},
+        "size": {"minimum": 0, "type": "integer"}
+      },
+      "required": ["path", "sha256", "size"],
+      "type": "object"
+    },
+    "limitations": {
+      "const": [
+        "This constructor writes only the exact 19-file generic Cleanroom fixture projection to an absent, empty-directory, or clean unborn Git target.",
+        "The portable transform changes only the fixture build output and artifact-allowlist roots to target-local ignored .workbench storage.",
+        "Construction does not qualify Gradle dependency resolution, compilation, remapping, a client, a dedicated server, IDE integration, publication, or arbitrary templates.",
+        "Direct apply requires exact plan consent; Blueprints owns fresh-target bootstrap, byte transactions, and recovery, while the Cleanroom profile owns admitted source bytes and rendering."
+      ]
+    },
+    "manifest": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {"const": "sha256-file-tree-v1"},
+        "files": {
+          "items": {"$ref": "#/$defs/file"},
+          "maxItems": 19,
+          "minItems": 19,
+          "type": "array"
+        },
+        "tree_digest": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["algorithm", "files", "tree_digest"],
+      "type": "object"
+    },
+    "application_receipt": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"state": {"const": "applied"}}},
+          "then": {
+            "not": {"required": ["failure_kind"]},
+            "properties": {
+              "diagnostic_code": {"type": "null"},
+              "mutation_state": {"const": "constructed-owner-admitted-project"},
+              "rollback": {"const": "available-while-after-bytes-match"}
+            },
+            "required": ["history_objects"]
+          }
+        },
+        {
+          "if": {"required": ["failure_kind"]},
+          "then": {
+            "properties": {
+              "diagnostic_code": {
+                "enum": [
+                  "BLUEPRINTS_M2_PARTIAL_FAILURE_ROLLED_BACK",
+                  "BLUEPRINTS_M2_ROLLBACK_REQUIRES_REVIEW"
+                ]
+              },
+              "mutation_state": {"enum": ["indeterminate", "restored"]},
+              "rollback": {"enum": ["blocked-by-later-edit", "succeeded"]},
+              "state": {"const": "rejected"}
+            },
+            "required": ["history_objects"]
+          },
+          "else": {
+            "if": {"properties": {"state": {"const": "rejected"}}},
+            "then": {
+              "properties": {
+                "mutation_state": {"const": "not-started"},
+                "rollback": {"const": "not-needed"}
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "authority_boundary": {"type": "object"},
+        "diagnostic_code": {
+          "anyOf": [
+            {"type": "null"},
+            {"minLength": 1, "type": "string"}
+          ]
+        },
+        "failure_kind": {"minLength": 1, "type": "string"},
+        "format": {"const": "workbench-cleanroom-mod-construction-receipt-v2"},
+        "history_objects": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+              "size": {"minimum": 0, "type": "integer"}
+            },
+            "required": ["sha256", "size"],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^workbench-cleanroom-mod-construction-receipt:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "kind": {"const": "workbench-cleanroom-mod-construction-receipt"},
+        "mutation_state": {
+          "enum": [
+            "constructed-owner-admitted-project",
+            "indeterminate",
+            "not-started",
+            "restored"
+          ]
+        },
+        "plan_id": {
+          "pattern": "^workbench-cleanroom-mod-construction-plan:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "rollback": {
+          "enum": [
+            "available-while-after-bytes-match",
+            "blocked-by-later-edit",
+            "not-needed",
+            "succeeded"
+          ]
+        },
+        "schema_version": {"const": 1},
+        "state": {"enum": ["applied", "rejected"]}
+      },
+      "required": [
+        "authority_boundary",
+        "diagnostic_code",
+        "format",
+        "id",
+        "kind",
+        "mutation_state",
+        "plan_id",
+        "rollback",
+        "schema_version",
+        "state"
+      ],
+      "type": "object"
+    },
+    "bootstrap_receipt": {
+      "additionalProperties": false,
+      "properties": {
+        "created_git": {"type": "boolean"},
+        "created_target": {"type": "boolean"},
+        "format": {"const": "workbench-blueprints-fresh-bootstrap-receipt-v2"},
+        "id": {
+          "pattern": "^workbench-blueprints-fresh-bootstrap-receipt:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "kind": {"const": "workbench-blueprints-fresh-bootstrap-receipt"},
+        "observation_id": {
+          "pattern": "^workbench-blueprints-fresh-target-observation:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "plan_id": {
+          "pattern": "^workbench-cleanroom-mod-construction-plan:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema_version": {"const": 2},
+        "state": {"const": "applied"},
+        "target_uri": {"pattern": "^file://", "type": "string"}
+      },
+      "required": [
+        "created_git",
+        "created_target",
+        "format",
+        "id",
+        "kind",
+        "observation_id",
+        "plan_id",
+        "schema_version",
+        "state",
+        "target_uri"
+      ],
+      "type": "object"
+    },
+    "plan": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {"type": "object"},
+        "authority_boundary": {"type": "object"},
+        "direct_apply_authorized": {"type": "boolean"},
+        "format": {"const": "workbench-cleanroom-mod-construction-plan-v2"},
+        "id": {
+          "pattern": "^workbench-cleanroom-mod-construction-plan:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "kind": {"const": "workbench-cleanroom-mod-construction-plan"},
+        "kind_id": {"const": "workbench-new-project-kind:cleanroom-mod"},
+        "limitations": {"$ref": "#/$defs/limitations"},
+        "operations": {"maxItems": 19, "minItems": 19, "type": "array"},
+        "output_mode": {"enum": ["instructions", "direct-apply"]},
+        "output_manifest": {"$ref": "#/$defs/manifest"},
+        "owner_record_id": {
+          "pattern": "^workbench-cleanroom-mod-construction-owner:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "portable_transform": {"type": "object"},
+        "request_id": {
+          "pattern": "^workbench-cleanroom-mod-construction-request:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema_version": {"const": 2},
+        "source_lock": {"type": "object"},
+        "target_observation": {"type": "object"},
+        "target_uri": {
+          "minLength": 8,
+          "pattern": "^file://",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter",
+        "authority_boundary",
+        "direct_apply_authorized",
+        "format",
+        "id",
+        "kind",
+        "kind_id",
+        "limitations",
+        "operations",
+        "output_mode",
+        "output_manifest",
+        "owner_record_id",
+        "portable_transform",
+        "request_id",
+        "schema_version",
+        "source_lock",
+        "target_observation",
+        "target_uri"
+      ],
+      "type": "object"
+    },
+    "bootstrap_recovery": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {"const": "workbench-blueprints-fresh-bootstrap-recovery-v2"},
+        "outcome": {"const": "restored"},
+        "plan_id": {
+          "pattern": "^workbench-cleanroom-mod-construction-plan:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "schema_version": {"const": 2},
+        "target_uri": {"pattern": "^file://", "type": "string"}
+      },
+      "required": ["format", "outcome", "plan_id", "schema_version", "target_uri"],
+      "type": "object"
+    },
+    "transaction_recovery": {
+      "additionalProperties": false,
+      "properties": {
+        "application_receipt": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/application_receipt"}
+          ]
+        },
+        "attempted_ordinals": {
+          "items": {"minimum": 0, "type": "integer"},
+          "maxItems": 19,
+          "type": "array"
+        },
+        "bootstrap": {"$ref": "#/$defs/bootstrap_recovery"},
+        "diagnostic_code": {
+          "anyOf": [
+            {"type": "null"},
+            {"minLength": 1, "type": "string"}
+          ]
+        },
+        "outcome": {"enum": ["applied", "restored", "review-required"]},
+        "workspace_mutated": {"type": "boolean"}
+      },
+      "required": [
+        "application_receipt",
+        "attempted_ordinals",
+        "diagnostic_code",
+        "outcome",
+        "workspace_mutated"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "application_receipt": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/application_receipt"}
+      ]
+    },
+    "bootstrap_receipt": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/bootstrap_receipt"}
+      ]
+    },
+    "command": {"enum": ["preview", "apply", "recover"]},
+    "format": {"const": "workbench-cleanroom-mod-construction-result-v2"},
+    "id": {
+      "pattern": "^workbench-cleanroom-mod-construction-result:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "kind": {"const": "workbench-cleanroom-mod-construction-result"},
+    "limitations": {"$ref": "#/$defs/limitations"},
+    "output_manifest": {"$ref": "#/$defs/manifest"},
+    "plan": {"$ref": "#/$defs/plan"},
+    "plan_id": {
+      "pattern": "^workbench-cleanroom-mod-construction-plan:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "recovery": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/bootstrap_recovery"},
+        {"$ref": "#/$defs/transaction_recovery"}
+      ]
+    },
+    "request_id": {
+      "pattern": "^workbench-cleanroom-mod-construction-request:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema_version": {"const": 2},
+    "state": {
+      "enum": ["ready", "applied", "rejected", "restored", "review-required"]
+    },
+    "target_uri": {"pattern": "^file://", "type": "string"}
+  },
+  "required": [
+    "application_receipt",
+    "bootstrap_receipt",
+    "command",
+    "format",
+    "id",
+    "kind",
+    "limitations",
+    "output_manifest",
+    "plan",
+    "plan_id",
+    "recovery",
+    "request_id",
+    "schema_version",
+    "state",
+    "target_uri"
+  ]
+}

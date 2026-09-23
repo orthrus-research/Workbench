@@ -1,0 +1,28 @@
+{
+  "jsonrpc": "2.0",
+  "id": "initialize-1",
+  "method": "initialize",
+  "params": {
+    "protocol_version": {
+      "major": 2,
+      "minor": 0
+    },
+    "client": {
+      "id": "workbench-client:conformance",
+      "kind": "test",
+      "version": "0.0.0"
+    },
+    "workspace_roots": [
+      "file:///workspace"
+    ],
+    "execution_host": {
+      "kind": "test"
+    },
+    "required_methods": [
+      "workspace/inspect",
+      "runtime/plan",
+      "registration/plan",
+      "shutdown"
+    ]
+  }
+}

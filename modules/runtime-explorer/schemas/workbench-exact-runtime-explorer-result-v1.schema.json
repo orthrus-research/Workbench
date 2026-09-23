@@ -1,0 +1,483 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/runtime-explorer/workbench-exact-runtime-explorer-result-v1.schema.json",
+  "title": "Workbench Exact Runtime Explorer result V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "read_only",
+    "result_id",
+    "query",
+    "summary",
+    "sources",
+    "matches",
+    "uncertainty",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-exact-runtime-explorer-result-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "read_only": {
+      "const": true
+    },
+    "result_id": {
+      "type": "string",
+      "pattern": "^workbench-runtime-explorer-result:sha256:[0-9a-f]{64}$"
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "sources": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "matches": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/entity"
+      }
+    },
+    "uncertainty": {
+      "$ref": "#/$defs/stringSet"
+    },
+    "limitations": {
+      "$ref": "#/$defs/stringSet"
+    }
+  },
+  "$defs": {
+    "singleLine": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "nullableSingleLine": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/singleLine"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stringSet": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/singleLine"
+      }
+    },
+    "freeObject": {
+      "type": "object"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value",
+        "basis"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "value": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "basis": {
+          "$ref": "#/$defs/singleLine"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw",
+        "text",
+        "terms",
+        "filters",
+        "interpreted"
+      ],
+      "properties": {
+        "raw": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^[^\\r\\n\\u0000]*$"
+        },
+        "terms": {
+          "$ref": "#/$defs/stringSet"
+        },
+        "filters": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/stringSet"
+          }
+        },
+        "interpreted": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identity"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "entities",
+        "returned",
+        "truncated",
+        "exact_entities",
+        "ambiguous_entities",
+        "observed_entities",
+        "runtime_coverage",
+        "source_count",
+        "record_count"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "exact",
+            "ambiguous-exact",
+            "matches",
+            "not-found"
+          ]
+        },
+        "entities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "returned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "exact_entities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ambiguous_entities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_entities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runtime_coverage": {
+          "enum": [
+            "supplied",
+            "unavailable"
+          ]
+        },
+        "source_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "source_id",
+        "source_kind",
+        "authority",
+        "state",
+        "identity",
+        "scope",
+        "coverage",
+        "limitations"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-exact-runtime-explorer-source-v1"
+        },
+        "source_id": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "source_kind": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "authority": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "state": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable",
+            "invalid",
+            "unvalidated"
+          ]
+        },
+        "identity": {
+          "$ref": "#/$defs/freeObject"
+        },
+        "scope": {
+          "$ref": "#/$defs/freeObject"
+        },
+        "coverage": {
+          "$ref": "#/$defs/freeObject"
+        },
+        "limitations": {
+          "$ref": "#/$defs/stringSet"
+        }
+      }
+    },
+    "facet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "source_id",
+        "authority",
+        "state",
+        "kind",
+        "name",
+        "identities",
+        "owner",
+        "version",
+        "scope",
+        "declaration",
+        "runtime_form",
+        "relationships",
+        "evidence",
+        "navigation",
+        "limitations"
+      ],
+      "properties": {
+        "record_id": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "source_id": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "authority": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "state": {
+          "enum": [
+            "observed",
+            "declared",
+            "static-possible",
+            "verbatim-evidence",
+            "presentation-observation",
+            "teaching",
+            "unresolved"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "name": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "identities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identity"
+          }
+        },
+        "owner": {
+          "$ref": "#/$defs/freeObject"
+        },
+        "version": {
+          "$ref": "#/$defs/nullableSingleLine"
+        },
+        "scope": {
+          "$ref": "#/$defs/freeObject"
+        },
+        "declaration": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/freeObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runtime_form": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/freeObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "relationships": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/freeObject"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/freeObject"
+          }
+        },
+        "navigation": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/freeObject"
+          }
+        },
+        "limitations": {
+          "$ref": "#/$defs/stringSet"
+        }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "score",
+        "exact",
+        "ambiguous",
+        "ambiguity",
+        "matched_by",
+        "kind",
+        "name",
+        "states",
+        "identities",
+        "owners",
+        "versions",
+        "scopes",
+        "facets",
+        "relationships",
+        "manuals",
+        "navigation",
+        "limitations"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^workbench-runtime-explorer-entity:sha256:[0-9a-f]{64}$"
+        },
+        "score": {
+          "type": "integer"
+        },
+        "exact": {
+          "type": "boolean"
+        },
+        "ambiguous": {
+          "type": "boolean"
+        },
+        "ambiguity": {
+          "$ref": "#/$defs/stringSet"
+        },
+        "matched_by": {
+          "$ref": "#/$defs/stringSet"
+        },
+        "kind": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "name": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "states": {
+          "$ref": "#/$defs/stringSet"
+        },
+        "identities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identity"
+          }
+        },
+        "owners": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/freeObject"
+          }
+        },
+        "versions": {
+          "$ref": "#/$defs/stringSet"
+        },
+        "scopes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/freeObject"
+          }
+        },
+        "facets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/facet"
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/freeObject"
+          }
+        },
+        "manuals": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/freeObject"
+          }
+        },
+        "navigation": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/freeObject"
+          }
+        },
+        "limitations": {
+          "$ref": "#/$defs/stringSet"
+        }
+      }
+    }
+  }
+}

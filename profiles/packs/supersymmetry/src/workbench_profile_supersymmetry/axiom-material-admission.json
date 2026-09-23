@@ -1,0 +1,439 @@
+{
+  "schema": "axiom.material-admission.v1",
+  "profile": "supersymmetry",
+  "context": "supersymmetry:material-authoring-gt-base",
+  "qualification": "pending-native-admission",
+  "nativeExtensions": {
+    "gregtech.api.items.metaitem.StandardMetaItem": [
+      "org/codehaus/groovy/runtime/DefaultGroovyMethods#with(Ljava/lang/Object;Lgroovy/lang/Closure;)Ljava/lang/Object;",
+      "org/codehaus/groovy/runtime/DefaultGroovyMethods#with(Ljava/lang/Object;ZLgroovy/lang/Closure;)Ljava/lang/Object;"
+    ]
+  },
+  "nativeReadFields": {},
+  "nativeObjectMappers": [],
+  "recipeMapExtensions": {"gregtech.api.recipes.RecipeMap": ["Inputs", "Outputs", "FluidInputs", "FluidOutputs"]},
+  "sourceTransforms": ["groovy.transform.TupleConstructor", "groovy.transform.RecordType", "groovy.transform.Trait"],
+  "sourceRoots": [
+    "classes/",
+    "globals/",
+    "material/",
+    "preInit/",
+    "prePostInit/",
+    "postInit/"
+  ],
+  "staticFields": [
+    "gregtech.api.GregTechAPI",
+    "gregtech.api.unification.material.MarkerMaterials$Tier",
+    "gregtech.api.unification.ore.OrePrefix",
+    "java.lang.Float",
+    "gregtech.api.GTValues",
+    "gregtech.api.unification.Elements",
+    "gregtech.api.fluids.store.FluidStorageKeys",
+    "gregtech.api.fluids.FluidConstants",
+    "gregtech.api.fluids.attribute.FluidAttributes",
+    "gregtech.api.unification.material.properties.BlastProperty$GasTier",
+    "supersymmetry.api.unification.material.properties.SuSyPropertyKey",
+    "supersymmetry.api.unification.material.info.SuSyMaterialFlags",
+    "supersymmetry.api.fluids.SusyFluidStorageKeys",
+    "supercritical.api.unification.SCElements",
+    "supercritical.api.unification.material.properties.SCPropertyKey",
+    "gregicality.multiblocks.api.unification.properties.GCYMPropertyKey",
+    "gregtechfoodoption.GTFOMaterialHandler",
+    "gregtech.api.unification.material.Materials",
+    "gregtech.api.unification.material.info.MaterialFlags",
+    "gregtech.api.unification.material.info.MaterialIconSet",
+    "gregtech.api.unification.material.properties.PropertyKey",
+    "net.minecraftforge.fml.common.eventhandler.EventPriority",
+    "com.cleanroommc.groovyscript.api.IIngredient"
+  ],
+  "constructors": {
+    "gregtech.api.items.metaitem.StandardMetaItem": ["()V", "(S)V"],
+    "gregtech.api.fluids.FluidBuilder": ["()V"],
+    "java.util.ArrayList": ["()V", "(I)V", "(Ljava/util/Collection;)V"],
+    "gregtech.api.recipes.RecipeMap": [
+      "(Ljava/lang/String;IIIILgregtech/api/recipes/RecipeBuilder;Z)V",
+      "(Ljava/lang/String;IZIZIZIZLgregtech/api/recipes/RecipeBuilder;Z)V"
+    ],
+    "gregtech.api.recipes.builders.SimpleRecipeBuilder": [
+      "()V", "(Lgregtech/api/recipes/Recipe;Lgregtech/api/recipes/RecipeMap;)V", "(Lgregtech/api/recipes/RecipeBuilder;)V"
+    ],
+    "gregtech.api.unification.material.properties.ToolProperty": [
+      "()V",
+      "(FFII)V"
+    ],
+    "gregtech.api.unification.material.Material$Builder": [
+      "(ILnet/minecraft/util/ResourceLocation;)V"
+    ],
+    "net.minecraft.util.ResourceLocation": [
+      "(Ljava/lang/String;)V",
+      "(Ljava/lang/String;Ljava/lang/String;)V"
+    ]
+  },
+  "nativeMethodMappings": {
+    "net.minecraft.util.ResourceLocation": {
+      "getNamespace": "func_110624_b",
+      "getPath": "func_110623_a"
+    }
+  },
+  "nativeMethods": {
+    "gregtech.api.items.metaitem.StandardMetaItem": [
+      "addItem(ILjava/lang/String;)Lgregtech/api/items/metaitem/MetaItem$MetaValueItem;",
+      "setRegistryName(Ljava/lang/String;)Lnet/minecraftforge/registries/IForgeRegistryEntry;",
+      "setRegistryName(Ljava/lang/String;Ljava/lang/String;)Lnet/minecraftforge/registries/IForgeRegistryEntry;",
+      "setRegistryName(Lnet/minecraft/util/ResourceLocation;)Lnet/minecraftforge/registries/IForgeRegistryEntry;",
+      "setRegistryName(Lnet/minecraft/util/ResourceLocation;)Ljava/lang/Object;"
+    ],
+    "gregtech.api.items.metaitem.MetaItem$MetaValueItem": [
+      "setMaxStackSize(I)Lgregtech/api/items/metaitem/MetaItem$MetaValueItem;",
+      "setModelAmount(I)Lgregtech/api/items/metaitem/MetaItem$MetaValueItem;",
+      "setCreativeTabs([Lnet/minecraft/creativetab/CreativeTabs;)Lgregtech/api/items/metaitem/MetaItem$MetaValueItem;",
+      "addComponents([Lgregtech/api/items/metaitem/stats/IItemComponent;)Lgregtech/api/items/metaitem/MetaItem$MetaValueItem;",
+      "setUnificationData(Lgregtech/api/unification/ore/OrePrefix;Lgregtech/api/unification/material/Material;)Lgregtech/api/items/metaitem/MetaItem$MetaValueItem;"
+    ],
+    "gregtech.api.items.metaitem.ElectricStats": [
+      "createRechargeableBattery(JI)Lgregtech/api/items/metaitem/ElectricStats;"
+    ],
+    "gregtech.api.fluids.FluidBuilder": ["temperature(I)Lgregtech/api/fluids/FluidBuilder;"],
+    "supersymmetry.api.util.SuSyUtility": ["susyId(Ljava/lang/String;)Lnet/minecraft/util/ResourceLocation;"],
+    "java.lang.String": ["toLowerCase()Ljava/lang/String;", "toLowerCase(Ljava/util/Locale;)Ljava/lang/String;", "startsWith(Ljava/lang/String;)Z", "startsWith(Ljava/lang/String;I)Z"],
+    "java.util.ArrayList": ["add(Ljava/lang/Object;)Z", "add(ILjava/lang/Object;)V", "iterator()Ljava/util/Iterator;"],
+    "gregtech.api.recipes.RecipeMap": [
+      "getMaxInputs()I", "getMaxOutputs()I", "getMaxFluidInputs()I", "getMaxFluidOutputs()I",
+      "setMaxInputs(I)V", "setMaxOutputs(I)V", "setMaxFluidInputs(I)V", "setMaxFluidOutputs(I)V",
+      "getByName(Ljava/lang/String;)Lgregtech/api/recipes/RecipeMap;", "getUnlocalizedName()Ljava/lang/String;"
+    ],
+    "net.minecraft.util.ResourceLocation": [
+      "func_110623_a()Ljava/lang/String;",
+      "func_110624_b()Ljava/lang/String;"
+    ],
+    "gregtech.api.unification.material.Material": [
+      "addFlags([Lgregtech/api/unification/material/info/MaterialFlag;)V",
+      "addFlags([Ljava/lang/String;)V",
+      "compareTo(Lgregtech/api/unification/material/Material;)I",
+      "compareTo(Ljava/lang/Object;)I",
+      "getBlastTemperature()I",
+      "getBlockHarvestLevel()I",
+      "getChemicalFormula()Ljava/lang/String;",
+      "getElement()Lgregtech/api/unification/Element;",
+      "getFluid()Lnet/minecraftforge/fluids/Fluid;",
+      "getFluid(I)Lnet/minecraftforge/fluids/FluidStack;",
+      "getFluid(Lgregtech/api/fluids/store/FluidStorageKey;)Lnet/minecraftforge/fluids/Fluid;",
+      "getFluid(Lgregtech/api/fluids/store/FluidStorageKey;I)Lnet/minecraftforge/fluids/FluidStack;",
+      "getId()I",
+      "getLocalizedName()Ljava/lang/String;",
+      "getMass()J",
+      "getMaterialComponents()Lcom/google/common/collect/ImmutableList;",
+      "getMaterialComponentsCt()[Lgregtech/api/unification/stack/MaterialStack;",
+      "getMaterialIconSet()Lgregtech/api/unification/material/info/MaterialIconSet;",
+      "getMaterialRGB()I",
+      "getModid()Ljava/lang/String;",
+      "getName()Ljava/lang/String;",
+      "getNeutrons()J",
+      "getPlasma(I)Lnet/minecraftforge/fluids/FluidStack;",
+      "getProperties()Lgregtech/api/unification/material/properties/MaterialProperties;",
+      "getProperty(Lgregtech/api/unification/material/properties/PropertyKey;)Lgregtech/api/unification/material/properties/IMaterialProperty;",
+      "getProtons()J",
+      "getRegistry()Lgregtech/api/unification/material/registry/MaterialRegistry;",
+      "getRegistryName()Ljava/lang/String;",
+      "getResourceLocation()Lnet/minecraft/util/ResourceLocation;",
+      "getToolHarvestLevel()I",
+      "getUnlocalizedName()Ljava/lang/String;",
+      "hasAnyOfFlags([Lgregtech/api/unification/material/info/MaterialFlag;)Z",
+      "hasFlag(Lgregtech/api/unification/material/info/MaterialFlag;)Z",
+      "hasFlags([Lgregtech/api/unification/material/info/MaterialFlag;)Z",
+      "hasFluid()Z",
+      "hasProperty(Lgregtech/api/unification/material/properties/PropertyKey;)Z",
+      "isElement()Z",
+      "isRadioactive()Z",
+      "isSolid()Z",
+      "multiply(J)Lgregtech/api/unification/stack/MaterialStack;",
+      "setFormula(Ljava/lang/String;)Lgregtech/api/unification/material/Material;",
+      "setFormula(Ljava/lang/String;Z)Lgregtech/api/unification/material/Material;",
+      "setMaterialIconSet(Lgregtech/api/unification/material/info/MaterialIconSet;)V",
+      "setMaterialRGB(I)V",
+      "setProperty(Lgregtech/api/unification/material/properties/PropertyKey;Lgregtech/api/unification/material/properties/IMaterialProperty;)V",
+      "toCamelCaseString()Ljava/lang/String;",
+      "toString()Ljava/lang/String;",
+      "verifyMaterial()V"
+    ],
+    "gregtech.api.unification.material.Material$Builder": [
+      "addDefaultEnchant(Lnet/minecraft/enchantment/Enchantment;I)Lgregtech/api/unification/material/Material$Builder;",
+      "addOreByproducts([Lgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material$Builder;",
+      "arcSmeltInto(Lgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material$Builder;",
+      "blast(I)Lgregtech/api/unification/material/Material$Builder;",
+      "blast(ILgregtech/api/unification/material/properties/BlastProperty$GasTier;)Lgregtech/api/unification/material/Material$Builder;",
+      "blast(Ljava/util/function/UnaryOperator;)Lgregtech/api/unification/material/Material$Builder;",
+      "blastTemp(I)Lgregtech/api/unification/material/Material$Builder;",
+      "blastTemp(ILgregtech/api/unification/material/properties/BlastProperty$GasTier;)Lgregtech/api/unification/material/Material$Builder;",
+      "blastTemp(ILgregtech/api/unification/material/properties/BlastProperty$GasTier;I)Lgregtech/api/unification/material/Material$Builder;",
+      "blastTemp(ILgregtech/api/unification/material/properties/BlastProperty$GasTier;II)Lgregtech/api/unification/material/Material$Builder;",
+      "build()Lgregtech/api/unification/material/Material;",
+      "burnTime(I)Lgregtech/api/unification/material/Material$Builder;",
+      "cableProperties(JII)Lgregtech/api/unification/material/Material$Builder;",
+      "cableProperties(JIIZ)Lgregtech/api/unification/material/Material$Builder;",
+      "cableProperties(JIIZI)Lgregtech/api/unification/material/Material$Builder;",
+      "color(I)Lgregtech/api/unification/material/Material$Builder;",
+      "colorAverage()Lgregtech/api/unification/material/Material$Builder;",
+      "components(Lcom/google/common/collect/ImmutableList;)Lgregtech/api/unification/material/Material$Builder;",
+      "components([Lgregtech/api/unification/stack/MaterialStack;)Lgregtech/api/unification/material/Material$Builder;",
+      "components([Ljava/lang/Object;)Lgregtech/api/unification/material/Material$Builder;",
+      "dust()Lgregtech/api/unification/material/Material$Builder;",
+      "dust(I)Lgregtech/api/unification/material/Material$Builder;",
+      "dust(II)Lgregtech/api/unification/material/Material$Builder;",
+      "element(Lgregtech/api/unification/Element;)Lgregtech/api/unification/material/Material$Builder;",
+      "flags(Ljava/util/Collection;[Lgregtech/api/unification/material/info/MaterialFlag;)Lgregtech/api/unification/material/Material$Builder;",
+      "flags([Lgregtech/api/unification/material/info/MaterialFlag;)Lgregtech/api/unification/material/Material$Builder;",
+      "fluid()Lgregtech/api/unification/material/Material$Builder;",
+      "fluid(Lgregtech/api/fluids/store/FluidStorageKey;Lgregtech/api/fluids/FluidBuilder;)Lgregtech/api/unification/material/Material$Builder;",
+      "fluid(Lgregtech/api/fluids/store/FluidStorageKey;Lgregtech/api/fluids/FluidState;)Lgregtech/api/unification/material/Material$Builder;",
+      "fluid(Lnet/minecraftforge/fluids/Fluid;Lgregtech/api/fluids/store/FluidStorageKey;Lgregtech/api/fluids/FluidState;)Lgregtech/api/unification/material/Material$Builder;",
+      "fluidPipeProperties(IIZ)Lgregtech/api/unification/material/Material$Builder;",
+      "fluidPipeProperties(IIZZZZ)Lgregtech/api/unification/material/Material$Builder;",
+      "gas()Lgregtech/api/unification/material/Material$Builder;",
+      "gas(Lgregtech/api/fluids/FluidBuilder;)Lgregtech/api/unification/material/Material$Builder;",
+      "gem()Lgregtech/api/unification/material/Material$Builder;",
+      "gem(I)Lgregtech/api/unification/material/Material$Builder;",
+      "gem(II)Lgregtech/api/unification/material/Material$Builder;",
+      "iconSet(Lgregtech/api/unification/material/info/MaterialIconSet;)Lgregtech/api/unification/material/Material$Builder;",
+      "ingot()Lgregtech/api/unification/material/Material$Builder;",
+      "ingot(I)Lgregtech/api/unification/material/Material$Builder;",
+      "ingot(II)Lgregtech/api/unification/material/Material$Builder;",
+      "ingotSmeltInto(Lgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material$Builder;",
+      "itemPipeProperties(IF)Lgregtech/api/unification/material/Material$Builder;",
+      "liquid()Lgregtech/api/unification/material/Material$Builder;",
+      "liquid(Lgregtech/api/fluids/FluidBuilder;)Lgregtech/api/unification/material/Material$Builder;",
+      "macerateInto(Lgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material$Builder;",
+      "ore()Lgregtech/api/unification/material/Material$Builder;",
+      "ore(II)Lgregtech/api/unification/material/Material$Builder;",
+      "ore(IIZ)Lgregtech/api/unification/material/Material$Builder;",
+      "ore(Z)Lgregtech/api/unification/material/Material$Builder;",
+      "oreSmeltInto(Lgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material$Builder;",
+      "plasma()Lgregtech/api/unification/material/Material$Builder;",
+      "plasma(Lgregtech/api/fluids/FluidBuilder;)Lgregtech/api/unification/material/Material$Builder;",
+      "polarizesInto(Lgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material$Builder;",
+      "polymer()Lgregtech/api/unification/material/Material$Builder;",
+      "polymer(I)Lgregtech/api/unification/material/Material$Builder;",
+      "rotorStats(FFI)Lgregtech/api/unification/material/Material$Builder;",
+      "separatedInto([Lgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material$Builder;",
+      "toolStats(Lgregtech/api/unification/material/properties/ToolProperty;)Lgregtech/api/unification/material/Material$Builder;",
+      "washedIn(Lgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material$Builder;",
+      "washedIn(Lgregtech/api/unification/material/Material;I)Lgregtech/api/unification/material/Material$Builder;",
+      "wood()Lgregtech/api/unification/material/Material$Builder;",
+      "wood(I)Lgregtech/api/unification/material/Material$Builder;",
+      "wood(II)Lgregtech/api/unification/material/Material$Builder;"
+    ],
+    "gregtech.api.unification.stack.MaterialStack": [
+      "copy()Lgregtech/api/unification/stack/MaterialStack;",
+      "copy(J)Lgregtech/api/unification/stack/MaterialStack;",
+      "equals(Ljava/lang/Object;)Z",
+      "hashCode()I",
+      "toFormatted()Ljava/lang/String;",
+      "toString()Ljava/lang/String;"
+    ],
+    "gregtech.api.unification.material.properties.MaterialProperties": [
+      "addBaseType(Lgregtech/api/unification/material/properties/PropertyKey;)V",
+      "ensureSet(Lgregtech/api/unification/material/properties/PropertyKey;)V",
+      "ensureSet(Lgregtech/api/unification/material/properties/PropertyKey;Z)V",
+      "getMaterial()Lgregtech/api/unification/material/Material;",
+      "getProperty(Lgregtech/api/unification/material/properties/PropertyKey;)Lgregtech/api/unification/material/properties/IMaterialProperty;",
+      "hasProperty(Lgregtech/api/unification/material/properties/PropertyKey;)Z",
+      "isEmpty()Z",
+      "setMaterial(Lgregtech/api/unification/material/Material;)V",
+      "setProperty(Lgregtech/api/unification/material/properties/PropertyKey;Lgregtech/api/unification/material/properties/IMaterialProperty;)V",
+      "toString()Ljava/lang/String;",
+      "verify()V"
+    ],
+    "gregtech.api.unification.material.properties.DustProperty": [
+      "getBurnTime()I",
+      "getHarvestLevel()I",
+      "setBurnTime(I)V",
+      "setHarvestLevel(I)V",
+      "verifyProperty(Lgregtech/api/unification/material/properties/MaterialProperties;)V"
+    ],
+    "gregtech.api.unification.material.properties.GemProperty": [
+      "verifyProperty(Lgregtech/api/unification/material/properties/MaterialProperties;)V"
+    ],
+    "gregtech.api.unification.material.properties.IngotProperty": [
+      "getArcSmeltInto()Lgregtech/api/unification/material/Material;",
+      "getMacerateInto()Lgregtech/api/unification/material/Material;",
+      "getMagneticMaterial()Lgregtech/api/unification/material/Material;",
+      "getSmeltingInto()Lgregtech/api/unification/material/Material;",
+      "setArcSmeltingInto(Lgregtech/api/unification/material/Material;)V",
+      "setMacerateInto(Lgregtech/api/unification/material/Material;)V",
+      "setMagneticMaterial(Lgregtech/api/unification/material/Material;)V",
+      "setSmeltingInto(Lgregtech/api/unification/material/Material;)V",
+      "verifyProperty(Lgregtech/api/unification/material/properties/MaterialProperties;)V"
+    ],
+    "gregtech.api.unification.material.properties.OreProperty": [
+      "addOreByProducts([Lgregtech/api/unification/material/Material;)V",
+      "getByProductMultiplier()I",
+      "getDirectSmeltResult()Lgregtech/api/unification/material/Material;",
+      "getOreByProduct(I)Lgregtech/api/unification/material/Material;",
+      "getOreByProduct(ILgregtech/api/unification/material/Material;)Lgregtech/api/unification/material/Material;",
+      "getOreByProducts()Ljava/util/List;",
+      "getOreMultiplier()I",
+      "getSeparatedInto()Ljava/util/List;",
+      "getWashedIn()Lorg/apache/commons/lang3/tuple/Pair;",
+      "isEmissive()Z",
+      "setByProductMultiplier(I)V",
+      "setDirectSmeltResult(Lgregtech/api/unification/material/Material;)V",
+      "setEmissive(Z)V",
+      "setOreByProducts(Ljava/util/Collection;)V",
+      "setOreByProducts([Lgregtech/api/unification/material/Material;)V",
+      "setOreMultiplier(I)V",
+      "setSeparatedInto([Lgregtech/api/unification/material/Material;)V",
+      "setWashedIn(Lgregtech/api/unification/material/Material;)V",
+      "setWashedIn(Lgregtech/api/unification/material/Material;I)V",
+      "verifyProperty(Lgregtech/api/unification/material/properties/MaterialProperties;)V"
+    ],
+    "gregtech.api.unification.material.properties.ToolProperty": [
+      "addEnchantmentForTools(Lnet/minecraft/enchantment/Enchantment;DD)V",
+      "addEnchantmentForTools(Lnet/minecraft/enchantment/Enchantment;I)V",
+      "getDurabilityMultiplier()I",
+      "getEnchantments()Lit/unimi/dsi/fastutil/objects/Object2ObjectMap;",
+      "getShouldIgnoreCraftingTools()Z",
+      "getToolAttackDamage()F",
+      "getToolAttackSpeed()F",
+      "getToolDurability()I",
+      "getToolEnchantability()I",
+      "getToolHarvestLevel()I",
+      "getToolSpeed()F",
+      "getUnbreakable()Z",
+      "isMagnetic()Z",
+      "setDurabilityMultiplier(I)V",
+      "setMagnetic(Z)V",
+      "setShouldIgnoreCraftingTools(Z)V",
+      "setToolAttackDamage(F)V",
+      "setToolAttackSpeed(F)V",
+      "setToolDurability(I)V",
+      "setToolEnchantability(I)V",
+      "setToolHarvestLevel(I)V",
+      "setToolSpeed(F)V",
+      "setUnbreakable(Z)V",
+      "verifyProperty(Lgregtech/api/unification/material/properties/MaterialProperties;)V"
+    ],
+    "gregtech.api.unification.material.properties.FluidProperty": [
+      "enqueueRegistration(Lgregtech/api/fluids/store/FluidStorageKey;Lgregtech/api/fluids/FluidBuilder;)V",
+      "get(Lgregtech/api/fluids/store/FluidStorageKey;)Lnet/minecraftforge/fluids/Fluid;",
+      "getPrimaryKey()Lgregtech/api/fluids/store/FluidStorageKey;",
+      "getQueuedBuilder(Lgregtech/api/fluids/store/FluidStorageKey;)Lgregtech/api/fluids/FluidBuilder;",
+      "getStorage()Lgregtech/api/fluids/store/FluidStorage;",
+      "registerFluids(Lgregtech/api/unification/material/Material;)V",
+      "setPrimaryKey(Lgregtech/api/fluids/store/FluidStorageKey;)V",
+      "setSolidifyingFluid(Lnet/minecraftforge/fluids/Fluid;)V",
+      "solidifiesFrom()Lnet/minecraftforge/fluids/Fluid;",
+      "solidifiesFrom(I)Lnet/minecraftforge/fluids/FluidStack;",
+      "store(Lgregtech/api/fluids/store/FluidStorageKey;Lnet/minecraftforge/fluids/Fluid;)V",
+      "verifyProperty(Lgregtech/api/unification/material/properties/MaterialProperties;)V"
+    ],
+    "com.cleanroommc.groovyscript.sandbox.GroovyLogImpl": [
+      "error(Ljava/lang/Object;)V",
+      "error(Ljava/lang/String;[Ljava/lang/Object;)V",
+      "errorMC(Ljava/lang/Object;)V",
+      "errorMC(Ljava/lang/String;[Ljava/lang/Object;)V",
+      "info(Ljava/lang/Object;)V",
+      "info(Ljava/lang/String;[Ljava/lang/Object;)V",
+      "infoMC(Ljava/lang/Object;)V",
+      "infoMC(Ljava/lang/String;[Ljava/lang/Object;)V",
+      "warn(Ljava/lang/Object;)V",
+      "warn(Ljava/lang/String;[Ljava/lang/Object;)V",
+      "warnMC(Ljava/lang/Object;)V",
+      "warnMC(Ljava/lang/String;[Ljava/lang/Object;)V"
+    ],
+    "com.cleanroommc.groovyscript.event.GroovyEventManager": [
+      "listen(Lcom/cleanroommc/groovyscript/event/EventBusType;Lgroovy/lang/Closure;)V",
+      "listen(Lcom/cleanroommc/groovyscript/event/EventBusType;Ljava/lang/Class;Lgroovy/lang/Closure;)V",
+      "listen(Lcom/cleanroommc/groovyscript/event/EventBusType;Lnet/minecraftforge/fml/common/eventhandler/EventPriority;Lgroovy/lang/Closure;)V",
+      "listen(Lgroovy/lang/Closure;)V",
+      "listen(Ljava/lang/Class;Lgroovy/lang/Closure;)V",
+      "listen(Lnet/minecraftforge/fml/common/eventhandler/EventPriority;Lcom/cleanroommc/groovyscript/event/EventBusType;Lgroovy/lang/Closure;)V",
+      "listen(Lnet/minecraftforge/fml/common/eventhandler/EventPriority;Lcom/cleanroommc/groovyscript/event/EventBusType;Ljava/lang/Class;Lgroovy/lang/Closure;)V",
+      "listen(Lnet/minecraftforge/fml/common/eventhandler/EventPriority;Lcom/cleanroommc/groovyscript/event/EventBusType;Ljava/lang/Class;Ljava/util/function/Consumer;)V",
+      "listen(Lnet/minecraftforge/fml/common/eventhandler/EventPriority;Lgroovy/lang/Closure;)V",
+      "listen(Lnet/minecraftforge/fml/common/eventhandler/EventPriority;Ljava/lang/Class;Lgroovy/lang/Closure;)V"
+    ],
+    "com.cleanroommc.groovyscript.api.IIngredient$1": [
+      "applyTransform(Lnet/minecraft/item/ItemStack;)Lnet/minecraft/item/ItemStack;",
+      "or(Lcom/cleanroommc/groovyscript/api/IIngredient;)Lcom/cleanroommc/groovyscript/api/IIngredient;"
+    ],
+    "com.cleanroommc.groovyscript.api.IIngredient$2": [
+      "applyTransform(Lnet/minecraft/item/ItemStack;)Lnet/minecraft/item/ItemStack;",
+      "or(Lcom/cleanroommc/groovyscript/api/IIngredient;)Lcom/cleanroommc/groovyscript/api/IIngredient;"
+    ]
+  },
+  "compilerStaticCalls": [
+    "java/lang/Long#valueOf(J)Ljava/lang/Long;",
+    "java/lang/Float#valueOf(F)Ljava/lang/Float;",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#compareGreaterThan(Ljava/lang/Object;Ljava/lang/Object;)Z",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#compareGreaterThanEqual(Ljava/lang/Object;Ljava/lang/Object;)Z",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#compareLessThan(Ljava/lang/Object;Ljava/lang/Object;)Z",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#compareLessThanEqual(Ljava/lang/Object;Ljava/lang/Object;)Z",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#isCase(Ljava/lang/Object;Ljava/lang/Object;)Z",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#compareNotEqual(Ljava/lang/Object;Ljava/lang/Object;)Z",
+    "org/codehaus/groovy/runtime/typehandling/DefaultTypeTransformation#longUnbox(Ljava/lang/Object;)J",
+    "java/lang/Short#valueOf(S)Ljava/lang/Short;",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#createPojoWrapper(Ljava/lang/Object;Ljava/lang/Class;)Lorg/codehaus/groovy/runtime/wrappers/Wrapper;",
+    "java/lang/Integer#valueOf(I)Ljava/lang/Integer;",
+    "java/lang/Double#valueOf(D)Ljava/lang/Double;",
+    "java/lang/Boolean#valueOf(Z)Ljava/lang/Boolean;",
+    "org/codehaus/groovy/runtime/typehandling/DefaultTypeTransformation#intUnbox(Ljava/lang/Object;)I",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#createList([Ljava/lang/Object;)Ljava/util/List;",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#createMap([Ljava/lang/Object;)Ljava/util/Map;",
+    "org/codehaus/groovy/runtime/ScriptBytecodeAdapter#compareEqual(Ljava/lang/Object;Ljava/lang/Object;)Z",
+    "org/codehaus/groovy/runtime/InvokerHelper#createAssertError(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/AssertionError;",
+    "org/codehaus/groovy/runtime/powerassert/AssertionRenderer#render(Ljava/lang/String;Lorg/codehaus/groovy/runtime/powerassert/ValueRecorder;)Ljava/lang/String;"
+  ],
+  "compilerVirtualCalls": [
+    "java/lang/Short#shortValue()S",
+    "java/util/Iterator#hasNext()Z",
+    "java/util/Iterator#next()Ljava/lang/Object;",
+    "java/lang/Integer#intValue()I",
+    "groovy/lang/Reference#get()Ljava/lang/Object;",
+    "org/codehaus/groovy/runtime/powerassert/ValueRecorder#clear()V",
+    "org/codehaus/groovy/runtime/powerassert/ValueRecorder#record(Ljava/lang/Object;I)Ljava/lang/Object;"
+  ],
+  "compilerConstructors": [
+    "java/math/BigInteger#<init>(Ljava/lang/String;)V",
+    "java/math/BigDecimal#<init>(Ljava/lang/String;)V",
+    "org/codehaus/groovy/runtime/GStringImpl#<init>([Ljava/lang/Object;[Ljava/lang/String;)V",
+    "groovy/lang/Reference#<init>(Ljava/lang/Object;)V",
+    "org/codehaus/groovy/runtime/powerassert/ValueRecorder#<init>()V"
+  ],
+  "compilerStaticFields": [
+    "java/lang/Short#TYPE:Ljava/lang/Class;",
+    "java/lang/Integer#TYPE:Ljava/lang/Class;"
+  ],
+  "referenceCasts": {
+    "java.lang.Integer": ["short", "java.lang.Short"],
+    "org.codehaus.groovy.runtime.GStringImpl": ["java.lang.String"]
+  },
+  "numericTypes": [
+    "java.lang.Byte",
+    "java.lang.Short",
+    "java.lang.Integer",
+    "java.lang.Long",
+    "java.lang.Float",
+    "java.lang.Double",
+    "java.math.BigInteger",
+    "java.math.BigDecimal"
+  ],
+  "numericOperations": [
+    "plus",
+    "minus",
+    "multiply",
+    "next",
+    "previous"
+  ],
+  "mapTypes": [
+    "java.util.LinkedHashMap",
+    "it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap"
+  ],
+  "listOperations": {
+    "[Ljava.lang.String;": ["collect", "getAt"],
+    "[J": ["getAt"],
+    "[I": ["getAt"],
+    "java.util.ArrayList": [
+      "each", "eachWithIndex", "grep", "size", "getAt", "collect", "collectEntries", "find", "findAll"
+    ]
+  }
+}

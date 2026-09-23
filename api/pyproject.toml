@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-api"
+version = "0.1.2"
+description = "Workbench module and host contracts"
+requires-python = ">=3.12,<3.15"
+dependencies = ["packaging>=26"]
+
+[tool.setuptools]
+packages = ["workbench_api", "workbench_resources.api"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.api" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.api" = ["pyproject.toml", "src/workbench_api/*.py"]

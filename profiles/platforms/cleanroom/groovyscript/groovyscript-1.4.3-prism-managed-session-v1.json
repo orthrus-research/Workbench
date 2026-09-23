@@ -1,0 +1,52 @@
+{
+  "format": "workbench-groovyscript-managed-session-profile-v1",
+  "schema_version": 1,
+  "profile_id": "workbench-platform:cleanroom:groovyscript:1.4.3-prism-managed-session-v1",
+  "platform_profile_id": "workbench-platform:cleanroom:groovyscript:1.4.3",
+  "language_service_profile_id": "workbench-platform:cleanroom:groovyscript:1.4.3-language-service-v1",
+  "launcher": {
+    "family": "prism",
+    "accepted_receipt_formats": [
+      "workbench-runtime-launch-receipt-v3"
+    ],
+    "launch_flag": "--launch",
+    "data_root_flag": "--dir",
+    "instance_config": "instance.cfg",
+    "jvm_arguments_key": "JvmArgs",
+    "override_jvm_arguments_key": "OverrideJavaArgs",
+    "disposable_instance_prefix": "workbench-",
+    "windows_process_tracker": "windows-cim-instance-id-or-upstream-port"
+  },
+  "overlay": {
+    "runtime_config": "config/groovyscript.cfg",
+    "port_property_type": "forge-int",
+    "port_property_key": "languageServerPort",
+    "start_jvm_argument": "-Dgroovyscript.run_ls=true"
+  },
+  "lifecycle": {
+    "default_readiness_timeout_seconds": 600,
+    "default_session_timeout_seconds": 21600,
+    "readiness_poll_interval_seconds": 0.25,
+    "client_attach_timeout_seconds": 120,
+    "graceful_shutdown_seconds": 15,
+    "force_shutdown_seconds": 10
+  },
+  "ide_handoff": {
+    "descriptor_format": "workbench-groovy-language-session-descriptor-v1",
+    "transport": "lsp-jsonrpc-tcp",
+    "connection_model": "one-active-client-sequential-reaccept",
+    "consumers": [
+      "terminal",
+      "intellij",
+      "vscode"
+    ]
+  },
+  "limitations": [
+    "The managed session is admitted only for an exact Workbench-created disposable Prism projection with a completed V3 launch receipt.",
+    "GroovyScript 1.4.3 accepts one active language client at a time and reopens the same port after that client disconnects.",
+    "The upstream endpoint has no cryptographic identity challenge; Workbench strengthens the binding through a reserved public endpoint, a checked upstream port, checked overlays, exact launch custody, and process observation.",
+    "When Workbench runs in WSL and Prism runs on Windows, the descriptor binds a managed stdio TCP bridge, a distinct Windows upstream port, and explicit local-to-server workspace URIs.",
+    "The readiness canary proves initialize and canonicalization diagnostics before handoff; it does not execute pack scripts or prove effective registry state.",
+    "Cancellation first requests a window close when available and then escalates only against session-owned process identities."
+  ]
+}

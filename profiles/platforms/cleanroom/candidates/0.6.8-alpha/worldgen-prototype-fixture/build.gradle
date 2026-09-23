@@ -1,0 +1,143 @@
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.27-kappa'
+}
+
+group = fixture_group
+version = fixture_version
+
+layout.buildDirectory = file(
+    '../../../../../../.workbench/build/cleanroom/0.6.8-alpha/worldgen-prototype-fixture'
+)
+
+base {
+    archivesName = fixture_archive
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.cleanroommc.com' }
+}
+
+dependencies {
+    compileOnly('com.cleanroommc:groovyscript:1.4.3') {
+        transitive = false
+    }
+    compileOnly('it.unimi.dsi:fastutil:8.5.18')
+    testImplementation('it.unimi.dsi:fastutil:8.5.18')
+    testImplementation('org.junit.jupiter:junit-jupiter:5.9.2')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher:1.9.2')
+}
+
+unimined.minecraft {
+    version minecraft_version
+
+    mappings {
+        mcp(mcp_channel, mcp_version)
+    }
+
+    cleanroom {
+        loader cleanroom_version
+    }
+
+    defaultRemapJar = false
+    remap(tasks.named('jar').get())
+}
+
+tasks.named('jar').configure {
+    archiveClassifier = 'dev'
+    finalizedBy(tasks.named('remapJar'))
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+tasks.withType(JavaCompile).configureEach {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test').configure {
+    useJUnitPlatform()
+}
+
+def serverRunDirectory = providers.gradleProperty('workbenchServerRunDir')
+def diagnosticsEnabled = providers.gradleProperty('workbenchWorldgenDiagnostics')
+def diagnosticsSampleModulo = providers.gradleProperty('workbenchWorldgenSampleModulo')
+def chunkSampleCacheChunks = providers.gradleProperty(
+    'workbenchWorldgenChunkSampleCacheChunks'
+)
+def biomePointCacheColumns = providers.gradleProperty(
+    'workbenchWorldgenBiomePointCacheColumns'
+)
+def regionCacheCells = providers.gradleProperty('workbenchWorldgenRegionCacheCells')
+def watershedTileCacheTiles = providers.gradleProperty(
+    'workbenchWorldgenWatershedTileCacheTiles'
+)
+def jfrBiomePoints = providers.gradleProperty('workbenchWorldgenJfrBiomePoints')
+tasks.named('runServer').configure {
+    if (serverRunDirectory.isPresent()) {
+        workingDir = file(serverRunDirectory.get())
+    }
+    if (diagnosticsEnabled.isPresent()) {
+        systemProperty 'workbench.worldgen.diagnostics', diagnosticsEnabled.get()
+    }
+    if (diagnosticsSampleModulo.isPresent()) {
+        systemProperty(
+            'workbench.worldgen.diagnostics.sample_modulo',
+            diagnosticsSampleModulo.get()
+        )
+    }
+    if (chunkSampleCacheChunks.isPresent()) {
+        systemProperty(
+            'workbench.worldgen.chunk_sample_cache_chunks',
+            chunkSampleCacheChunks.get()
+        )
+    }
+    if (biomePointCacheColumns.isPresent()) {
+        systemProperty(
+            'workbench.worldgen.biome_point_cache_columns',
+            biomePointCacheColumns.get()
+        )
+    }
+    if (regionCacheCells.isPresent()) {
+        systemProperty(
+            'workbench.worldgen.region_cache_cells',
+            regionCacheCells.get()
+        )
+    }
+    if (watershedTileCacheTiles.isPresent()) {
+        systemProperty(
+            'workbench.worldgen.watershed_tile_cache_tiles',
+            watershedTileCacheTiles.get()
+        )
+    }
+    if (jfrBiomePoints.isPresent()) {
+        systemProperty 'workbench.worldgen.jfr.biome_points', jfrBiomePoints.get()
+    }
+    doFirst {
+        if (!serverRunDirectory.isPresent()) {
+            throw new GradleException(
+                'runServer requires -PworkbenchServerRunDir=<absolute ignored target directory>'
+            )
+        }
+        File requestedDirectory = new File(serverRunDirectory.get())
+        if (!requestedDirectory.isAbsolute()) {
+            throw new GradleException('workbenchServerRunDir must be an absolute path')
+        }
+        if (!requestedDirectory.toPath().normalize().startsWith(
+            rootProject.file('../../../../../../.workbench').toPath().normalize()
+        )) {
+            throw new GradleException(
+                'workbenchServerRunDir must be inside this repository\'s ignored .workbench storage'
+            )
+        }
+    }
+}

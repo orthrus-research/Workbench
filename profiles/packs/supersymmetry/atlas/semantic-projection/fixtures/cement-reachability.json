@@ -1,0 +1,103 @@
+{
+  "declarations": [
+    {
+      "alias": "limestone_dust_legacy",
+      "attributes": {
+        "label": "limestone.dust"
+      },
+      "descriptor": {
+        "domain": "material-form",
+        "key": {
+          "id": "metaitem:limestone.dust"
+        },
+        "kind": "item-form"
+      },
+      "lifecycle": {
+        "execution_index": 62,
+        "stage": "postInit"
+      },
+      "provenance": {
+        "commit": "f3be4e2f32c6f0619735cde3c6d70d9d38fa197a",
+        "line": 65,
+        "path": "groovy/postInit/chains/CementChain.groovy",
+        "source_url": "https://github.com/SymmetricDevs/Supersymmetry/commit/df7eba1cd796743f1bf1dc94a96e7cfeba24caf3"
+      }
+    },
+    {
+      "alias": "hot_cement_clinker_recipe",
+      "attributes": {
+        "intended_stage": "Steam",
+        "label": "hot cement clinker sintering recipe",
+        "requirements": [
+          {
+            "semantic_alias": "limestone_dust_legacy"
+          }
+        ],
+        "semantic_role": "recipe"
+      },
+      "descriptor": {
+        "domain": "recipe-process",
+        "key": {
+          "recipe_id": "supersymmetry:hot_cement_clinker_sintering"
+        },
+        "kind": "machine-recipe"
+      },
+      "lifecycle": {
+        "execution_index": 62,
+        "stage": "postInit"
+      },
+      "provenance": {
+        "commit": "f3be4e2f32c6f0619735cde3c6d70d9d38fa197a",
+        "line": 62,
+        "path": "groovy/postInit/chains/CementChain.groovy",
+        "source_url": "https://github.com/SymmetricDevs/Supersymmetry/commit/df7eba1cd796743f1bf1dc94a96e7cfeba24caf3"
+      }
+    }
+  ],
+  "expected": {
+    "diagnostic_codes": [
+      "PROGRESSION_UNREACHABLE"
+    ],
+    "failed_aliases": [
+      "hot_cement_clinker_recipe"
+    ]
+  },
+  "fixture": "cement-reachability",
+  "format": "workbench-supersymmetry-semantic-regression-fixture-v1",
+  "historical_evidence": {
+    "fix_commit": "df7eba1cd796743f1bf1dc94a96e7cfeba24caf3",
+    "fix_summary": "Replace unobtainable metaitem('limestone.dust') with obtainable metaitem('dustLimestone').",
+    "replay_ref": "f3be4e2f32c6f0619735cde3c6d70d9d38fa197a",
+    "source_profile": "legacy-forge-0.1.16.11"
+  },
+  "runtime": {
+    "capture": {
+      "capture_id": "supersymmetry-history:cement-reachability:pre-fix",
+      "evidence_kind": "historical-regression-replay"
+    },
+    "effects": [],
+    "registry": [
+      {
+        "descriptor_alias": "limestone_dust_legacy",
+        "provenance": {
+          "observation": "The registry-valid legacy form has no legal acquisition path in the replayed progression context."
+        },
+        "state": {
+          "reachable_stages": [],
+          "registered": true
+        }
+      },
+      {
+        "descriptor_alias": "hot_cement_clinker_recipe",
+        "provenance": {
+          "observation": "The recipe registration exists after postInit."
+        },
+        "state": {
+          "registered": true
+        }
+      }
+    ],
+    "stage": "postInit"
+  },
+  "schema_version": 1
+}

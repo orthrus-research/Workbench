@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-feature-change-session-context-v1.schema.json",
+  "title": "Workbench feature-change Work Session context V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "change_id",
+    "claims",
+    "context_id",
+    "created_at",
+    "format",
+    "plan_id",
+    "runtime_config_sha256",
+    "runtime_config_uri",
+    "schema_version",
+    "session_id",
+    "session_record_id",
+    "session_record_sha256",
+    "session_record_uri",
+    "start_result_sha256",
+    "start_result_uri",
+    "setup_request_sha256",
+    "state_root_uri",
+    "workspace_uri"
+  ],
+  "properties": {
+    "change_id": {"type": "string", "pattern": "^workbench-feature-change:sha256:[0-9a-f]{64}$"},
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publication_authorized", "release_authorized", "support_claimed"],
+      "properties": {
+        "publication_authorized": {"const": false},
+        "release_authorized": {"const": false},
+        "support_claimed": {"const": false}
+      }
+    },
+    "context_id": {"type": "string", "pattern": "^workbench-feature-change-session-context:sha256:[0-9a-f]{64}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "format": {"const": "workbench-feature-change-session-context-v1"},
+    "plan_id": {"type": "string", "pattern": "^workbench-developer-material-fluid-recipe-plan:sha256:[0-9a-f]{64}$"},
+    "runtime_config_sha256": {"$ref": "#/$defs/digest"},
+    "runtime_config_uri": {"type": "string", "format": "uri", "pattern": "^file:"},
+    "schema_version": {"const": 1},
+    "session_id": {"type": "string", "pattern": "^work-session-v2-[0-9a-f]{32}$"},
+    "session_record_id": {"type": "string", "pattern": "^work-session-record:sha256:[0-9a-f]{64}$"},
+    "session_record_sha256": {"$ref": "#/$defs/digest"},
+    "session_record_uri": {"type": "string", "format": "uri", "pattern": "^file:"},
+    "start_result_sha256": {"$ref": "#/$defs/digest"},
+    "start_result_uri": {"type": "string", "format": "uri", "pattern": "^file:"},
+    "setup_request_sha256": {"$ref": "#/$defs/digest"},
+    "state_root_uri": {"type": "string", "format": "uri", "pattern": "^file:"},
+    "workspace_uri": {"type": "string", "format": "uri", "pattern": "^file:"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

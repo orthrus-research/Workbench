@@ -1,0 +1,257 @@
+{
+  "absence_states": [
+    "unavailable",
+    "not-observed",
+    "ambiguous",
+    "unresolved",
+    "truncated"
+  ],
+  "authority_roles": [
+    {
+      "admission_rule": "Exact pinned API contract language defines the named type, call, field, lifecycle, or obligation in the same version scope.",
+      "id": "api-contract",
+      "permitted_bases": [
+        "pinned-source"
+      ],
+      "strength": "normative"
+    },
+    {
+      "admission_rule": "Exact pinned executable source checks, invokes, rejects, registers, or otherwise enforces the named behavior in the same lifecycle and side scope.",
+      "id": "source-enforcement",
+      "permitted_bases": [
+        "pinned-source"
+      ],
+      "strength": "normative"
+    },
+    {
+      "admission_rule": "An exact normalized runtime-mechanics record observes the named subject and behavior in the bound snapshot, profile, and physical side.",
+      "id": "runtime-observation",
+      "permitted_bases": [
+        "runtime-mechanics"
+      ],
+      "strength": "observational"
+    },
+    {
+      "admission_rule": "An exact runtime-presentation record observes the named presentation subject in the bound client presentation scope.",
+      "id": "presentation-observation",
+      "permitted_bases": [
+        "runtime-presentation"
+      ],
+      "strength": "observational"
+    },
+    {
+      "admission_rule": "Exact quest or runtime-mechanics records observe the named integration endpoints and relationship in one bound scope.",
+      "id": "integration-observation",
+      "permitted_bases": [
+        "quest-data",
+        "runtime-mechanics"
+      ],
+      "strength": "observational"
+    },
+    {
+      "admission_rule": "An authorized placed-world fixture observes the named controller, location, state, and check outcome without generalizing beyond that fixture.",
+      "id": "world-observation",
+      "permitted_bases": [
+        "placed-world-observation"
+      ],
+      "strength": "observational"
+    },
+    {
+      "admission_rule": "A controlled omission comparison or closed-world enumerator binds the same subject, inputs, versions, and scope and records the omitted condition plus resulting outcome; ordinary absence is not admitted.",
+      "id": "omission-proof",
+      "permitted_bases": [
+        "pinned-source",
+        "runtime-mechanics",
+        "runtime-presentation",
+        "placed-world-observation"
+      ],
+      "strength": "closed-scope"
+    },
+    {
+      "admission_rule": "An exact pinned source or observed runtime/presentation record illustrates one implementation without supplying normative force.",
+      "id": "example-only",
+      "permitted_bases": [
+        "pinned-source",
+        "runtime-mechanics",
+        "runtime-presentation"
+      ],
+      "strength": "illustrative"
+    },
+    {
+      "admission_rule": "A named deterministic policy derives this record exclusively from exact cited evidence inputs and retains their scope limits.",
+      "id": "derivation",
+      "permitted_bases": [
+        "curated-interpretation"
+      ],
+      "strength": "derived"
+    },
+    {
+      "admission_rule": "A curated explanation cites exact evidence inputs and does not add mechanical, normative, or observational authority.",
+      "id": "explanation",
+      "permitted_bases": [
+        "curated-interpretation"
+      ],
+      "strength": "explanatory"
+    }
+  ],
+  "canonicalization_id": "manual-canonical-json-v1",
+  "claim_rules": {
+    "disconnected_evidence_forbidden": true,
+    "example_frequency_is_normative": false,
+    "example_promotion_forbidden": true,
+    "negative_claim": {
+      "closed_scope_required_for": [
+        "observed",
+        "proven"
+      ],
+      "normative_roles_for_expected": [
+        "api-contract",
+        "source-enforcement"
+      ],
+      "omission_proof_required_for": [
+        "observed",
+        "proven"
+      ]
+    },
+    "runtime_observation_proves_reproduction": false,
+    "support_any_semantics": "OR of role combinations; every role in one selected combination is required",
+    "unused_evidence_forbidden": true
+  },
+  "contract_id": "MANUALS-IMPLEMENTATION-GUIDE-V1",
+  "policy_id": "MANUALS-REQUIREMENT-POLICY-V1",
+  "requirement_classes": [
+    {
+      "condition": "forbidden",
+      "id": "compile-required",
+      "modal": "must",
+      "normative": true,
+      "support_any": [
+        [
+          "api-contract"
+        ],
+        [
+          "source-enforcement"
+        ],
+        [
+          "omission-proof"
+        ]
+      ]
+    },
+    {
+      "condition": "forbidden",
+      "id": "runtime-required",
+      "modal": "must",
+      "normative": true,
+      "support_any": [
+        [
+          "source-enforcement"
+        ],
+        [
+          "omission-proof"
+        ]
+      ]
+    },
+    {
+      "condition": "forbidden",
+      "id": "identity-required",
+      "modal": "must",
+      "normative": true,
+      "support_any": [
+        [
+          "api-contract"
+        ],
+        [
+          "source-enforcement"
+        ],
+        [
+          "omission-proof"
+        ]
+      ]
+    },
+    {
+      "condition": "forbidden",
+      "id": "presentation-required",
+      "modal": "must",
+      "normative": true,
+      "support_any": [
+        [
+          "source-enforcement"
+        ],
+        [
+          "omission-proof"
+        ]
+      ]
+    },
+    {
+      "condition": "forbidden",
+      "id": "integration-required",
+      "modal": "must",
+      "normative": true,
+      "support_any": [
+        [
+          "source-enforcement"
+        ],
+        [
+          "omission-proof"
+        ]
+      ]
+    },
+    {
+      "condition": "required",
+      "id": "conditional",
+      "modal": "must-when",
+      "normative": true,
+      "support_any": [
+        [
+          "api-contract"
+        ],
+        [
+          "source-enforcement"
+        ],
+        [
+          "omission-proof"
+        ]
+      ],
+      "when_true_classes": [
+        "compile-required",
+        "runtime-required",
+        "identity-required",
+        "presentation-required",
+        "integration-required"
+      ]
+    },
+    {
+      "condition": "forbidden",
+      "id": "conventional",
+      "modal": "should",
+      "normative": false,
+      "support_any": [
+        [
+          "example-only",
+          "explanation"
+        ],
+        [
+          "api-contract"
+        ]
+      ]
+    },
+    {
+      "condition": "forbidden",
+      "id": "optional",
+      "modal": "may",
+      "normative": false,
+      "support_any": [
+        [
+          "api-contract"
+        ],
+        [
+          "source-enforcement"
+        ],
+        [
+          "omission-proof"
+        ]
+      ]
+    }
+  ],
+  "schema_version": 1
+}

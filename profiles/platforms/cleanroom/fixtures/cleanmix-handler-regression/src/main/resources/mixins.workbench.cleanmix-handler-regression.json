@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_8",
+  "target": "@env(PREINIT)",
+  "package": "dev.workbench.cleanmixhandler.mixin",
+  "mixins": [
+    "ParentTargetMixin",
+    "ChildTargetMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

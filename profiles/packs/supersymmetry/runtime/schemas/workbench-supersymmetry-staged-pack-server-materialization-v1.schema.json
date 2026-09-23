@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.org/workbench/schemas/workbench-supersymmetry-staged-pack-server-materialization-v1.schema.json",
+  "title": "Supersymmetry staged Packwiz server materialization V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eula", "format", "infrastructure", "limitations", "materialization_id", "mod_inventory", "packwiz_options", "plan_id", "role", "schema_version", "seed", "server_properties", "source", "stage_id", "state", "target", "tools"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-staged-pack-server-materialization-v1"},
+    "schema_version": {"const": 1},
+    "materialization_id": {"pattern": "^workbench-supersymmetry-staged-pack-server-materialization:sha256:[0-9a-f]{64}$"},
+    "plan_id": {"pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"},
+    "stage_id": {"pattern": "^workbench-supersymmetry-staged-material-fluid-pack:sha256:[0-9a-f]{64}$"},
+    "role": {"enum": ["baseline", "candidate"]},
+    "state": {"const": "materialized"},
+    "source": {"type": "object", "required": ["copy", "refreshed_pack", "revision", "untracked_excluded", "workspace_uri"]},
+    "seed": {
+      "type": "object",
+      "required": ["materialization_id", "policy", "receipt_sha256", "receipt_size", "receipt_uri", "seed_tree", "seeded_files", "template_payload", "template_uri"],
+      "properties": {"policy": {"const": "cleanroom-bootstrap-and-artifact-seed-only"}},
+      "additionalProperties": true
+    },
+    "tools": {"type": "object", "required": ["installer", "java", "packwiz"]},
+    "packwiz_options": {"type": "object", "required": ["decisions", "files", "final_state", "initial_state", "side"], "properties": {"side": {"const": "server"}}, "additionalProperties": true},
+    "infrastructure": {"type": "object", "required": ["cleanroom_launcher", "launcher_name", "minecraft_server"]},
+    "eula": {"type": "object", "additionalProperties": false, "required": ["operation", "sha256", "size", "value"], "properties": {"operation": {"const": "fresh-target-only"}, "sha256": {"pattern": "^[0-9a-f]{64}$"}, "size": {"type": "integer", "minimum": 1}, "value": {"const": true}}},
+    "server_properties": {"type": "object", "additionalProperties": false, "required": ["defaultworldgenerator_port", "level_type", "projection_sha256", "projection_size", "source_uri"], "properties": {"defaultworldgenerator_port": {"type": "string"}, "level_type": {"const": "RTG"}, "projection_sha256": {"pattern": "^[0-9a-f]{64}$"}, "projection_size": {"type": "integer", "minimum": 1}, "source_uri": {"type": "string", "pattern": "^file:"}}},
+    "mod_inventory": {"type": "object", "required": ["entries", "entry_count", "inventory_sha256"]},
+    "target": {"type": "object", "additionalProperties": false, "required": ["runtime_uri"], "properties": {"runtime_uri": {"type": "string", "pattern": "^file:"}}},
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  }
+}

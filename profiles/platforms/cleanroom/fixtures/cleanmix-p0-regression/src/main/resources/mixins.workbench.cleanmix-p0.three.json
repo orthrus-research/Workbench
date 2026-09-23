@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_11",
+  "target": "@env(DEFAULT)",
+  "package": "dev.workbench.cleanmixp0.mixin",
+  "mixins": [
+    "KnownGapMixins$ThreeBaseMixin",
+    "KnownGapMixins$ThreeMiddleMixin",
+    "KnownGapMixins$ThreeLeafMixin"
+  ],
+  "injectors": {"defaultRequire": 1}
+}

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-subsurface-profile-v1.schema.json",
+  "title": "Workbench subsurface pack profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "profile_id",
+    "pack_profile",
+    "adapter",
+    "defaults",
+    "dimension_semantics",
+    "state_semantics",
+    "grid_semantics",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {"const": "workbench-subsurface-pack-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1},
+    "pack_profile": {"type": "string", "minLength": 1},
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inventory_profile_id", "impact_profile_id", "trace_profile_id"],
+      "properties": {
+        "inventory_profile_id": {"type": "string"},
+        "impact_profile_id": {"type": "string"},
+        "trace_profile_id": {"type": "string"}
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inventory", "impact", "manifest"],
+      "properties": {
+        "inventory": {"type": "string", "minLength": 1},
+        "impact": {"type": "string", "minLength": 1},
+        "manifest": {"type": "string", "minLength": 1}
+      }
+    },
+    "dimension_semantics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["dimension_id", "aliases", "surface_world"],
+        "properties": {
+          "dimension_id": {"type": "integer"},
+          "aliases": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "surface_world": {"type": "boolean"}
+        }
+      }
+    },
+    "state_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ore_prefix", "surface_rock_prefix", "air_states", "fluid_prefixes", "host_properties", "known_host_variants"],
+      "properties": {
+        "ore_prefix": {"type": "string", "minLength": 1},
+        "surface_rock_prefix": {"type": "string", "minLength": 1},
+        "air_states": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "fluid_prefixes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "host_properties": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "known_host_variants": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "grid_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ore_grid_chunks", "consulted_grid_radius", "bedrock_fluid_grid_chunks"],
+      "properties": {
+        "ore_grid_chunks": {"type": "integer", "minimum": 1},
+        "consulted_grid_radius": {"type": "integer", "minimum": 0},
+        "bedrock_fluid_grid_chunks": {"type": "integer", "minimum": 1}
+      }
+    },
+    "boundaries": {
+      "const": {
+        "atlas_remains_causal_authority": true,
+        "bedrock_fluids_are_virtual_cells": true,
+        "profile_is_pack_specific": true,
+        "strata_remains_final_state_authority": true
+      }
+    }
+  }
+}

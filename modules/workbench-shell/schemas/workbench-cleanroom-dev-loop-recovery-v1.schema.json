@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-cleanroom-dev-loop-recovery-v1.schema.json",
+  "title": "Workbench Cleanroom generic fixture dev-loop recovery V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "state", "reason", "remaining_sides",
+    "next_action"
+  ],
+  "properties": {
+    "format": {"const": "workbench-cleanroom-dev-loop-recovery-v1"},
+    "schema_version": {"const": 1},
+    "state": {"enum": ["blocked", "retry-safe", "clean"]},
+    "reason": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "minLength": 1, "maxLength": 4096}
+      ]
+    },
+    "remaining_sides": {
+      "type": "array", "maxItems": 2, "uniqueItems": true,
+      "items": {"enum": ["client", "server"]}
+    },
+    "next_action": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/nextAction"}
+      ]
+    }
+  },
+  "$defs": {
+    "fileUri": {"type": "string", "pattern": "^file:/", "maxLength": 8192},
+    "nextAction": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "action_id", "mutation_posture", "source_plan_id",
+        "source_plan_uri", "reconstruction_inputs"
+      ],
+      "properties": {
+        "action_id": {"const": "dev.fixture-run"},
+        "mutation_posture": {"const": "creates-fresh-isolated-target"},
+        "source_plan_id": {
+          "type": "string",
+          "pattern": "^workbench-cleanroom-dev-loop-plan:sha256:[0-9a-f]{64}$"
+        },
+        "source_plan_uri": {"$ref": "#/$defs/fileUri"},
+        "reconstruction_inputs": {
+          "type": "object", "additionalProperties": false,
+          "required": ["gradle_cmd", "java_home", "state_root", "sides", "debug"],
+          "properties": {
+            "gradle_cmd": {"type": "string", "minLength": 1, "maxLength": 8192},
+            "java_home": {"type": "string", "minLength": 1, "maxLength": 8192},
+            "state_root": {"type": "string", "minLength": 1, "maxLength": 8192},
+            "sides": {
+              "type": "array", "minItems": 1, "maxItems": 2,
+              "uniqueItems": true,
+              "items": {"enum": ["client", "server"]}
+            },
+            "debug": {"const": false}
+          }
+        }
+      }
+    }
+  }
+}

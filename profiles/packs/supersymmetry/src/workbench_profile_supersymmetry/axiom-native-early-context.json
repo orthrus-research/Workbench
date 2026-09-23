@@ -1,0 +1,626 @@
+{
+  "schema": "axiom.native-pack-early-context.v1",
+  "id": "supersymmetry:required-early",
+  "side": "server",
+  "packRevision": "3e83cd7bad57bd4c424de4e6cc707ab02fe32f54",
+  "artifactDescriptors": [
+    "mods/ae2-extended-life.pw.toml",
+    "mods/alet.pw.toml",
+    "mods/architecturecraft-tridev.pw.toml",
+    "mods/athenaeum.pw.toml",
+    "mods/autoreglib.pw.toml",
+    "mods/barrels-drums-storage-more.pw.toml",
+    "mods/better-builders-wands.pw.toml",
+    "mods/biomes-o-plenty.pw.toml",
+    "mods/bubbles-a-baubles-fork.pw.toml",
+    "mods/building-gadgets.pw.toml",
+    "mods/catwalks-4.pw.toml",
+    "mods/cb-multipart.pw.toml",
+    "mods/cd4017be-library.pw.toml",
+    "mods/chameleon.pw.toml",
+    "mods/chest-transporter.pw.toml",
+    "mods/chisel.pw.toml",
+    "mods/codechicken-lib-1-8.pw.toml",
+    "mods/commons0815.pw.toml",
+    "mods/creativecore.pw.toml",
+    "mods/dropt.pw.toml",
+    "mods/engineers-decor.pw.toml",
+    "mods/forgelin-continuous.pw.toml",
+    "mods/fugue.pw.toml",
+    "mods/gaspunk-inhaler.pw.toml",
+    "mods/gaspunk.pw.toml",
+    "mods/geckolib.pw.toml",
+    "mods/gregicality-multiblocks.pw.toml",
+    "mods/gregtech-ce-unofficial.pw.toml",
+    "mods/gregtech-food-option.pw.toml",
+    "mods/groovyscript.pw.toml",
+    "mods/had-enough-items.pw.toml",
+    "mods/icbm.pw.toml",
+    "mods/ichunutil.pw.toml",
+    "mods/immersive-railroading.pw.toml",
+    "mods/industrial-renewal.pw.toml",
+    "mods/ivtoolkit.pw.toml",
+    "mods/just-enough-calculation.pw.toml",
+    "mods/lazy-ae2.pw.toml",
+    "mods/libnine.pw.toml",
+    "mods/littletiles.pw.toml",
+    "mods/mcjtylib-refilmed.pw.toml",
+    "mods/modernmarkings.pw.toml",
+    "mods/modularui.pw.toml",
+    "mods/mrtjpcore.pw.toml",
+    "mods/multistorage.pw.toml",
+    "mods/nae2.pw.toml",
+    "mods/natures-compass.pw.toml",
+    "mods/new-tardis-mod.pw.toml",
+    "mods/omlib.pw.toml",
+    "mods/ompd.pw.toml",
+    "mods/openblocks-elevator.pw.toml",
+    "mods/opencomputers.pw.toml",
+    "mods/openglasses2.pw.toml",
+    "mods/openmodularturrets.pw.toml",
+    "mods/opensecurity.pw.toml",
+    "mods/packagedauto.pw.toml",
+    "mods/portal-gun.pw.toml",
+    "mods/project-red-core.pw.toml",
+    "mods/project-red-illumination.pw.toml",
+    "mods/project-red-integration.pw.toml",
+    "mods/pyrotech.pw.toml",
+    "mods/quark-rotn-edition.pw.toml",
+    "mods/redstone-control.pw.toml",
+    "mods/redstone-gauges-and-switches.pw.toml",
+    "mods/refinedtools.pw.toml",
+    "mods/retro-sophisticated-backpacks.pw.toml",
+    "mods/scalar-legacy.pw.toml",
+    "mods/scaling-health.pw.toml",
+    "mods/scape-and-run-parasites.pw.toml",
+    "mods/shetiphiancore.pw.toml",
+    "mods/silent-lib.pw.toml",
+    "mods/stargate-network.pw.toml",
+    "mods/storage-drawers.pw.toml",
+    "mods/supercritical.pw.toml",
+    "mods/sussypatches.pw.toml",
+    "mods/susycore.pw.toml",
+    "mods/techguns.pw.toml",
+    "mods/tool-belt.pw.toml",
+    "mods/torchmaster.pw.toml",
+    "mods/track-api.pw.toml",
+    "mods/travelers-backpack.pw.toml",
+    "mods/universal-mod-core.pw.toml",
+    "mods/universal-tweaks.pw.toml",
+    "mods/vertically-stacked-dimensions.pw.toml",
+    "mods/weeping-angels-mod.pw.toml",
+    "mods/xtones.pw.toml",
+    "mods/ynet-an-xnet-fork.pw.toml"
+  ],
+  "coremods": [
+    {
+      "plugin": "mod.acgaming.universaltweaks.core.UTLoadingPlugin",
+      "artifact": "mods/universal-tweaks.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "com.cleanroommc.groovyscript.core.GroovyScriptCore",
+      "artifact": "mods/groovyscript.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "net.minecraftforge.fml.relauncher.FMLCorePlugin",
+      "artifact": "cleanroom",
+      "setupClass": "net.minecraftforge.fml.common.asm.FMLSanityChecker"
+    },
+    {
+      "plugin": "net.minecraftforge.classloading.FMLForgePlugin",
+      "artifact": "cleanroom",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "com.cleanroommc.fugue.common.FugueLoadingPlugin",
+      "artifact": "mods/fugue.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "com.creativemd.creativecore.core.CreativePatchingLoader",
+      "artifact": "mods/creativecore.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "io.github.chaosunity.forgelin.preloader.ForgelinPlugin",
+      "artifact": "mods/forgelin-continuous.pw.toml",
+      "setupClass": "io.github.chaosunity.forgelin.preloader.ForgelinSetup"
+    },
+    {
+      "plugin": "gregtechfoodoption.mixins.GTFOEarlyMixinPlugin",
+      "artifact": "mods/gregtech-food-option.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "ivorius.ivtoolkit.IvToolkitLoadingPlugin",
+      "artifact": "mods/ivtoolkit.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "com.creativemd.littletiles.LittlePatchingLoader",
+      "artifact": "mods/littletiles.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "co.neeve.nae2.NAE2MixinPlugin",
+      "artifact": "mods/nae2.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "pcl.opensecurity.util.SoundUnpack",
+      "artifact": "mods/opensecurity.pw.toml",
+      "setupClass": "pcl.opensecurity.util.SoundUnpack"
+    },
+    {
+      "plugin": "com.cleanroommc.retrosophisticatedbackpacks.preloader.RSBPlugin",
+      "artifact": "mods/retro-sophisticated-backpacks.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "com.cleanroommc.scalar.ScalarLoadingPlugin",
+      "artifact": "mods/scalar-legacy.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "dev.tianmi.sussypatches.core.LoadingPlugin",
+      "artifact": "mods/sussypatches.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "baubles.core.BubblesCore",
+      "artifact": "mods/bubbles-a-baubles-fork.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "appeng.core.AE2ELCore",
+      "artifact": "mods/ae2-extended-life.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "gregtech.asm.GregTechLoadingPlugin",
+      "artifact": "mods/gregtech-ce-unofficial.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "li.cil.oc.common.launch.TransformerLoader",
+      "artifact": "mods/opencomputers.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "vazkii.quark.base.asm.LoadingPlugin",
+      "artifact": "mods/quark-rotn-edition.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "shetiphian.asm.TweakPlugin",
+      "artifact": "contained:shetiphian-asm",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "com.cleanroommc.modularui.core.ModularUICore",
+      "artifact": "mods/modularui.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "cd4017be.dimstack.asm.CorePlugin",
+      "artifact": "mods/vertically-stacked-dimensions.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "supersymmetry.asm.SusyLoadingPlugin",
+      "artifact": "mods/susycore.pw.toml",
+      "setupClass": "none"
+    },
+    {
+      "plugin": "techguns.core.TechgunsFMLPlugin",
+      "artifact": "mods/techguns.pw.toml",
+      "setupClass": "none"
+    }
+  ],
+  "transformers": [
+    "org.spongepowered.asm.mixin.transformer.Proxy",
+    "net.minecraftforge.fml.common.asm.transformers.PatchingTransformer",
+    "$wrapper.net.minecraftforge.fml.common.asm.transformers.SideTransformer",
+    "$wrapper.net.minecraftforge.fml.common.asm.transformers.EventSubscriptionTransformer",
+    "$wrapper.net.minecraftforge.fml.common.asm.transformers.EventSubscriberTransformer",
+    "$wrapper.net.minecraftforge.fml.common.asm.transformers.SoundEngineFixTransformer",
+    "$wrapper.net.minecraftforge.fml.common.asm.transformers.LWJGLTransformer",
+    "$wrapper.com.creativemd.littletiles.LittleTilesTransformer",
+    "codechicken.asm.internal.SnifferTransformer",
+    "net.minecraftforge.fml.common.asm.transformers.DeobfuscationTransformer",
+    "net.minecraftforge.fml.common.asm.transformers.AccessTransformer",
+    "baubles.core.BubblesTransformer",
+    "io.github.chaosunity.forgelin.transformer.ForgelinTransformer",
+    "com.cleanroommc.groovyscript.core.GroovyScriptTransformer",
+    "com.creativemd.littletiles.LittleTilesAfterTransformer",
+    "net.minecraftforge.fml.common.asm.transformers.ModAccessTransformer",
+    "net.minecraftforge.fml.common.asm.transformers.ItemStackTransformer",
+    "net.minecraftforge.fml.common.asm.transformers.ItemBlockTransformer",
+    "net.minecraftforge.fml.common.asm.transformers.ItemBlockSpecialTransformer",
+    "net.minecraftforge.fml.common.asm.transformers.PotionEffectTransformer",
+    "org.spongepowered.asm.mixin.transformer.Proxy",
+    "$wrapper.appeng.core.transformer.AE2ELTransformer",
+    "$wrapper.gregtech.asm.GregTechTransformer",
+    "$wrapper.li.cil.oc.common.asm.ClassTransformer",
+    "$wrapper.vazkii.quark.base.asm.ClassTransformer",
+    "$wrapper.shetiphian.asm.ClassTransformer",
+    "$wrapper.com.cleanroommc.modularui.core.ClassTransformer",
+    "$wrapper.cd4017be.dimstack.asm.ChunkPrimerTransformer",
+    "$wrapper.cd4017be.dimstack.asm.BlockPortalTransformer",
+    "$wrapper.supersymmetry.asm.SusyTransformer",
+    "$wrapper.techguns.core.TechgunsASMTransformer"
+  ],
+  "transformerWrappers": [
+    {
+      "parent": "net.minecraftforge.fml.common.asm.transformers.SideTransformer",
+      "coremod": "FMLCorePlugin",
+      "artifact": "cleanroom"
+    },
+    {
+      "parent": "net.minecraftforge.fml.common.asm.transformers.EventSubscriptionTransformer",
+      "coremod": "FMLCorePlugin",
+      "artifact": "cleanroom"
+    },
+    {
+      "parent": "net.minecraftforge.fml.common.asm.transformers.EventSubscriberTransformer",
+      "coremod": "FMLCorePlugin",
+      "artifact": "cleanroom"
+    },
+    {
+      "parent": "net.minecraftforge.fml.common.asm.transformers.SoundEngineFixTransformer",
+      "coremod": "FMLCorePlugin",
+      "artifact": "cleanroom"
+    },
+    {
+      "parent": "net.minecraftforge.fml.common.asm.transformers.LWJGLTransformer",
+      "coremod": "FMLCorePlugin",
+      "artifact": "cleanroom"
+    },
+    {
+      "parent": "com.creativemd.littletiles.LittleTilesTransformer",
+      "coremod": "LittlePatchingLoader",
+      "artifact": "mods/littletiles.pw.toml"
+    },
+    {
+      "parent": "appeng.core.transformer.AE2ELTransformer",
+      "coremod": "AE2ELCore",
+      "artifact": "mods/ae2-extended-life.pw.toml"
+    },
+    {
+      "parent": "gregtech.asm.GregTechTransformer",
+      "coremod": "GregTechLoadingPlugin",
+      "artifact": "mods/gregtech-ce-unofficial.pw.toml"
+    },
+    {
+      "parent": "li.cil.oc.common.asm.ClassTransformer",
+      "coremod": "TransformerLoader",
+      "artifact": "mods/opencomputers.pw.toml"
+    },
+    {
+      "parent": "vazkii.quark.base.asm.ClassTransformer",
+      "coremod": "Quark Plugin",
+      "artifact": "mods/quark-rotn-edition.pw.toml"
+    },
+    {
+      "parent": "shetiphian.asm.ClassTransformer",
+      "coremod": "ShetiPhian-ASM",
+      "artifact": "contained:shetiphian-asm"
+    },
+    {
+      "parent": "com.cleanroommc.modularui.core.ClassTransformer",
+      "coremod": "ModularUI-Core",
+      "artifact": "mods/modularui.pw.toml"
+    },
+    {
+      "parent": "cd4017be.dimstack.asm.ChunkPrimerTransformer",
+      "coremod": "Vertically Stacked Dimensions ASM",
+      "artifact": "mods/vertically-stacked-dimensions.pw.toml"
+    },
+    {
+      "parent": "cd4017be.dimstack.asm.BlockPortalTransformer",
+      "coremod": "Vertically Stacked Dimensions ASM",
+      "artifact": "mods/vertically-stacked-dimensions.pw.toml"
+    },
+    {
+      "parent": "supersymmetry.asm.SusyTransformer",
+      "coremod": "SusyLoadingPlugin",
+      "artifact": "mods/susycore.pw.toml"
+    },
+    {
+      "parent": "techguns.core.TechgunsASMTransformer",
+      "coremod": "Techguns Core",
+      "artifact": "mods/techguns.pw.toml"
+    }
+  ],
+  "injectedContainers": [
+    "com.cleanroommc.groovyscript.sandbox.ScriptModContainer",
+    "net.minecraftforge.fml.common.FMLContainer",
+    "net.minecraftforge.common.ForgeModContainer",
+    "com.creativemd.creativecore.core.CreativeCoreDummy",
+    "ivorius.ivtoolkit.IvToolkitCoreContainer",
+    "com.creativemd.littletiles.LittleTilesCore",
+    "com.cleanroommc.scalar.ScalarModContainer",
+    "li.cil.oc.common.launch.CoreModContainer",
+    "techguns.core.TechgunsCore"
+  ],
+  "mixinPhase": "INIT",
+  "deferredMixinPhase": "DEFAULT",
+  "definitionWitness": {
+    "target": "org/codehaus/groovy/reflection/CachedClass$1",
+    "artifact": "mods/groovyscript.pw.toml",
+    "method": "initValue()[Lorg/codehaus/groovy/reflection/CachedField;",
+    "hookOwner": "com/cleanroommc/groovyscript/sandbox/transformer/GroovyCodeFactory",
+    "hookName": "makeFieldsHook",
+    "hookDescriptor": "(Lorg/codehaus/groovy/reflection/CachedClass;)Ljava/security/PrivilegedAction;"
+  },
+  "qualification": "unqualified-native-execution",
+  "materialInitializationComplete": false,
+  "lateMixinSelectionQualified": false,
+  "selection": {
+    "requiredMods": [
+      "minecraft",
+      "mcp",
+      "cleanroom",
+      "cleanmix",
+      "mixinbooter",
+      "configanytime",
+      "kirino_engine",
+      "kirino_ecs",
+      "kirino_gl",
+      "supersymmetry",
+      "FML",
+      "forge",
+      "ivtoolkit",
+      "codechickenlib",
+      "groovyscript",
+      "gregtech",
+      "gcym",
+      "supercritical",
+      "sussypatches",
+      "susy",
+      "scalar",
+      "opencomputers|core",
+      "opencomputers",
+      "geckolib3",
+      "modularui",
+      "immersiverailroading",
+      "trackapi",
+      "universalmodcore",
+      "baubles",
+      "gregtechfoodoption",
+      "biomesoplenty",
+      "quark",
+      "autoreglib",
+      "pyrotech",
+      "athenaeum",
+      "dropt",
+      "fugue",
+      "engineersdecor",
+      "jei",
+      "icbmclassic",
+      "industrialrenewal",
+      "sgcraft",
+      "appliedenergistics2",
+      "portalgun",
+      "techguns",
+      "microblockcbe",
+      "forgemultipartcbe",
+      "minecraftmultipartcbe",
+      "threng",
+      "tardis",
+      "gaspunk",
+      "pathos",
+      "ichunutil",
+      "libnine",
+      "chisel",
+      "cd4017be_lib",
+      "rs_ctr",
+      "nae2",
+      "architecturecraft",
+      "bdsandm",
+      "betterbuilderswands",
+      "catwalks",
+      "chesttransporter",
+      "elevatorid",
+      "buildinggadgets",
+      "chameleon",
+      "ags_modernmarkings",
+      "packagedauto",
+      "storagedrawers",
+      "torchmaster",
+      "xtones",
+      "gp_inhaler",
+      "mcjtylib_ng",
+      "multistorage",
+      "omlib",
+      "ompd",
+      "openmodularturrets",
+      "rsgauges",
+      "rftools",
+      "shetiphiancore",
+      "travelersbackpack",
+      "xnet",
+      "commons0815",
+      "guitoolkit",
+      "rendertoolkit",
+      "mrtjpcore",
+      "openglasses",
+      "projectred-core",
+      "projectred-illumination",
+      "projectred-integration",
+      "projectred-transmission",
+      "creativecore",
+      "forgelin_continuous",
+      "forgelin",
+      "littletiles",
+      "opensecurity",
+      "retro_sophisticated_backpacks",
+      "creativecoredummy",
+      "littletilescore",
+      "jecalculation",
+      "naturescompass",
+      "scalinghealth",
+      "srparasites",
+      "silentlib",
+      "toolbelt",
+      "dimstack",
+      "weeping-angels",
+      "alet",
+      "universaltweaks"
+    ],
+    "requiredMixinConfigurations": [
+      "mixins.supercritical.gregtech.json",
+      "mixins.susy.gregtech.json",
+      "mixins.susy.gcym.json",
+      "mixins.gregtechfoodoption.late.json",
+      "mixins.nae2.json",
+      "mixin.retro_sophisticated_backpacks.json",
+      "mixins/tweaks/mixins.performance.prefixcheck.json"
+    ],
+    "definitionWitnesses": [
+      {
+        "target": "net.minecraftforge.fml.common.LoadController",
+        "artifact": "cleanroom",
+        "mixin": "com.cleanroommc.groovyscript.core.mixin.LoaderControllerMixin",
+        "methodDescriptor": "(Lnet/minecraftforge/fml/common/LoaderState;[Ljava/lang/Object;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+        "hook": "com/cleanroommc/groovyscript/GroovyScript.initializeGroovyPreInit()V",
+        "dispatchMethod": "distributeStateMessage",
+        "dispatchDescriptor": "(Lnet/minecraftforge/fml/common/LoaderState;[Ljava/lang/Object;)V"
+      },
+      {
+        "target": "gregtech.api.unification.OreDictUnifier",
+        "artifact": "mods/gregtech-ce-unofficial.pw.toml",
+        "mixin": "supersymmetry.mixins.gregtech.OreDictUnifierMixin",
+        "methodName": "registerOre",
+        "methodDescriptor": "(Lnet/minecraft/item/ItemStack;Lgregtech/api/unification/stack/ItemMaterialInfo;)V",
+        "hook": "supersymmetry/loaders/recipes/handlers/RecyclingManager.registerOre(Lnet/minecraft/item/ItemStack;Lgregtech/api/unification/stack/ItemMaterialInfo;)V"
+      }
+    ]
+  },
+  "dependencyOperations": {
+    "mods/codechicken-lib-1-8.pw.toml": "Original GregTech required dependency during native Loader selection",
+    "mods/opencomputers.pw.toml": "Original Susy-Core class definition resolves DriverSpeaker and OpenComputers DriverItem during FMLModContainer construction",
+    "mods/scalar-legacy.pw.toml": "Original OpenComputers Scala coremod and mod-language adapter prerequisites",
+    "mods/geckolib.pw.toml": "Original Susy-Core automatic subscriber registration resolves EntityDropPod and its GeckoLib IAnimatable interface during construction",
+    "mods/modularui.pw.toml": "Original Susy-Core automatic subscriber registration resolves EntityLander and its ModularUI IGuiHolder interface during construction",
+    "mods/immersive-railroading.pw.toml": "Original Susy onModConstruction initializes IR DefinitionManager stock loaders and accesses the original ImmersiveRailroading instance for entity registration",
+    "mods/universal-mod-core.pw.toml": "Original SuSyIRLoader definition resolves IEntityRender and calls Universal Mod Core EntityRegistry.register; also a required original IR dependency",
+    "mods/track-api.pw.toml": "Original Immersive Railroading metadata requires TrackAPI during Loader selection",
+    "mods/bubbles-a-baubles-fork.pw.toml": "Original saved Battery.groovy imports BaubleType and constructs GregTech BaubleBehavior for custom batteries; Bubbles is the selected Baubles API owner",
+    "mods/gregtech-food-option.pw.toml": "Original saved material classes import GTFOMaterialHandler fields for supported material registrations; preserve GTFO native construction and lifecycle",
+    "mods/biomes-o-plenty.pw.toml": "Original saved GregTech worldgen biome_map configuration requires Biomes O Plenty mountain and volcanic_island before CoreModule.init; preserve original configured biome registrations in preInit",
+    "mods/quark-rotn-edition.pw.toml": "Original saved ModifyRecipeMaps removes native centrifuge recipes using Quark frog and crab food item registrations; preserve original configured module registration and ASM",
+    "mods/autoreglib.pw.toml": "Original Quark required dependency and native item/block registration service for the saved recipe input items",
+    "mods/pyrotech.pw.toml": "Original saved ModifyRecipeMaps removes native centrifuge recipes using Pyrotech roasted foods, berries and marshmallow item registrations; preserve original configured module lifecycle",
+    "mods/athenaeum.pw.toml": "Original Pyrotech and Dropt required dependency and native module registration/event routing",
+    "mods/dropt.pw.toml": "Original Pyrotech required dependency during Loader selection and configured native Dropt integration",
+    "mods/fugue.pw.toml": "Original Athenaeum Injector used by required Dropt/Pyrotech construction writes static final native API fields; pinned Fugue default reflectionPatchTargets selects that Injector through its original ReflectFieldTransformer for the selected JVM",
+    "mods/engineers-decor.pw.toml": "Original saved OreDict registers blockConcrete from Engineer Decor rebar_concrete, rebar_concrete_tile and gas_concrete; preserve original configured native block/item registrations",
+    "mods/had-enough-items.pw.toml": "Original saved OreDict calls mods.jei.ingredient.yeet; original Groovy ModSupport binds that property only when the pinned HEI owner is natively loaded, with its original SERVER proxy and registry integration",
+    "mods/icbm.pw.toml": "Original saved OreDict registers ICBM concrete and removes native saltpeter/sulfur ore entries; preserve original configured registration callbacks",
+    "mods/industrial-renewal.pw.toml": "Original saved OreDict registers blockConcrete from Industrial Renewal concrete and removes selected Industrial Renewal rod/ingot ore entries; preserve original configured native registrations",
+    "mods/stargate-network.pw.toml": "Original saved OreDict.groovy removes ore membership and recipes for sgcraft:naquadahingot; retain native registration and configured lifecycle",
+    "mods/ae2-extended-life.pw.toml": "Original saved OreDict.groovy removes ore membership and recipes for appliedenergistics2:material; retain native registration and configured lifecycle",
+    "mods/portal-gun.pw.toml": "Original saved OreDict.groovy removes ore membership and recipes for portalgun:item_dust_ender_pearl; retain native registration and configured lifecycle",
+    "mods/techguns.pw.toml": "Original saved OreDict.groovy removes ore membership and recipes for techguns:itemshared; retain native registration and configured lifecycle",
+    "mods/cb-multipart.pw.toml": "Original saved OreDict.groovy removes ore membership and recipes for microblockcbe:stone_rod; retain native registration and configured lifecycle",
+    "mods/lazy-ae2.pw.toml": "Original saved OreDict.groovy removes ore membership and recipes for threng:material:3; retain native registration and configured lifecycle",
+    "mods/new-tardis-mod.pw.toml": "Original saved OreDict.groovy removes ore membership and recipes for tardis:cinnabar; retain native registration and configured lifecycle",
+    "mods/gaspunk.pw.toml": "Original saved OreDict.groovy removes ore membership and recipes for gaspunk:sulfur; retain native registration and configured lifecycle",
+    "mods/ichunutil.pw.toml": "Original PortalGun required iChunUtil dependency for saved OreDict ingredient registration",
+    "mods/libnine.pw.toml": "Original Lazy AE2 metadata requires libnine for saved OreDict coal dust ingredient registration",
+    "mods/chisel.pw.toml": "Original saved Concrete.groovy registers Susy structural blocks in mods.chisel.carving; preserve original SERVER Chisel registration, access transformer and Groovy container lifecycle",
+    "mods/cd4017be-library.pw.toml": "Original RedstoneControl required dependency and owner of saved cd4017be_lib recipe removals; preserve original access transformer, saved core/redstoneControl configuration scripts and registry callbacks",
+    "mods/redstone-control.pw.toml": "Original saved RedstoneControl.groovy replaces rs_ctr processor recipes with native item identities and processor3 stats NBT; preserve original SERVER CommonProxy, configured registration and lifecycle callbacks",
+    "mods/nae2.pw.toml": "Original saved AppliedEnergistics.groovy requires nae2 material components, storage cells and pattern_multiplier; preserve original configured item registration, coremod and late mixin selection",
+    "mods/architecturecraft-tridev.pw.toml": "Original saved ArchitectureCraft.groovy sawbench, pulley, sawblade and shaped recipes require original configured SERVER registration and lifecycle callbacks",
+    "mods/barrels-drums-storage-more.pw.toml": "Original saved BDSandM.groovy crate, barrel, key, color tool and upgrade recipes require original configured SERVER registration and lifecycle callbacks",
+    "mods/better-builders-wands.pw.toml": "Original saved BuilderWands.groovy native wand inputs and outputs require original configured SERVER registration and lifecycle callbacks",
+    "mods/catwalks-4.pw.toml": "Original saved Catwalks.groovy blowtorch, catwalk and structural part recipes require original configured SERVER registration and lifecycle callbacks",
+    "mods/chest-transporter.pw.toml": "Original saved ChestTranporters.groovy native transporter recipe replacements require original configured SERVER registration and lifecycle callbacks",
+    "mods/openblocks-elevator.pw.toml": "Original saved Elevators.groovy native elevator variants require original configured SERVER registration and lifecycle callbacks",
+    "mods/building-gadgets.pw.toml": "Original saved BuildingGadgets.groovy gadget, construction block and paste recipes require original configured SERVER item registration and lifecycle callbacks",
+    "mods/chameleon.pw.toml": "Original Storage Drawers required Chameleon dependency provides original registry and integration lifecycle for saved StorageDrawers.groovy recipes",
+    "mods/modernmarkings.pw.toml": "Original saved ModernMarkings.groovy marking block recipes require original SERVER registry callbacks",
+    "mods/packagedauto.pw.toml": "Original saved PackagedAuto.groovy packager, unpackager, encoder and package recipes require original configured SERVER registration and AE2 integration",
+    "mods/storage-drawers.pw.toml": "Original saved StorageDrawers.groovy drawer, upgrade and controller recipe replacements require original configured SERVER registration and Chameleon integration",
+    "mods/torchmaster.pw.toml": "Original saved TorchMaster.groovy torch and lamp recipe replacements require original configured SERVER registration and lifecycle callbacks",
+    "mods/xtones.pw.toml": "Original saved XTones.groovy colored block and lamp recipe replacements require original SERVER registration and the natively loaded Chisel integration",
+    "mods/gaspunk-inhaler.pw.toml": "Original saved GasPunk.groovy inhaler recipes; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/mcjtylib-refilmed.pw.toml": "Original saved RFTools.groovy and XNet.groovy required original McJtyLib dependency, access rules and registration services; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/multistorage.pw.toml": "Original saved MultiStorage.groovy storage block and upgrade replacements; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/omlib.pw.toml": "Original saved OpenModularTurrets.groovy and OpenModularPassiveDefense.groovy required original OMLib dependency and registration services; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/ompd.pw.toml": "Original saved OpenModularPassiveDefense.groovy wall and fence recipes; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/openmodularturrets.pw.toml": "Original saved OpenModularTurrets.groovy turrets, bases, ammunition and upgrade recipes; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/redstone-gauges-and-switches.pw.toml": "Original saved RSGauges.groovy gauges, sensors and switch recipes; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/refinedtools.pw.toml": "Original saved RFTools.groovy machine frame, RF machine and card recipes; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/shetiphiancore.pw.toml": "Original saved MultiStorage.groovy required original ShetiPhianCore dependency and registration services; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/travelers-backpack.pw.toml": "Original saved TravelersBackpack.groovy backpack, tank, hose and sleeping bag recipes; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/ynet-an-xnet-fork.pw.toml": "Original saved XNet.groovy controller, cable, connector and router recipes; preserve original SERVER configuration, access transformation, registry callbacks and loaded integration conditions",
+    "mods/commons0815.pw.toml": "Original saved OpenGlasses.groovy original required Commons0815, guiToolkit and renderToolkit dependency declarations, access rules and common callbacks; preserve original SERVER transformation, configuration, native owners and callback order",
+    "mods/mrtjpcore.pw.toml": "Original saved ProjectRed.groovy and ProjectRedIllumination.groovy original required MrTJPCore configuration, Scala proxy and registration helpers; preserve original SERVER transformation, configuration, native owners and callback order",
+    "mods/openglasses2.pw.toml": "Original saved OpenGlasses.groovy original terminal and glasses registrations; preserve original SERVER transformation, configuration, native owners and callback order",
+    "mods/project-red-core.pw.toml": "Original saved ProjectRed.groovy original core components and required base registrations; preserve original SERVER transformation, configuration, native owners and callback order",
+    "mods/project-red-illumination.pw.toml": "Original saved ProjectRedIllumination.groovy original lamps, buttons and multipart lights; preserve original SERVER transformation, configuration, native owners and callback order",
+    "mods/project-red-integration.pw.toml": "Original saved ProjectRed.groovy original gate, wire and framed wire registrations; preserve original SERVER transformation, configuration, native owners and callback order",
+    "mods/creativecore.pw.toml": "Original saved LittleTiles.groovy original required CreativeCore configuration, injected container and common registration services; preserve original SERVER callbacks, configuration and loaded integration branches",
+    "mods/forgelin-continuous.pw.toml": "Original saved SophisticatedBackpacks.groovy original required Kotlin language adapter and access transformation; preserve original SERVER callbacks, configuration and loaded integration branches",
+    "mods/littletiles.pw.toml": "Original saved LittleTiles.groovy original tool, storage, dyeable block and structure registrations; preserve original SERVER callbacks, configuration and loaded integration branches",
+    "mods/opensecurity.pw.toml": "Original saved OpenSecurity.groovy original security device and card registrations, including original sound extraction setup; preserve original SERVER callbacks, configuration and loaded integration branches",
+    "mods/retro-sophisticated-backpacks.pw.toml": "Original saved SophisticatedBackpacks.groovy original backpack, upgrade and capability registrations; preserve original SERVER callbacks, configuration and loaded integration branches",
+    "mods/just-enough-calculation.pw.toml": "Original saved MiscRecipes.groovy native calculator crafting replacement; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/natures-compass.pw.toml": "Original saved MiscRecipes.groovy native compass crafting replacement; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/scaling-health.pw.toml": "Original saved MiscRecipes.groovy crystal ore lookup and original removal; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/scape-and-run-parasites.pw.toml": "Original saved MiscRecipes.groovy infested ore metadata lookups and original removals; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/silent-lib.pw.toml": "Original saved MiscRecipes.groovy required original ScalingHealth library; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/tool-belt.pw.toml": "Original saved MiscRecipes.groovy native belt and pouch crafting replacements; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/vertically-stacked-dimensions.pw.toml": "Original saved MiscRecipes.groovy dimension pipe crafting replacement with original CD4017BE recipe/configuration callbacks; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/weeping-angels-mod.pw.toml": "Original saved MiscRecipes.groovy kontron ore lookup and original removal; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/alet.pw.toml": "Original saved LittleTiles.groovy native ALET tape measure crafting replacement; preserve original common/SERVER callbacks, configuration and loaded integrations",
+    "mods/universal-tweaks.pw.toml": "Original pack-selected Universal Tweaks coremod, configuration, early/late mixins and common/SERVER lifecycle; compare original prefix checking and effective registry observations without warning suppression."
+  },
+  "accessTransformers": [
+    "net.minecraftforge.fml.common.asm.transformers.AccessTransformer",
+    "baubles.core.BubblesTransformer",
+    "io.github.chaosunity.forgelin.transformer.ForgelinTransformer",
+    "com.cleanroommc.groovyscript.core.GroovyScriptTransformer",
+    "com.creativemd.littletiles.LittleTilesAfterTransformer"
+  ],
+  "construction": {
+    "groovyPlugins": [
+      {
+        "class": "baubles.common.integration.groovyscript.BaublesGroovyPlugin",
+        "artifact": "mods/bubbles-a-baubles-fork.pw.toml"
+      },
+      {
+        "class": "dev.tianmi.sussypatches.integration.grs.GrSModule",
+        "artifact": "mods/sussypatches.pw.toml"
+      },
+      {
+        "class": "gregtech.integration.groovy.GroovyScriptModule",
+        "artifact": "mods/gregtech-ce-unofficial.pw.toml"
+      },
+      {
+        "class": "supersymmetry.integration.groovyscript.GrSModule",
+        "artifact": "mods/susycore.pw.toml"
+      }
+    ],
+    "susyStockLoaders": [
+      "transporter_erector",
+      "tunnel_bore"
+    ]
+  },
+  "serverOwner": "original-dedicated-server-construction",
+  "containedArtifacts": [
+    {
+      "id": "contained:shetiphian-asm",
+      "parentArtifact": "mods/shetiphiancore.pw.toml",
+      "entry": "shetiphian-asm.jar",
+      "outputPath": "mods/memory_repo/shetiphian/asm/ShetiPhian-ASM/1.12.0/ShetiPhian-ASM-1.12.0.jar",
+      "sha256": "a99fedbe9036a00ce694cb44b220f7426301f40f2c35f11d96a96a888bda6eaf",
+      "size": 7086
+    }
+  ]
+}

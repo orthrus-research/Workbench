@@ -1,0 +1,148 @@
+{
+  "format": "workbench-cleanroom-worldgen-prototype-pattern-v1",
+  "schema_version": 1,
+  "pattern_id": "cleanroom-worldgen-prototype-pattern:sha256:281277ccf91afce476d3f05ea3cc4f70365e18d4e50f18085f40d86c3b1e009e",
+  "maturity": "experimental",
+  "execution_state": "unexecuted",
+  "candidate_lock_sha256": "d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541",
+  "hook_catalog_id": "worldgen-hook-catalog:sha256:a91a820832548e7d6bd19ec1efd92fe55684cf77552d67fd6b2bf86910a999b3",
+  "hook_errata_id": "worldgen-hook-catalog-v1-errata:sha256:15edb0f8fc9e91288e22798adb843a8936ec7ce8b16b9e616a943ec1d060e19f",
+  "subject": {
+    "mod_id": "workbench_worldgen_prototype",
+    "world_type": "wb_proto",
+    "biome_provider": "net.minecraft.world.biome.BiomeProviderSingle",
+    "biome": "minecraft:plains",
+    "generator": "dev.workbench.worldgenprototype.world.PrototypeChunkGenerator",
+    "surface_y": 4,
+    "structures": "deliberately absent in this bounded prototype"
+  },
+  "source_inventory": [
+    {
+      "path": "worldgen-prototype-fixture/build.gradle",
+      "sha256": "17514777858f5aaf53d4715465d7d086d716889ca252c8367e7343ca083e02fb"
+    },
+    {
+      "path": "worldgen-prototype-fixture/gradle.properties",
+      "sha256": "bf5c1759c494a97b16cb67df055a7f0010efa03e2f42517771b92caef0dca8b8"
+    },
+    {
+      "path": "worldgen-prototype-fixture/settings.gradle",
+      "sha256": "7b6982fe6280990afbb31a06a102facaf344ed50bb3d945d42a98bf0238ad1f4"
+    },
+    {
+      "path": "worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/WorldgenPrototypeMod.java",
+      "sha256": "2c3b5da0738d084a37f86081b248225c40722f60ae17eaede9923243e9391a8d"
+    },
+    {
+      "path": "worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/PrototypeWorldType.java",
+      "sha256": "8c9c2611e59d2720d769ffe4df09145bdf60f571204dd1cb5debf1c9a9dd4257"
+    },
+    {
+      "path": "worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/PrototypeChunkGenerator.java",
+      "sha256": "ebb131404d98b627601146143fb6520214b5f2e078f69ddfdb99766f9a8eaf66"
+    },
+    {
+      "path": "worldgen-prototype-fixture/src/main/java/dev/workbench/worldgenprototype/world/PrototypeFeature.java",
+      "sha256": "1c361ab1eddf5e411eb6d4fe4a23424f541642439ed6760bed939b6db51ac049"
+    },
+    {
+      "path": "worldgen-prototype-fixture/src/main/resources/mcmod.info",
+      "sha256": "2af9688a0d7090671c860940ee7be80d61d08ec30a0d7c93239ec14f1fe17f13"
+    },
+    {
+      "path": "worldgen-prototype-fixture/src/main/resources/pack.mcmeta",
+      "sha256": "e4f6efec3c68f4db9598c0b2be45dd0b540067374d06f35068290dcfdd53dd0e"
+    }
+  ],
+  "editable_stage_graph": [
+    {
+      "id": "generate.base",
+      "order": 10,
+      "owner_method": "PrototypeChunkGenerator#generateChunk(int,int)",
+      "feature_method": "PrototypeFeature#generateBase(ChunkPrimer,Random,int,int)",
+      "write_domain": "new ChunkPrimer",
+      "forge_delivery": "none; internal subject stage"
+    },
+    {
+      "id": "populate.custom",
+      "order": 20,
+      "owner_method": "PrototypeChunkGenerator#populate(int,int)",
+      "feature_method": "PrototypeFeature#populateCustom(World,Random,int,int)",
+      "write_domain": "loaded World",
+      "forge_delivery": "PopulateChunkEvent.Populate.EventType.CUSTOM gate after Populate Pre"
+    },
+    {
+      "id": "decorate.custom",
+      "order": 30,
+      "owner_method": "PrototypeChunkGenerator#populate(int,int)",
+      "feature_method": "PrototypeFeature#decorateCustom(World,Random,int,int)",
+      "write_domain": "loaded World",
+      "forge_delivery": "DecorateBiomeEvent.Decorate.EventType.CUSTOM gate between Decorate Pre and Post"
+    }
+  ],
+  "active_stage": "generate.base",
+  "population_event_order": [
+    "PopulateChunkEvent.Pre",
+    "PopulateChunkEvent.Populate.CUSTOM",
+    "DecorateBiomeEvent.Pre",
+    "DecorateBiomeEvent.Decorate.CUSTOM",
+    "DecorateBiomeEvent.Post",
+    "PopulateChunkEvent.Populate.ANIMALS",
+    "PopulateChunkEvent.Post"
+  ],
+  "framework_ownership": {
+    "game_registry_generate_world": "patched Chunk.populate(IChunkGenerator), after generator populate returns",
+    "generator_requirement": "must not call GameRegistry.generateWorld",
+    "independent_generator_delivery": "automatic Forge IWorldGenerator dispatch"
+  },
+  "observer_route": {
+    "world_type": "wb_observe",
+    "generator_setting": "workbench-generator-class=dev.workbench.worldgenprototype.world.PrototypeChunkGenerator",
+    "delegate_constructor": "public <init>(World)",
+    "scope": "substitutes and observes the generator only; does not exercise PrototypeWorldType or its BiomeProvider"
+  },
+  "no_entanglement": {
+    "forbidden_subject_references": [
+      "dev.workbench.worldgenobservatory",
+      "dev.workbench.syntheticworldgen",
+      "ivorius",
+      "reccomplex",
+      "GameRegistry.generateWorld",
+      "IWorldGenerator",
+      "reflection"
+    ],
+    "recurrent_complex_role": "optional independent stock-artifact listener in a separate pack-owned runtime case"
+  },
+  "acceptance_gates": [
+    {
+      "id": "build.remapped_jar",
+      "state": "unexecuted",
+      "required_evidence": "retained build receipt binding source inventory, toolchain, inputs, and remapped artifact"
+    },
+    {
+      "id": "runtime.world_type_provider_selection",
+      "state": "unexecuted",
+      "required_evidence": "fresh-world receipt selecting wb_proto, BiomeProviderSingle, and PrototypeChunkGenerator together"
+    },
+    {
+      "id": "runtime.observed_generator_route",
+      "state": "unexecuted",
+      "required_evidence": "fresh-world receipt selecting wb_observe with the exact delegate setting"
+    },
+    {
+      "id": "runtime.aa_determinism",
+      "state": "unexecuted",
+      "required_evidence": "two admitted fresh-JVM bundles and bounded Atlas equal answers"
+    },
+    {
+      "id": "runtime.intentional_divergence",
+      "state": "unexecuted",
+      "required_evidence": "one declared feature change and Atlas first divergence at the predicted boundary"
+    },
+    {
+      "id": "runtime.independent_decorator",
+      "state": "unexecuted",
+      "required_evidence": "standard Forge listener/callback path to attributed terminal chunk storage without subject integration"
+    }
+  ]
+}

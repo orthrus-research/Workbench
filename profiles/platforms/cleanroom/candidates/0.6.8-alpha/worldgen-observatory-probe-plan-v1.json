@@ -1,0 +1,171 @@
+{
+  "binding": {
+    "candidate_id": "workbench-platform:cleanroom:0.6.8-alpha+mc-1.12.2+forge-14.23.5.2864+mcp-9.42-stable_39",
+    "candidate_lock_path": "candidate-lock-v1.json",
+    "candidate_lock_sha256": "d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541",
+    "catalog_id": "worldgen-hook-catalog:sha256:a91a820832548e7d6bd19ec1efd92fe55684cf77552d67fd6b2bf86910a999b3",
+    "worldgen_hook_catalog_path": "worldgen-hook-catalog-v1.json",
+    "worldgen_hook_catalog_sha256": "b226f7891c6e6feff7e3a688ab44d85d1b8ed552b629988cb73724c9208fd586"
+  },
+  "evidence_boundary": {
+    "capture_success": "not_claimed",
+    "install_time_application": "not_observed",
+    "kind": "static-source-binding-plan",
+    "runtime_reachability": "not_observed"
+  },
+  "format": "workbench-cleanroom-worldgen-observatory-probe-plan-v1",
+  "hooks": [
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeProvideChunk",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunkProviderServer",
+      "raw_hook_id": "cleanroom-worldgen:cps.provide_chunk",
+      "target_class": "net.minecraft.world.gen.ChunkProviderServer",
+      "target_descriptor": "(II)Lnet/minecraft/world/chunk/Chunk;",
+      "target_method": "provideChunk"
+    },
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeLoadChunk",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunkProviderServer",
+      "raw_hook_id": "cleanroom-worldgen:cps.load_chunk",
+      "target_class": "net.minecraft.world.gen.ChunkProviderServer",
+      "target_descriptor": "(II)Lnet/minecraft/world/chunk/Chunk;",
+      "target_method": "loadChunk"
+    },
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeLoadChunkCallback",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunkProviderServer",
+      "raw_hook_id": "cleanroom-worldgen:cps.load_chunk_callback",
+      "target_class": "net.minecraft.world.gen.ChunkProviderServer",
+      "target_descriptor": "(IILjava/lang/Runnable;)Lnet/minecraft/world/chunk/Chunk;",
+      "target_method": "loadChunk"
+    },
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeGenerateChunkCall",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunkProviderServer",
+      "raw_hook_id": "cleanroom-worldgen:cps.generate_chunk_call",
+      "target_class": "net.minecraft.world.gen.ChunkProviderServer",
+      "target_descriptor": "(II)Lnet/minecraft/world/chunk/Chunk;",
+      "target_method": "provideChunk"
+    },
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observePublicPopulate",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunk",
+      "raw_hook_id": "cleanroom-worldgen:chunk.populate_neighbors",
+      "target_class": "net.minecraft.world.chunk.Chunk",
+      "target_descriptor": "(Lnet/minecraft/world/chunk/IChunkProvider;Lnet/minecraft/world/gen/IChunkGenerator;)V",
+      "target_method": "populate"
+    },
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeOwnedPopulate",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunk",
+      "raw_hook_id": "cleanroom-worldgen:chunk.populate_owned",
+      "target_class": "net.minecraft.world.chunk.Chunk",
+      "target_descriptor": "(Lnet/minecraft/world/gen/IChunkGenerator;)V",
+      "target_method": "populate"
+    },
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeGeneratorPopulateCall",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunk",
+      "raw_hook_id": "cleanroom-worldgen:chunk.generator_populate_call",
+      "target_class": "net.minecraft.world.chunk.Chunk",
+      "target_descriptor": "(Lnet/minecraft/world/gen/IChunkGenerator;)V",
+      "target_method": "populate"
+    },
+    {
+      "canonical_role": "block_write.chunk_storage",
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeChunkSetBlockState",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunk",
+      "raw_hook_id": "cleanroom-worldgen:write.chunk_storage",
+      "target_class": "net.minecraft.world.chunk.Chunk",
+      "target_descriptor": "(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;)Lnet/minecraft/block/state/IBlockState;",
+      "target_method": "setBlockState"
+    },
+    {
+      "canonical_role": "block_write.chunk_primer",
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observePrimerSetBlockState",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinChunkPrimer",
+      "raw_hook_id": "cleanroom-worldgen:write.chunk_primer",
+      "target_class": "net.minecraft.world.chunk.ChunkPrimer",
+      "target_descriptor": "(IIILnet/minecraft/block/state/IBlockState;)V",
+      "target_method": "setBlockState"
+    },
+    {
+      "canonical_role": "block_write.world_api",
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeWorldSetBlockState",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinWorld",
+      "raw_hook_id": "cleanroom-worldgen:write.world_api",
+      "target_class": "net.minecraft.world.World",
+      "target_descriptor": "(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;I)Z",
+      "target_method": "setBlockState"
+    },
+    {
+      "canonical_role": "event_dispatch.bus_post",
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observePost",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinEventBus",
+      "raw_hook_id": "cleanroom-worldgen:event_bus.post",
+      "target_class": "net.minecraftforge.fml.common.eventhandler.EventBus",
+      "target_descriptor": "(Lnet/minecraftforge/fml/common/eventhandler/Event;)Z",
+      "target_method": "post"
+    },
+    {
+      "canonical_role": "event_dispatch.per_listener_callsite",
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$observeListenerInvocation",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.MixinEventBus",
+      "raw_hook_id": "cleanroom-worldgen:event_bus.listener_invoke",
+      "target_class": "net.minecraftforge.fml.common.eventhandler.EventBus",
+      "target_descriptor": "(Lnet/minecraftforge/fml/common/eventhandler/Event;)Z",
+      "target_method": "post"
+    },
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$getOwner",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.ASMEventHandlerAccess",
+      "raw_hook_id": "cleanroom-worldgen:event_bus.listener_owner_accessor",
+      "target_class": "net.minecraftforge.fml.common.eventhandler.ASMEventHandler",
+      "target_descriptor": "()Lnet/minecraftforge/fml/common/ModContainer;",
+      "target_method": "workbench$getOwner"
+    },
+    {
+      "canonical_role": null,
+      "expected_cardinality": 1,
+      "merged_method_marker": "workbench$getReadable",
+      "mixin_class": "dev.workbench.worldgenobservatory.probe.mixin.ASMEventHandlerAccess",
+      "raw_hook_id": "cleanroom-worldgen:event_bus.listener_readable_accessor",
+      "target_class": "net.minecraftforge.fml.common.eventhandler.ASMEventHandler",
+      "target_descriptor": "()Ljava/lang/String;",
+      "target_method": "workbench$getReadable"
+    }
+  ],
+  "plan_id": "cleanroom-worldgen-observatory-probe-plan:sha256:8527a4145ad194dae11b2e462ad5dd14b8e9438054f7e6a5cbe885cbbe7845ce",
+  "plugin_source": {
+    "path": "worldgen-observatory-fixture/src/main/java/dev/workbench/worldgenobservatory/probe/ProbeMixinPlugin.java",
+    "sha256": "a786e6d36ffe94009bddb1218ce71ff2140e27f6c832bf7ab726edfcef021d81"
+  },
+  "raw_transport": {
+    "format": "workbench-cleanroom-worldgen-observatory-raw-v1",
+    "schema_id": "workbench://schemas/cleanroom/worldgen-observatory-raw-v1.schema.json",
+    "schema_path": "worldgen-observatory-fixture/src/main/resources/workbench-worldgen-observatory-raw-v1.schema.json",
+    "schema_sha256": "d4bc5dc1b01dbf3756c7db562a27472468049eec3045da25ce8cb4b4933b4838"
+  },
+  "schema_version": 1
+}

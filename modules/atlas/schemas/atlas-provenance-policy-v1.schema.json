@@ -1,0 +1,388 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-provenance-policy-v1.schema.json",
+  "title": "Supersymmetry Atlas causal provenance policy v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "policy_id",
+    "identity_policy",
+    "node_classes",
+    "causal_strengths",
+    "relation_policies",
+    "lifecycle_model",
+    "closure_policies",
+    "negative_statement_policies",
+    "pagination_policy"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "policy_id": {
+      "const": "ATLAS-CAUSAL-PROVENANCE-POLICY-V1"
+    },
+    "identity_policy": {
+      "type": "object",
+      "required": [
+        "canonical_json",
+        "request_id_prefix",
+        "result_id_prefix",
+        "node_id_prefix",
+        "relation_id_prefix",
+        "path_id_prefix",
+        "evidence_id_prefix",
+        "statement_id_prefix",
+        "source_span_byte_interval"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "canonical_json": {
+          "const": "sorted-keys-utf8-no-insignificant-whitespace-no-trailing-newline"
+        },
+        "request_id_prefix": {
+          "const": "atlas-provenance-request:sha256:"
+        },
+        "result_id_prefix": {
+          "const": "atlas-provenance-result:sha256:"
+        },
+        "node_id_prefix": {
+          "const": "atlas-provenance-node:sha256:"
+        },
+        "relation_id_prefix": {
+          "const": "atlas-provenance-relation:sha256:"
+        },
+        "path_id_prefix": {
+          "const": "atlas-provenance-path:sha256:"
+        },
+        "evidence_id_prefix": {
+          "const": "atlas-provenance-evidence:sha256:"
+        },
+        "statement_id_prefix": {
+          "const": "atlas-provenance-statement:sha256:"
+        },
+        "source_span_byte_interval": {
+          "const": "inclusive-zero-based"
+        }
+      }
+    },
+    "node_classes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "source-span",
+          "declared-object",
+          "configuration-entry",
+          "script-operation",
+          "lifecycle-event",
+          "runtime-state",
+          "final-runtime-record",
+          "explanation"
+        ]
+      }
+    },
+    "causal_strengths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "ownership",
+          "possibility",
+          "participation",
+          "transformation",
+          "causation",
+          "identity",
+          "observation",
+          "derivation"
+        ]
+      }
+    },
+    "relation_policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "predicate",
+          "direction",
+          "subject_classes",
+          "object_classes",
+          "permitted_strengths",
+          "evidence_requirements",
+          "lifecycle_requirement",
+          "closure_role",
+          "meaning"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "predicate": {
+            "enum": [
+              "declares",
+              "registers",
+              "loads_configuration",
+              "invokes",
+              "copies",
+              "transforms",
+              "mutates",
+              "removes",
+              "replaces",
+              "reconciles_to",
+              "observed_as_final",
+              "derives_explanation"
+            ]
+          },
+          "direction": {
+            "const": "subject-earlier-or-derivation-input-to-object-result"
+          },
+          "subject_classes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "object_classes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "permitted_strengths": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_requirements": {
+            "type": "object"
+          },
+          "lifecycle_requirement": {
+            "enum": [
+              "required",
+              "optional",
+              "forbidden"
+            ]
+          },
+          "closure_role": {
+            "enum": [
+              "context-only",
+              "conditional-transition",
+              "causal-transition",
+              "identity-only",
+              "final-endpoint",
+              "presentation-only"
+            ]
+          },
+          "meaning": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "lifecycle_model": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "stages",
+        "order_constraints"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "model_id": {
+          "const": "FORGE-CLEANROOM-SUSY-LIFECYCLE-V1"
+        },
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "stage_id",
+              "applicable_profiles",
+              "meaning"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "stage_id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+              },
+              "applicable_profiles": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "COMMON_FINAL_STATE",
+                    "CLIENT_JEI_FINAL_STATE",
+                    "OFFLINE_ARTIFACT_STATE"
+                  ]
+                }
+              },
+              "meaning": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "order_constraints": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "before",
+              "after",
+              "profiles"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "before": {
+                "type": "string"
+              },
+              "after": {
+                "type": "string"
+              },
+              "profiles": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "COMMON_FINAL_STATE",
+                    "CLIENT_JEI_FINAL_STATE",
+                    "OFFLINE_ARTIFACT_STATE"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "closure_policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "state",
+          "requires_closed_path",
+          "requires_open_frontier",
+          "requires_truncation",
+          "meaning"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "enum": [
+              "closed",
+              "partial",
+              "bounded",
+              "unresolved",
+              "unavailable"
+            ]
+          },
+          "requires_closed_path": {
+            "type": "boolean"
+          },
+          "requires_open_frontier": {
+            "type": "boolean"
+          },
+          "requires_truncation": {
+            "type": "boolean"
+          },
+          "meaning": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "negative_statement_policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "required_authorities",
+          "allowed_result_states",
+          "requires_closed_path",
+          "bounded_wording"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "not-found-in-closed-source-scope",
+              "not-observed-in-final-capture",
+              "removed-before-final",
+              "no-closed-causal-path"
+            ]
+          },
+          "required_authorities": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "pinned-source",
+                "runtime-mechanics",
+                "derived-validation"
+              ]
+            }
+          },
+          "allowed_result_states": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "closed",
+                "partial",
+                "bounded",
+                "unresolved",
+                "unavailable"
+              ]
+            }
+          },
+          "requires_closed_path": {
+            "type": "boolean"
+          },
+          "bounded_wording": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "pagination_policy": {
+      "type": "object",
+      "required": [
+        "mode",
+        "truncation_is_completion"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "none-v1-single-bounded-result"
+        },
+        "truncation_is_completion": {
+          "const": false
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,240 @@
+import java.security.MessageDigest
+import java.util.jar.JarFile
+import java.util.regex.Pattern
+import groovy.json.JsonOutput
+
+/*
+ * D01 runtime launch seam.
+ *
+ * The canonical Cleanroom fixture remains frozen.  When and only when all
+ * three D01 properties are supplied, this init script rewrites Unimined's
+ * launch immediately before execution: every development output or duplicate
+ * fixture origin is removed from the raw JavaExec classpath, and the exact
+ * installed remapped JAR replaces those outputs in Cleanroom Loader's
+ * crl.dev.extrapath discovery/transform channel.  The Java agent then observes
+ * the real ProtectionDomain inside the owned client/server JVM.  Any residual
+ * development origin or raw-classpath fixture origin fails the task.
+ */
+
+def probeEntry = 'dev/workbench/dailyloop/DailyLoopProbe.class'
+
+def sha256 = { File value ->
+    MessageDigest digest = MessageDigest.getInstance('SHA-256')
+    value.withInputStream { input ->
+        byte[] buffer = new byte[1024 * 1024]
+        int count
+        while ((count = input.read(buffer)) >= 0) {
+            if (count > 0) {
+                digest.update(buffer, 0, count)
+            }
+        }
+    }
+    'sha256:' + digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+}
+
+def containsFixtureClass = { File raw ->
+    File value = raw.canonicalFile
+    if (value.isDirectory()) {
+        return new File(value, probeEntry).isFile()
+    }
+    if (!value.isFile()) {
+        throw new GradleException("D01 JAR-only classpath entry is unavailable: ${value}")
+    }
+    try {
+        JarFile archive = new JarFile(value)
+        try {
+            return archive.getJarEntry(probeEntry) != null
+        } finally {
+            archive.close()
+        }
+    } catch (java.util.zip.ZipException ignored) {
+        return false
+    }
+}
+
+gradle.afterProject { project, state ->
+    if (state.failure != null || !project.hasProperty('workbenchD01JarOnlyArtifact')) {
+        return
+    }
+    for (String required : [
+        'workbenchD01JarOnlyArtifact',
+        'workbenchD01CodeSourceAgent',
+        'workbenchD01ProbeCapture',
+        'workbenchD01ExpectedArtifactSha256',
+    ]) {
+        if (!project.hasProperty(required) || project.property(required).toString().isBlank()) {
+            throw new GradleException("D01 JAR-only launch requires -P${required}=<exact value>")
+        }
+    }
+
+    File artifact = project.file(project.property('workbenchD01JarOnlyArtifact')).canonicalFile
+    File agent = project.file(project.property('workbenchD01CodeSourceAgent')).canonicalFile
+    File capture = project.file(project.property('workbenchD01ProbeCapture')).canonicalFile
+    File extraPathCapture = new File(
+        capture.absolutePath + '.removed-crl-dev-extrapath.json'
+    ).canonicalFile
+    String expectedSha256 = project.property('workbenchD01ExpectedArtifactSha256').toString()
+    if (!artifact.isFile() || !artifact.name.endsWith('.jar')) {
+        throw new GradleException("D01 installed fixture artifact is not one JAR: ${artifact}")
+    }
+    if (!agent.isFile() || !agent.name.endsWith('.jar')) {
+        throw new GradleException("D01 CodeSource agent is not one JAR: ${agent}")
+    }
+    if (capture.exists()) {
+        throw new GradleException("D01 CodeSource capture already exists: ${capture}")
+    }
+    if (extraPathCapture.exists()) {
+        throw new GradleException(
+            "D01 Cleanroom development-extra-path capture already exists: ${extraPathCapture}"
+        )
+    }
+    if (sha256(artifact) != expectedSha256) {
+        throw new GradleException('D01 installed fixture artifact digest changed before launch')
+    }
+
+    project.tasks.matching { task -> task.name in ['runClient', 'runServer'] }.configureEach { task ->
+        if (!(task instanceof org.gradle.api.tasks.JavaExec)) {
+            throw new GradleException("D01 expected ${task.path} to be one JavaExec launch")
+        }
+        task.doFirst {
+            def sourceSets = project.extensions.findByName('sourceSets')
+            if (sourceSets == null || sourceSets.findByName('main') == null) {
+                throw new GradleException('D01 cannot resolve the fixture main source set')
+            }
+            Set<File> developmentOutputs = sourceSets.main.output.files.collect {
+                it.canonicalFile
+            }.toSet()
+
+            // Unimined's Cleanroom run transform deliberately removes the main
+            // source set from JavaExec.classpath, then re-introduces those
+            // directories through this Cleanroom Loader JVM property.  Merely
+            // rewriting classpath therefore still loads the development mod and
+            // creates a duplicate beside the installed JAR.  Remove every
+            // injected occurrence, retain the exact paths for physical evidence,
+            // and fail closed if the property escaped through another JVM-arg
+            // channel.
+            List<String> removedExtraPathArguments = []
+            if (task.systemProperties.containsKey('crl.dev.extrapath')) {
+                removedExtraPathArguments.add(
+                    '-Dcrl.dev.extrapath=' + task.systemProperties.remove('crl.dev.extrapath')
+                )
+            }
+            List<String> retainedJvmArguments = []
+            (task.jvmArgs ?: []).each { Object rawArgument ->
+                String argument = rawArgument.toString()
+                if (argument.startsWith('-Dcrl.dev.extrapath=')) {
+                    removedExtraPathArguments.add(argument)
+                } else {
+                    retainedJvmArguments.add(argument)
+                }
+            }
+            task.setJvmArgs(retainedJvmArguments)
+            if (removedExtraPathArguments.isEmpty()) {
+                throw new GradleException(
+                    'D01 JAR-only launch did not observe Cleanroom development extra paths'
+                )
+            }
+            List<File> removedExtraPaths = []
+            removedExtraPathArguments.each { String argument ->
+                String rawPaths = argument.substring('-Dcrl.dev.extrapath='.length())
+                rawPaths.split(Pattern.quote(File.pathSeparator), -1).each { String rawPath ->
+                    if (rawPath.isBlank()) {
+                        throw new GradleException(
+                            'D01 Cleanroom development-extra-path argument contains an empty path'
+                        )
+                    }
+                    removedExtraPaths.add(project.file(rawPath).canonicalFile)
+                }
+            }
+            if (removedExtraPaths.toSet() != developmentOutputs) {
+                throw new GradleException(
+                    'D01 Cleanroom development-extra-path capture does not exactly match '
+                        + "the fixture main outputs: ${removedExtraPaths}"
+                )
+            }
+            List<File> rewritten = []
+            task.classpath.files.each { File raw ->
+                File entry = raw.canonicalFile
+                boolean developmentOutput = developmentOutputs.any { File output ->
+                    entry == output || entry.toPath().startsWith(output.toPath())
+                }
+                if (!developmentOutput && !containsFixtureClass(entry)) {
+                    rewritten.add(entry)
+                }
+            }
+            task.classpath = project.files(rewritten)
+
+            List<File> finalEntries = task.classpath.files.collect { it.canonicalFile }
+            List<File> fixtureOrigins = finalEntries.findAll { containsFixtureClass(it) }
+            if (!fixtureOrigins.isEmpty()) {
+                throw new GradleException(
+                    "D01 JAR-only launch retained raw-classpath fixture origins: ${fixtureOrigins}"
+                )
+            }
+            if (finalEntries.any { it == artifact }) {
+                throw new GradleException(
+                    'D01 installed fixture artifact escaped into the raw Java classpath'
+                )
+            }
+            capture.parentFile.mkdirs()
+            task.jvmArgs("-javaagent:${agent.absolutePath}")
+            if (project.hasProperty('workbenchD01DebugPort')) {
+                String debugPort = project.property('workbenchD01DebugPort').toString()
+                if (!(debugPort ==~ /[1-9][0-9]{0,4}/)
+                        || Integer.parseInt(debugPort) > 65535) {
+                    throw new GradleException('D01 debug port is invalid')
+                }
+                task.jvmArgs(
+                    '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,'
+                        + "address=127.0.0.1:${debugPort}"
+                )
+            }
+            task.systemProperty('workbench.d01.expectedArtifact', artifact.absolutePath)
+            task.systemProperty('workbench.d01.expectedArtifactSha256', expectedSha256)
+            task.systemProperty('workbench.d01.probeCapture', capture.absolutePath)
+            task.systemProperty('workbench.d01.rawClasspathFixtureOriginCount', '0')
+            task.systemProperty('workbench.d01.extraPathFixtureOriginCount', '1')
+            task.systemProperty('workbench.d01.runtimeMode', 'jar-only')
+            task.systemProperty(
+                'workbench.d01.removedExtraPathCapture', extraPathCapture.absolutePath
+            )
+            task.systemProperty('crl.dev.extrapath', artifact.absolutePath)
+
+            List<String> effectiveExtraPathArguments = task.allJvmArgs.findAll {
+                it.toString().startsWith('-Dcrl.dev.extrapath=')
+            }.collect { it.toString() }
+            if (effectiveExtraPathArguments.size() != 1) {
+                throw new GradleException(
+                    'D01 JAR-only launch did not retain exactly one Cleanroom extra path: '
+                        + effectiveExtraPathArguments
+                )
+            }
+            List<File> effectiveExtraPaths = effectiveExtraPathArguments[0]
+                .substring('-Dcrl.dev.extrapath='.length())
+                .split(Pattern.quote(File.pathSeparator), -1)
+                .collect { String rawPath -> project.file(rawPath).canonicalFile }
+            if (effectiveExtraPaths != [artifact]) {
+                throw new GradleException(
+                    'D01 Cleanroom extra path does not contain only the installed CAS JAR: '
+                        + effectiveExtraPaths
+                )
+            }
+            extraPathCapture.parentFile.mkdirs()
+            extraPathCapture.setText(
+                JsonOutput.toJson([
+                    format: 'workbench-d01-rewritten-cleanroom-extra-path-v1',
+                    task: task.path,
+                    removed_arguments: removedExtraPathArguments,
+                    removed_paths: removedExtraPaths.collect { it.absolutePath },
+                    development_outputs: developmentOutputs.collect { it.absolutePath }.sort(),
+                    raw_classpath_fixture_origins: fixtureOrigins.collect { it.absolutePath },
+                    effective_arguments: effectiveExtraPathArguments,
+                    effective_paths: effectiveExtraPaths.collect { it.absolutePath },
+                    installed_artifact: artifact.absolutePath,
+                    installed_artifact_sha256: expectedSha256,
+                ]) + '\n',
+                'UTF-8'
+            )
+        }
+    }
+}

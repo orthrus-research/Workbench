@@ -1,0 +1,47 @@
+{
+  "format": "workbench-crucible-literal-diagnostic-policy-v1",
+  "schema_version": 1,
+  "policy_id": "supersymmetry.recurrent-complex-1.4.8.6.cleanroom-0.6.8-alpha.resource-health",
+  "owner_profile_id": "supersymmetry.cleanroom-0.6.8-alpha",
+  "subject_artifact_sha256": "253226e6c7efe61ae255df0cc2e19d1420945cb7e86f7cd79f51d5db10fd9de8",
+  "log_format": "forge-log4j2-bracketed-v1",
+  "match_semantics": "literal-logger-level-message-prefix-v1",
+  "zero_match_state": "inconclusive",
+  "rules": [
+    {
+      "rule_id": "recurrent_complex.cascading_generation",
+      "disposition": "review",
+      "logger": "reccomplex",
+      "level": "WARN",
+      "message_prefix": "Cascading chunk generation happening while "
+    },
+    {
+      "rule_id": "recurrent_complex.resource_holy",
+      "disposition": "fail",
+      "logger": "reccomplex",
+      "level": "WARN",
+      "message_prefix": "Error reading resource: Holy"
+    },
+    {
+      "rule_id": "recurrent_complex.resource_peaceful_crypt",
+      "disposition": "fail",
+      "logger": "reccomplex",
+      "level": "WARN",
+      "message_prefix": "Error reading resource: PeacefulCrypt"
+    },
+    {
+      "rule_id": "recurrent_complex.resource_tribal_chest",
+      "disposition": "fail",
+      "logger": "reccomplex",
+      "level": "WARN",
+      "message_prefix": "Error reading resource: TribalChest"
+    },
+    {
+      "rule_id": "recurrent_complex.resource_unholy",
+      "disposition": "fail",
+      "logger": "reccomplex",
+      "level": "WARN",
+      "message_prefix": "Error reading resource: Unholy"
+    }
+  ]
+}

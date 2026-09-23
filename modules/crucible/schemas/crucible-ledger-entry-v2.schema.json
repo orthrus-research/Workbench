@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-ledger-entry-v2.schema.json",
+  "title": "Workbench Crucible immutable evidence ledger entry V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "context_ref_id",
+    "ledger_namespace",
+    "ordinal",
+    "previous_entry_id",
+    "entry_record_kind",
+    "entry_record_id"
+  ],
+  "properties": {
+    "kind": {"const": "ledger-entry"},
+    "format": {"const": "workbench-crucible-ledger-entry-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-ledger-entry-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {
+      "type": "string",
+      "pattern": "^ledger-entry:sha256:[0-9a-f]{64}$"
+    },
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/contextRefId"},
+    "ledger_namespace": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "ordinal": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nonNegativeInteger"},
+    "previous_entry_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableLedgerEntryId"},
+    "entry_record_kind": {"enum": ["evidence-record", "admission-record"]},
+    "entry_record_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceOrAdmissionRecordId"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"entry_record_kind": {"const": "evidence-record"}}},
+      "then": {
+        "properties": {
+          "entry_record_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceRecordId"}
+        }
+      },
+      "else": {
+        "properties": {
+          "entry_record_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/admissionRecordId"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"ordinal": {"const": 0}}},
+      "then": {"properties": {"previous_entry_id": {"type": "null"}}},
+      "else": {
+        "properties": {
+          "ordinal": {"minimum": 1},
+          "previous_entry_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/ledgerEntryId"}
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,300 @@
+name: validate
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  axiom:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prepare the Linux evaluation boundary
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - name: Build, test and exercise the independent installed Java engine
+        run: python3 tools/build_axiom.py --provision --output .workbench/candidate-axiom
+      - name: Verify exact upstream source inputs
+        run: python3 tools/axiom_sources.py --provision .workbench/axiom-ci-sources
+      - name: Resolve the locked Axiom runtime JDK
+        run: python3 -c 'from validation.provision_ide_toolchains import TOOLCHAIN_ROOT, load_lock; print("AXIOM_JAVA_HOME=" + str(TOOLCHAIN_ROOT / load_lock()["java_platform"]["archive_root"]))' >> "$GITHUB_ENV"
+      - name: Capture and exercise the portable source target
+        run: |
+          python3 tools/build_axiom_target.py --supersymmetry .workbench/axiom-ci-sources/supersymmetry --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --groovyscript .workbench/axiom-ci-sources/groovyscript --output .workbench/axiom-ci-target.zip
+          python3 tools/axiom_target_smoke.py --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --target .workbench/axiom-ci-target.zip --report .workbench/axiom-ci-result.json
+          python3 tools/axiom_composition_conformance.py --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --target .workbench/axiom-ci-target.zip --report .workbench/axiom-ci-composition.json
+      - name: Compare original source algorithms independently
+        run: |
+          python3 tools/axiom_source_conformance.py --gtceu .workbench/axiom-ci-sources/gtceu --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME"
+          python3 tools/axiom_registry_conformance.py --gtceu .workbench/axiom-ci-sources/gtceu --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --registry-root .workbench/axiom/registry-runtime --report .workbench/axiom-ci-registry-conformance.json
+          python3 tools/axiom_fluid_conformance.py --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --provision-cleanroom .workbench/axiom-ci-fluid-cleanroom --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --registry-root .workbench/axiom/registry-runtime --report .workbench/axiom-ci-fluid-conformance.json
+          python3 tools/axiom_loader_conformance.py --groovyscript .workbench/axiom-ci-sources/groovyscript --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME"
+          python3 tools/axiom_bootstrap_sources.py --gtceu .workbench/axiom-ci-sources/gtceu
+          python3 tools/axiom_event_conformance.py --cleanroom-root .workbench/axiom-ci-fluid-cleanroom --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --library-root .workbench/axiom-ci-event-libraries --provision-libraries --report .workbench/axiom-ci-event-conformance.json
+          python3 tools/axiom_construction_conformance.py --gtceu .workbench/axiom-ci-sources/gtceu --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --registry-root .workbench/axiom/registry-runtime --report .workbench/axiom-ci-construction-conformance.json
+          python3 tools/axiom_prefix_conformance.py --gtceu .workbench/axiom-ci-sources/gtceu --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --registry-root .workbench/axiom/registry-runtime --report .workbench/axiom-ci-prefix-conformance.json
+          python3 tools/axiom_forge_registry_conformance.py --cleanroom .workbench/axiom-ci-fluid-cleanroom --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --registry-root .workbench/axiom/registry-runtime --report .workbench/axiom-ci-forge-registry-conformance.json
+          python3 tools/axiom_stack_conformance.py --cleanroom .workbench/axiom-ci-fluid-cleanroom --gtceu .workbench/axiom-ci-sources/gtceu --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --registry-root .workbench/axiom/registry-runtime --report .workbench/axiom-ci-stack-conformance.json
+      - name: Qualify actual Cleanroom block, fluid and enchantment identities
+        run: python3 tools/axiom_native_identity_conformance.py --cleanroom .workbench/axiom-ci-fluid-cleanroom --gtceu .workbench/axiom-ci-sources/gtceu --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --java-home "$AXIOM_JAVA_HOME" --library-root .workbench/axiom-ci-native-libraries --provision-libraries --output .workbench/axiom-ci-native-identities --report .workbench/axiom-ci-native-identities.json
+      - name: Build and qualify native material producers in the same Cleanroom context
+        run: |
+          python3 tools/build_axiom_native_materials.py --java-home "$AXIOM_JAVA_HOME" --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --images .workbench/axiom-ci-native-identities --library-root .workbench/axiom-ci-native-libraries --output .workbench/axiom-ci-native-materials
+          python3 tools/axiom_native_material_conformance.py --java-home "$AXIOM_JAVA_HOME" --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --images .workbench/axiom-ci-native-identities --library-root .workbench/axiom-ci-native-libraries --program .workbench/axiom-ci-native-materials --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --cleanroom .workbench/axiom-ci-fluid-cleanroom --report .workbench/axiom-ci-native-materials.json
+      - name: Qualify complete GT catalog at the frozen material checkpoint
+        run: python3 tools/axiom_catalog_conformance.py --java-home "$AXIOM_JAVA_HOME" --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --images .workbench/axiom-ci-native-identities --library-root .workbench/axiom-ci-native-libraries --program .workbench/axiom-ci-native-materials --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --cleanroom .workbench/axiom-ci-fluid-cleanroom --supersymmetry .workbench/axiom-ci-sources/supersymmetry --report .workbench/axiom-ci-material-catalog.json
+      - name: Qualify native items, ore registration and GT unification
+        run: python3 tools/axiom_item_conformance.py --java-home "$AXIOM_JAVA_HOME" --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --images .workbench/axiom-ci-native-identities --library-root .workbench/axiom-ci-native-libraries --program .workbench/axiom-ci-native-materials --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --cleanroom .workbench/axiom-ci-fluid-cleanroom --supersymmetry .workbench/axiom-ci-sources/supersymmetry --groovyscript .workbench/axiom-ci-sources/groovyscript --report .workbench/axiom-ci-native-items.json
+      - name: Qualify generated material-prefix item identities and registration
+        run: python3 tools/axiom_material_item_conformance.py --java-home "$AXIOM_JAVA_HOME" --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --images .workbench/axiom-ci-native-identities --library-root .workbench/axiom-ci-native-libraries --program .workbench/axiom-ci-native-materials --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --cleanroom .workbench/axiom-ci-fluid-cleanroom --supersymmetry .workbench/axiom-ci-sources/supersymmetry --groovyscript .workbench/axiom-ci-sources/groovyscript --report .workbench/axiom-ci-material-items.json
+      - name: Qualify composed material blocks, frames and native ItemBlocks
+        run: python3 tools/axiom_material_block_conformance.py --java-home "$AXIOM_JAVA_HOME" --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --images .workbench/axiom-ci-native-identities --library-root .workbench/axiom-ci-native-libraries --program .workbench/axiom-ci-native-materials --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --cleanroom .workbench/axiom-ci-fluid-cleanroom --supersymmetry .workbench/axiom-ci-sources/supersymmetry --groovyscript .workbench/axiom-ci-sources/groovyscript --report .workbench/axiom-ci-material-blocks.json
+
+      - name: Qualify GT and Susy ore variants, native access rules and drop selections
+        run: python3 tools/axiom_material_ore_conformance.py --java-home "$AXIOM_JAVA_HOME" --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --images .workbench/axiom-ci-native-identities --library-root .workbench/axiom-ci-native-libraries --program .workbench/axiom-ci-native-materials --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --cleanroom .workbench/axiom-ci-fluid-cleanroom --supersymmetry .workbench/axiom-ci-sources/supersymmetry --groovyscript .workbench/axiom-ci-sources/groovyscript --report .workbench/axiom-ci-material-ores.json
+
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      selection: ${{ steps.plan.outputs.plan }}
+      ide: ${{ steps.plan.outputs.ide }}
+      physical: ${{ steps.plan.outputs.physical_cleanroom }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: plan
+        run: python3 validation/ci_validation.py plan --event-name "$GITHUB_EVENT_NAME" --event-file "$GITHUB_EVENT_PATH" --output .workbench/validation/ci/plan.json --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: validation-plan
+          path: .workbench/validation/ci/
+          include-hidden-files: true
+          retention-days: 14
+
+  workbench:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Reject project-local Pixi configuration
+        run: python tools/check_pixi_project_config.py
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'master' }}
+
+      - name: Verify the developer environment boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          pixi run --locked --no-config setup-core --json > "$RUNNER_TEMP/pixi-setup.json"
+          pixi run --locked --no-config workbench environment status --json > "$RUNNER_TEMP/environment-status.json"
+          pixi run --locked --no-config python - "$RUNNER_TEMP/pixi-setup.json" "$RUNNER_TEMP/environment-status.json" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          setup, status = (json.loads(Path(path).read_text()) for path in sys.argv[1:])
+          if (setup.get("format"), setup.get("schema_version")) != (
+              "workbench-pixi-setup-result-v2",
+              2,
+          ):
+              raise SystemExit("setup did not emit the exact Pixi V2 attestation")
+          if not setup.get("pixi", {}).get("verification", {}).get(
+              "manifest_and_lock_identities_bound"
+          ):
+              raise SystemExit("setup did not bind the manifest and lock")
+          if not setup.get("pixi", {}).get("verification", {}).get(
+              "expected_closure_derived_from_bound_inputs"
+          ):
+              raise SystemExit("setup did not derive the target-scoped lock closure")
+          if not setup.get("pixi", {}).get("verification", {}).get(
+              "pixi_executable_version"
+          ):
+              raise SystemExit("setup did not verify the custody-staged Pixi copy")
+          if setup.get("pixi", {}).get("verification", {}).get(
+              "pixi_launch_time_executable_identity"
+          ) is not False:
+              raise SystemExit("setup overclaimed Pixi launch-time executable identity")
+          if setup.get("pixi", {}).get("tool", {}).get("version") != "0.75.0":
+              raise SystemExit("setup did not observe the required Pixi version")
+          if status.get("execution", {}).get("mode") != "source-pixi":
+              raise SystemExit("environment status did not observe the active Pixi environment")
+          if status.get("pixi", {}).get("matches_required_constraint") is not True:
+              raise SystemExit("environment status did not observe the required Pixi version")
+          PY
+
+      - name: Exercise the developer-facing core
+        shell: bash
+        run: |
+          set -euo pipefail
+          pixi run --locked --no-config python tools/build_paths.py validate
+          pixi run --locked --no-config python tools/render_brand_assets.py check
+          pixi run --locked --no-config python tools/public_repository.py validate
+          # Ordinary CI inspects the exact checked-out commit. Publication
+          # readiness additionally requires a separately reviewed scan receipt.
+          pixi run --locked --no-config python tools/prepare_public_export.py plan --revision "$GITHUB_SHA"
+          pixi run --locked --no-config validate
+
+      - name: Check whitespace
+        run: git diff --check
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: quick-validation-diagnostics
+          path: .workbench/validation/
+          include-hidden-files: true
+          retention-days: 14
+
+  native-packages:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+      - name: Exercise native Windows path behavior in source owners
+        if: matrix.os == 'windows-2025'
+        shell: bash
+        run: |
+          pixi run --environment release --locked --no-config python validation/validate.py --suite project-intelligence --suite pack-program-studio --result .workbench/validation/windows-paths-result.json
+          pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/windows-paths-result.json --group windows-paths
+      - name: Build the complete native assembly once
+        run: pixi run --environment release --locked --no-config python tools/build_native_distribution.py --suite --output .workbench/native-suite --diagnostics .workbench/validation/ci/native-build
+      - name: Verify exact native wheels, relocated installation and installed workflows
+        run: pixi run --environment release --locked --no-config python tools/validate_native_packages.py --wheelhouse .workbench/native-suite --diagnostics .workbench/validation/ci/native-conformance
+      - name: Exercise the actual offline Core installation route
+        shell: bash
+        run: |
+          pixi run --environment release --locked --no-config python tools/build_native_distribution.py --from-wheelhouse .workbench/native-suite --output .workbench/core-wheelhouse --diagnostics .workbench/validation/ci/core-closure
+          pixi run --environment release --locked --no-config python tools/install_workbench.py .workbench/core-wheelhouse --destination "$RUNNER_TEMP/workbench-native-core" --diagnostics .workbench/validation/ci/core-install
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success() && matrix.os == 'ubuntu-24.04'
+        with:
+          name: native-linux-assembly
+          path: .workbench/native-suite/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: native-diagnostics-${{ matrix.os }}
+          path: .workbench/validation/
+          include-hidden-files: true
+          retention-days: 14
+
+  canonical:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+      - name: Provision the required locked Node implementation
+        run: pixi run --locked --no-config python validation/provision_ide_toolchains.py --node-only --path-file "$GITHUB_PATH"
+      - name: Complete Python and repository policy coverage
+        run: pixi run --environment release --locked --no-config python validation/validate.py --tier canonical --policy --result .workbench/validation/canonical-result.json
+      - name: Require the real pip isolation probe
+        run: pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/canonical-result.json --group pip
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: canonical-validation-diagnostics
+          path: .workbench/validation/
+          include-hidden-files: true
+          retention-days: 14
+
+  ide:
+    needs: [plan, native-packages]
+    if: needs.plan.outputs.ide == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+          environments: release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: native-linux-assembly
+          path: .workbench/native-suite
+      - name: Install the exact inspected native assembly for the IDE journey
+        run: pixi run --environment release --locked --no-config python tools/install_workbench.py .workbench/native-suite --destination "$RUNNER_TEMP/workbench-ide-core" --diagnostics .workbench/validation/ci/ide-core-install
+      - name: Validate locked IDE hosts and installed Core journeys
+        run: xvfb-run -a pixi run --environment release --locked --no-config python validation/validate_ide.py --full --installed-core "$RUNNER_TEMP/workbench-ide-core/bin/workbench" --jobs 2 --diagnostics .workbench/validation/ci/ide
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ide-validation-diagnostics
+          path: |
+            .workbench/validation/ci/
+            clients/intellij-community/build/test-results/
+            clients/intellij-community/build/reports/pluginVerifier/
+          include-hidden-files: true
+          retention-days: 14
+
+  physical-cleanroom:
+    needs: plan
+    if: needs.plan.outputs.physical == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+          environments: release
+      - name: Provision exact physical fixture toolchains
+        run: pixi run --environment release --locked --no-config python validation/provision_ide_toolchains.py --physical-env-file "$GITHUB_ENV"
+      - name: Exercise physical build, artifact rejection and process custody
+        run: pixi run --environment release --locked --no-config python validation/validate.py --suite cleanroom-profile --suite workbench-shell --jobs 1 --result .workbench/validation/physical-result.json
+      - name: Require every physical probe to execute and pass
+        run: pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/physical-result.json --group physical-cleanroom
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: physical-cleanroom-diagnostics
+          path: .workbench/validation/
+          include-hidden-files: true
+          retention-days: 14
+
+  required-validation:
+    if: always()
+    needs: [plan, workbench, canonical, native-packages, axiom, ide, physical-cleanroom]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Reconcile every planned required stage with actual outcomes
+        env:
+          VALIDATION_PLAN: ${{ needs.plan.outputs.selection }}
+          VALIDATION_RESULTS: ${{ toJSON(needs) }}
+        run: python3 validation/ci_validation.py gate --plan-json "$VALIDATION_PLAN" --results-json "$VALIDATION_RESULTS"

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.dev/workbench/schemas/developer-feature-record-catalog-v1.schema.json",
+  "title": "Workbench retained developer-feature record catalog V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "filters",
+    "format",
+    "id",
+    "kind",
+    "limitations",
+    "records",
+    "schema_version",
+    "state_root_uri"
+  ],
+  "properties": {
+    "format": {"const": "workbench-developer-feature-record-catalog-v1"},
+    "schema_version": {"const": 1},
+    "kind": {"const": "workbench-developer-feature-record-catalog"},
+    "id": {
+      "type": "string",
+      "pattern": "^workbench-developer-feature-record-catalog:sha256:[0-9a-f]{64}$"
+    },
+    "state_root_uri": {"type": "string", "pattern": "^file:"},
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collection", "family"],
+      "properties": {
+        "family": {
+          "type": ["string", "null"],
+          "enum": [
+            "material-fluid-recipe",
+            "recipe-change",
+            "quest-for-process",
+            null
+          ]
+        },
+        "collection": {
+          "type": ["string", "null"],
+          "enum": [
+            "plans",
+            "receipts",
+            "rollbacks",
+            "recoveries",
+            "runs",
+            null
+          ]
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "records": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {"$ref": "#/$defs/record"}
+    }
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collection",
+        "diagnostic_code",
+        "family",
+        "operation_count",
+        "plan_id",
+        "record_id",
+        "record_kind",
+        "record_state",
+        "reference",
+        "uri",
+        "verification_state",
+        "workspace_uri"
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "material-fluid-recipe",
+            "recipe-change",
+            "quest-for-process"
+          ]
+        },
+        "collection": {
+          "enum": ["plans", "receipts", "rollbacks", "recoveries", "runs"]
+        },
+        "record_id": {"$ref": "#/$defs/content_id"},
+        "reference": {"$ref": "#/$defs/content_id"},
+        "record_kind": {"type": "string", "minLength": 1},
+        "record_state": {"type": "string", "minLength": 1},
+        "plan_id": {"$ref": "#/$defs/content_id"},
+        "diagnostic_code": {"type": ["string", "null"]},
+        "operation_count": {"type": "integer", "minimum": 1},
+        "verification_state": {"enum": ["ready", "stale"]},
+        "uri": {"type": "string", "pattern": "^file:"},
+        "workspace_uri": {"type": "string", "pattern": "^file:"}
+      }
+    },
+    "content_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    }
+  }
+}

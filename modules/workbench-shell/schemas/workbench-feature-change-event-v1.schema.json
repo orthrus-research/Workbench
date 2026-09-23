@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-feature-change-event-v1.schema.json",
+  "title": "Workbench feature change append-only event V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "event_id", "change_id", "sequence",
+    "previous_event_id", "kind", "payload"
+  ],
+  "properties": {
+    "format": {"const": "workbench-feature-change-event-v1"},
+    "schema_version": {"const": 1},
+    "event_id": {
+      "type": "string",
+      "pattern": "^workbench-feature-change-event:sha256:[0-9a-f]{64}$"
+    },
+    "change_id": {
+      "type": "string",
+      "pattern": "^workbench-feature-change:sha256:[0-9a-f]{64}$"
+    },
+    "sequence": {"type": "integer", "minimum": 0},
+    "previous_event_id": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "string",
+          "pattern": "^workbench-feature-change-event:sha256:[0-9a-f]{64}$"
+        }
+      ]
+    },
+    "kind": {
+      "enum": [
+        "started", "matrix-completed", "applied", "apply-rejected",
+        "verified", "verification-failed", "rolled-back", "rollback-blocked",
+        "recovery-checked"
+      ]
+    },
+    "payload": {"type": "object"}
+  }
+}

@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-query-result-v1.schema.json",
+  "title": "Supersymmetry Atlas target-parameterized query result v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "request_id",
+    "query_instance",
+    "resolution",
+    "authorities",
+    "evidence",
+    "capabilities",
+    "result_status",
+    "answer"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "enum": [1]
+    },
+    "format": {
+      "enum": ["susy-atlas-query-result-v1"]
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^atlas-query:sha256:[0-9a-f]{64}$"
+    },
+    "query_instance": {
+      "type": "object"
+    },
+    "resolution": {
+      "type": "object",
+      "required": [
+        "status",
+        "candidate_count",
+        "targets",
+        "profile_gaps",
+        "detail"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "resolved",
+            "resolved-with-profile-gaps",
+            "missing",
+            "ambiguous",
+            "unsupported-kind"
+          ]
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "targets": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": [
+              "profile",
+              "physical_side",
+              "node_id",
+              "node_kind"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "profile": {
+                "type": "string",
+                "minLength": 1
+              },
+              "physical_side": {
+                "type": "string",
+                "minLength": 1
+              },
+              "node_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "node_kind": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              }
+            }
+          }
+        },
+        "profile_gaps": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": [
+              "profile",
+              "physical_side"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "profile": {
+                "type": "string",
+                "minLength": 1
+              },
+              "physical_side": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S(?:.*\\S)?$"
+        }
+      }
+    },
+    "authorities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "basis",
+          "status",
+          "evidence_ids",
+          "detail"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "basis": {
+            "enum": [
+              "runtime-mechanics",
+              "runtime-presentation",
+              "pinned-source",
+              "quest-data",
+              "curated-interpretation",
+              "placed-world-observation"
+            ]
+          },
+          "status": {
+            "enum": [
+              "available",
+              "not-applicable",
+              "not-observed",
+              "unavailable",
+              "ambiguous",
+              "unresolved",
+              "not-requested"
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S(?:.*\\S)?$"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "basis",
+          "authority",
+          "record_kind",
+          "record",
+          "record_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "basis": {
+            "enum": [
+              "runtime-mechanics",
+              "runtime-presentation",
+              "pinned-source",
+              "quest-data",
+              "curated-interpretation",
+              "placed-world-observation"
+            ]
+          },
+          "authority": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S(?:.*\\S)?$"
+          },
+          "record_kind": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "record": {
+            "type": "object"
+          },
+          "record_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "section",
+          "question_id",
+          "target_kind",
+          "status",
+          "required_authorities",
+          "available_authorities",
+          "missing_authorities",
+          "evidence_ids",
+          "reason_code"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "section": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "question_id": {
+            "type": "string",
+            "pattern": "^(?:DEVELOPER|PLAYER)-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+          },
+          "target_kind": {
+            "enum": [
+              "material",
+              "item",
+              "item-variant",
+              "fluid",
+              "fluid-variant",
+              "ore-dictionary",
+              "ore-prefix",
+              "recipe",
+              "recipe-map",
+              "machine",
+              "recipe-rule",
+              "process-rule",
+              "worldgen-deposit",
+              "quest",
+              "entity"
+            ]
+          },
+          "status": {
+            "enum": [
+              "supported",
+              "not-applicable",
+              "unavailable",
+              "unresolved"
+            ]
+          },
+          "required_authorities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "runtime-mechanics",
+                "runtime-presentation",
+                "pinned-source",
+                "quest-data",
+                "curated-interpretation",
+                "placed-world-observation"
+              ]
+            }
+          },
+          "available_authorities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "runtime-mechanics",
+                "runtime-presentation",
+                "pinned-source",
+                "quest-data",
+                "curated-interpretation",
+                "placed-world-observation"
+              ]
+            }
+          },
+          "missing_authorities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "runtime-mechanics",
+                "runtime-presentation",
+                "pinned-source",
+                "quest-data",
+                "curated-interpretation",
+                "placed-world-observation"
+              ]
+            }
+          },
+          "evidence_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reason_code": {
+            "enum": [
+              "available",
+              "target-kind-not-applicable",
+              "required-authority-unavailable",
+              "identity-unresolved",
+              "policy-unresolved"
+            ]
+          }
+        }
+      }
+    },
+    "result_status": {
+      "enum": [
+        "resolved",
+        "answered",
+        "answered-with-profile-gap",
+        "ambiguous",
+        "unresolved-identity",
+        "unresolved-evidence",
+        "not-applicable",
+        "unsupported-query",
+        "no-mechanical-route"
+      ]
+    },
+    "answer": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  }
+}

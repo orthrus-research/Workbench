@@ -1,0 +1,71 @@
+{
+  "artifact": {
+    "exclude_suffixes": [
+      "-dev.jar",
+      "-sources.jar"
+    ],
+    "glob": ".workbench/build/cleanroom/0.6.8-alpha/worldgen-prototype-fixture/libs/worldgen-prototype-*.jar",
+    "mod_id": "workbench_worldgen_prototype"
+  },
+  "cleanroom": "0.6.8-alpha",
+  "defaults": {
+    "debug_region": [
+      -24,
+      -4,
+      16,
+      16
+    ],
+    "diagnostic_sample_modulo": 1,
+    "fast_region": [
+      -2,
+      -2,
+      4,
+      4
+    ],
+    "halo_chunks": 1,
+    "heap": "4096M",
+    "seed": 8675309
+  },
+  "fixture": "profiles/platforms/cleanroom/candidates/0.6.8-alpha/worldgen-prototype-fixture",
+  "format": "workbench-worldgen-iteration-profile-v2",
+  "minecraft_version": "1.12.2",
+  "plan": "profiles/platforms/cleanroom/candidates/0.6.8-alpha/worldgen-prototype-fixture/examples/groovy/postInit/world_studio_mega_regions.groovy",
+  "platform_profile_id": "workbench-platform:cleanroom:0.6.8-alpha",
+  "profile_id": "workbench-pack:supersymmetry:worldgen-iteration-v2",
+  "runtime": {
+    "discovery_roots": [
+      ".workbench/templates",
+      ".workbench/runs"
+    ],
+    "passthrough_integrations": [
+      {
+        "filename_tokens": [
+          "RecurrentComplex"
+        ],
+        "integration_id": "recurrent_complex",
+        "mod_ids": [
+          "reccomplex"
+        ],
+        "policy": "passthrough-standard-forge-lifecycle"
+      }
+    ],
+    "required_mod_filename_tokens": [
+      "BiomesOPlenty",
+      "groovyscript",
+      "CaveGenerator"
+    ],
+    "required_mod_ids": [
+      "biomesoplenty",
+      "groovyscript",
+      "cavegenerator"
+    ],
+    "server_jar_glob": "cleanroom-0.6.8-alpha.jar"
+  },
+  "schema_version": 2,
+  "toolchains": {
+    "minimum_cleanroom_java_major": 25,
+    "proven_cleanroom_java": "25.0.4",
+    "proven_gradle": "9.6.1"
+  },
+  "world_type": "wb_proto"
+}

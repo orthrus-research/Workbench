@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-query-instance-v1.schema.json",
+  "title": "Supersymmetry Atlas target-parameterized query instance v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "query_instance_id",
+    "question_id",
+    "question_definition_sha256",
+    "selector",
+    "snapshot_id",
+    "scopes",
+    "traversal_options",
+    "authority_requirements",
+    "query_policy_id",
+    "capability_policy_id",
+    "capability_policy_sha256"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "enum": [1]
+    },
+    "format": {
+      "enum": ["susy-atlas-query-instance-v1"]
+    },
+    "query_instance_id": {
+      "type": "string",
+      "pattern": "^atlas-query:sha256:[0-9a-f]{64}$"
+    },
+    "question_id": {
+      "type": "string",
+      "pattern": "^(?:DEVELOPER|PLAYER)-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}$"
+    },
+    "question_definition_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "selector": {
+      "type": "object",
+      "required": [
+        "kind",
+        "key_kind",
+        "key"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "material",
+            "item",
+            "item-variant",
+            "fluid",
+            "fluid-variant",
+            "ore-dictionary",
+            "ore-prefix",
+            "recipe",
+            "recipe-map",
+            "machine",
+            "recipe-rule",
+            "process-rule",
+            "worldgen-deposit",
+            "quest",
+            "entity"
+          ]
+        },
+        "key_kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S(?:.*\\S)?$"
+        }
+      }
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+    },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "profile",
+          "physical_side"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "properties": {
+              "profile": {
+                "const": "COMMON_FINAL_STATE"
+              },
+              "physical_side": {
+                "enum": [
+                  "CLIENT",
+                  "DEDICATED_SERVER"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "profile": {
+                "const": "CLIENT_JEI_FINAL_STATE"
+              },
+              "physical_side": {
+                "const": "CLIENT"
+              }
+            }
+          },
+          {
+            "properties": {
+              "profile": {
+                "const": "OFFLINE_ARTIFACT_STATE"
+              },
+              "physical_side": {
+                "const": "OFFLINE"
+              }
+            }
+          }
+        ],
+        "properties": {
+          "profile": {
+            "enum": [
+              "COMMON_FINAL_STATE",
+              "CLIENT_JEI_FINAL_STATE",
+              "OFFLINE_ARTIFACT_STATE"
+            ]
+          },
+          "physical_side": {
+            "enum": [
+              "CLIENT",
+              "DEDICATED_SERVER",
+              "OFFLINE"
+            ]
+          }
+        }
+      }
+    },
+    "traversal_options": {
+      "type": "object",
+      "required": [
+        "route",
+        "recycling",
+        "construction"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "route": {
+          "type": "object",
+          "required": [
+            "max_depth",
+            "max_routes",
+            "max_alternatives_per_slot",
+            "include_chanced_outputs",
+            "include_procedural_rules",
+            "max_visited_nodes"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "max_depth": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_routes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_alternatives_per_slot": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "include_chanced_outputs": {
+              "type": "boolean"
+            },
+            "include_procedural_rules": {
+              "type": "boolean"
+            },
+            "max_visited_nodes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "recycling": {
+          "type": "object",
+          "required": [
+            "max_depth",
+            "max_operations",
+            "max_consumers_per_target",
+            "max_output_alternatives_per_slot",
+            "max_visited_targets"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "max_depth": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_operations": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_consumers_per_target": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_output_alternatives_per_slot": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_visited_targets": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "construction": {
+          "type": "object",
+          "required": [
+            "max_depth",
+            "max_routes",
+            "max_alternatives_per_slot",
+            "max_visited_nodes",
+            "max_machine_roots"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "max_depth": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_routes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_alternatives_per_slot": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_visited_nodes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_machine_roots": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "authority_requirements": {
+      "type": "object",
+      "required": [
+        "required",
+        "optional"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "runtime-mechanics",
+              "runtime-presentation",
+              "pinned-source",
+              "quest-data",
+              "curated-interpretation",
+              "placed-world-observation"
+            ]
+          }
+        },
+        "optional": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "runtime-mechanics",
+              "runtime-presentation",
+              "pinned-source",
+              "quest-data",
+              "curated-interpretation",
+              "placed-world-observation"
+            ]
+          }
+        }
+      }
+    },
+    "query_policy_id": {
+      "enum": ["ATLAS-QUERY-POLICY-V1"]
+    },
+    "capability_policy_id": {
+      "enum": ["ATLAS-CAPABILITY-POLICY-V1"]
+    },
+    "capability_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

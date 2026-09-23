@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-planning-evidence-v1.schema.json",
+  "title": "Supersymmetry Blueprints planning evidence v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "target_state_id",
+    "atlas",
+    "allocation",
+    "reconciliation"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-planning-evidence-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "target_state_id": {
+      "type": "string",
+      "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+    },
+    "atlas": {
+      "type": "object",
+      "required": [
+        "current_id",
+        "relevant_drift",
+        "queries"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "current_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relevant_drift": {
+          "enum": [
+            "none",
+            "blocking"
+          ]
+        },
+        "queries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "standard_key",
+              "query_id",
+              "result_id",
+              "availability",
+              "result",
+              "evidence_sha256"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "standard_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "query_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "result_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "availability": {
+                "enum": [
+                  "available",
+                  "unavailable"
+                ]
+              },
+              "result": true,
+              "evidence_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "allocation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "domain_name",
+          "authority_id",
+          "evidence_sha256",
+          "occupied_values",
+          "proposed_value"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "domain_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authority_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "occupied_values": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "integer"
+            }
+          },
+          "proposed_value": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "reconciliation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "standard_key",
+          "identity_kind",
+          "observed",
+          "evidence_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "standard_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "identity_kind": {
+            "enum": [
+              "identity-absent",
+              "identity-equivalent",
+              "identity-compatible",
+              "identity-conflict"
+            ]
+          },
+          "observed": true,
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

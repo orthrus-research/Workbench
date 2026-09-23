@@ -1,0 +1,43 @@
+{
+  "format": "workbench-ide-validation-toolchain-lock-v1",
+  "gradle": {
+    "archive_root": "gradle-9.6.1",
+    "archive_sha256": "9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14",
+    "archive_size": 140682664,
+    "archive_url": "https://services.gradle.org/distributions/gradle-9.6.1-bin.zip",
+    "version": "9.6.1"
+  },
+  "java": {
+    "archive_root": "zulu21.50.19-ca-jdk21.0.11-linux_x64",
+    "archive_sha256": "bc5e3383431cb7f1dce8c262dd474501ee9bd7569f1c59a8b6fe5c1589aa4a58",
+    "archive_url": "https://cdn.azul.com/zulu/bin/zulu21.50.19-ca-jdk21.0.11-linux_x64.tar.gz",
+    "platform": "linux-x86_64",
+    "runtime_build": "Zulu21.50+19-CA",
+    "version": "21.0.11"
+  },
+  "java_platform": {
+    "archive_root": "jdk-25.0.4+7",
+    "archive_sha256": "e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94",
+    "archive_url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4%2B7/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4_7.tar.gz",
+    "platform": "linux-x86_64",
+    "runtime_build": "Temurin-25.0.4+7",
+    "version": "25.0.4"
+  },
+  "node": {
+    "archive_root": "node-v22.22.1-linux-x64",
+    "archive_sha256": "9a6bc82f9b491279147219f6a18add1e18424dce90d41d2a5fcd69d4924ba3aa",
+    "archive_url": "https://nodejs.org/download/release/v22.22.1/node-v22.22.1-linux-x64.tar.xz",
+    "platform": "linux-x86_64",
+    "version": "22.22.1"
+  },
+  "npm": {
+    "archive_root": "npm-11.17.0",
+    "archive_sha256": "b290bbb35b9e72c3ef84edbe041f28c4479c4d9ee79f555817b8caafe7ce4bba",
+    "archive_url": "https://registry.npmjs.org/npm/-/npm-11.17.0.tgz",
+    "version": "11.17.0"
+  },
+  "vscode_extension_host": {
+    "current": "1.133.0",
+    "minimum": "1.125.0"
+  }
+}

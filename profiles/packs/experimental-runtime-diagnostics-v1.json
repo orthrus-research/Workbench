@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "diagnostic_kind": "recipe-reload",
+      "pack_profile_id": "workbench-pack:supersymmetry",
+      "spec": "supersymmetry/diagnostics/recipe-reload-diagnostic-profile-v1.json"
+    }
+  ],
+  "format": "workbench-pack-experimental-runtime-diagnostic-catalog-v1",
+  "schema_version": 1
+}

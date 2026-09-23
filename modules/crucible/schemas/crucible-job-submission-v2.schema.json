@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-job-submission-v2.schema.json",
+  "title": "Workbench Crucible durable job submission V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind", "format", "schema_version", "schema_id", "canonicalizer", "id",
+    "job_id", "context_ref_id", "input_binding_id", "capability_id", "handler_id",
+    "handler_implementation_id", "request_object_descriptor_id", "plan_record_id",
+    "consent_record_id", "idempotency_key_digest", "idempotency_scope",
+    "idempotency_collision_policy", "requested_resource_claims", "mutation_boundary",
+    "retry_of_terminal_seal_id", "submitted_by_actor_id",
+    "submitted_at", "privacy_class", "retention_policy_id", "evidence_eligible"
+  ],
+  "properties": {
+    "kind": {"const": "job-submission"},
+    "format": {"const": "workbench-crucible-job-submission-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-job-submission-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobSubmissionId"},
+    "job_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobId"},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/contextRefId"},
+    "input_binding_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/inputBindingId"},
+    "capability_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/capabilityId"},
+    "handler_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/handlerId"},
+    "handler_implementation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/implementationId"},
+    "request_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "plan_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableOperationPlanId"},
+    "consent_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableConsentDecisionId"},
+    "idempotency_key_digest": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/sha256"},
+    "idempotency_scope": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "idempotency_collision_policy": {"enum": ["return-existing", "reject", "retry-after-terminal"]},
+    "requested_resource_claims": {
+      "type": "array", "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/resourceRequest"}
+    },
+    "mutation_boundary": {"enum": ["none", "immutable-publication", "reference-update", "protected-state", "external-side-effect"]},
+    "retry_of_terminal_seal_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableJobTerminalSealId"},
+    "submitted_by_actor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/actorId"},
+    "submitted_at": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/timestamp"},
+    "privacy_class": {"enum": ["public", "project", "sensitive", "restricted"]},
+    "retention_policy_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/policyId"},
+    "evidence_eligible": {"const": false}
+  }
+}

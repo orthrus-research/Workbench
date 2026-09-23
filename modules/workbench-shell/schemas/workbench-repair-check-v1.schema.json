@@ -1,0 +1,825 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-repair-check-v1.schema.json",
+  "title": "Workbench host repair check V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "operation_class",
+    "state",
+    "host",
+    "setup",
+    "requirements"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-repair-check-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "operation_class": {
+      "const": "read-only"
+    },
+    "state": {
+      "enum": [
+        "ready",
+        "repairable",
+        "attention"
+      ]
+    },
+    "host": {
+      "$ref": "#/$defs/host"
+    },
+    "setup": {
+      "$ref": "#/$defs/setup"
+    },
+    "requirements": {
+      "$ref": "#/$defs/requirements"
+    }
+  },
+  "$defs": {
+    "nonemptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32768
+    },
+    "nullableString": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "setupRecordId": {
+      "type": "string",
+      "pattern": "^workbench-user-setup:sha256:[0-9a-f]{64}$"
+    },
+    "nullableSetupRecordId": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/setupRecordId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "id_like"
+      ],
+      "properties": {
+        "id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 65536
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id_like": {
+          "oneOf": [
+            {
+              "type": "string",
+              "maxLength": 65536
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "system",
+        "machine",
+        "repair_family_recognized",
+        "distribution"
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "linux",
+            "windows",
+            "macos",
+            "other"
+          ]
+        },
+        "system": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "machine": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "repair_family_recognized": {
+          "type": "boolean"
+        },
+        "distribution": {
+          "$ref": "#/$defs/distribution"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "family": {
+                "enum": [
+                  "linux",
+                  "windows"
+                ]
+              }
+            },
+            "required": [
+              "family"
+            ]
+          },
+          "then": {
+            "properties": {
+              "repair_family_recognized": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "repair_family_recognized": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "invalidSetupObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "recoverable",
+        "size_bytes",
+        "device",
+        "inode",
+        "mode",
+        "mtime_ns",
+        "sha256",
+        "observation_id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "missing",
+            "unreadable",
+            "symlink",
+            "regular-file",
+            "other"
+          ]
+        },
+        "recoverable": {
+          "type": "boolean"
+        },
+        "size_bytes": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "device": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inode": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mtime_ns": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observation_id": {
+          "type": "string",
+          "pattern": "^workbench-invalid-setup:(?:sha256:[0-9a-f]{64}|missing|unreadable:[A-Za-z_][A-Za-z0-9_]*)$"
+        }
+      }
+    },
+    "setup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_path",
+        "record_id",
+        "state",
+        "git_binding",
+        "error",
+        "invalid_observation",
+        "recovery_path"
+      ],
+      "properties": {
+        "record_path": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "record_id": {
+          "$ref": "#/$defs/nullableSetupRecordId"
+        },
+        "state": {
+          "enum": [
+            "configured",
+            "not-configured",
+            "invalid"
+          ]
+        },
+        "git_binding": {
+          "enum": [
+            "current",
+            "repair-needed",
+            "not-configured",
+            "invalid"
+          ]
+        },
+        "error": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "invalid_observation": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/invalidSetupObservation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recovery_path": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "configured"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "record_id": {
+                "$ref": "#/$defs/setupRecordId"
+              },
+              "git_binding": {
+                "enum": [
+                  "current",
+                  "repair-needed"
+                ]
+              },
+              "error": {
+                "type": "null"
+              },
+              "invalid_observation": {
+                "type": "null"
+              },
+              "recovery_path": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "not-configured"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "record_id": {
+                "type": "null"
+              },
+              "git_binding": {
+                "const": "not-configured"
+              },
+              "error": {
+                "type": "null"
+              },
+              "invalid_observation": {
+                "type": "null"
+              },
+              "recovery_path": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "invalid"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "record_id": {
+                "type": "null"
+              },
+              "git_binding": {
+                "const": "invalid"
+              },
+              "error": {
+                "$ref": "#/$defs/nonemptyString"
+              },
+              "invalid_observation": {
+                "$ref": "#/$defs/invalidSetupObservation"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "invalid_observation": {
+                "type": "object",
+                "properties": {
+                  "recoverable": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "recoverable"
+                ]
+              }
+            },
+            "required": [
+              "invalid_observation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "recovery_path": {
+                "$ref": "#/$defs/nonemptyString"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "recovery_path": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "executableIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "size_bytes",
+        "sha256",
+        "device",
+        "inode",
+        "mode",
+        "mtime_ns"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 536870912
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "device": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "mtime_ns": {
+          "type": "integer"
+        }
+      }
+    },
+    "candidateSource": {
+      "enum": [
+        "explicit",
+        "saved-setup",
+        "environment",
+        "PATH",
+        "workbench-runtime",
+        "linux-common-directory",
+        "windows-program-files",
+        "windows-local-app-data",
+        "windows-chocolatey",
+        "windows-scoop"
+      ]
+    },
+    "missingCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "source",
+        "state"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "source": {
+          "$ref": "#/$defs/candidateSource"
+        },
+        "state": {
+          "const": "missing"
+        }
+      }
+    },
+    "incompatibleCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "source",
+        "state",
+        "detail"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "source": {
+          "$ref": "#/$defs/candidateSource"
+        },
+        "state": {
+          "const": "incompatible"
+        },
+        "detail": {
+          "$ref": "#/$defs/nonemptyString"
+        }
+      }
+    },
+    "readyCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "source",
+        "state",
+        "version",
+        "executable_identity"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "source": {
+          "$ref": "#/$defs/candidateSource"
+        },
+        "state": {
+          "const": "ready"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^git version ",
+          "maxLength": 512
+        },
+        "executable_identity": {
+          "$ref": "#/$defs/executableIdentity"
+        }
+      }
+    },
+    "gitCandidate": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/missingCandidate"
+        },
+        {
+          "$ref": "#/$defs/incompatibleCandidate"
+        },
+        {
+          "$ref": "#/$defs/readyCandidate"
+        }
+      ]
+    },
+    "manager": {
+      "enum": [
+        "apt-get",
+        "dnf",
+        "yum",
+        "zypper",
+        "pacman",
+        "winget",
+        "chocolatey"
+      ]
+    },
+    "command": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/nonemptyString"
+      }
+    },
+    "repairNotNeeded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "command"
+      ],
+      "properties": {
+        "state": {
+          "const": "not-needed"
+        },
+        "command": {
+          "type": "null"
+        }
+      }
+    },
+    "repairManual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "detail",
+        "command"
+      ],
+      "properties": {
+        "state": {
+          "const": "manual"
+        },
+        "detail": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "command": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/command"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "repairAvailable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "manager",
+        "requires_elevation",
+        "command",
+        "executable_identities",
+        "detail"
+      ],
+      "properties": {
+        "state": {
+          "const": "available"
+        },
+        "manager": {
+          "$ref": "#/$defs/manager"
+        },
+        "requires_elevation": {
+          "type": "boolean"
+        },
+        "command": {
+          "$ref": "#/$defs/command"
+        },
+        "executable_identities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/executableIdentity"
+          }
+        },
+        "detail": {
+          "$ref": "#/$defs/nonemptyString"
+        }
+      }
+    },
+    "gitReady": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "state",
+        "executable",
+        "version",
+        "discovery",
+        "executable_identity",
+        "candidates_checked",
+        "repair"
+      ],
+      "properties": {
+        "required": {
+          "const": true
+        },
+        "state": {
+          "const": "ready"
+        },
+        "executable": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^git version ",
+          "maxLength": 512
+        },
+        "discovery": {
+          "$ref": "#/$defs/candidateSource"
+        },
+        "executable_identity": {
+          "$ref": "#/$defs/executableIdentity"
+        },
+        "candidates_checked": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/gitCandidate"
+          }
+        },
+        "repair": {
+          "$ref": "#/$defs/repairNotNeeded"
+        }
+      }
+    },
+    "gitUnavailable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "state",
+        "executable",
+        "version",
+        "discovery",
+        "executable_identity",
+        "candidates_checked",
+        "detail",
+        "repair"
+      ],
+      "properties": {
+        "required": {
+          "const": true
+        },
+        "state": {
+          "enum": [
+            "missing",
+            "incompatible"
+          ]
+        },
+        "executable": {
+          "type": "null"
+        },
+        "version": {
+          "type": "null"
+        },
+        "discovery": {
+          "type": "null"
+        },
+        "executable_identity": {
+          "type": "null"
+        },
+        "candidates_checked": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/gitCandidate"
+          }
+        },
+        "detail": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "repair": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/repairManual"
+            },
+            {
+              "$ref": "#/$defs/repairAvailable"
+            }
+          ]
+        }
+      }
+    },
+    "gitRequirement": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/gitReady"
+        },
+        {
+          "$ref": "#/$defs/gitUnavailable"
+        }
+      ]
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "git"
+      ],
+      "properties": {
+        "git": {
+          "$ref": "#/$defs/gitRequirement"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,645 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/runtime-diagnosis-v2.schema.json",
+  "title": "Workbench read-only runtime diagnosis V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "diagnosis_id",
+    "operation_class",
+    "authority",
+    "state",
+    "checkpoint",
+    "source",
+    "runtime",
+    "evidence",
+    "analysis_evidence_label",
+    "exception_chain",
+    "log_observations",
+    "primary_failure",
+    "wrappers",
+    "artifact_roots",
+    "artifact_observations",
+    "findings",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-runtime-diagnosis-v2"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "diagnosis_id": {
+      "$ref": "#/$defs/sha256Id"
+    },
+    "operation_class": {
+      "const": "read-only"
+    },
+    "authority": {
+      "$ref": "#/$defs/authority"
+    },
+    "state": {
+      "enum": [
+        "blocked",
+        "checkpoint-reached",
+        "inconclusive"
+      ]
+    },
+    "checkpoint": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/checkpoint"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "runtime": {
+      "type": "object"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "label",
+          "state"
+        ],
+        "properties": {
+          "label": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "state": {
+            "enum": [
+              "verified",
+              "unavailable"
+            ]
+          }
+        }
+      }
+    },
+    "analysis_evidence_label": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/nonempty"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "exception_chain": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/exception"
+      }
+    },
+    "log_observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/logObservation"
+      }
+    },
+    "primary_failure": {
+      "oneOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "wrappers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/wrapper"
+      }
+    },
+    "artifact_roots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactRoot"
+      }
+    },
+    "artifact_observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactObservation"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonempty"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sha256Id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "fileUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^file:"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "normative",
+        "atlas_publication",
+        "sentinel_policy_finding"
+      ],
+      "properties": {
+        "classification": {
+          "const": "integration-observation"
+        },
+        "normative": {
+          "const": false
+        },
+        "atlas_publication": {
+          "const": false
+        },
+        "sentinel_policy_finding": {
+          "const": false
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "marker",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "marker": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "source": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace",
+        "project",
+        "pack_profile",
+        "launch_receipt",
+        "launch_id",
+        "launch_outcome"
+      ],
+      "properties": {
+        "workspace": {
+          "type": "object"
+        },
+        "project": {
+          "type": "object"
+        },
+        "pack_profile": {
+          "type": "object"
+        },
+        "launch_receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "uri",
+            "sha256",
+            "size"
+          ],
+          "properties": {
+            "uri": {
+              "$ref": "#/$defs/fileUri"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "launch_id": {
+          "$ref": "#/$defs/sha256Id"
+        },
+        "launch_outcome": {
+          "enum": [
+            "checkpoint-reached",
+            "failed",
+            "timed-out"
+          ]
+        }
+      }
+    },
+    "exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "depth",
+        "type",
+        "message"
+      ],
+      "properties": {
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "type": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "logObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "count",
+        "classification",
+        "evidence_label",
+        "sample_messages"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "classification": {
+          "const": "non-terminal-log-observation"
+        },
+        "evidence_label": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "sample_messages": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "payloadIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tree_sha256",
+        "file_count",
+        "total_bytes"
+      ],
+      "properties": {
+        "tree_sha256": {
+          "$ref": "#/$defs/sha256Id"
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "state",
+        "basis"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "verified",
+            "unverified",
+            "drifted"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "materialization-receipt-and-tree",
+            "current-local-artifacts"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "materialization_id": {
+          "$ref": "#/$defs/sha256Id"
+        },
+        "receipt_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "expected_payload": {
+          "$ref": "#/$defs/payloadIdentity"
+        },
+        "recorded_payload": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/payloadIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_payload": {
+          "$ref": "#/$defs/payloadIdentity"
+        }
+      }
+    },
+    "artifactRoot": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "state",
+            "uri"
+          ],
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "state": {
+              "const": "unavailable"
+            },
+            "uri": {
+              "$ref": "#/$defs/fileUri"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "state",
+            "mods_uri",
+            "provenance"
+          ],
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "state": {
+              "const": "available"
+            },
+            "mods_uri": {
+              "$ref": "#/$defs/fileUri"
+            },
+            "provenance": {
+              "$ref": "#/$defs/provenance"
+            }
+          }
+        }
+      ]
+    },
+    "artifactObservation": {
+      "type": "object",
+      "required": [
+        "role",
+        "artifact_uri",
+        "artifact_sha256",
+        "artifact_size",
+        "entry",
+        "entry_sha256",
+        "entry_size",
+        "root_source",
+        "launch_binding"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "target-class",
+            "mixin-class",
+            "mixin-config"
+          ]
+        },
+        "artifact_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifact_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "entry": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "entry_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "entry_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "root_source": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "launch_binding": {
+          "enum": [
+            "verified",
+            "unverified",
+            "drifted"
+          ]
+        }
+      }
+    },
+    "wrapper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "subject",
+        "classification",
+        "artifact_state",
+        "launch_binding",
+        "reason"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "subject": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "classification": {
+          "const": "transformation-wrapper"
+        },
+        "artifact_state": {
+          "enum": [
+            "present-launch-bound",
+            "present-unverified"
+          ]
+        },
+        "launch_binding": {
+          "enum": [
+            "verified",
+            "unverified",
+            "drifted"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "guidance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pattern_id",
+        "maturity",
+        "spec_sha256",
+        "interpretation",
+        "developer_actions",
+        "related_experiments"
+      ],
+      "properties": {
+        "pattern_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "maturity": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "spec_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "interpretation": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "developer_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        },
+        "related_experiments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "finding_id",
+        "category",
+        "severity",
+        "confidence",
+        "summary",
+        "facts",
+        "artifact_binding"
+      ],
+      "properties": {
+        "finding_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "category": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "severity": {
+          "enum": [
+            "blocking",
+            "warning",
+            "information"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "confirmed",
+            "observed",
+            "inferred"
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "facts": {
+          "type": "object"
+        },
+        "artifact_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "basis"
+          ],
+          "properties": {
+            "state": {
+              "enum": [
+                "verified",
+                "unverified",
+                "drifted"
+              ]
+            },
+            "basis": {
+              "enum": [
+                "launch-bound-artifacts",
+                "current-local-artifacts"
+              ]
+            }
+          }
+        },
+        "guidance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/guidance"
+          }
+        }
+      }
+    }
+  }
+}

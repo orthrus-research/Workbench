@@ -1,0 +1,103 @@
+{
+  "format": "workbench-pack-source-declarations-v1",
+  "schema_version": 1,
+  "declaration_set_id": "workbench-pack-source-declarations:sha256:091ab2655a8099d9215c148dfb77e80a3eec3147deac9be636275e9047f0dcfe",
+  "authority": {
+    "owner": "Pack Program Studio",
+    "claim": "source declarations only",
+    "runtime_authority": "none",
+    "playability_authority": "none"
+  },
+  "binding": {
+    "program_id": "fixture:legacy-v1",
+    "pack_profile_id": "test",
+    "platform_profile_id": "test",
+    "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_kind": "pack-program-static-analysis",
+    "navigation_contract": 1,
+    "source_observation": {
+      "root_uri": "file:///fixture",
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "source_interpreter": {},
+    "selected_profile": {},
+    "normalizer_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "declarations": [
+    {
+      "source_declaration_id": "workbench-pack-source-declaration:sha256:7f6368bfa393fbabe598274ec2ad4a003450e1edeadbe16676e48bddb951c554",
+      "semantic_descriptor": {
+        "domain": "test",
+        "kind": "quest",
+        "key": {
+          "id": "硫酸-ß-😀"
+        }
+      },
+      "evidence_state": "static-candidate",
+      "attributes": {
+        "navigation": {
+          "kind": "quest",
+          "label": "硫酸-ß-😀",
+          "location": {
+            "path": "quests.json",
+            "sha256": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881",
+            "byte_start": 0,
+            "byte_end": 1,
+            "start": {
+              "line": 1,
+              "column": 1
+            },
+            "end": {
+              "line": 1,
+              "column": 2
+            },
+            "coordinate_system": "one-based-utf16",
+            "interval": "half-open"
+          },
+          "provides": [
+            {
+              "domain": "test",
+              "kind": "quest",
+              "key": {
+                "id": "硫酸-ß-😀"
+              }
+            }
+          ],
+          "references": [
+            {
+              "relation": "requires-quest",
+              "target": {
+                "domain": "test",
+                "kind": "quest",
+                "key": {
+                  "id": "missing"
+                }
+              },
+              "state": "declared",
+              "details": {}
+            }
+          ],
+          "issues": []
+        }
+      },
+      "lifecycle": {},
+      "provenance": {
+        "authority": "Pack Program Studio"
+      },
+      "source_effect_id": null,
+      "limitations": [
+        "This declaration is inferred from source and does not establish runtime registration or playable reachability."
+      ]
+    }
+  ],
+  "summary": {
+    "declarations": 1,
+    "by_kind": {
+      "quest": 1
+    }
+  },
+  "limitations": [
+    "The feed preserves static candidates; Crucible remains the owner of observed runtime registry and effect state.",
+    "Atlas may normalize these descriptors but must preserve this source provenance and evidence state."
+  ]
+}

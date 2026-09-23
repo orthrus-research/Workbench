@@ -1,0 +1,27 @@
+{
+  "format": "workbench-cleanroom-compatibility-overlays-v1",
+  "overlays": [
+    {
+      "evidence": {
+        "declared_argument_name": "flag",
+        "failure": "ModifyVariable name=arg3 matched 0 of 1 arguments under CleanMixin 0.7.0",
+        "source_annotation": "@ModifyVariable(method=\"setBlock\", name=\"arg3\", at=@At(\"HEAD\"), argsOnly=true, remap=false, require=1)"
+      },
+      "input_artifact": {
+        "filename": "supersymmetry-v0.1.112.jar",
+        "sha256": "11101461f859ccae3f9924ea0903c02694e52e7cb93048e7fc89adbda70bf3ec"
+      },
+      "overlay_id": "susy-reccomplex-modify-variable-name-v1",
+      "profile_state": "provisional",
+      "target": {
+        "entry": "supersymmetry/mixins/reccomplex/StructureSpawnContextMixin.class",
+        "input_entry_sha256": "77208fc27f343b1b42a24e0073c68d65e1feab2f6bbc9cdc81af01fd86da1f5d",
+        "replacement": {
+          "from_constant_pool_utf8": "arg3",
+          "to_constant_pool_utf8": "flag"
+        }
+      }
+    }
+  ],
+  "schema_version": 1
+}

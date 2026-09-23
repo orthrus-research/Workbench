@@ -1,0 +1,5 @@
+# Development and compatibility-module validation.
+PyYAML==6.0.3
+jsonschema==4.19.2
+referencing==0.36.2
+packaging==26.0

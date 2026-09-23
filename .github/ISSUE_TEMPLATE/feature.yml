@@ -1,0 +1,58 @@
+name: Feature request
+description: Propose a bounded Workbench capability or developer-experience improvement.
+title: "[Feature]: "
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Workbench Core or CLI
+        - Workbench for VS Code
+        - Workbench for IntelliJ IDEA Community
+        - Atlas
+        - Blueprints
+        - Manuals or documentation
+        - Profile or runtime support
+        - Repository and release engineering
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Developer problem
+      description: Explain the workflow problem before proposing an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe a bounded, observable result and who benefits.
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: Relevant authority or evidence
+      description: Link a Cleanroom rule, API, pack convention, example, or existing Workbench contract when known.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Note current workarounds or smaller approaches.
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and release impact
+      description: Identify profiles, clients, formats, or component versions that may be affected.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This request does not assume Supersymmetry behavior is universal.
+          required: true
+        - label: This request does not require redistributing restricted game or mod artifacts.
+          required: true

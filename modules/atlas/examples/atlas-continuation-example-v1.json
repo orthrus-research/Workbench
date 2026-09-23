@@ -1,0 +1,82 @@
+{
+  "ancestry": [],
+  "binding": {
+    "algorithm": {
+      "id": "ATLAS-ROUTE-CONTINUATION",
+      "version": 1
+    },
+    "evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "fairness_policy_id": "ATLAS-ROUTE-BREADTH-FIRST-V1",
+    "original_request_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "query_instance_id": "atlas-query:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "query_instance_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "runtime_projection": {
+      "bytes": 1,
+      "format": "susy-runtime-graph-query-projection-v1",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "sqlite_application_id": 1398098247,
+      "sqlite_user_version": 2
+    },
+    "roots": [
+      {
+        "node_id": "rg:example:item_variant:root",
+        "node_kind": "item_variant",
+        "physical_side": "CLIENT",
+        "profile": "COMMON_FINAL_STATE"
+      }
+    ],
+    "scopes": [
+      {
+        "physical_side": "CLIENT",
+        "profile": "COMMON_FINAL_STATE"
+      }
+    ],
+    "snapshot_id": "SNAPSHOT-EXAMPLE",
+    "structural_limits": {
+      "max_depth": 8,
+      "max_routes": 50
+    }
+  },
+  "binding_sha256": "0fa6c58f264701de8fa2112430dd5bdb9799bd7faf3d961737bb528615107e78",
+  "continuation_id": "atlas-continuation:sha256:17ae758996289e40680c126a3dc324ea4a04ab7809ec6b4fdd689bd6c406ca23",
+  "cumulative_budget": {
+    "consumed_work_items": 1
+  },
+  "format": "susy-atlas-continuation-manifest-v1",
+  "frontier": {
+    "pending": [
+      "root"
+    ]
+  },
+  "invalidation": {
+    "reasons": [],
+    "valid": true
+  },
+  "kind": "route",
+  "page_ranges": [
+    {
+      "end": 1,
+      "start": 0,
+      "stream": "producer-occurrences",
+      "subject_id": "root"
+    }
+  ],
+  "parent": null,
+  "result": {
+    "routes": []
+  },
+  "result_sha256": "18a08e2a6a64fe8f8b178453908493eec71b62c1250d47734466736c98c6431e",
+  "schema_version": 1,
+  "segment_budget": {
+    "allocated_work_items": 1,
+    "consumed_work_items": 1
+  },
+  "segment_index": 0,
+  "state": {
+    "pending": [
+      "root"
+    ]
+  },
+  "state_sha256": "ecb85120f8dbef88364f8c3cdf17cc1738a9c1d818be7bc5ea1ea77966381895",
+  "status": "active"
+}

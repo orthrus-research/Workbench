@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-continuation-delta-v1.schema.json",
+  "title": "Supersymmetry Atlas continuation delta v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "delta_id",
+    "kind",
+    "parent_continuation_id",
+    "parent_manifest_sha256",
+    "child_continuation_id",
+    "child_manifest_sha256",
+    "binding_sha256",
+    "segment_index",
+    "budget_increment",
+    "page_ranges",
+    "operations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"enum": [1]},
+    "format": {"enum": ["susy-atlas-continuation-delta-v1"]},
+    "delta_id": {
+      "type": "string",
+      "pattern": "^atlas-continuation-delta:sha256:[0-9a-f]{64}$"
+    },
+    "kind": {"enum": ["route", "recycling"]},
+    "parent_continuation_id": {
+      "type": "string",
+      "pattern": "^atlas-continuation:sha256:[0-9a-f]{64}$"
+    },
+    "parent_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "child_continuation_id": {
+      "type": "string",
+      "pattern": "^atlas-continuation:sha256:[0-9a-f]{64}$"
+    },
+    "child_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "binding_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "segment_index": {"type": "integer", "minimum": 1},
+    "budget_increment": {"type": "integer", "minimum": 0},
+    "page_ranges": {"type": "array"},
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["op", "path"],
+        "properties": {
+          "op": {"enum": ["add", "remove", "replace"]},
+          "path": {"type": "string", "pattern": "^/"},
+          "value": {}
+        }
+      }
+    }
+  }
+}

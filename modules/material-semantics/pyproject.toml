@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-material-semantics"
+version = "0.1.1"
+description = "Workbench material-semantics module"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.1,<0.2.0"]
+
+[project.entry-points."workbench.modules"]
+"material-semantics" = "workbench_registration_material_semantics:module"
+
+[tool.setuptools]
+packages = ["workbench_material_semantics", "workbench_resources.modules.material-semantics"]
+py-modules = ["workbench_registration_material_semantics"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.material-semantics" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.modules.material-semantics" = ["pyproject.toml", "src/**/*.py"]
+
+[tool.workbench]
+module-id = "material-semantics"
+requires = []
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]

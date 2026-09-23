@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-sentinel"
+version = "0.1.0"
+description = "Workbench sentinel module"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.0,<0.2.0"]
+
+[project.entry-points."workbench.modules"]
+"sentinel" = "workbench_registration_sentinel:module"
+
+[tool.setuptools]
+packages = ["workbench_sentinel", "workbench_resources.modules.sentinel"]
+py-modules = ["workbench_registration_sentinel"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.sentinel" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.modules.sentinel" = ["pyproject.toml", "README.md", "contracts/**/*", "src/**/*.py"]
+
+[tool.workbench]
+module-id = "sentinel"
+requires = []
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]

@@ -1,0 +1,658 @@
+{
+  "schema_version": 1,
+  "policy_id": "ATLAS-CAUSAL-PROVENANCE-POLICY-V1",
+  "identity_policy": {
+    "canonical_json": "sorted-keys-utf8-no-insignificant-whitespace-no-trailing-newline",
+    "request_id_prefix": "atlas-provenance-request:sha256:",
+    "result_id_prefix": "atlas-provenance-result:sha256:",
+    "node_id_prefix": "atlas-provenance-node:sha256:",
+    "relation_id_prefix": "atlas-provenance-relation:sha256:",
+    "path_id_prefix": "atlas-provenance-path:sha256:",
+    "evidence_id_prefix": "atlas-provenance-evidence:sha256:",
+    "statement_id_prefix": "atlas-provenance-statement:sha256:",
+    "source_span_byte_interval": "inclusive-zero-based"
+  },
+  "node_classes": [
+    "source-span",
+    "declared-object",
+    "configuration-entry",
+    "script-operation",
+    "lifecycle-event",
+    "runtime-state",
+    "final-runtime-record",
+    "explanation"
+  ],
+  "causal_strengths": [
+    "ownership",
+    "possibility",
+    "participation",
+    "transformation",
+    "causation",
+    "identity",
+    "observation",
+    "derivation"
+  ],
+  "relation_policies": [
+    {
+      "predicate": "declares",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "source-span"
+      ],
+      "object_classes": [
+        "declared-object"
+      ],
+      "permitted_strengths": [
+        "ownership"
+      ],
+      "evidence_requirements": {
+        "ownership": [
+          "source-span"
+        ]
+      },
+      "lifecycle_requirement": "forbidden",
+      "closure_role": "context-only",
+      "meaning": "The exact source span defines the declared object; this proves declaration ownership, not execution or final runtime presence."
+    },
+    {
+      "predicate": "registers",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "declared-object",
+        "script-operation",
+        "lifecycle-event"
+      ],
+      "object_classes": [
+        "runtime-state"
+      ],
+      "permitted_strengths": [
+        "participation",
+        "causation"
+      ],
+      "evidence_requirements": {
+        "participation": [
+          "stage-execution"
+        ],
+        "causation": [
+          "stage-execution",
+          "state-transition"
+        ]
+      },
+      "lifecycle_requirement": "required",
+      "closure_role": "causal-transition",
+      "meaning": "The subject participates in or, with exact execution and endpoint evidence, causes registration of the object runtime state."
+    },
+    {
+      "predicate": "loads_configuration",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "configuration-entry"
+      ],
+      "object_classes": [
+        "lifecycle-event",
+        "runtime-state"
+      ],
+      "permitted_strengths": [
+        "participation",
+        "causation"
+      ],
+      "evidence_requirements": {
+        "participation": [
+          "configuration-selection"
+        ],
+        "causation": [
+          "configuration-selection",
+          "state-transition"
+        ]
+      },
+      "lifecycle_requirement": "required",
+      "closure_role": "conditional-transition",
+      "meaning": "The exact configuration entry is consumed at the named lifecycle stage; causation additionally requires an exact selected value and downstream endpoint."
+    },
+    {
+      "predicate": "invokes",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "source-span",
+        "script-operation",
+        "lifecycle-event"
+      ],
+      "object_classes": [
+        "script-operation",
+        "lifecycle-event"
+      ],
+      "permitted_strengths": [
+        "possibility",
+        "participation",
+        "causation"
+      ],
+      "evidence_requirements": {
+        "possibility": [
+          "source-span"
+        ],
+        "participation": [
+          "stage-execution"
+        ],
+        "causation": [
+          "source-span",
+          "stage-execution"
+        ]
+      },
+      "lifecycle_requirement": "optional",
+      "closure_role": "conditional-transition",
+      "meaning": "A static call site proves only possibility; participation or causation requires accepted execution and lifecycle evidence."
+    },
+    {
+      "predicate": "copies",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "declared-object",
+        "runtime-state"
+      ],
+      "object_classes": [
+        "runtime-state"
+      ],
+      "permitted_strengths": [
+        "transformation",
+        "causation"
+      ],
+      "evidence_requirements": {
+        "transformation": [
+          "state-transition"
+        ],
+        "causation": [
+          "stage-execution",
+          "state-transition"
+        ]
+      },
+      "lifecycle_requirement": "required",
+      "closure_role": "causal-transition",
+      "meaning": "The object is a separately identified runtime state copied from the exact declared or runtime predecessor; the operation belongs in transition evidence and structural similarity alone cannot establish this relation."
+    },
+    {
+      "predicate": "transforms",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "declared-object",
+        "runtime-state"
+      ],
+      "object_classes": [
+        "runtime-state"
+      ],
+      "permitted_strengths": [
+        "transformation",
+        "causation"
+      ],
+      "evidence_requirements": {
+        "transformation": [
+          "state-transition"
+        ],
+        "causation": [
+          "stage-execution",
+          "state-transition"
+        ]
+      },
+      "lifecycle_requirement": "required",
+      "closure_role": "causal-transition",
+      "meaning": "The object is an exact after-state produced from the declared or runtime predecessor by a non-identity transformation; the operation belongs in transition evidence."
+    },
+    {
+      "predicate": "mutates",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "runtime-state"
+      ],
+      "object_classes": [
+        "runtime-state"
+      ],
+      "permitted_strengths": [
+        "transformation",
+        "causation"
+      ],
+      "evidence_requirements": {
+        "transformation": [
+          "state-transition"
+        ],
+        "causation": [
+          "stage-execution",
+          "state-transition"
+        ]
+      },
+      "lifecycle_requirement": "required",
+      "closure_role": "causal-transition",
+      "meaning": "The subject and object are exact before and after runtime states; the bound mutation operation belongs in transition evidence."
+    },
+    {
+      "predicate": "removes",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "runtime-state"
+      ],
+      "object_classes": [
+        "runtime-state"
+      ],
+      "permitted_strengths": [
+        "transformation",
+        "causation"
+      ],
+      "evidence_requirements": {
+        "transformation": [
+          "state-transition"
+        ],
+        "causation": [
+          "stage-execution",
+          "state-transition"
+        ]
+      },
+      "lifecycle_requirement": "required",
+      "closure_role": "causal-transition",
+      "meaning": "The subject is the exact predecessor and the object is its exact tombstone or post-removal state; the removal operation belongs in transition evidence, and absence from one capture is insufficient."
+    },
+    {
+      "predicate": "replaces",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "runtime-state"
+      ],
+      "object_classes": [
+        "runtime-state"
+      ],
+      "permitted_strengths": [
+        "transformation",
+        "causation"
+      ],
+      "evidence_requirements": {
+        "transformation": [
+          "state-transition"
+        ],
+        "causation": [
+          "stage-execution",
+          "state-transition"
+        ]
+      },
+      "lifecycle_requirement": "required",
+      "closure_role": "causal-transition",
+      "meaning": "The subject and object are exact predecessor and successor runtime states; the replacement operation belongs in transition evidence, and remove/add observations remain ordered."
+    },
+    {
+      "predicate": "reconciles_to",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "runtime-state",
+        "final-runtime-record"
+      ],
+      "object_classes": [
+        "runtime-state",
+        "final-runtime-record"
+      ],
+      "permitted_strengths": [
+        "identity"
+      ],
+      "evidence_requirements": {
+        "identity": [
+          "identity-reconciliation"
+        ]
+      },
+      "lifecycle_requirement": "forbidden",
+      "closure_role": "identity-only",
+      "meaning": "Exact typed identity and accepted reconciliation evidence connect profile records; this relation does not establish causal creation."
+    },
+    {
+      "predicate": "observed_as_final",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "runtime-state"
+      ],
+      "object_classes": [
+        "final-runtime-record"
+      ],
+      "permitted_strengths": [
+        "observation"
+      ],
+      "evidence_requirements": {
+        "observation": [
+          "final-runtime-record"
+        ]
+      },
+      "lifecycle_requirement": "required",
+      "closure_role": "final-endpoint",
+      "meaning": "The exact runtime state is bound to the immutable final record in the selected snapshot and scope; observation alone does not assign source ownership."
+    },
+    {
+      "predicate": "derives_explanation",
+      "direction": "subject-earlier-or-derivation-input-to-object-result",
+      "subject_classes": [
+        "final-runtime-record"
+      ],
+      "object_classes": [
+        "explanation"
+      ],
+      "permitted_strengths": [
+        "derivation"
+      ],
+      "evidence_requirements": {
+        "derivation": [
+          "causal-validation"
+        ]
+      },
+      "lifecycle_requirement": "forbidden",
+      "closure_role": "presentation-only",
+      "meaning": "A player or developer explanation is derived from a validated result and never becomes mechanical or causal evidence."
+    }
+  ],
+  "lifecycle_model": {
+    "model_id": "FORGE-CLEANROOM-SUSY-LIFECYCLE-V1",
+    "stages": [
+      {
+        "stage_id": "static-source",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE",
+          "OFFLINE_ARTIFACT_STATE"
+        ],
+        "meaning": "Revision-bound source exists outside runtime execution; its presence does not prove it ran."
+      },
+      {
+        "stage_id": "mod-construction",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "Forge constructs dependency-ordered mod containers and performs construction-time configuration synchronization."
+      },
+      {
+        "stage_id": "new-registry",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "Forge posts NewRegistry before mod pre-initialization."
+      },
+      {
+        "stage_id": "groovy-pre-init",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "GroovyScript runs the configured preInit loader after NewRegistry and before mod pre-init handlers."
+      },
+      {
+        "stage_id": "mod-pre-init",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "Forge distributes mod pre-initialization, including the GTCEu material and content window."
+      },
+      {
+        "stage_id": "ordinary-registry-events",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "Forge posts ordered Register events after all mod pre-init handlers."
+      },
+      {
+        "stage_id": "forge-initialization",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "Forge loads recipe inputs and distributes initialization."
+      },
+      {
+        "stage_id": "groovy-init",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "GroovyScript's init hook occurs before mod post-init; an occurrence must not be invented when the pack config selects no init roots."
+      },
+      {
+        "stage_id": "mod-post-init",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "Forge distributes mod post-initialization."
+      },
+      {
+        "stage_id": "groovy-post-init",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "GroovyScript runs prePostInit and postInit roots in their configured order before load complete."
+      },
+      {
+        "stage_id": "load-complete-freeze",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ],
+        "meaning": "Forge posts load complete and freezes active registries."
+      },
+      {
+        "stage_id": "server-startup",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE"
+        ],
+        "meaning": "Server startup lifecycle occurs after content loading; readiness alone is not clean provenance evidence."
+      },
+      {
+        "stage_id": "offline-artifact-load",
+        "applicable_profiles": [
+          "OFFLINE_ARTIFACT_STATE"
+        ],
+        "meaning": "An exact offline artifact is loaded under its adapter contract without pretending it ran through Forge."
+      },
+      {
+        "stage_id": "final-observation",
+        "applicable_profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE",
+          "OFFLINE_ARTIFACT_STATE"
+        ],
+        "meaning": "The accepted normalized final record is observed for the exact profile and physical side."
+      }
+    ],
+    "order_constraints": [
+      {
+        "before": "mod-construction",
+        "after": "new-registry",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "new-registry",
+        "after": "groovy-pre-init",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "groovy-pre-init",
+        "after": "mod-pre-init",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "mod-pre-init",
+        "after": "ordinary-registry-events",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "ordinary-registry-events",
+        "after": "forge-initialization",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "forge-initialization",
+        "after": "groovy-init",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "groovy-init",
+        "after": "mod-post-init",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "mod-post-init",
+        "after": "groovy-post-init",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "groovy-post-init",
+        "after": "load-complete-freeze",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "load-complete-freeze",
+        "after": "server-startup",
+        "profiles": [
+          "COMMON_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "load-complete-freeze",
+        "after": "final-observation",
+        "profiles": [
+          "COMMON_FINAL_STATE",
+          "CLIENT_JEI_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "server-startup",
+        "after": "final-observation",
+        "profiles": [
+          "COMMON_FINAL_STATE"
+        ]
+      },
+      {
+        "before": "offline-artifact-load",
+        "after": "final-observation",
+        "profiles": [
+          "OFFLINE_ARTIFACT_STATE"
+        ]
+      }
+    ]
+  },
+  "closure_policies": [
+    {
+      "state": "closed",
+      "requires_closed_path": true,
+      "requires_open_frontier": false,
+      "requires_truncation": false,
+      "meaning": "At least one exact edge-connected source-to-final path contains a proven causal or transformation transition, no possibility-only edge, and an observed_as_final endpoint."
+    },
+    {
+      "state": "partial",
+      "requires_closed_path": false,
+      "requires_open_frontier": true,
+      "requires_truncation": false,
+      "meaning": "Some evidence-typed path is retained, but one or more named semantic, identity, lifecycle, source, or runtime frontiers remain open."
+    },
+    {
+      "state": "bounded",
+      "requires_closed_path": false,
+      "requires_open_frontier": true,
+      "requires_truncation": true,
+      "meaning": "A request bound was reached; emitted paths remain valid but the result is never promoted to completion."
+    },
+    {
+      "state": "unresolved",
+      "requires_closed_path": false,
+      "requires_open_frontier": false,
+      "requires_truncation": false,
+      "meaning": "Available records cannot establish an edge-connected causal path to the exact final runtime record."
+    },
+    {
+      "state": "unavailable",
+      "requires_closed_path": false,
+      "requires_open_frontier": false,
+      "requires_truncation": false,
+      "meaning": "A required authority artifact is unavailable; this state makes no negative statement about the game."
+    }
+  ],
+  "negative_statement_policies": [
+    {
+      "kind": "not-found-in-closed-source-scope",
+      "required_authorities": [
+        "pinned-source"
+      ],
+      "allowed_result_states": [
+        "partial",
+        "bounded",
+        "unresolved"
+      ],
+      "requires_closed_path": false,
+      "bounded_wording": "No match was found in the named revision-bound source scope under the named complete index policy; this does not prove absence outside that scope."
+    },
+    {
+      "kind": "not-observed-in-final-capture",
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "allowed_result_states": [
+        "partial",
+        "bounded",
+        "unresolved"
+      ],
+      "requires_closed_path": false,
+      "bounded_wording": "No matching record was observed in the bound final capture; this does not prove global or cross-profile absence."
+    },
+    {
+      "kind": "removed-before-final",
+      "required_authorities": [
+        "pinned-source",
+        "runtime-mechanics"
+      ],
+      "allowed_result_states": [
+        "closed"
+      ],
+      "requires_closed_path": true,
+      "bounded_wording": "The bound predecessor was removed by the evidenced transition before the selected final observation."
+    },
+    {
+      "kind": "no-closed-causal-path",
+      "required_authorities": [
+        "derived-validation"
+      ],
+      "allowed_result_states": [
+        "partial",
+        "bounded",
+        "unresolved",
+        "unavailable"
+      ],
+      "requires_closed_path": false,
+      "bounded_wording": "No closed causal path is established by this exact result and its stated bounds; this does not prove that no causal path exists."
+    }
+  ],
+  "pagination_policy": {
+    "mode": "none-v1-single-bounded-result",
+    "truncation_is_completion": false
+  }
+}

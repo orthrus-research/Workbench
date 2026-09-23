@@ -1,0 +1,55 @@
+{
+  "format": "workbench-atlas-recipe-health-search-v1",
+  "schema_version": 1,
+  "context": {
+    "format": "workbench-atlas-recipe-health-context-v1",
+    "schema_version": 1,
+    "context_type": "categorical-graph-v2",
+    "root": "/fixture/atlas-complete",
+    "graph_set_id": "workbench-atlas-graph-set-v2:sha256:f778c2d24d5eec558f255ef950da692a4897eb275f81a6d130d86f09047339e3",
+    "scope": {
+      "pack_profile_id": "fixture-pack",
+      "physical_side": "dedicated_server",
+      "platform_candidate": "fixture",
+      "platform_profile_id": "fixture-platform",
+      "projection_profile": "cycle-boundary-v1"
+    },
+    "summary": {
+      "edge_count": 16,
+      "node_count": 13,
+      "partition_count": 1
+    },
+    "capabilities": {
+      "recipe_search": true,
+      "duplicate_signatures": true,
+      "producers": true,
+      "consumers": true,
+      "source_mutations": false,
+      "stoichiometry": false,
+      "reachability": false
+    },
+    "recipe_count": 4,
+    "search": {
+      "requires_semantic_key": false,
+      "selection_is_exact_node_id": true
+    }
+  },
+  "query": "mixer|d7cbbb688b2e506c022e95cef8c4f629a29b9b36a6e50324e70dff466dbb95af|0",
+  "results": [
+    {
+      "selection_id": "workbench-atlas-node-v2:gt-recipe:mixer%7Cd7cbbb688b2e506c022e95cef8c4f629a29b9b36a6e50324e70dff466dbb95af%7C0",
+      "kind": "gt-recipe",
+      "semantic_key": "mixer|d7cbbb688b2e506c022e95cef8c4f629a29b9b36a6e50324e70dff466dbb95af|0",
+      "properties": {
+        "duplicate_ordinal": 0,
+        "duration": 40,
+        "eut": 30,
+        "lookup_active": true,
+        "recipe_map": "mixer",
+        "semantic_sha256": "d7cbbb688b2e506c022e95cef8c4f629a29b9b36a6e50324e70dff466dbb95af"
+      },
+      "evidence": []
+    }
+  ],
+  "truncated": false
+}

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-feature-change-view-v1.schema.json",
+  "title": "Workbench feature change reopened view V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "change_id", "plan_id", "lifecycle",
+    "header", "plan", "events", "latest_sequence"
+  ],
+  "properties": {
+    "format": {"const": "workbench-feature-change-view-v1"},
+    "schema_version": {"const": 1},
+    "change_id": {"$ref": "#/$defs/changeId"},
+    "plan_id": {"$ref": "#/$defs/contentId"},
+    "lifecycle": {
+      "enum": [
+        "planned", "tested", "test-no-go", "applied", "apply-rejected",
+        "verified", "verification-failed", "rolled-back", "rollback-blocked"
+      ]
+    },
+    "header": {"$ref": "#/$defs/header"},
+    "plan": {
+      "type": "object",
+      "required": ["format", "schema_version", "id", "kind"],
+      "properties": {
+        "format": {"const": "workbench-developer-material-fluid-recipe-plan-v1"},
+        "schema_version": {"const": 1},
+        "id": {"$ref": "#/$defs/contentId"},
+        "kind": {"const": "workbench-developer-material-fluid-recipe-plan"}
+      }
+    },
+    "events": {
+      "type": "array", "minItems": 1, "maxItems": 100000,
+      "items": {"$ref": "#/$defs/event"}
+    },
+    "latest_sequence": {"type": "integer", "minimum": 0}
+  },
+  "$defs": {
+    "changeId": {
+      "type": "string",
+      "pattern": "^workbench-feature-change:sha256:[0-9a-f]{64}$"
+    },
+    "contentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "fileUri": {"type": "string", "pattern": "^file:/", "maxLength": 8192},
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format", "schema_version", "change_id", "intent", "plan_id",
+        "plan_uri", "workspace_uri", "transaction_root_uri", "limitations"
+      ],
+      "properties": {
+        "format": {"const": "workbench-feature-change-header-v1"},
+        "schema_version": {"const": 1},
+        "change_id": {"$ref": "#/$defs/changeId"},
+        "intent": {"const": "supersymmetry-material-backed-fluid-recipe"},
+        "plan_id": {"$ref": "#/$defs/contentId"},
+        "plan_uri": {"$ref": "#/$defs/fileUri"},
+        "workspace_uri": {"$ref": "#/$defs/fileUri"},
+        "transaction_root_uri": {"$ref": "#/$defs/fileUri"},
+        "limitations": {
+          "type": "array", "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format", "schema_version", "event_id", "change_id", "sequence",
+        "previous_event_id", "kind", "payload"
+      ],
+      "properties": {
+        "format": {"const": "workbench-feature-change-event-v1"},
+        "schema_version": {"const": 1},
+        "event_id": {
+          "type": "string",
+          "pattern": "^workbench-feature-change-event:sha256:[0-9a-f]{64}$"
+        },
+        "change_id": {"$ref": "#/$defs/changeId"},
+        "sequence": {"type": "integer", "minimum": 0},
+        "previous_event_id": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "string",
+              "pattern": "^workbench-feature-change-event:sha256:[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "started", "matrix-completed", "applied", "apply-rejected",
+            "verified", "verification-failed", "rolled-back", "rollback-blocked",
+            "recovery-checked"
+          ]
+        },
+        "payload": {"type": "object"}
+      }
+    }
+  }
+}

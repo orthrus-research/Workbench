@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/feature-studio-service-bindings-v3.schema.json",
+  "title": "Workbench Feature Studio live Service V3 binding projection V3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projection_id",
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "capability_projection_id",
+    "registry_id",
+    "service_distribution_id",
+    "source_tree_id",
+    "dependency_lock_id",
+    "descriptors",
+    "control_capability_ids",
+    "authority_boundary",
+    "limitations"
+  ],
+  "properties": {
+    "projection_id": {
+      "type": "string",
+      "pattern": "^feature-studio-service-binding-projection:sha256:[0-9a-f]{64}$"
+    },
+    "format": {
+      "const": "workbench-feature-studio-service-binding-projection-v3"
+    },
+    "schema_version": {"const": 3},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "capability_projection_id": {
+      "type": "string",
+      "pattern": "^feature-studio-capability-projection:sha256:[0-9a-f]{64}$"
+    },
+    "registry_id": {
+      "type": "string",
+      "pattern": "^component-capability-registry:sha256:[0-9a-f]{64}$"
+    },
+    "service_distribution_id": {
+      "type": "string",
+      "pattern": "^service-distribution:sha256:[0-9a-f]{64}$"
+    },
+    "source_tree_id": {
+      "type": "string",
+      "pattern": "^source-tree:sha256:[0-9a-f]{64}$"
+    },
+    "dependency_lock_id": {
+      "type": "string",
+      "pattern": "^dependency-lock:sha256:[0-9a-f]{64}$"
+    },
+    "descriptors": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"$ref": "#/$defs/descriptor"}
+    },
+    "control_capability_ids": {"$ref": "#/$defs/controls"},
+    "authority_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "descriptor_authority_admissions",
+        "profile_policy_admissions",
+        "direct_source_application"
+      ],
+      "properties": {
+        "descriptor_authority_admissions": {"const": false},
+        "profile_policy_admissions": {"const": false},
+        "direct_source_application": {"const": false}
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 2048}
+    }
+  },
+  "$defs": {
+    "capabilityId": {
+      "type": "string",
+      "pattern": "^capability:sha256:[0-9a-f]{64}$"
+    },
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "capability_descriptor_id",
+        "state",
+        "reason",
+        "capability_id",
+        "capability_key",
+        "handler_id",
+        "handler_implementation_id",
+        "protocol_method",
+        "asynchronous"
+      ],
+      "properties": {
+        "operation": {
+          "enum": ["inspect", "plan", "verify", "explain", "export"]
+        },
+        "capability_descriptor_id": {
+          "type": "string",
+          "pattern": "^feature-studio-capability-binding:sha256:[0-9a-f]{64}$"
+        },
+        "state": {"const": "available"},
+        "reason": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+        },
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "capability_key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+        },
+        "handler_id": {
+          "type": "string",
+          "pattern": "^handler:sha256:[0-9a-f]{64}$"
+        },
+        "handler_implementation_id": {
+          "type": "string",
+          "pattern": "^implementation:sha256:[0-9a-f]{64}$"
+        },
+        "protocol_method": {
+          "enum": ["operation/plan", "operation/commit"]
+        },
+        "asynchronous": {"type": "boolean"}
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crucible.service.capabilities",
+        "crucible.service.context-list",
+        "crucible.service.job-cancel",
+        "crucible.service.job-event-page",
+        "crucible.service.job-subscribe",
+        "workbench.feature-studio.context-register",
+        "workbench.feature-studio.job-result"
+      ],
+      "properties": {
+        "crucible.service.capabilities": {"$ref": "#/$defs/capabilityId"},
+        "crucible.service.context-list": {"$ref": "#/$defs/capabilityId"},
+        "crucible.service.job-cancel": {"$ref": "#/$defs/capabilityId"},
+        "crucible.service.job-event-page": {"$ref": "#/$defs/capabilityId"},
+        "crucible.service.job-subscribe": {"$ref": "#/$defs/capabilityId"},
+        "workbench.feature-studio.context-register": {
+          "$ref": "#/$defs/capabilityId"
+        },
+        "workbench.feature-studio.job-result": {
+          "$ref": "#/$defs/capabilityId"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-runtime-explorer"
+version = "0.1.1"
+description = "Workbench runtime-explorer module"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.0,<0.2.0", "workbench-atlas>=0.1.0,<0.2.0", "workbench-crucible>=0.1.0,<0.2.0", "workbench-pack-program-studio>=0.1.0,<0.2.0", "workbench-project-intelligence>=0.1.0,<0.2.0"]
+
+[project.entry-points."workbench.modules"]
+"runtime-explorer" = "workbench_registration_runtime_explorer:module"
+
+[tool.setuptools]
+packages = ["workbench_runtime_explorer", "workbench_resources.modules.runtime-explorer"]
+py-modules = ["workbench_registration_runtime_explorer"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.runtime-explorer" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.modules.runtime-explorer" = ["pyproject.toml", "README.md", "src/**/*.py"]
+
+[tool.workbench]
+module-id = "runtime-explorer"
+requires = ["atlas", "crucible", "pack-program-studio", "project-intelligence"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]

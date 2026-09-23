@@ -1,0 +1,27 @@
+{
+  "cleanmix_compatibility_output_name": "cleanmix_version_compatibility.json",
+  "component": {
+    "distribution": "CleanMix",
+    "distribution_version": "0.7.0",
+    "source_revision": "24898e32adc735fe48f4a3732b1831bd566c4626"
+  },
+  "format": "workbench-mixin-compiler-ap-build-policy-v1",
+  "minimum_processor_artifact_count": 1,
+  "minimum_runtime_artifact_count": 1,
+  "minimum_source_count": 1,
+  "policy_id": "workbench-cleanroom-cleanmix-0.7.0-compiler-ap-build-policy-v1",
+  "processor_service_path": "META-INF/services/javax.annotation.processing.Processor",
+  "required_output_kinds": [
+    "cleanmix-compatibility",
+    "mapping",
+    "refmap"
+  ],
+  "required_processor_artifact_sha256s": [
+    "a41daa71398e948bc09fa578ae2460be639df0fa82fccdb630b316418d5a4a36"
+  ],
+  "required_processor_providers": [
+    "org.spongepowered.tools.obfuscation.MixinObfuscationProcessorInjection",
+    "org.spongepowered.tools.obfuscation.MixinObfuscationProcessorTargets"
+  ],
+  "schema_version": 1
+}

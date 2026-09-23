@@ -1,0 +1,857 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/managed-run-plan-v1.schema.json",
+  "title": "Workbench managed run plan V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalization_id",
+    "plan_id",
+    "read_only_preview",
+    "capability",
+    "profile",
+    "recipe",
+    "availability",
+    "status",
+    "target",
+    "runner",
+    "effective",
+    "doctor",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-managed-run-plan-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "canonicalization_id": {
+      "const": "workbench-canonical-json-v1"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^workbench-managed-run-plan:sha256:[0-9a-f]{64}$"
+    },
+    "read_only_preview": {
+      "const": true
+    },
+    "capability": {
+      "$ref": "#/$defs/capability"
+    },
+    "profile": {
+      "$ref": "#/$defs/profile"
+    },
+    "recipe": {
+      "$ref": "#/$defs/recipe"
+    },
+    "availability": {
+      "$ref": "#/$defs/availability"
+    },
+    "status": {
+      "$ref": "#/$defs/status"
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "runner": {
+      "$ref": "#/$defs/runner"
+    },
+    "effective": {
+      "$ref": "#/$defs/effective"
+    },
+    "doctor": {
+      "$ref": "#/$defs/doctor"
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/singleLine"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "availability": {
+            "properties": {
+              "state": {
+                "const": "unavailable"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        },
+        "required": [
+          "availability"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "doctor": {
+            "properties": {
+              "status": {
+                "const": "blocked"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "doctor"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/+-]*$"
+    },
+    "singleLine": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 65536,
+      "pattern": "^[^\\u0000]+$"
+    },
+    "nullableSingleLine": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/singleLine"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "attention",
+        "blocked"
+      ]
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "definition_path",
+        "definition_sha256"
+      ],
+      "properties": {
+        "capability_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "definition_path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pack",
+        "catalog_id",
+        "catalog_path",
+        "catalog_file_sha256",
+        "catalog_canonical_sha256",
+        "worldgen_profile_id",
+        "worldgen_profile_format",
+        "worldgen_profile_schema_version",
+        "worldgen_profile_path",
+        "worldgen_profile_file_sha256",
+        "worldgen_profile_canonical_sha256"
+      ],
+      "properties": {
+        "pack": {
+          "$ref": "#/$defs/identifier"
+        },
+        "catalog_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "catalog_path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "catalog_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "catalog_canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "worldgen_profile_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "worldgen_profile_format": {
+          "$ref": "#/$defs/identifier"
+        },
+        "worldgen_profile_schema_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "worldgen_profile_path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "worldgen_profile_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "worldgen_profile_canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recipe_id",
+        "name",
+        "purpose",
+        "canonical_sha256"
+      ],
+      "properties": {
+        "recipe_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "purpose": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "available",
+            "unavailable"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/singleLine"
+        }
+      }
+    },
+    "candidateLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "path",
+        "file_sha256",
+        "canonical_sha256"
+      ],
+      "properties": {
+        "candidate_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "serverJar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "size",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "runtimeTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "path",
+        "jar_inventory_sha256",
+        "server_jar"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "resolved",
+            "unresolved",
+            "unavailable"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/nullableSingleLine"
+        },
+        "jar_inventory_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "server_jar": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/serverJar"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "resolved"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/singleLine"
+              },
+              "jar_inventory_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "server_jar": {
+                "$ref": "#/$defs/serverJar"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "path": {
+                "type": "null"
+              },
+              "jar_inventory_sha256": {
+                "type": "null"
+              },
+              "server_jar": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "java": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "version_output",
+        "version",
+        "major"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "version_output": {
+          "$ref": "#/$defs/text"
+        },
+        "version": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "major": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "gradle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "version_output",
+        "version"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "version_output": {
+          "$ref": "#/$defs/text"
+        },
+        "version": {
+          "$ref": "#/$defs/singleLine"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "side",
+        "workspace_path",
+        "minecraft_version",
+        "platform_profile_id",
+        "platform_profile_canonical_sha256",
+        "candidate_lock",
+        "pack_id",
+        "fixture_path",
+        "runtime_template",
+        "world_type",
+        "java",
+        "gradle",
+        "strata_root",
+        "disposable_runtime",
+        "fresh_world_required"
+      ],
+      "properties": {
+        "target_id": {
+          "type": "string",
+          "pattern": "^workbench-managed-run-target:sha256:[0-9a-f]{64}$"
+        },
+        "side": {
+          "const": "dedicated-server"
+        },
+        "workspace_path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "minecraft_version": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "platform_profile_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "platform_profile_canonical_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "candidate_lock": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/candidateLock"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pack_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "fixture_path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "runtime_template": {
+          "$ref": "#/$defs/runtimeTemplate"
+        },
+        "world_type": {
+          "$ref": "#/$defs/identifier"
+        },
+        "java": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/java"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gradle": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/gradle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strata_root": {
+          "$ref": "#/$defs/nullableSingleLine"
+        },
+        "disposable_runtime": {
+          "const": true
+        },
+        "fresh_world_required": {
+          "const": true
+        }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner_id",
+        "implementation_path",
+        "implementation_sha256",
+        "working_directory",
+        "command",
+        "arguments",
+        "reproduction_command"
+      ],
+      "properties": {
+        "runner_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "implementation_path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "working_directory": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "command": {
+          "$ref": "#/$defs/nullableSingleLine"
+        },
+        "arguments": {
+          "type": "array",
+          "maxItems": 512,
+          "items": {
+            "$ref": "#/$defs/singleLine"
+          }
+        },
+        "reproduction_command": {
+          "$ref": "#/$defs/nullableSingleLine"
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "dimension",
+        "min_x",
+        "min_z",
+        "width",
+        "height",
+        "chunk_count",
+        "halo"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "dimension": {
+          "type": "integer"
+        },
+        "min_x": {
+          "type": "integer"
+        },
+        "min_z": {
+          "type": "integer"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "chunk_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "halo": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_modulo",
+        "structured_logs",
+        "record_jfr"
+      ],
+      "properties": {
+        "sample_modulo": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "structured_logs": {
+          "type": "boolean"
+        },
+        "record_jfr": {
+          "type": "boolean"
+        }
+      }
+    },
+    "planBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "effective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "seed",
+        "region",
+        "diagnostics",
+        "heap",
+        "plan",
+        "open_viewer",
+        "record_jfr",
+        "skip_build",
+        "jvm_arguments",
+        "mutations",
+        "stages",
+        "outputs",
+        "retention",
+        "restart_boundary"
+      ],
+      "properties": {
+        "mode": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        "region": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/region"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "diagnostics": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/diagnostics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "heap": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[KMG]$"
+        },
+        "plan": {
+          "$ref": "#/$defs/planBinding"
+        },
+        "open_viewer": {
+          "type": "boolean"
+        },
+        "record_jfr": {
+          "type": "boolean"
+        },
+        "skip_build": {
+          "const": false
+        },
+        "jvm_arguments": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/singleLine"
+          }
+        },
+        "mutations": {
+          "$ref": "#/$defs/orderedDescriptions"
+        },
+        "stages": {
+          "$ref": "#/$defs/orderedIdentifiers"
+        },
+        "outputs": {
+          "$ref": "#/$defs/orderedDescriptions"
+        },
+        "retention": {
+          "$ref": "#/$defs/orderedDescriptions"
+        },
+        "restart_boundary": {
+          "$ref": "#/$defs/singleLine"
+        }
+      }
+    },
+    "orderedDescriptions": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/singleLine"
+      }
+    },
+    "orderedIdentifiers": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "doctor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report_format",
+        "report_schema_version",
+        "report_canonical_sha256",
+        "status",
+        "blocker_count",
+        "warning_count",
+        "information_count",
+        "blocker_ids"
+      ],
+      "properties": {
+        "report_format": {
+          "const": "workbench-project-intelligence-workspace-doctor-report-v1"
+        },
+        "report_schema_version": {
+          "const": 1
+        },
+        "report_canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "blocker_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warning_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "information_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocker_ids": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      }
+    }
+  }
+}

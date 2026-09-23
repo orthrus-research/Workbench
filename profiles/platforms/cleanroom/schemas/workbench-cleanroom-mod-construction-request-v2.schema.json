@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/profiles/cleanroom/workbench-cleanroom-mod-construction-request-v2.schema.json",
+  "title": "Cleanroom mod fresh-project construction request V2",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "consent": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_direct_apply": {"type": "boolean"}
+      },
+      "required": ["allow_direct_apply"],
+      "type": "object"
+    },
+    "format": {"const": "workbench-cleanroom-mod-construction-request-v2"},
+    "id": {
+      "pattern": "^workbench-cleanroom-mod-construction-request:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "kind_id": {"const": "workbench-new-project-kind:cleanroom-mod"},
+    "operation": {"const": "create"},
+    "output_mode": {"enum": ["instructions", "direct-apply"]},
+    "schema_version": {"const": 2},
+    "sequence": {"minimum": 0, "type": "integer"},
+    "target_uri": {
+      "minLength": 8,
+      "pattern": "^file://",
+      "type": "string"
+    }
+  },
+  "required": [
+    "consent",
+    "format",
+    "id",
+    "kind_id",
+    "operation",
+    "output_mode",
+    "schema_version",
+    "sequence",
+    "target_uri"
+  ]
+}

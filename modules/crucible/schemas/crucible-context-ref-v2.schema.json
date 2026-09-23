@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json",
+  "title": "Workbench Crucible ContextRef V2",
+  "$defs": {
+    "contextRefId": {
+      "type": "string",
+      "pattern": "^context-ref:sha256:[0-9a-f]{64}$"
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "store_id",
+    "workspace_binding",
+    "profile_scope",
+    "source_lock_ids",
+    "dependency_lock_ids",
+    "artifact_lock_ids",
+    "runtime_scope",
+    "world_scope",
+    "dimension_scope",
+    "region_scope",
+    "operation_scopes",
+    "privacy_class_id",
+    "resource_budget_class_id"
+  ],
+  "properties": {
+    "kind": {"const": "context-ref"},
+    "format": {"const": "workbench-crucible-context-ref-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {"$ref": "#/$defs/contextRefId"},
+    "store_id": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/storeId"},
+    "workspace_binding": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/workspaceBinding"},
+    "profile_scope": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/profileScope"},
+    "source_lock_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/sourceLockId"}
+    },
+    "dependency_lock_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/dependencyLockId"}
+    },
+    "artifact_lock_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/artifactLockId"}
+    },
+    "runtime_scope": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/runtimeScope"},
+    "world_scope": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/worldScope"},
+    "dimension_scope": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/dimensionScope"},
+    "region_scope": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/regionScope"},
+    "operation_scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/operationScope"}
+    },
+    "privacy_class_id": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/privacyClassId"},
+    "resource_budget_class_id": {"$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/resourceBudgetClassId"}
+  }
+}

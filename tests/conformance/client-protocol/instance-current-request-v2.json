@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "instance-current-1",
+  "method": "instance/current",
+  "params": {}
+}

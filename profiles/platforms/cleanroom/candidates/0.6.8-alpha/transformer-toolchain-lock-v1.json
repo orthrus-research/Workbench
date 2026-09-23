@@ -1,0 +1,308 @@
+{
+  "artifacts": [
+    {
+      "coordinate": "com.cleanroommc:cleanmix:0.7.0",
+      "filename": "cleanmix-0.7.0.jar",
+      "role": "mixin-engine",
+      "sha1": "78fa8926fd9579caf4e02b2e6e6d36e5594ae602",
+      "sha256": "a41daa71398e948bc09fa578ae2460be639df0fa82fccdb630b316418d5a4a36",
+      "size": 1094214,
+      "source_binding": "tag-version-correspondence; reproducible-build equivalence not proven",
+      "url": "https://maven.cleanroommc.com/com/cleanroommc/cleanmix/0.7.0/cleanmix-0.7.0.jar",
+      "verification": "Repository SHA-1 matched and SHA-256 was measured from the published bytes."
+    },
+    {
+      "coordinate": "com.cleanroommc:mixinextras-common:0.5.5",
+      "filename": "mixinextras-common-0.5.5.jar",
+      "role": "mixin-extension",
+      "sha1": "5a822b77f347f39bd821c2c4759a22686800e05",
+      "sha256": "6aa293132763b356fe6de570c18535acb93ab5509e0dd2e50fec8747373765e6",
+      "size": 725959,
+      "source_binding": "tag-version-and-POM-SCM correspondence; reproducible-build equivalence not proven",
+      "url": "https://maven.cleanroommc.com/com/cleanroommc/mixinextras-common/0.5.5/mixinextras-common-0.5.5.jar",
+      "verification": "Repository SHA-1 matched and SHA-256 was measured from the published bytes."
+    },
+    {
+      "coordinate": "com.google.code.gson:gson:2.14.0",
+      "filename": "gson-2.14.0.jar",
+      "role": "candidate-selected-cleanmix-runtime-dependency",
+      "sha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f",
+      "size": 313604,
+      "url": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar",
+      "verification": "Maven Central SHA-256 and downloaded size."
+    },
+    {
+      "coordinate": "com.google.guava:guava:33.6.0-jre",
+      "filename": "guava-33.6.0-jre.jar",
+      "role": "candidate-selected-cleanmix-runtime-dependency",
+      "sha256": "dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3",
+      "size": 3064793,
+      "url": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar",
+      "verification": "Maven Central SHA-256 and downloaded size."
+    },
+    {
+      "coordinate": "org.ow2.asm:asm:9.10.1",
+      "filename": "asm-9.10.1.jar",
+      "role": "bytecode-api",
+      "sha256": "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb",
+      "size": 126151,
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar",
+      "verification": "Maven Central SHA-256 and downloaded size."
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-analysis:9.10.1",
+      "filename": "asm-analysis-9.10.1.jar",
+      "role": "bytecode-api",
+      "sha256": "dede75a21306b65974ecd8f87114ff6970f09fb794157a4ca09ab25c888c2bfc",
+      "size": 35140,
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar",
+      "verification": "Maven Central SHA-256 and downloaded size."
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-commons:9.10.1",
+      "filename": "asm-commons-9.10.1.jar",
+      "role": "bytecode-api",
+      "sha256": "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895",
+      "size": 74840,
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar",
+      "verification": "Maven Central SHA-256 and downloaded size."
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-deprecated:7.1",
+      "filename": "asm-deprecated-7.1.jar",
+      "role": "legacy-asm-compatibility-overlay",
+      "sha1": "004ad3a41a931f2ef0aa8f8dc5d7c82090d744c1",
+      "sha256": "774b81f7f282848b5e97e8e367b683fed2114ca8b39de3f56bc179d3e2a18f01",
+      "size": 9152,
+      "source_binding": "published compatibility artifact; source revision not identified",
+      "url": "https://maven.outlands.top/releases/org/ow2/asm/asm-deprecated/7.1/asm-deprecated-7.1.jar",
+      "verification": "Repository SHA-1 matched and SHA-256 was measured from the published bytes."
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-tree:9.10.1",
+      "filename": "asm-tree-9.10.1.jar",
+      "role": "bytecode-api",
+      "sha256": "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b",
+      "size": 51958,
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar",
+      "verification": "Maven Central SHA-256 and downloaded size."
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-util:9.10.1",
+      "filename": "asm-util-9.10.1.jar",
+      "role": "bytecode-api",
+      "sha256": "1bb99d091fba2597dc6d51193e9bbcf0d8447e7ed96bd8f0198b18152f09655c",
+      "size": 95628,
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar",
+      "verification": "Maven Central SHA-256 and downloaded size."
+    },
+    {
+      "coordinate": "top.outlands:foundation:0.19.11",
+      "filename": "foundation-0.19.11.jar",
+      "role": "launch-and-transformer-host",
+      "sha1": "d09a565ce42656fcb975cde37f6df5187513e584",
+      "sha256": "a9f5cf9cb54715edf22d6bcb49bae50f281f818b1731f53f22aab85a48a7b54b",
+      "size": 55607,
+      "source_binding": "version match only; published POM has no SCM revision and reproducible-build equivalence is unresolved",
+      "url": "https://maven.cleanroommc.com/top/outlands/foundation/0.19.11/foundation-0.19.11.jar",
+      "verification": "Repository SHA-1 matched and SHA-256 was measured from the published bytes."
+    }
+  ],
+  "behavior_binding": {
+    "cleanmix_compatibility_default": "0.1.0",
+    "cleanmix_compatibility_latest_boundary": "0.6.0",
+    "embedded_mixinbooter_api_version": "11.8",
+    "real_phases": [
+      "PREINIT",
+      "INIT",
+      "DEFAULT"
+    ],
+    "runtime_epoch": "cleanmix-release-0.7.x"
+  },
+  "binding": {
+    "candidate_id": "workbench-platform:cleanroom:0.6.8-alpha+mc-1.12.2+forge-14.23.5.2864+mcp-9.42-stable_39",
+    "candidate_lock_path": "candidate-lock-v1.json",
+    "candidate_lock_sha256": "d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541",
+    "doctor_policy_id": "workbench-cleanroom-mixin-doctor-policy-v1",
+    "doctor_policy_path": "profiles/platforms/cleanroom/mixins/cleanroom-mixin-doctor-policy-v1.json",
+    "doctor_policy_sha256": "e4f1f29f5995564196e3161f24412ecf2741383d1ef3126c646ae00d22661595"
+  },
+  "evidence_boundary": {
+    "artifact_presence_in_a_specific_installation": "not_observed",
+    "kind": "static-source-and-artifact-specification",
+    "runtime_receipt": "not_claimed",
+    "runtime_service_selection": "expected-not-observed-by-this-lock",
+    "transformed_class_outputs": "not_observed"
+  },
+  "evidence_sources": [
+    {
+      "assertions": [
+        "Cleanroom 0.6.8-alpha selects Java 25, ASM 9.10.1, asm-deprecated 7.1, CleanMix 0.7.0, MixinExtras 0.5.5, Foundation 0.19.11, Guava 33.6.0-jre, and Gson 2.14.0.",
+        "Foundation is the generated launch main class."
+      ],
+      "id": "cleanroom-candidate-build",
+      "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+      "tree_sha1": "fd54df0c7e83d783993a281331c140c5f97bb160",
+      "urls": [
+        "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/gradle.properties",
+        "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/projects/cleanroom/build.gradle"
+      ]
+    },
+    {
+      "assertions": [
+        "CleanMix 0.7.0 derives from Fabric Mixin 0.17.3 and Sponge Mixin 0.8.7.",
+        "CleanMix is built for Java 8 against ASM 9.8, while the candidate supplies ASM 9.10.1 at runtime."
+      ],
+      "id": "cleanmix-build",
+      "revision": "24898e32adc735fe48f4a3732b1831bd566c4626",
+      "tree_sha1": "7bdf03df469a1bbcf4cf5cba93f74e6bc1641218",
+      "urls": [
+        "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/gradle.properties",
+        "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/build.gradle"
+      ]
+    },
+    {
+      "assertions": [
+        "MixinExtras common 0.5.5 is the Cleanroom fork selected by the candidate and is built for Java 8."
+      ],
+      "id": "mixinextras-build",
+      "revision": "c4a53ea53f320ede4214a9c65d0c23476d0915c3",
+      "tree_sha1": "b8c204b0d80b27a4f148ba93aa868cad27724fcd",
+      "url": "https://github.com/CleanroomMC/MixinExtras/blob/c4a53ea53f320ede4214a9c65d0c23476d0915c3/build.gradle.kts"
+    },
+    {
+      "assertions": [
+        "Foundation source declares version 0.19.11 and Java 25.",
+        "Foundation exposes opt-in class dumping, verbose logging, target filtering, and transformer-debug properties."
+      ],
+      "id": "foundation-build-and-debug",
+      "revision": "518565d49cd67eb48d025110855e0904956b2104",
+      "tree_sha1": "0cb64a2344b3261578b117f2019501e48b4b093e",
+      "urls": [
+        "https://github.com/CleanroomMC/Foundation/blob/518565d49cd67eb48d025110855e0904956b2104/build.gradle",
+        "https://github.com/CleanroomMC/Foundation/blob/518565d49cd67eb48d025110855e0904956b2104/src/main/java/top/outlands/foundation/boot/ActualClassLoader.java",
+        "https://github.com/CleanroomMC/Foundation/blob/518565d49cd67eb48d025110855e0904956b2104/src/main/java/top/outlands/foundation/TransformerDelegate.java"
+      ]
+    },
+    {
+      "assertions": [
+        "Cleanroom declares CleanMixService and CleanMixBootstrap through service descriptors.",
+        "CleanMix declares Blackboard as the global-property service."
+      ],
+      "id": "native-service-descriptors",
+      "revision": "candidate-source-revisions",
+      "urls": [
+        "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/resources/META-INF/services/org.spongepowered.asm.service.IMixinService",
+        "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/resources/META-INF/services/org.spongepowered.asm.service.IMixinServiceBootstrap",
+        "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/src/cleanroom/resources/META-INF/services/org.spongepowered.asm.service.IGlobalPropertyService"
+      ]
+    }
+  ],
+  "format": "workbench-cleanroom-transformer-toolchain-lock-v1",
+  "java_runtime": {
+    "archive_sha256": null,
+    "component": "java-runtime-epsilon",
+    "exact_patch": null,
+    "major": 25,
+    "resolution": "Candidate source fixes the major and launcher component, but this lock does not identify a vendor, patch release, or downloaded archive."
+  },
+  "lock_id": "workbench-cleanroom-transformer-toolchain:0.6.8-alpha:v1",
+  "native_service_expectations": {
+    "audit": {
+      "disable_property": "cleanmix.auditTrail",
+      "path": "logs/cleanmix.log"
+    },
+    "bootstrap_service": "com.cleanroommc.cleanmix.service.CleanMixBootstrap",
+    "development_mixin_property": "crl.dev.mixin",
+    "foundation_debug_properties": [
+      "foundation.debug_transformer",
+      "foundation.dump",
+      "foundation.target",
+      "foundation.verbose"
+    ],
+    "global_property_service": "org.spongepowered.asm.service.mojang.Blackboard",
+    "launch_main_class": "top.outlands.foundation.boot.Foundation",
+    "mixin_service": "com.cleanroommc.cleanmix.service.CleanMixService",
+    "mixin_service_name": "CleanMix",
+    "owner_resolver": "com.cleanroommc.discovery.CleanroomModDiscoverer",
+    "selected_mixin_service_count": 1,
+    "standalone_mixinbooter_artifact": "not-expected",
+    "verification_status": "expected-from-static-source"
+  },
+  "platform_versions": {
+    "asm_runtime": "9.10.1",
+    "cleanmix": "0.7.0",
+    "cleanmix_build_asm": "9.8",
+    "cleanmix_upstream_fabric_mixin": "0.17.3",
+    "cleanmix_upstream_sponge_mixin": "0.8.7",
+    "foundation": "0.19.11",
+    "mixinbooter_compatibility_api": "11.8",
+    "mixinextras": "0.5.5"
+  },
+  "schema_version": 1,
+  "supporting_coordinate_pins": [
+    {
+      "coordinate": "net.lenni0451:Reflect:1.6.4",
+      "reason": "Cleanroom directly overrides Foundation's published 1.6.3 dependency."
+    },
+    {
+      "coordinate": "net.lenni0451.commons:unchecked:1.9.2",
+      "reason": "Cleanroom directly installs Foundation support code."
+    },
+    {
+      "coordinate": "net.sf.jopt-simple:jopt-simple:5.0.4",
+      "reason": "Foundation runtime dependency."
+    },
+    {
+      "coordinate": "org.apache.logging.log4j:log4j-api:2.26.0",
+      "reason": "Foundation runtime dependency and Cleanroom platform logging API."
+    },
+    {
+      "coordinate": "org.apache.logging.log4j:log4j-core:2.26.0",
+      "reason": "Foundation runtime dependency and Cleanroom platform logging implementation."
+    },
+    {
+      "coordinate": "org.javassist:javassist:3.30.2-GA",
+      "reason": "Foundation runtime dependency."
+    }
+  ],
+  "toolchain_scope": {
+    "byte_locked": [
+      "CleanMix engine",
+      "MixinExtras extension",
+      "Foundation launch host",
+      "ASM runtime modules and compatibility overlay",
+      "Candidate-selected Guava and Gson namespaces"
+    ],
+    "coordinate_only": [
+      "Supporting Foundation dependencies"
+    ],
+    "excluded": [
+      "The complete Cleanroom runtime library graph",
+      "A particular installed instance",
+      "Build-plugin and userdev toolchains"
+    ]
+  },
+  "uncertainties": [
+    {
+      "id": "java-distribution",
+      "resolution": "Bind the provisioned Java archive, vendor, and patch in an installation receipt.",
+      "statement": "Only Java major 25 and the launcher component are fixed by candidate source."
+    },
+    {
+      "id": "foundation-source-artifact-correspondence",
+      "resolution": "Obtain an upstream SCM attestation or reproduce and compare the publication.",
+      "statement": "The Foundation source revision declares 0.19.11, but the published POM does not bind that source revision."
+    },
+    {
+      "id": "supporting-library-bytes",
+      "resolution": "Promote supporting coordinates into a full candidate runtime lock if their byte identity becomes a Doctor decision input.",
+      "statement": "Supporting Foundation dependencies are exact coordinate selections but are not byte-locked here."
+    },
+    {
+      "id": "runtime-presence-and-selection",
+      "resolution": "Capture an installation inventory and runtime service receipt against this lock.",
+      "statement": "Published bytes and source selections do not prove that a particular launch loaded them or selected only CleanMixService."
+    }
+  ]
+}

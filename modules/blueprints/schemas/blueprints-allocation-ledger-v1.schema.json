@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/schema/blueprints-allocation-ledger-v1.schema.json",
+  "title": "Blueprints allocation reservation ledger v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "ledger_id",
+    "generation",
+    "parent_ledger_id",
+    "reservations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-allocation-ledger-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-IMPLEMENTATION-STANDARD-V1"
+    },
+    "ledger_id": {
+      "type": "string",
+      "pattern": "^blueprints-allocation-ledger:sha256:[0-9a-f]{64}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "parent_ledger_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^blueprints-allocation-ledger:sha256:[0-9a-f]{64}$"
+    },
+    "reservations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reservation_id",
+          "domain_name",
+          "value",
+          "status",
+          "feature_identity",
+          "standard_id",
+          "request_id",
+          "release_id",
+          "retired_by_release_id"
+        ],
+        "properties": {
+          "reservation_id": {
+            "type": "string",
+            "pattern": "^blueprints-allocation-reservation:sha256:[0-9a-f]{64}$"
+          },
+          "domain_name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+          },
+          "value": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "enum": [
+              "active",
+              "retired"
+            ]
+          },
+          "feature_identity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "standard_id": {
+            "type": "string",
+            "pattern": "^blueprints-standard:sha256:[0-9a-f]{64}$"
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^blueprints-request:sha256:[0-9a-f]{64}$"
+          },
+          "release_id": {
+            "type": "string",
+            "pattern": "^blueprints-release:sha256:[0-9a-f]{64}$"
+          },
+          "retired_by_release_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^blueprints-release:sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

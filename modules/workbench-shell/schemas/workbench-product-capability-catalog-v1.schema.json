@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orthrus-research.github.io/workbench/schemas/workbench-product-capability-catalog-v1.schema.json",
+  "title": "Workbench product capability catalog V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "catalog_id",
+    "command_catalog_digest",
+    "suites",
+    "capabilities"
+  ],
+  "properties": {
+    "format": {"const": "workbench-product-capability-catalog-v1"},
+    "schema_version": {"const": 1},
+    "catalog_id": {
+      "type": "string",
+      "pattern": "^workbench-product-capabilities:sha256:[0-9a-f]{64}$"
+    },
+    "command_catalog_digest": {"$ref": "#/$defs/digest"},
+    "suites": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/suite"}
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/capability"}
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "title",
+        "summary",
+        "authority",
+        "availability",
+        "command_count"
+      ],
+      "properties": {
+        "suite_id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "authority": {"type": "string", "minLength": 1},
+        "availability": {
+          "enum": ["available", "experimental", "unavailable"]
+        },
+        "command_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "capability_key",
+        "title",
+        "summary",
+        "authority",
+        "risk",
+        "availability",
+        "handler",
+        "catalog_action",
+        "limitations"
+      ],
+      "properties": {
+        "capability_id": {
+          "type": "string",
+          "pattern": "^capability:sha256:[0-9a-f]{64}$"
+        },
+        "capability_key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]+$"
+        },
+        "title": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "authority": {"type": "string", "minLength": 1},
+        "risk": {
+          "enum": ["read-only", "writes-output", "mutating", "destructive"]
+        },
+        "availability": {
+          "enum": ["available", "experimental", "unavailable"]
+        },
+        "handler": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "registered", "executable"],
+          "properties": {
+            "kind": {"enum": ["process", "document"]},
+            "registered": {"const": true},
+            "executable": {"type": "boolean"}
+          }
+        },
+        "catalog_action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["command_id", "suite_id", "action_digest"],
+          "properties": {
+            "command_id": {"type": "string", "minLength": 1},
+            "suite_id": {"type": "string", "minLength": 1},
+            "action_digest": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  }
+}

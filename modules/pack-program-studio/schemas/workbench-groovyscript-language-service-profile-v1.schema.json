@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-groovyscript-language-service-profile-v1.schema.json",
+  "title": "Workbench GroovyScript language-service profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "profile_id",
+    "platform_profile_id",
+    "groovyscript",
+    "server",
+    "runtime_layout",
+    "bounds",
+    "canary",
+    "limitations"
+  ],
+  "properties": {
+    "format": {"const": "workbench-groovyscript-language-service-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1},
+    "platform_profile_id": {"type": "string", "minLength": 1},
+    "groovyscript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "artifact_filename", "artifact_sha256", "artifact_size", "source_commit"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1},
+        "artifact_filename": {"type": "string", "minLength": 1},
+        "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "artifact_size": {"type": "integer", "minimum": 1},
+        "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport", "default_host", "default_port", "runtime_side", "start_property", "compile_trigger", "diagnostic_method", "text_document_sync", "compilation_phase", "endpoint_identity_protocol"],
+      "properties": {
+        "transport": {"const": "lsp-jsonrpc-tcp"},
+        "default_host": {"type": "string", "minLength": 1},
+        "default_port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "runtime_side": {"const": "client"},
+        "start_property": {"type": "string", "minLength": 1},
+        "compile_trigger": {"const": "textDocument/documentSymbol"},
+        "diagnostic_method": {"const": "textDocument/publishDiagnostics"},
+        "text_document_sync": {"const": "full"},
+        "compilation_phase": {"const": "canonicalization"},
+        "endpoint_identity_protocol": {"const": "unavailable"}
+      }
+    },
+    "runtime_layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_relative_path", "mods_directory", "groovy_directory", "run_config", "cache_directory"],
+      "properties": {
+        "artifact_relative_path": {"type": "string", "minLength": 1},
+        "mods_directory": {"type": "string", "minLength": 1},
+        "groovy_directory": {"type": "string", "minLength": 1},
+        "run_config": {"type": "string", "minLength": 1},
+        "cache_directory": {"type": "string", "minLength": 1}
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_files", "max_source_bytes", "max_total_source_bytes", "max_header_bytes", "max_message_bytes", "max_transcript_messages", "max_diagnostics", "max_runtime_artifacts", "max_runtime_artifact_bytes"],
+      "properties": {
+        "max_files": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "max_source_bytes": {"type": "integer", "minimum": 1, "maximum": 67108864},
+        "max_total_source_bytes": {"type": "integer", "minimum": 1, "maximum": 536870912},
+        "max_header_bytes": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+        "max_message_bytes": {"type": "integer", "minimum": 1024, "maximum": 268435456},
+        "max_transcript_messages": {"type": "integer", "minimum": 16, "maximum": 1000000},
+        "max_diagnostics": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "max_runtime_artifacts": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "max_runtime_artifact_bytes": {"type": "integer", "minimum": 1, "maximum": 4294967296}
+      }
+    },
+    "canary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefix", "required_severity"],
+      "properties": {
+        "prefix": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "required_severity": {"const": 1}
+      }
+    },
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  }
+}

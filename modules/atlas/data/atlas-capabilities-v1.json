@@ -1,0 +1,536 @@
+{
+  "schema_version": 1,
+  "policy_id": "ATLAS-CAPABILITY-POLICY-V1",
+  "admitted_target_kinds": [
+    "material",
+    "item",
+    "item-variant",
+    "fluid",
+    "fluid-variant",
+    "ore-dictionary",
+    "ore-prefix",
+    "recipe",
+    "recipe-map",
+    "machine",
+    "recipe-rule",
+    "process-rule",
+    "worldgen-deposit"
+  ],
+  "selector_policies": [
+    {
+      "kind": "material",
+      "runtime_kind": "material",
+      "key_kinds": [
+        "material-numeric-id",
+        "material-resource-location",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "item",
+      "runtime_kind": "item",
+      "key_kinds": [
+        "item-resource-location",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "item-variant",
+      "runtime_kind": "item_variant",
+      "key_kinds": [
+        "item-variant-identity",
+        "item-variant-resource-location",
+        "item-variant-sha256",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "fluid",
+      "runtime_kind": "fluid",
+      "key_kinds": [
+        "fluid-default-registration-name",
+        "fluid-name",
+        "fluid-resource-location",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "fluid-variant",
+      "runtime_kind": "fluid_variant",
+      "key_kinds": [
+        "fluid-variant-identity",
+        "fluid-variant-name",
+        "fluid-variant-sha256",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "ore-dictionary",
+      "runtime_kind": "ore_dictionary_key",
+      "key_kinds": [
+        "ore-dictionary-name",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "ore-prefix",
+      "runtime_kind": "ore_prefix",
+      "key_kinds": [
+        "ore-prefix-name",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "recipe",
+      "runtime_kind": "recipe",
+      "key_kinds": [
+        "recipe-native-identity",
+        "recipe-resource-location",
+        "recipe-semantic-sha256",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "recipe-map",
+      "runtime_kind": "recipe_map",
+      "key_kinds": [
+        "recipe-map-name",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "machine",
+      "runtime_kind": "machine",
+      "key_kinds": [
+        "machine-numeric-id",
+        "machine-resource-location",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "recipe-rule",
+      "runtime_kind": "recipe_rule",
+      "key_kinds": [
+        "dynamic-rule-identity",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "process-rule",
+      "runtime_kind": "process_rule",
+      "key_kinds": [
+        "procedural-rule-identity",
+        "runtime-node-id"
+      ]
+    },
+    {
+      "kind": "worldgen-deposit",
+      "runtime_kind": "worldgen_deposit",
+      "key_kinds": [
+        "runtime-node-id"
+      ]
+    }
+  ],
+  "metadata_sections": [
+    "runtime",
+    "evidence",
+    "snapshot_id",
+    "profile_scope",
+    "known_gaps",
+    "assertions"
+  ],
+  "section_policies": [
+    {
+      "section": "target",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix",
+        "recipe",
+        "recipe-map",
+        "machine",
+        "recipe-rule",
+        "process-rule",
+        "worldgen-deposit"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [
+        "runtime-presentation",
+        "pinned-source",
+        "quest-data",
+        "curated-interpretation",
+        "placed-world-observation"
+      ],
+      "rationale": "Every admitted target begins with an exact runtime identity; other authorities may enrich but never replace it."
+    },
+    {
+      "section": "pinned_source",
+      "target_kinds": [
+        "material",
+        "ore-prefix",
+        "recipe",
+        "recipe-map",
+        "machine"
+      ],
+      "required_authorities": [
+        "pinned-source"
+      ],
+      "optional_authorities": [
+        "curated-interpretation"
+      ],
+      "rationale": "V1 source projection is admitted only for canonical catalog kinds with pinned declarations."
+    },
+    {
+      "section": "declaration",
+      "target_kinds": [
+        "material",
+        "ore-prefix",
+        "recipe",
+        "recipe-map",
+        "machine"
+      ],
+      "required_authorities": [
+        "pinned-source"
+      ],
+      "optional_authorities": [
+        "curated-interpretation"
+      ],
+      "rationale": "Declaration requires a pinned source relation to an exact canonical entity."
+    },
+    {
+      "section": "ownership",
+      "target_kinds": [
+        "material",
+        "ore-prefix",
+        "recipe",
+        "recipe-map",
+        "machine"
+      ],
+      "required_authorities": [
+        "pinned-source"
+      ],
+      "optional_authorities": [
+        "curated-interpretation"
+      ],
+      "rationale": "Ownership is reported only from a reviewed canonical relation, never inferred from namespaces or display text."
+    },
+    {
+      "section": "quests",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "quest-data"
+      ],
+      "optional_authorities": [
+        "runtime-mechanics"
+      ],
+      "rationale": "Quest guidance must retain an exact quest-to-runtime identity path for a resource-like target."
+    },
+    {
+      "section": "quest_prerequisites",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "quest-data"
+      ],
+      "optional_authorities": [
+        "runtime-mechanics"
+      ],
+      "rationale": "Quest prerequisites are guidance relations and are not promoted to mechanical prerequisites."
+    },
+    {
+      "section": "producers",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Producer occurrence joins operate on exact resource-like target identities."
+    },
+    {
+      "section": "consumers",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Consumer occurrence joins operate on exact resource-like target identities."
+    },
+    {
+      "section": "routes",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Backward process-chain traversal currently starts from resource-like targets."
+    },
+    {
+      "section": "recipes",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [
+        "runtime-presentation"
+      ],
+      "rationale": "V1 recipe details are projected from exact producer and consumer occurrences for a resource-like target."
+    },
+    {
+      "section": "executable_machines",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Executable-machine rows derive from the exact recipes reached by resource usage."
+    },
+    {
+      "section": "ingredient_slots",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Ingredient grouping is a lossless projection of retained route slots."
+    },
+    {
+      "section": "reusable_requirements",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Reusable requirements are retained route-slot semantics, not guessed catalyst behavior."
+    },
+    {
+      "section": "byproducts",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Byproducts are lossless co-output projections from retained route operations."
+    },
+    {
+      "section": "recycling_paths",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Recycling traverses exact byproduct roots under shared declared limits."
+    },
+    {
+      "section": "prerequisites",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Mechanical prerequisites are recomputed from the retained route DAG."
+    },
+    {
+      "section": "machine_construction",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [],
+      "rationale": "Construction roots come from machines required by the exact route, not a fuzzy machine name."
+    },
+    {
+      "section": "infrastructure_requirements",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics",
+        "pinned-source"
+      ],
+      "optional_authorities": [
+        "placed-world-observation"
+      ],
+      "rationale": "Infrastructure meaning requires runtime candidates plus version-bound source semantics; formed-world satisfaction is optional until M5."
+    },
+    {
+      "section": "classification",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics",
+        "runtime-presentation"
+      ],
+      "optional_authorities": [],
+      "rationale": "The current row classification joins exact resource occurrences across mechanics and presentation scopes."
+    },
+    {
+      "section": "comparison",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix"
+      ],
+      "required_authorities": [
+        "runtime-mechanics",
+        "runtime-presentation"
+      ],
+      "optional_authorities": [],
+      "rationale": "V1 profile comparison is a four-scope resource occurrence and presentation reconciliation."
+    },
+    {
+      "section": "confidence",
+      "target_kinds": [
+        "material",
+        "item",
+        "item-variant",
+        "fluid",
+        "fluid-variant",
+        "ore-dictionary",
+        "ore-prefix",
+        "recipe",
+        "recipe-map",
+        "machine",
+        "recipe-rule",
+        "process-rule",
+        "worldgen-deposit"
+      ],
+      "required_authorities": [
+        "runtime-mechanics"
+      ],
+      "optional_authorities": [
+        "runtime-presentation",
+        "pinned-source",
+        "quest-data",
+        "curated-interpretation",
+        "placed-world-observation"
+      ],
+      "rationale": "Verification scope reports only observed authorities and named gaps for the exact request."
+    }
+  ]
+}

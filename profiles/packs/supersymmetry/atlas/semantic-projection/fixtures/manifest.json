@@ -1,0 +1,21 @@
+{
+  "fixtures": [
+    {
+      "gate": "first-acceptance",
+      "name": "cement-reachability",
+      "path": "cement-reachability.json"
+    },
+    {
+      "gate": "first-acceptance",
+      "name": "lv-mixer-capacity",
+      "path": "lv-mixer-capacity.json"
+    },
+    {
+      "gate": "next",
+      "name": "duplicate-gas-registration",
+      "path": "duplicate-gas-registration.json"
+    }
+  ],
+  "format": "workbench-supersymmetry-semantic-fixture-manifest-v1",
+  "schema_version": 1
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-runtime-session-v2.schema.json",
+  "title": "Workbench Crucible durable runtime session V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind", "format", "schema_version", "schema_id", "canonicalizer", "id",
+    "session_id", "job_id", "job_submission_id", "attempt_record_id", "attempt_id",
+    "context_ref_id", "input_binding_id", "session_kind", "parent_session_record_id",
+    "custodian_component_id", "custodian_implementation_id", "request_object_descriptor_id",
+    "raw_event_schema_object_descriptor_ids", "privacy_class", "retention_policy_id",
+    "opened_at", "evidence_eligible"
+  ],
+  "properties": {
+    "kind": {"const": "runtime-session"},
+    "format": {"const": "workbench-crucible-runtime-session-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-runtime-session-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/runtimeSessionRecordId"},
+    "session_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/sessionId"},
+    "job_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobId"},
+    "job_submission_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobSubmissionId"},
+    "attempt_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobAttemptRecordId"},
+    "attempt_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/attemptId"},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/contextRefId"},
+    "input_binding_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/inputBindingId"},
+    "session_kind": {"enum": ["process", "capture", "build", "analysis", "world", "external-tool"]},
+    "parent_session_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableRuntimeSessionRecordId"},
+    "custodian_component_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/componentId"},
+    "custodian_implementation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/implementationId"},
+    "request_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "raw_event_schema_object_descriptor_ids": {
+      "type": "array", "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"}
+    },
+    "privacy_class": {"enum": ["public", "project", "sensitive", "restricted"]},
+    "retention_policy_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/policyId"},
+    "opened_at": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/timestamp"},
+    "evidence_eligible": {"const": false}
+  }
+}

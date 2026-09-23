@@ -1,0 +1,660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/cleanroom/worldgen-observatory-raw-v1.schema.json",
+  "title": "Cleanroom exact-candidate worldgen observatory raw transport v1",
+  "type": "object",
+  "required": [
+    "format",
+    "record_type",
+    "sequence",
+    "capture_id",
+    "scope",
+    "causality",
+    "actor",
+    "order",
+    "outcome",
+    "coverage",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "workbench-cleanroom-worldgen-observatory-raw-v1"
+    },
+    "record_type": {
+      "enum": [
+        "probe_health",
+        "span_enter",
+        "span_return",
+        "span_throw",
+        "event_dispatch",
+        "block_write",
+        "chunk_access",
+        "capture_control",
+        "fixture_driver",
+        "cooperative_stage",
+        "decision",
+        "rng_observation",
+        "checkpoint",
+        "diagnostic"
+      ]
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "capture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "causality": {
+      "$ref": "#/$defs/causality"
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "order": {
+      "$ref": "#/$defs/order"
+    },
+    "outcome": {
+      "$ref": "#/$defs/outcome"
+    },
+    "coverage": {
+      "$ref": "#/$defs/coverage"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "record_type": { "const": "probe_health" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/probeHealthPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "span_enter" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/spanEnterPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "span_return" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/spanReturnPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "span_throw" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/spanThrowPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "event_dispatch" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/eventDispatchPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "block_write" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/blockWritePayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "chunk_access" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/chunkAccessPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "capture_control" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/captureControlPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "fixture_driver" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/fixtureDriverPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "cooperative_stage" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/cooperativeStagePayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "decision" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/decisionPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "rng_observation" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/rngObservationPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "checkpoint" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/checkpointPayload" } } }
+    },
+    {
+      "if": { "properties": { "record_type": { "const": "diagnostic" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/diagnosticPayload" } } }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selectedChunks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^-?[0-9]+,-?[0-9]+$"
+      }
+    },
+    "nullableInteger": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "dimension_id",
+        "chunk_x",
+        "chunk_z"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "dimension_id": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "chunk_x": {
+          "$ref": "#/$defs/nullableInteger"
+        },
+        "chunk_z": {
+          "$ref": "#/$defs/nullableInteger"
+        }
+      }
+    },
+    "causality": {
+      "type": "object",
+      "required": [
+        "trace_id",
+        "root_trigger_id",
+        "span_id",
+        "parent_span_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trace_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "root_trigger_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "span_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "parent_span_id": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "required": [
+        "binding",
+        "mod_id",
+        "class_name",
+        "method_name",
+        "method_descriptor",
+        "mapping_namespace",
+        "code_source_sha256",
+        "transformed_class_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "binding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mod_id": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "class_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "method_name": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "method_descriptor": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "mapping_namespace": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "code_source_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "transformed_class_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "order": {
+      "type": "object",
+      "required": [
+        "thread_name",
+        "thread_id",
+        "thread_sequence",
+        "lamport",
+        "monotonic_ns"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "thread_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thread_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "thread_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lamport": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "required": [
+        "state",
+        "exception_class",
+        "exception_message_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "entered",
+            "returned",
+            "threw",
+            "canceled",
+            "observed",
+            "incomplete"
+          ]
+        },
+        "exception_class": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "exception_message_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "mode",
+        "detail_state",
+        "dropped_record_count"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "summary",
+            "trace",
+            "forensic",
+            "lossless-fixture"
+          ]
+        },
+        "detail_state": {
+          "enum": [
+            "complete",
+            "unavailable"
+          ]
+        },
+        "dropped_record_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "probeHealthPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hook_id", "health_state", "target_class", "target_method",
+        "target_descriptor", "original_class_sha256", "transformed_class_sha256",
+        "expected_injection_count", "observed_injection_count"
+      ],
+      "properties": {
+        "hook_id": { "$ref": "#/$defs/nonEmptyString" },
+        "health_state": { "enum": ["applied_not_reached", "failed", "reached"] },
+        "target_class": { "$ref": "#/$defs/nonEmptyString" },
+        "target_method": { "$ref": "#/$defs/nonEmptyString" },
+        "target_descriptor": { "$ref": "#/$defs/nonEmptyString" },
+        "original_class_sha256": { "$ref": "#/$defs/sha256" },
+        "transformed_class_sha256": { "$ref": "#/$defs/sha256" },
+        "expected_injection_count": { "type": "integer", "minimum": 0 },
+        "observed_injection_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "spanEnterPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["span_kind", "operation_id", "arguments_sha256"],
+      "properties": {
+        "span_kind": { "$ref": "#/$defs/nonEmptyString" },
+        "operation_id": { "$ref": "#/$defs/nonEmptyString" },
+        "arguments_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "spanReturnPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["span_kind", "result_sha256"],
+      "properties": {
+        "span_kind": { "$ref": "#/$defs/nonEmptyString" },
+        "result_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "spanThrowPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["span_kind", "throwable_state_sha256"],
+      "properties": {
+        "span_kind": { "$ref": "#/$defs/nonEmptyString" },
+        "throwable_state_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "chunkAccessPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "access_kind", "api_id", "current_generation_chunk_x",
+        "current_generation_chunk_z", "requested_chunk_x", "requested_chunk_z",
+        "loaded_before", "result"
+      ],
+      "properties": {
+        "access_kind": { "$ref": "#/$defs/nonEmptyString" },
+        "api_id": { "$ref": "#/$defs/nonEmptyString" },
+        "current_generation_chunk_x": { "$ref": "#/$defs/nullableInteger" },
+        "current_generation_chunk_z": { "$ref": "#/$defs/nullableInteger" },
+        "requested_chunk_x": { "type": "integer" },
+        "requested_chunk_z": { "type": "integer" },
+        "loaded_before": { "type": "boolean" },
+        "result": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "eventDispatchPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_class", "bus_id", "boundary", "listener_ordinal", "listener",
+        "state_before_sha256", "state_after_sha256", "cancelled_before",
+        "cancelled_after", "result_before", "result_after"
+      ],
+      "properties": {
+        "event_class": { "$ref": "#/$defs/nonEmptyString" },
+        "bus_id": { "$ref": "#/$defs/nonEmptyString" },
+        "boundary": { "$ref": "#/$defs/nonEmptyString" },
+        "listener_ordinal": { "$ref": "#/$defs/nullableInteger" },
+        "listener": { "$ref": "#/$defs/nullableString" },
+        "state_before_sha256": { "$ref": "#/$defs/sha256" },
+        "state_after_sha256": { "$ref": "#/$defs/sha256" },
+        "cancelled_before": { "type": "boolean" },
+        "cancelled_after": { "type": "boolean" },
+        "result_before": { "$ref": "#/$defs/nonEmptyString" },
+        "result_after": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "blockWritePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hook_id", "write_chain_id", "chain_depth", "channel", "position_x",
+        "position_y", "position_z", "generation_chunk_x", "generation_chunk_z",
+        "target_chunk_x", "target_chunk_z", "before_state_sha256",
+        "requested_state_sha256", "after_state_sha256", "flags", "terminal"
+      ],
+      "properties": {
+        "hook_id": { "$ref": "#/$defs/nonEmptyString" },
+        "write_chain_id": { "$ref": "#/$defs/nonEmptyString" },
+        "chain_depth": { "type": "integer", "minimum": 0 },
+        "channel": { "enum": ["chunk_primer", "world_api", "chunk_storage"] },
+        "position_x": { "type": "integer" },
+        "position_y": { "type": "integer" },
+        "position_z": { "type": "integer" },
+        "generation_chunk_x": { "$ref": "#/$defs/nullableInteger" },
+        "generation_chunk_z": { "$ref": "#/$defs/nullableInteger" },
+        "target_chunk_x": { "type": "integer" },
+        "target_chunk_z": { "type": "integer" },
+        "before_state_sha256": { "$ref": "#/$defs/sha256" },
+        "requested_state_sha256": { "$ref": "#/$defs/sha256" },
+        "after_state_sha256": { "$ref": "#/$defs/sha256" },
+        "flags": { "$ref": "#/$defs/nullableInteger" },
+        "terminal": { "type": "boolean" }
+      }
+    },
+    "captureControlPayload": {
+      "oneOf": [
+        { "$ref": "#/$defs/captureControlStartPayload" },
+        { "$ref": "#/$defs/captureControlStopPayload" }
+      ]
+    },
+    "captureControlStartPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control", "capture_control_id", "controller", "requested_mode",
+        "world_seed_sha256", "route_order", "selector_sha256", "route_sha256",
+        "selected_chunks"
+      ],
+      "properties": {
+        "control": { "const": "start" },
+        "capture_control_id": { "$ref": "#/$defs/nonEmptyString" },
+        "controller": { "const": "dedicated_server_fixture_v1" },
+        "requested_mode": { "enum": ["summary", "trace", "forensic", "lossless-fixture"] },
+        "world_seed_sha256": { "$ref": "#/$defs/sha256" },
+        "route_order": { "enum": ["forward", "reverse"] },
+        "selector_sha256": { "$ref": "#/$defs/sha256" },
+        "route_sha256": { "$ref": "#/$defs/sha256" },
+        "selected_chunks": { "$ref": "#/$defs/selectedChunks" }
+      }
+    },
+    "captureControlStopPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control", "capture_control_id", "controller", "requested_mode",
+        "route_order", "route_sha256", "completion_state", "open_span_count",
+        "open_write_count"
+      ],
+      "properties": {
+        "control": { "const": "stop" },
+        "capture_control_id": { "$ref": "#/$defs/nonEmptyString" },
+        "controller": { "const": "dedicated_server_fixture_v1" },
+        "requested_mode": { "enum": ["summary", "trace", "forensic", "lossless-fixture"] },
+        "route_order": { "enum": ["forward", "reverse"] },
+        "route_sha256": { "$ref": "#/$defs/sha256" },
+        "completion_state": { "enum": ["complete", "incomplete"] },
+        "open_span_count": { "type": "integer", "minimum": 0 },
+        "open_write_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "fixtureDriverPayload": {
+      "oneOf": [
+        { "$ref": "#/$defs/fixtureDriverStartPayload" },
+        { "$ref": "#/$defs/fixtureDriverCompletePayload" },
+        { "$ref": "#/$defs/fixtureDriverFailedPayload" }
+      ]
+    },
+    "fixtureDriverStartPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "world_seed_sha256", "route_order", "route_sha256", "selected_chunks"],
+      "properties": {
+        "action": { "const": "route_started" },
+        "world_seed_sha256": { "$ref": "#/$defs/sha256" },
+        "route_order": { "enum": ["forward", "reverse"] },
+        "route_sha256": { "$ref": "#/$defs/sha256" },
+        "selected_chunks": { "$ref": "#/$defs/selectedChunks" }
+      }
+    },
+    "fixtureDriverCompletePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action", "completion_marker", "world_seed_sha256", "route_order",
+        "route_sha256", "result_identity_sha256", "selected_chunks", "save_state",
+        "shutdown_state"
+      ],
+      "properties": {
+        "action": { "const": "complete" },
+        "completion_marker": { "const": "dedicated_server_fixture_complete_v1" },
+        "world_seed_sha256": { "$ref": "#/$defs/sha256" },
+        "route_order": { "enum": ["forward", "reverse"] },
+        "route_sha256": { "$ref": "#/$defs/sha256" },
+        "result_identity_sha256": { "$ref": "#/$defs/sha256" },
+        "selected_chunks": { "$ref": "#/$defs/selectedChunks" },
+        "save_state": { "const": "flushed" },
+        "shutdown_state": { "const": "requested" }
+      }
+    },
+    "fixtureDriverFailedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "route_order", "route_sha256", "completion_marker"],
+      "properties": {
+        "action": { "const": "failed" },
+        "route_order": { "enum": ["forward", "reverse"] },
+        "route_sha256": { "$ref": "#/$defs/sha256" },
+        "completion_marker": { "type": "null" }
+      }
+    },
+    "cooperativeStagePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage_id", "boundary", "world_seed_sha256"],
+      "properties": {
+        "stage_id": { "$ref": "#/$defs/nonEmptyString" },
+        "boundary": { "enum": ["enter", "exit", "callback"] },
+        "world_seed_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "decisionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage_id", "rule_id", "input_state_sha256", "decision",
+        "output_state_sha256", "world_seed_sha256"
+      ],
+      "properties": {
+        "stage_id": { "$ref": "#/$defs/nonEmptyString" },
+        "rule_id": { "$ref": "#/$defs/sha256" },
+        "input_state_sha256": { "$ref": "#/$defs/sha256" },
+        "decision": { "$ref": "#/$defs/nonEmptyString" },
+        "output_state_sha256": { "$ref": "#/$defs/sha256" },
+        "world_seed_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "rngObservationPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage_id", "lane_id", "stream_id", "algorithm", "operation",
+        "parameters_sha256", "observed_seed", "result_sha256",
+        "rolling_digest_sha256", "world_seed_sha256"
+      ],
+      "properties": {
+        "stage_id": { "$ref": "#/$defs/nonEmptyString" },
+        "lane_id": { "$ref": "#/$defs/nonEmptyString" },
+        "stream_id": { "$ref": "#/$defs/nonEmptyString" },
+        "algorithm": { "const": "workbench.rng-lanes.mix64.v1" },
+        "operation": { "const": "derive_named_seed_without_consuming_runtime_random" },
+        "parameters_sha256": { "$ref": "#/$defs/sha256" },
+        "observed_seed": { "type": "integer" },
+        "result_sha256": { "$ref": "#/$defs/sha256" },
+        "rolling_digest_sha256": { "$ref": "#/$defs/sha256" },
+        "world_seed_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "checkpointPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpoint_id", "stage_id", "canonicalization_id",
+        "semantic_state_sha256", "world_seed_sha256"
+      ],
+      "properties": {
+        "checkpoint_id": { "$ref": "#/$defs/nonEmptyString" },
+        "stage_id": { "$ref": "#/$defs/nonEmptyString" },
+        "canonicalization_id": { "const": "chunk-block-state-registry-name-metadata-yzx-v1" },
+        "semantic_state_sha256": { "$ref": "#/$defs/sha256" },
+        "world_seed_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "diagnosticPayload": {
+      "oneOf": [
+        { "$ref": "#/$defs/observerDiagnosticPayload" },
+        { "$ref": "#/$defs/cooperativeDiagnosticPayload" }
+      ]
+    },
+    "observerDiagnosticPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message_arguments_sha256"],
+      "properties": {
+        "code": { "$ref": "#/$defs/nonEmptyString" },
+        "severity": { "const": "error" },
+        "message_arguments_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "cooperativeDiagnosticPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "stage_id", "world_seed_sha256", "severity"],
+      "properties": {
+        "code": { "$ref": "#/$defs/nonEmptyString" },
+        "stage_id": { "$ref": "#/$defs/nonEmptyString" },
+        "world_seed_sha256": { "$ref": "#/$defs/sha256" },
+        "severity": { "const": "error" }
+      }
+    }
+  }
+}

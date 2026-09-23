@@ -1,0 +1,375 @@
+{
+  "format": "workbench-atlas-recipe-impact-report-v2",
+  "schema_version": 2,
+  "context": {
+    "format": "workbench-atlas-recipe-health-context-v1",
+    "schema_version": 1,
+    "context_type": "categorical-graph-v2",
+    "root": "/graph",
+    "graph_set_id": "workbench-atlas-graph-set-v2:sha256:f778c2d24d5eec558f255ef950da692a4897eb275f81a6d130d86f09047339e3",
+    "scope": {
+      "pack_profile_id": "fixture-pack",
+      "physical_side": "dedicated_server",
+      "platform_candidate": "fixture",
+      "platform_profile_id": "fixture-platform",
+      "projection_profile": "cycle-boundary-v1"
+    },
+    "summary": {
+      "edge_count": 16,
+      "node_count": 13,
+      "partition_count": 1
+    },
+    "capabilities": {
+      "recipe_search": true,
+      "duplicate_signatures": true,
+      "producers": true,
+      "consumers": true,
+      "source_mutations": false,
+      "stoichiometry": false,
+      "reachability": false
+    },
+    "recipe_count": 4,
+    "search": {
+      "requires_semantic_key": false,
+      "selection_is_exact_node_id": true
+    }
+  },
+  "selection": {
+    "selection_id": "workbench-atlas-node-v2:gt-recipe:mixer%7Cd7cbbb688b2e506c022e95cef8c4f629a29b9b36a6e50324e70dff466dbb95af%7C0",
+    "kind": "gt-recipe",
+    "semantic_key": "mixer|d7cbbb688b2e506c022e95cef8c4f629a29b9b36a6e50324e70dff466dbb95af|0",
+    "properties": {
+      "duplicate_ordinal": 0,
+      "duration": 40,
+      "eut": 30,
+      "lookup_active": true,
+      "recipe_map": "mixer",
+      "semantic_sha256": "d7cbbb688b2e506c022e95cef8c4f629a29b9b36a6e50324e70dff466dbb95af"
+    },
+    "evidence": []
+  },
+  "scenario": {
+    "kind": "remove-exact-observed-recipe",
+    "selected_recipe_assumed_unavailable": true,
+    "change_interpretation": "a recipe change is assessed only as loss of the selected current recipe; replacement inputs, outputs, and runtime behavior require a new observed graph or a separately validated proposed-recipe model"
+  },
+  "analysis_model": {
+    "kind": "complete-observed-finite-recipe-dependency-exposure",
+    "resource_at_risk_rule": "every observed finite recipe producer is an unavailable candidate",
+    "recipe_at_risk_rule": "at least one exact input selector accepts only resources already classified at risk",
+    "claim_boundary": "candidate dead paths inside observed finite recipe structure; not gameplay reachability"
+  },
+  "exploration": {
+    "mode": "complete-finite",
+    "status": "complete",
+    "graph_node_count": 13,
+    "graph_edge_count": 16,
+    "visited_node_count": 11,
+    "traversed_edge_count": 11,
+    "worklist_event_count": 1,
+    "cycle_algorithm": "iterative-scc"
+  },
+  "evidence_completeness": {
+    "status": "incomplete",
+    "graph_incomplete_selector_count": 1,
+    "graph_unknown_lookup_recipe_count": 0,
+    "encountered_incomplete_selector_ids": [
+      "workbench-atlas-node-v2:gt-recipe-input-selector:consumer%7Cfluid%7C0"
+    ],
+    "encountered_unknown_lookup_recipe_ids": []
+  },
+  "direct": {
+    "inputs": [
+      {
+        "relation": "accepts-gt-fluid-input",
+        "semantic_key": "singleton",
+        "properties": {
+          "amount": 1000
+        },
+        "evidence": [],
+        "node": {
+          "selection_id": "workbench-atlas-node-v2:forge-fluid:feed",
+          "kind": "forge-fluid",
+          "semantic_key": "feed",
+          "properties": {
+            "name": "feed"
+          },
+          "evidence": []
+        },
+        "selector": {
+          "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:selected%7Cfluid%7C0",
+          "kind": "gt-recipe-input-selector",
+          "semantic_key": "selected|fluid|0",
+          "properties": {
+            "amount": 1000,
+            "non_consumable": false,
+            "ordinal": 0
+          },
+          "evidence": []
+        },
+        "selector_edge": {
+          "relation": "has-fluid-input-selector",
+          "properties": {
+            "ordinal": 0
+          },
+          "evidence": []
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "output": {
+          "relation": "produces-gt-fluid",
+          "semantic_key": "singleton",
+          "properties": {
+            "amount": 1000,
+            "ordinal": 0
+          },
+          "evidence": [],
+          "node": {
+            "selection_id": "workbench-atlas-node-v2:forge-fluid:product",
+            "kind": "forge-fluid",
+            "semantic_key": "product",
+            "properties": {
+              "name": "product"
+            },
+            "evidence": []
+          }
+        },
+        "producer_portfolio": {
+          "status": "observed-alternatives-present",
+          "alternative_producers": [
+            {
+              "recipe": {
+                "selection_id": "workbench-atlas-node-v2:gt-recipe:mixer%7C3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559%7C0",
+                "kind": "gt-recipe",
+                "semantic_key": "mixer|3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559|0",
+                "properties": {
+                  "duplicate_ordinal": 0,
+                  "duration": 40,
+                  "eut": 30,
+                  "lookup_active": true,
+                  "recipe_map": "mixer",
+                  "semantic_sha256": "3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559"
+                },
+                "evidence": []
+              },
+              "output_edge": {
+                "relation": "produces-gt-fluid",
+                "semantic_key": "singleton",
+                "properties": {
+                  "amount": 1000,
+                  "ordinal": 0
+                },
+                "evidence": []
+              }
+            },
+            {
+              "recipe": {
+                "selection_id": "workbench-atlas-node-v2:gt-recipe:mixer%7Cd098ab5e44b9aabb755f76d806598f43573c662b35e4a2eab1e312ec9ad195e2%7C0",
+                "kind": "gt-recipe",
+                "semantic_key": "mixer|d098ab5e44b9aabb755f76d806598f43573c662b35e4a2eab1e312ec9ad195e2|0",
+                "properties": {
+                  "duplicate_ordinal": 0,
+                  "duration": 40,
+                  "eut": 30,
+                  "lookup_active": true,
+                  "recipe_map": "mixer",
+                  "semantic_sha256": "d098ab5e44b9aabb755f76d806598f43573c662b35e4a2eab1e312ec9ad195e2"
+                },
+                "evidence": []
+              },
+              "output_edge": {
+                "relation": "produces-gt-fluid",
+                "semantic_key": "singleton",
+                "properties": {
+                  "amount": 1000,
+                  "ordinal": 0
+                },
+                "evidence": []
+              }
+            }
+          ],
+          "truncated": false,
+          "evidence_complete": true,
+          "viability": "not-assessed"
+        },
+        "downstream_consumers": [
+          {
+            "recipe": {
+              "selection_id": "workbench-atlas-node-v2:gt-recipe:mixer%7C3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559%7C0",
+              "kind": "gt-recipe",
+              "semantic_key": "mixer|3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559|0",
+              "properties": {
+                "duplicate_ordinal": 0,
+                "duration": 40,
+                "eut": 30,
+                "lookup_active": true,
+                "recipe_map": "mixer",
+                "semantic_sha256": "3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559"
+              },
+              "evidence": []
+            },
+            "selector": {
+              "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:recycler%7Cfluid%7C0",
+              "kind": "gt-recipe-input-selector",
+              "semantic_key": "recycler|fluid|0",
+              "properties": {
+                "amount": 1000,
+                "non_consumable": false,
+                "ordinal": 0
+              },
+              "evidence": []
+            },
+            "acceptance_edge": {
+              "relation": "accepts-gt-fluid-input",
+              "semantic_key": "singleton",
+              "properties": {
+                "amount": 1000
+              },
+              "evidence": []
+            }
+          }
+        ],
+        "downstream_consumers_truncated": false,
+        "downstream_consumers_evidence_complete": false
+      }
+    ]
+  },
+  "propagation": {
+    "status": "evidence-incomplete",
+    "at_risk_resources": [],
+    "at_risk_recipes": [],
+    "alternative_dependency_components": [
+      {
+        "component_id": "workbench-atlas-dependency-component-v2:sha256:5e474f26602b406ca705d63eb4ed9f1c949394c75b0809252230bb0651b73d04",
+        "member_node_ids": [
+          "workbench-atlas-node-v2:forge-fluid:product",
+          "workbench-atlas-node-v2:gt-recipe-input-selector:recycler%7Cfluid%7C0",
+          "workbench-atlas-node-v2:gt-recipe:mixer%7C3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559%7C0"
+        ],
+        "root_resource_ids": [
+          "workbench-atlas-node-v2:forge-fluid:product"
+        ],
+        "witness": {
+          "node_ids": [
+            "workbench-atlas-node-v2:forge-fluid:product",
+            "workbench-atlas-node-v2:gt-recipe:mixer%7C3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559%7C0",
+            "workbench-atlas-node-v2:gt-recipe-input-selector:recycler%7Cfluid%7C0",
+            "workbench-atlas-node-v2:forge-fluid:product"
+          ],
+          "arcs": [
+            {
+              "source_id": "workbench-atlas-node-v2:forge-fluid:product",
+              "target_id": "workbench-atlas-node-v2:gt-recipe:mixer%7C3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559%7C0",
+              "edge_id": "workbench-atlas-edge-v2:sha256:0552940a48d7e03e76178d524c2cd246c3d7d3d0688474886d7ef6fee4f9a5cc",
+              "relation": "produces-gt-fluid",
+              "direction": "reverse"
+            },
+            {
+              "source_id": "workbench-atlas-node-v2:gt-recipe:mixer%7C3642285f572b31a3f90b9dbfd32b6c13509bb42182a954eef17be0986a27f559%7C0",
+              "target_id": "workbench-atlas-node-v2:gt-recipe-input-selector:recycler%7Cfluid%7C0",
+              "edge_id": "workbench-atlas-edge-v2:sha256:6db62579e8ffe5a79a815b6184e2793d5c7400802820490b3e34804ed79d78f4",
+              "relation": "has-fluid-input-selector",
+              "direction": "forward"
+            },
+            {
+              "source_id": "workbench-atlas-node-v2:gt-recipe-input-selector:recycler%7Cfluid%7C0",
+              "target_id": "workbench-atlas-node-v2:forge-fluid:product",
+              "edge_id": "workbench-atlas-edge-v2:sha256:ef9e64c9c4d8f7c1eebf1e9d13f6834a600b59d2abf511aa26f04abfb162317c",
+              "relation": "accepts-gt-fluid-input",
+              "direction": "forward"
+            }
+          ]
+        },
+        "interpretation": "mutually reachable nodes in observed alternative-producer input dependencies; one witness is shown, not every cycle",
+        "viability_effect": "unknown"
+      }
+    ]
+  },
+  "progression_signals": {
+    "energy_and_machine_signals": {
+      "observed_recipe_properties": {
+        "eut": 30,
+        "duration": 40,
+        "recipe_map": "mixer",
+        "hidden": null,
+        "lookup_active": true
+      },
+      "recipe_map": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-map:mixer",
+        "kind": "gt-recipe-map",
+        "semantic_key": "mixer",
+        "properties": {
+          "name": "mixer"
+        },
+        "evidence": []
+      },
+      "machines_observed_using_recipe_map": [],
+      "machine_numeric_tiers_observed": [],
+      "truncated": false,
+      "evidence_complete": true,
+      "interpretation": "numeric EUT and machine tier properties are observed signals; no pack progression tier is inferred"
+    },
+    "quest_signals": {
+      "status": "evidence-unavailable",
+      "direct_resource_requirements": [],
+      "structural_prerequisite_dependents": [],
+      "prerequisite_cycle_components": [],
+      "interpretation": "these are definition references and prerequisite structure, not observed player blockage or task execution"
+    }
+  },
+  "frontiers": [],
+  "unknowns": [
+    {
+      "code": "selector-acceptance-incomplete",
+      "message": "Captured input evidence does not establish this selector's complete nonempty accepted-resource set.",
+      "subject_id": "workbench-atlas-node-v2:gt-recipe-input-selector:consumer%7Cfluid%7C0"
+    }
+  ],
+  "evidence_gaps": [
+    {
+      "code": "counterfactual-runtime-not-observed",
+      "message": "Atlas did not execute a runtime with the selected recipe removed or changed."
+    },
+    {
+      "code": "non-recipe-acquisition-not-assessed",
+      "message": "World generation, loot, trade, inventory, commands, and other acquisition domains are not treated as alternative producers."
+    },
+    {
+      "code": "dynamic-recipes-not-executed",
+      "message": "Procedural and contextual recipe rules were not invoked for this counterfactual."
+    },
+    {
+      "code": "stoichiometry-and-chance-not-assessed",
+      "message": "Amounts, reusable inputs, probabilities, throughput, and inventory balance do not establish or refute availability here."
+    },
+    {
+      "code": "progression-reachability-not-proven",
+      "message": "Quest definitions, finite recipes, and machine signals do not prove player reachability or a broken progression path."
+    },
+    {
+      "code": "task-execution-not-invoked",
+      "message": "BetterQuesting task matching, completion, and reward execution were not invoked."
+    },
+    {
+      "code": "pack-tier-policy-not-applied",
+      "message": "Numeric EUT and observed machine tier fields are reported without deriving a pack progression tier."
+    },
+    {
+      "code": "graph-projection-limitations",
+      "message": "Fixture matcher evidence is incomplete."
+    }
+  ],
+  "summary": {
+    "selected_output_count": 1,
+    "sole_observed_finite_producer_output_count": 0,
+    "at_risk_resource_candidate_count": 0,
+    "at_risk_recipe_candidate_count": 0,
+    "quest_requirement_exposure_count": 0,
+    "structural_quest_dependent_count": 0,
+    "alternative_dependency_component_count": 1,
+    "quest_prerequisite_component_count": 0,
+    "truncated": false
+  }
+}

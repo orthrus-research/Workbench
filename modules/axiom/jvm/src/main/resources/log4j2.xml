@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="ERROR">
+  <Appenders>
+    <Console name="Diagnostics" target="SYSTEM_ERR">
+      <PatternLayout pattern="%level %logger: %msg%n%throwable"/>
+    </Console>
+  </Appenders>
+  <Loggers><Root level="warn"><AppenderRef ref="Diagnostics"/></Root></Loggers>
+</Configuration>

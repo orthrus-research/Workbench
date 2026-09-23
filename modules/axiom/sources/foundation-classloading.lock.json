@@ -1,0 +1,79 @@
+{
+  "schema": "axiom.classloading-source-lock.v1",
+  "repository": "https://github.com/CleanroomMC/Foundation",
+  "revision": "518565d49cd67eb48d025110855e0904956b2104",
+  "version": "0.19.11",
+  "sourceArtifactCorrespondenceQualified": false,
+  "selectedArtifact": {
+    "path": "top/outlands/foundation/0.19.11/foundation-0.19.11.jar",
+    "sha256": "a9f5cf9cb54715edf22d6bcb49bae50f281f818b1731f53f22aab85a48a7b54b"
+  },
+  "references": [
+    {
+      "path": "src/main/java/top/outlands/foundation/boot/ActualClassLoader.java",
+      "sha256": "f42b316ed2e409888eff726622dee5f24e0eafccca0675aaee548f8c29dea89f"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/boot/TransformerHolder.java",
+      "sha256": "bb8e2e84c1839c3e5f97f131e14667e68e1bd473c6474a44e490f44b0da1f2d2"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/boot/LoadsAllClassLoader.java",
+      "sha256": "eb782bfbd6afbbc9fdcb15d5d2786d518a48393f3136a5a6be2fc5826bc0febd"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/TransformerDelegate.java",
+      "sha256": "b93a1619bdac9aae3c43d3a36627391999000d7e2d60445a18420038b1acb13c"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/trie/PrefixTrie.java",
+      "sha256": "733e08e083838abfe1d096858d2f262cd2defc50ceed4de861f8b3595fd9bb27"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/trie/AbstractTrie.java",
+      "sha256": "697fbf984422754cd5c3d3de5ff7e9637a5728ea4b8bedc72af0e1328579c995"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/trie/TrieNode.java",
+      "sha256": "141b998835ab2366288e1e5c9c030f12ad9155ad5cbf3571418c6745282b217d"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/function/ExplicitTransformerFunction.java",
+      "sha256": "43de387b90d54d3aeb651f7b6221e9cdb1812ff64c13af463a431ae1d58e1143"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/function/TransformerFunction.java",
+      "sha256": "764b01d3647c377938e0320edfe70f0472a01a167aaee2e3118bb492f4d85156"
+    },
+    {
+      "path": "src/main/java/top/outlands/foundation/IExplicitTransformer.java",
+      "sha256": "b89fbd781f699c7cfd3407d3bb167afd92f5c7a6dd0f8f22bed44e5c933b115f"
+    },
+    {
+      "path": "src/main/java/net/minecraft/launchwrapper/IClassTransformer.java",
+      "sha256": "bdcec3bec5559a3a73d1d506a8e29de4c8e5d4138b9a701855f57f4f73b60721"
+    },
+    {
+      "path": "src/main/java/net/minecraft/launchwrapper/IClassNameTransformer.java",
+      "sha256": "021990b066a6e6c273a38881c74610dd8f643443848621aaf11fbd156b14e2ef"
+    },
+    {
+      "path": "src/main/java/net/minecraft/launchwrapper/LaunchClassLoader.java",
+      "sha256": "669154bda670664937b217e9de0febe0406dd55b557071a38bf1e13a9b939592"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "739f114e65d79f8f7051ff1c789e152c5fa72f3971173baec366b7537c441f21"
+    }
+  ],
+  "oracleLibraries": [
+    {
+      "path": "org/apache/logging/log4j/log4j-api/2.26.0/log4j-api-2.26.0.jar",
+      "sha256": "820de7bbaf430eaf2e3e5ccb92f23e2085797c5ac4d4f7fc6c8b660fbefa1dbc"
+    },
+    {
+      "path": "org/apache/logging/log4j/log4j-core/2.26.0/log4j-core-2.26.0.jar",
+      "sha256": "406bb3132c47a5d322e5c571feb0787ca84496469f346eb51f1ef2ee45499902"
+    }
+  ]
+}

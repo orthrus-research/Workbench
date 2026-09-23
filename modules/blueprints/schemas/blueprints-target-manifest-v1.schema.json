@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-target-manifest-v1.schema.json",
+  "title": "Supersymmetry Blueprints target manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "target_state_id",
+    "repository_id",
+    "revision",
+    "dirty",
+    "manifest_sha256",
+    "entries"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-target-manifest-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "target_state_id": {
+      "type": "string",
+      "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+    },
+    "repository_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]*$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "dirty": {
+      "type": "boolean"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "kind",
+          "mode",
+          "head_mode",
+          "index_mode",
+          "head_sha256",
+          "index_sha256",
+          "worktree_sha256",
+          "layers"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^[^/\\\\](?:.*[^/\\\\])?$"
+          },
+          "kind": {
+            "enum": [
+              "file",
+              "symlink",
+              "deleted"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "pattern": "^[0-7]{6}$"
+          },
+          "head_mode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-7]{6}$"
+              }
+            ]
+          },
+          "index_mode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-7]{6}$"
+              }
+            ]
+          },
+          "head_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "index_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "worktree_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "layers": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "tracked",
+                "staged",
+                "unstaged",
+                "untracked"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

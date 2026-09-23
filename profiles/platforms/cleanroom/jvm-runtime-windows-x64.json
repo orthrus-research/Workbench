@@ -1,0 +1,503 @@
+{
+  "schema": "axiom.jvm-runtime.v1",
+  "profile": "cleanroom",
+  "selectionStatus": "selected-workbench-mvp-runtime",
+  "qualificationStatus": "unqualified-installed-native-runtime",
+  "runtimeVersion": "25.0.4+7-LTS",
+  "vendor": "Eclipse Adoptium",
+  "vmName": "OpenJDK 64-Bit Server VM",
+  "os": "Windows",
+  "architecture": "amd64",
+  "javaRelease": 25,
+  "archive": {
+    "archive_root": "jdk-25.0.4+7",
+    "archive_sha256": "7caab7db43bf4b94a2e6252c699e70d90084f9aa7c943cd3414761fd540937ae",
+    "archive_url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4%2B7/OpenJDK25U-jdk_x64_windows_hotspot_25.0.4_7.zip",
+    "platform": "windows-x86_64",
+    "runtime_build": "Temurin-25.0.4+7",
+    "version": "25.0.4"
+  },
+  "runtimeFiles": [
+    {
+      "path": "conf/security/java.security",
+      "size": 75867,
+      "sha256": "8f42977f80b73ed19f941a1e2886de91d61e2c799b22f3e8e370d54c1ce99365"
+    },
+    {
+      "path": "release",
+      "size": 1639,
+      "sha256": "151541557e2cc19f36f991cf077741504962c6a16e1d2cc5d9157fddfee74583"
+    },
+    {
+      "path": "bin/java.exe",
+      "size": 50304,
+      "sha256": "1dfe0b08636bc74b56db5e246f038cfe67c18f567053373fa601d310f29ed9da"
+    },
+    {
+      "path": "lib/modules",
+      "size": 144973393,
+      "sha256": "47f28be3d25a42a73c137698af1ee4937dce754d9273e2d88f444a6704e4f2f9"
+    },
+    {
+      "path": "bin/api-ms-win-core-console-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "88ace577a9c51061cb7d1a36babbbefa48212fadc838ffde98fdfff60de18386"
+    },
+    {
+      "path": "bin/api-ms-win-core-console-l1-2-0.dll",
+      "size": 22056,
+      "sha256": "c062477ad3bfdc57b0cc402179637a214dab5045c8d644592c7decca7d18aa50"
+    },
+    {
+      "path": "bin/api-ms-win-core-datetime-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "1bd81dfd19204b44662510d9054852fb77c9f25c1088d647881c9b976cc16818"
+    },
+    {
+      "path": "bin/api-ms-win-core-debug-l1-1-0.dll",
+      "size": 21944,
+      "sha256": "591358eb4d1531e9563ee0813e4301c552ce364c912ce684d16576eabf195dc3"
+    },
+    {
+      "path": "bin/api-ms-win-core-errorhandling-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "d56ce7b1cd76108ad6c137326ec694a14c99d48c3d7b0ace8c3ff4d9bcee3ce8"
+    },
+    {
+      "path": "bin/api-ms-win-core-fibers-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "91d249d7bc0e38ef6bcb17158b1fdc6dd8888dc086615c9b8b750b87e52a5fb3"
+    },
+    {
+      "path": "bin/api-ms-win-core-fibers-l1-1-1.dll",
+      "size": 22072,
+      "sha256": "fc9d86cec621383eab636ebc87ddd3f5c19a3cb2a33d97be112c051d0b275429"
+    },
+    {
+      "path": "bin/api-ms-win-core-file-l1-1-0.dll",
+      "size": 26152,
+      "sha256": "1ca895aba4e7435563a6b43e85eba67a0f8c74aa6a6a94d0fc48fa35535e2585"
+    },
+    {
+      "path": "bin/api-ms-win-core-file-l1-2-0.dll",
+      "size": 22056,
+      "sha256": "4cadbc0c39da7c6722206fdcebd670abe5b8d261e7b041dd94f9397a89d1990d"
+    },
+    {
+      "path": "bin/api-ms-win-core-file-l2-1-0.dll",
+      "size": 21960,
+      "sha256": "93c624b366ba16c643fc8933070a26f03b073ad0cf7f80173266d67536c61989"
+    },
+    {
+      "path": "bin/api-ms-win-core-handle-l1-1-0.dll",
+      "size": 21944,
+      "sha256": "39095f59c41d76ec81bb2723d646fde4c148e7cc3402f4980d2ade95cb9c84f9"
+    },
+    {
+      "path": "bin/api-ms-win-core-heap-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "8f105771b236dbcb859de271f0a6822ce1cb79c36988dd42c9e3f6f55c5f7eb9"
+    },
+    {
+      "path": "bin/api-ms-win-core-interlocked-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "53b25e753ca785bf8b695d89dde5818a318890211dc992a89146f16658f0b606"
+    },
+    {
+      "path": "bin/api-ms-win-core-kernel32-legacy-l1-1-1.dll",
+      "size": 22080,
+      "sha256": "a9b13a1cd1b8c19b0c6b4afcd5bb0dd29c0e2288231ac9e6db8510094ce68ba6"
+    },
+    {
+      "path": "bin/api-ms-win-core-libraryloader-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "7f39ba298b41e4963047341288cab36b6a241835ee11ba4ad70f44dacd40906c"
+    },
+    {
+      "path": "bin/api-ms-win-core-localization-l1-2-0.dll",
+      "size": 22080,
+      "sha256": "6ee44dd0d8510dc024c9f7c79b1b9fa88c987b26b6beb6653ddd11751c34e5dc"
+    },
+    {
+      "path": "bin/api-ms-win-core-memory-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "0512a35316ec9180437f86696a84c5c06a7e4e82e050055a656e5bf9fca206f9"
+    },
+    {
+      "path": "bin/api-ms-win-core-namedpipe-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "c05f1fffe3b5a2738ea54ce9485cca026fb9635f982626fba1e1dcc531897273"
+    },
+    {
+      "path": "bin/api-ms-win-core-processenvironment-l1-1-0.dll",
+      "size": 21968,
+      "sha256": "c4eca98c3c67b6395d5b005b00ac1eb0318b86b23aa71035a44c2b1602befba9"
+    },
+    {
+      "path": "bin/api-ms-win-core-processthreads-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "5ccb89e93d67bc3288d4e84649c5346e66e15e3d7cd65d989daf3f4cb584be9a"
+    },
+    {
+      "path": "bin/api-ms-win-core-processthreads-l1-1-1.dll",
+      "size": 22072,
+      "sha256": "4ad565a8ba3ef0ea8ab87221ad11f83ee0bc844ce236607958406663b407333e"
+    },
+    {
+      "path": "bin/api-ms-win-core-profile-l1-1-0.dll",
+      "size": 22080,
+      "sha256": "7809160932f44e59b021699f5bc68799eb7293ee1fa926d6fcca3c3445302e61"
+    },
+    {
+      "path": "bin/api-ms-win-core-rtlsupport-l1-1-0.dll",
+      "size": 21960,
+      "sha256": "9dc1e91e71c7c054854bd1487cb4e6946d82c9f463430f1c4e8d1471005172b1"
+    },
+    {
+      "path": "bin/api-ms-win-core-string-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "60fc31d2a0c634412f529dba76af3b9bf991352877c6dae528186d3935704cfd"
+    },
+    {
+      "path": "bin/api-ms-win-core-synch-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "3a72b4f29f39a265d32ad12f0ce15dbf60129c840e10d84d427829ede45e78ad"
+    },
+    {
+      "path": "bin/api-ms-win-core-synch-l1-2-0.dll",
+      "size": 22080,
+      "sha256": "efc1e4460984a73cf47a3def033af1c8f3b1dbc1a56cd27781d3aacf3e3330cb"
+    },
+    {
+      "path": "bin/api-ms-win-core-sysinfo-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "b203d862ddef1dd62bf623fc866c7f7a9c317c1c2ae30d1f52cb41f955b5698e"
+    },
+    {
+      "path": "bin/api-ms-win-core-sysinfo-l1-2-0.dll",
+      "size": 22080,
+      "sha256": "2703635d835396afd0f138d7c73751afe7e33a24f4225d08c1690b0a371932c0"
+    },
+    {
+      "path": "bin/api-ms-win-core-timezone-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "33f4fddc181066fce06b2227bded813f95e94ed1f3d785e982c6b6b56c510c57"
+    },
+    {
+      "path": "bin/api-ms-win-core-util-l1-1-0.dll",
+      "size": 21944,
+      "sha256": "6eda016742a6171205a387a14b3c0b331841567740376f56768f8c151724207d"
+    },
+    {
+      "path": "bin/api-ms-win-crt-conio-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "b762061b688aae679afe788904d2c9970f74a7dac98f3b42463d08f25e483d3f"
+    },
+    {
+      "path": "bin/api-ms-win-crt-convert-l1-1-0.dll",
+      "size": 26056,
+      "sha256": "ebb2ae5535a64f65daeab8235585114fc9dd2cf1a49f5852d446250b998b6ae4"
+    },
+    {
+      "path": "bin/api-ms-win-crt-environment-l1-1-0.dll",
+      "size": 22080,
+      "sha256": "17d63275d00bdd8670422b95bd264c532998e0a1b041079e54fce4b6b7a55819"
+    },
+    {
+      "path": "bin/api-ms-win-crt-filesystem-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "9a9e2a65a281644e368d0f272b95ba5f6b445d1c35910d06056c5ebeb77402db"
+    },
+    {
+      "path": "bin/api-ms-win-crt-heap-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "bab9ac3ec83e380ae51e4295ef3bf2c738627812d3a49d1e713661abbc8dc57a"
+    },
+    {
+      "path": "bin/api-ms-win-crt-locale-l1-1-0.dll",
+      "size": 22080,
+      "sha256": "bd14c67ea28e21d6257ad780a37122c9b5773f69e693f5db6bffaee4d839526e"
+    },
+    {
+      "path": "bin/api-ms-win-crt-math-l1-1-0.dll",
+      "size": 30248,
+      "sha256": "606d66d82db562ea7979179d06486a0f94d079941d26b80a1e2c49d29959df6f"
+    },
+    {
+      "path": "bin/api-ms-win-crt-multibyte-l1-1-0.dll",
+      "size": 30248,
+      "sha256": "95f49efbe8107786733fa7c474025cf3fee0ac632f240367b296c736d06572aa"
+    },
+    {
+      "path": "bin/api-ms-win-crt-private-l1-1-0.dll",
+      "size": 75328,
+      "sha256": "1bc82bed6143d2bf1b6b08a7809f4a5e29317d6fddd338a7da3c0223522e4bbf"
+    },
+    {
+      "path": "bin/api-ms-win-crt-process-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "f6156b1020380ec4f0e48577ebedaaef5fb1ab1f337d8b4e72e6a33a7567a9cc"
+    },
+    {
+      "path": "bin/api-ms-win-crt-runtime-l1-1-0.dll",
+      "size": 26152,
+      "sha256": "c5902934d026d7e15fbe9917d474f3322846a41a25e66f4b2b1f758801879f4b"
+    },
+    {
+      "path": "bin/api-ms-win-crt-stdio-l1-1-0.dll",
+      "size": 26168,
+      "sha256": "a9c5a153d8c0286f9b41a2b1c65854ad9e6471b8755b7de87bae4470e60bcab6"
+    },
+    {
+      "path": "bin/api-ms-win-crt-string-l1-1-0.dll",
+      "size": 26176,
+      "sha256": "25b8f83a7767211b11132775a0e27a45aa4ec8ab4e6572599f9c172ae3606b40"
+    },
+    {
+      "path": "bin/api-ms-win-crt-time-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "7c7f6393f06de11750adb09cc5698ae55cd9fb27b2e51e207286feb1b5b2b156"
+    },
+    {
+      "path": "bin/api-ms-win-crt-utility-l1-1-0.dll",
+      "size": 21952,
+      "sha256": "d8ba5f17b9ffcbf3aeaf3fa1da226832d2fa90f81acce0cd669464e76ce434ac"
+    },
+    {
+      "path": "bin/attach.dll",
+      "size": 30336,
+      "sha256": "3bfb41dc666739cc3f8df12ee7e5ad7acab6a5d4f056918bc73a08fdb039417e"
+    },
+    {
+      "path": "bin/awt.dll",
+      "size": 1418880,
+      "sha256": "322296e4052fd3f0528a1f93b189614ea434006b887ad8f9bc5b8d79acdfc9e3"
+    },
+    {
+      "path": "bin/dt_shmem.dll",
+      "size": 37504,
+      "sha256": "8994ab3298a45cae99c8d66349aa4a993e2111857f8137d2fd219cdb50bfa8ef"
+    },
+    {
+      "path": "bin/dt_socket.dll",
+      "size": 36984,
+      "sha256": "c5604bffd87aa066b09f74b3f3083a0cbc3da88ad37c91965eb5aedb69279dcc"
+    },
+    {
+      "path": "bin/extnet.dll",
+      "size": 24696,
+      "sha256": "899259d91e0306c26e5f6a8f252b921fc91f5a51ef8446493d2247557f560fff"
+    },
+    {
+      "path": "bin/fontmanager.dll",
+      "size": 1018488,
+      "sha256": "c25cc683affface1787fbcfe4267ef06c0099dbb13f916b2a5c401e478475095"
+    },
+    {
+      "path": "bin/freetype.dll",
+      "size": 560768,
+      "sha256": "4269dcb90dd82c920d95c4a16daa8ed7f899384372280fcc564d1eecd7316d1f"
+    },
+    {
+      "path": "bin/instrument.dll",
+      "size": 52344,
+      "sha256": "cea943c101733e4fbc45f8bdab0d78fd8ffc0970a13d06263ff87033c535670b"
+    },
+    {
+      "path": "bin/j2gss.dll",
+      "size": 52344,
+      "sha256": "13b21136a6f37def423be53c89cf7a934db9743278473ac29b862ca06c2feef9"
+    },
+    {
+      "path": "bin/j2pcsc.dll",
+      "size": 26744,
+      "sha256": "2a2c833778ad8b558fc84e9a02e60b57ce277366860e852016a7af4533a32245"
+    },
+    {
+      "path": "bin/j2pkcs11.dll",
+      "size": 82040,
+      "sha256": "586b5e359b6823871e81fb5deba0c0bd66de21db6c7bdcde40d231fa1c48e751"
+    },
+    {
+      "path": "bin/jaas.dll",
+      "size": 28800,
+      "sha256": "1a298fe20928b3c9db39b1a34dc71e77c83d8153f87ad67b99f100a27d57b01a"
+    },
+    {
+      "path": "bin/java.dll",
+      "size": 116856,
+      "sha256": "e5b9d03078656bc530f03857fa89c435db4fd7b246a6f34edea4f1c59f5b31e6"
+    },
+    {
+      "path": "bin/javaaccessbridge.dll",
+      "size": 309880,
+      "sha256": "d4bf0db0bac2fc23984fd0afacd1d0cc09dece332909709b0122238d04884e2e"
+    },
+    {
+      "path": "bin/javajpeg.dll",
+      "size": 180856,
+      "sha256": "c7ebde30dc8c900690a218735e819da8252a286933a986c18a692dfa498b26eb"
+    },
+    {
+      "path": "bin/jawt.dll",
+      "size": 21624,
+      "sha256": "fe845fd3ba49af03439f858f8ae90bca0a45cb8b341e57afe57494924c18fbb5"
+    },
+    {
+      "path": "bin/jdwp.dll",
+      "size": 240248,
+      "sha256": "8d0bd55a40f1425edfa0036ef679d86ba09e290e2095a05eb2fa5360c25e6ecd"
+    },
+    {
+      "path": "bin/jimage.dll",
+      "size": 34424,
+      "sha256": "2375c81a92a89dfbcdd613790748b702e81f762d964e10b41c294264735be325"
+    },
+    {
+      "path": "bin/jli.dll",
+      "size": 84096,
+      "sha256": "da2693437d06125ba8392bc2b8200adb094dd0c294f9771b68e2d089cc3f655a"
+    },
+    {
+      "path": "bin/jpackage.dll",
+      "size": 137336,
+      "sha256": "686cc1fffe4a85f78bb430645314d7e5ee1feeb64072e7a2f090c8c307705266"
+    },
+    {
+      "path": "bin/jsound.dll",
+      "size": 61048,
+      "sha256": "85de0d5a4049a064e19ab0cc17101cfc29fe3ccc88544bcbd8765fb53875301a"
+    },
+    {
+      "path": "bin/jsvml.dll",
+      "size": 869504,
+      "sha256": "0f6931a1353a4aa937e379e4ab4b28cfa7cc2847b3fdce962922be6cf0a6480b"
+    },
+    {
+      "path": "bin/lcms.dll",
+      "size": 260216,
+      "sha256": "55beb403c3690e3cdbaac46e91d0cb21956ef8e78574adaf2a384d2593141341"
+    },
+    {
+      "path": "bin/management.dll",
+      "size": 29824,
+      "sha256": "3cc759174fa5cf6f270fbcb6d0415e4312605d2b87f5a3a5bd8c080e7b18f882"
+    },
+    {
+      "path": "bin/management_agent.dll",
+      "size": 25216,
+      "sha256": "9100539fe713a2daa9114e5caa1bbdfc329e597aef6a88085f76926865eadd0f"
+    },
+    {
+      "path": "bin/management_ext.dll",
+      "size": 36472,
+      "sha256": "5a7e301717e879709a952eef5ba9f715849f61fc4563292ebad23e537fe47e0c"
+    },
+    {
+      "path": "bin/mlib_image.dll",
+      "size": 521336,
+      "sha256": "d261464667a9153aaeee3be1f71d0e9ac6cfe0d63005287d1be0fe76447314a6"
+    },
+    {
+      "path": "bin/msvcp140.dll",
+      "size": 575056,
+      "sha256": "a4c2229bdc2a2a630acdc095b4d86008e5c3e3bc7773174354f3da4f5beb9cde"
+    },
+    {
+      "path": "bin/net.dll",
+      "size": 61048,
+      "sha256": "87955e43ccd8af43645cb5f23e435d80ca1afbfa3e47969fb002b57e65231d4e"
+    },
+    {
+      "path": "bin/nio.dll",
+      "size": 81536,
+      "sha256": "953b491b5981356d04288884bf3f178d94b892d11445e864b67420eddd56094d"
+    },
+    {
+      "path": "bin/prefs.dll",
+      "size": 25720,
+      "sha256": "a3f84f8ef9b7c8e9b19afa7e089f5694d9df8b9b9a187ef1e0216a3df0db2b5b"
+    },
+    {
+      "path": "bin/rmi.dll",
+      "size": 21120,
+      "sha256": "335cf168524fbb923a5b9af2edb46a2874223af7f40b837dd6a4241bf40eef96"
+    },
+    {
+      "path": "bin/saproc.dll",
+      "size": 39032,
+      "sha256": "8d16da3ffe7362c51e2ddaf79ad3936a400be0afc65e60c41dd43279e3d6ce10"
+    },
+    {
+      "path": "bin/server/jvm.dll",
+      "size": 15460984,
+      "sha256": "50f653c1d30db1342f5d476946ef63f25b663f72e89445c0d70a33d1b86a4ee2"
+    },
+    {
+      "path": "bin/splashscreen.dll",
+      "size": 211576,
+      "sha256": "96a9a4736d460b10afc503f4453272c92ff55440126cb1388754d0cf2141553f"
+    },
+    {
+      "path": "bin/sspi_bridge.dll",
+      "size": 45184,
+      "sha256": "eb148cbe5b25a469dc0391cd4b0c77b7ddb73f0c44a27194ea79a17add13b2b1"
+    },
+    {
+      "path": "bin/sunmscapi.dll",
+      "size": 49272,
+      "sha256": "5ffa0a0bfa49e460c4c819d133975f6fd75ff2e3e91adce77eec35de1d65490d"
+    },
+    {
+      "path": "bin/syslookup.dll",
+      "size": 28792,
+      "sha256": "b422b0a9d714a68aea1257be572f42d1c2c43b67bec62bd53ff9a75d4971b337"
+    },
+    {
+      "path": "bin/ucrtbase.dll",
+      "size": 1361448,
+      "sha256": "2e5fb14b7bf8540278f3614a12f0226e56a7cc9e64b81cbd976c6fcf2f71cbfb"
+    },
+    {
+      "path": "bin/vcruntime140.dll",
+      "size": 119888,
+      "sha256": "02c6aa0e6e624411a9f19b0360a7865ab15908e26024510e5c38a9c08362c35a"
+    },
+    {
+      "path": "bin/vcruntime140_1.dll",
+      "size": 49640,
+      "sha256": "7dd9aa02e271c68ca6d5f18d651d23a15d7259715af43326578f7dde27f37637"
+    },
+    {
+      "path": "bin/verify.dll",
+      "size": 54904,
+      "sha256": "1106ed604cee900ab37c5ed2b7a61f83fe87f3be24e84667d5225a38bfe9a15d"
+    },
+    {
+      "path": "bin/w2k_lsa_auth.dll",
+      "size": 32384,
+      "sha256": "8d11dc8d0a40eaa402576a23e68ba9736124656b272638eb5800c7b2bff5248f"
+    },
+    {
+      "path": "bin/windowsaccessbridge-64.dll",
+      "size": 72312,
+      "sha256": "d23effc7d132c0cc3bb1c9991cd361a6c764139d6c8a1acf881e9101297057f4"
+    },
+    {
+      "path": "bin/zip.dll",
+      "size": 82040,
+      "sha256": "d18e94754ad3b1f894b06b61eddb8b8a33c3a2bf073ef1ceb5a7fc313b06b111"
+    }
+  ],
+  "compilerFiles": [
+    {
+      "path": "bin/javac.exe",
+      "size": 24696,
+      "sha256": "a41dbdf0740275e6941129959bb3f95fe30244694b92d7406cb87ad66523d85c"
+    }
+  ],
+  "identityScope": "selected-runtime-files; shared archives disabled; trusted-unchanged-installation; not OS or loaded-memory attestation",
+  "requiredVmArguments": [
+    "-Xshare:off"
+  ]
+}

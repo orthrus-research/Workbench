@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible-fixtures/synthetic-closed-values-v1.schema.json",
+  "title": "C01 synthetic closed values",
+  "oneOf": [
+    {"$ref": "#/$defs/evidencePayload"},
+    {"$ref": "#/$defs/validationResult"},
+    {"$ref": "#/$defs/parameterValues"},
+    {"$ref": "#/$defs/resourceLimits"},
+    {"$ref": "#/$defs/compatibilityConstraints"},
+    {"$ref": "#/$defs/propertyValue"},
+    {"$ref": "#/$defs/refinementSummary"}
+  ],
+  "$defs": {
+    "evidencePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_kind", "observation", "ordinal"],
+      "properties": {
+        "value_kind": {"const": "evidence-payload"},
+        "observation": {"const": "alpha-before-beta"},
+        "ordinal": {"const": 0}
+      }
+    },
+    "validationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_kind", "outcome"],
+      "properties": {
+        "value_kind": {"const": "validation-result"},
+        "outcome": {"const": "passed"}
+      }
+    },
+    "parameterValues": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_kind"],
+      "properties": {
+        "value_kind": {"const": "parameter-values"}
+      }
+    },
+    "resourceLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_kind", "records"],
+      "properties": {
+        "value_kind": {"const": "resource-limits"},
+        "records": {"const": 64}
+      }
+    },
+    "compatibilityConstraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_kind", "context"],
+      "properties": {
+        "value_kind": {"const": "compatibility-constraints"},
+        "context": {"const": "exact"}
+      }
+    },
+    "propertyValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_kind", "value"],
+      "properties": {
+        "value_kind": {"const": "property-value"},
+        "value": {"const": "present"}
+      }
+    },
+    "refinementSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_kind", "fine_subject_count"],
+      "properties": {
+        "value_kind": {"const": "refinement-summary"},
+        "fine_subject_count": {"const": 1}
+      }
+    }
+  }
+}

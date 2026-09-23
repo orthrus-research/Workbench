@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-materialization-recipe-v2.schema.json",
+  "title": "Workbench Crucible materialization recipe V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "recipe_name",
+    "semantic_version",
+    "recipe_owner",
+    "authority_owner",
+    "implementation",
+    "derivation_steps",
+    "accepted_inputs",
+    "input_selector_object_descriptor_id",
+    "parameter_schema_object_descriptor_id",
+    "canonical_parameter_values_object_descriptor_id",
+    "schema_object_descriptor_ids",
+    "ontology_ids",
+    "profile_adapter_bindings",
+    "tool_ids",
+    "output_contracts",
+    "policies",
+    "resource_limits_object_descriptor_id",
+    "incremental_publication_enabled",
+    "full_build_conformance_case_ids",
+    "incremental_equivalence_case_ids"
+  ],
+  "properties": {
+    "kind": {"const": "materialization-recipe"},
+    "format": {"const": "workbench-crucible-materialization-recipe-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-materialization-recipe-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {
+      "type": "string",
+      "pattern": "^materialization-recipe:sha256:[0-9a-f]{64}$"
+    },
+    "recipe_name": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "semantic_version": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "recipe_owner": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorityBinding"},
+    "authority_owner": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorityBinding"},
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation_id",
+        "executable_object_descriptor_id",
+        "source_tree_object_descriptor_id",
+        "dependency_lock_object_descriptor_id",
+        "runtime_environment_object_descriptor_id"
+      ],
+      "properties": {
+        "implementation_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/implementationId"},
+        "executable_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableObjectDescriptorId"},
+        "source_tree_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableObjectDescriptorId"},
+        "dependency_lock_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+        "runtime_environment_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"}
+      },
+      "anyOf": [
+        {"properties": {"executable_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"}}},
+        {"properties": {"source_tree_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"}}}
+      ]
+    },
+    "derivation_steps": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "derivation_step_id",
+          "step_key",
+          "implementation_id",
+          "input_contracts",
+          "output_contracts"
+        ],
+        "properties": {
+          "derivation_step_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/derivationStepId"},
+          "step_key": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+          "implementation_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/implementationId"},
+          "input_contracts": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "input_contract_key",
+                "input_mode",
+                "evidence_kind_ids",
+                "source_contracts"
+              ],
+              "properties": {
+                "input_contract_key": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+                "input_mode": {"enum": ["evidence", "source-graph-record"]},
+                "evidence_kind_ids": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"}
+                },
+                "source_contracts": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "source_kind",
+                      "contract_key",
+                      "predecessor_step_id",
+                      "record_kinds"
+                    ],
+                    "properties": {
+                      "source_kind": {
+                        "enum": [
+                          "accepted-graph-input",
+                          "predecessor-output",
+                          "local-output"
+                        ]
+                      },
+                      "contract_key": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+                      "predecessor_step_id": {
+                        "oneOf": [
+                          {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/derivationStepId"},
+                          {"type": "null"}
+                        ]
+                      },
+                      "record_kinds": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphRecordKind"}
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "source_kind": {"const": "predecessor-output"}
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "predecessor_step_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/derivationStepId"}
+                          }
+                        },
+                        "else": {
+                          "properties": {"predecessor_step_id": {"type": "null"}}
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "if": {"properties": {"input_mode": {"const": "evidence"}}},
+                  "then": {
+                    "properties": {
+                      "evidence_kind_ids": {"minItems": 1},
+                      "source_contracts": {"maxItems": 0}
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "evidence_kind_ids": {"maxItems": 0},
+                      "source_contracts": {"minItems": 1}
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "output_contracts": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["output_contract_key", "output_record_kinds"],
+              "properties": {
+                "output_contract_key": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+                "output_record_kinds": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphRecordKind"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "accepted_inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_kind_ids", "graph_input_contracts", "scope_compatibility_rule_id"],
+      "properties": {
+        "evidence_kind_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"}
+        },
+        "graph_input_contracts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "graph_input_contract_key",
+              "graph_family_id",
+              "category_id",
+              "resolution_id",
+              "record_kinds"
+            ],
+            "properties": {
+              "graph_input_contract_key": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+              "graph_family_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+              "category_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+              "resolution_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+              "record_kinds": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphRecordKind"}
+              }
+            }
+          }
+        },
+        "scope_compatibility_rule_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"}
+      },
+      "anyOf": [
+        {"properties": {"evidence_kind_ids": {"minItems": 1}}},
+        {"properties": {"graph_input_contracts": {"minItems": 1}}}
+      ]
+    },
+    "input_selector_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "parameter_schema_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "canonical_parameter_values_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "schema_object_descriptor_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"}
+    },
+    "ontology_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/ontologyId"}
+    },
+    "profile_adapter_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/profileAdapterBinding"}
+    },
+    "tool_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/toolId"}
+    },
+    "output_contracts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "output_contract_key",
+          "graph_family_id",
+          "category_id",
+          "resolution_id",
+          "graph_record_schema_object_descriptor_id",
+          "subject_contracts"
+        ],
+        "properties": {
+          "output_contract_key": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+          "graph_family_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+          "category_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+          "resolution_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+          "graph_record_schema_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+          "subject_contracts": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["node_kind", "subject_kind", "subject_identity_schema_object_descriptor_id"],
+              "properties": {
+                "node_kind": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+                "subject_kind": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "subject_identity_schema_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "total_order",
+        "partition",
+        "deduplication",
+        "category_membership",
+        "category_overlap",
+        "cross_category_edges",
+        "resolution_aggregation",
+        "refinement_mapping",
+        "evidence_propagation",
+        "conflict_propagation",
+        "frontier_propagation",
+        "dependency_footprint",
+        "invalidation",
+        "deterministic_failure"
+      ],
+      "properties": {
+        "identity": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "total_order": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "partition": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "deduplication": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "category_membership": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "category_overlap": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "cross_category_edges": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "resolution_aggregation": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "refinement_mapping": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "evidence_propagation": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "conflict_propagation": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "frontier_propagation": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "dependency_footprint": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "invalidation": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+        "deterministic_failure": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"}
+      }
+    },
+    "resource_limits_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "incremental_publication_enabled": {"type": "boolean"},
+    "full_build_conformance_case_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/conformanceCaseId"}
+    },
+    "incremental_equivalence_case_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/conformanceCaseId"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"incremental_publication_enabled": {"const": true}}},
+      "then": {"properties": {"incremental_equivalence_case_ids": {"minItems": 1}}}
+    }
+  ]
+}

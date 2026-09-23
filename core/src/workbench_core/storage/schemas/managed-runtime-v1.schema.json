@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/managed-runtime-v1.schema.json",
+  "title": "Workbench managed runtime V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalization_id",
+    "runtime_id",
+    "state",
+    "created_at",
+    "last_used_at",
+    "workspace_root",
+    "storage_root",
+    "relative_path",
+    "producer",
+    "profile",
+    "source_template",
+    "world",
+    "content",
+    "references",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-managed-runtime-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "canonicalization_id": {
+      "const": "workbench-canonical-json-v1"
+    },
+    "runtime_id": {
+      "type": "string",
+      "pattern": "^workbench-managed-runtime:sha256:[0-9a-f]{64}$"
+    },
+    "state": {
+      "enum": [
+        "ready",
+        "active",
+        "stopped",
+        "trashed"
+      ]
+    },
+    "created_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "last_used_at": {
+      "$ref": "#/$defs/nullableTimestamp"
+    },
+    "workspace_root": {
+      "$ref": "#/$defs/absolutePath"
+    },
+    "storage_root": {
+      "$ref": "#/$defs/absolutePath"
+    },
+    "relative_path": {
+      "$ref": "#/$defs/workbenchRelativePath"
+    },
+    "producer": {
+      "$ref": "#/$defs/producer"
+    },
+    "profile": {
+      "$ref": "#/$defs/profile"
+    },
+    "source_template": {
+      "$ref": "#/$defs/sourceTemplate"
+    },
+    "world": {
+      "$ref": "#/$defs/world"
+    },
+    "content": {
+      "$ref": "#/$defs/content"
+    },
+    "references": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    },
+    "limitations": {
+      "$ref": "#/$defs/limitations"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/+@=-]*$"
+    },
+    "singleLine": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/timestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "absolutePath": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/singleLine"
+        },
+        {
+          "not": {
+            "pattern": "(^|[\\\\/])\\.\\.([\\\\/]|$)"
+          }
+        }
+      ]
+    },
+    "workbenchRelativePath": {
+      "allOf": [
+        {
+          "type": "string",
+          "minLength": 11,
+          "maxLength": 8192,
+          "pattern": "^\\.workbench/[^\\r\\n\\u0000]+$"
+        },
+        {
+          "not": {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        }
+      ]
+    },
+    "relativePath": {
+      "allOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192,
+          "pattern": "^[^/\\r\\n\\u0000][^\\r\\n\\u0000]*$"
+        },
+        {
+          "not": {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        }
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/singleLine"
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "producer_id",
+        "implementation_path",
+        "implementation_sha256"
+      ],
+      "properties": {
+        "producer_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "implementation_path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pack",
+        "profile_id",
+        "profile_path",
+        "profile_file_sha256",
+        "profile_canonical_sha256",
+        "platform_profile_id",
+        "minecraft_version",
+        "cleanroom_version",
+        "side"
+      ],
+      "properties": {
+        "pack": {
+          "$ref": "#/$defs/identifier"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "profile_path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "profile_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "profile_canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "platform_profile_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "minecraft_version": {
+          "const": "1.12.2"
+        },
+        "cleanroom_version": {
+          "$ref": "#/$defs/identifier"
+        },
+        "side": {
+          "const": "dedicated-server"
+        }
+      }
+    },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relative_path",
+        "size_bytes",
+        "sha256"
+      ],
+      "properties": {
+        "relative_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "sourceTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "inventory_sha256",
+        "server_jar",
+        "audit_safe"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "inventory_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "server_jar": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "audit_safe": {
+          "const": true
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level_name",
+        "relative_path",
+        "state",
+        "seed",
+        "world_type"
+      ],
+      "properties": {
+        "level_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.-]+$",
+          "not": {
+            "enum": [".", ".."]
+          }
+        },
+        "relative_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "state": {
+          "enum": [
+            "reserved-absent",
+            "present",
+            "snapshotted"
+          ]
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        "world_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tree_observation_sha256",
+        "logical_bytes",
+        "unique_allocated_bytes",
+        "file_count",
+        "directory_count",
+        "symlink_count",
+        "independent_copy"
+      ],
+      "properties": {
+        "tree_observation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "logical_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_allocated_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "directory_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "symlink_count": {
+          "const": 0
+        },
+        "independent_copy": {
+          "const": true
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "resource_id",
+        "path",
+        "sha256",
+        "required"
+      ],
+      "properties": {
+        "relation": {
+          "enum": [
+            "created-by",
+            "copied-from",
+            "depends-on",
+            "uses"
+          ]
+        },
+        "resource_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/absolutePath"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "resource_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "resource_id"
+          ]
+        },
+        {
+          "properties": {
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      ]
+    }
+  }
+}

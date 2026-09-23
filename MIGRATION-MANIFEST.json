@@ -1,0 +1,380 @@
+{
+  "schema_version": 1,
+  "migration_id": "workbench-bootstrap-2026-07-30",
+  "destination": "Workbench",
+  "source_repository": {
+    "origin": "private predecessor snapshot",
+    "publication": "not retained",
+    "license": "LGPL-3.0-only"
+  },
+  "imports": [
+    {
+      "id": "workbench-product-definition",
+      "source": "private predecessor snapshot (not published)",
+      "source_roots": [
+        "unpublished product-definition sources"
+      ],
+      "destination_roots": [
+        "docs/product"
+      ],
+      "disposition": "adapted",
+      "notes": "Retained public product documentation adapts the predecessor's repository role and delivery philosophy. Private source paths, object identifiers, and working notes are intentionally not published."
+    },
+    {
+      "id": "atlas-v1",
+      "source_roots": [
+        "unpublished predecessor Atlas sources"
+      ],
+      "destination_roots": [
+        "modules/atlas",
+        "profiles/packs/supersymmetry/atlas"
+      ],
+      "disposition": "mixed",
+      "notes": "V1 contracts, schemas, compact query inputs, and identity-bearing retained records preserve their historical identities. Selected current Python paths were adapted, and pack-specific adapters moved into the Supersymmetry profile; unrouted production-pilot and evidence-recovery runners, the duplicate profile normalizer, the unexposed material-causal implementation, and the Supersymmetry reconciled-graph producer are not retained."
+    },
+    {
+      "id": "blueprints-v1",
+      "source_roots": [
+        "unpublished predecessor Blueprints sources"
+      ],
+      "destination_roots": [
+        "modules/blueprints",
+        "profiles/packs/supersymmetry/blueprints"
+      ],
+      "disposition": "adapted",
+      "notes": "Engine behavior and V1 formats were retained; resource paths and synthetic fixtures were relocated."
+    },
+    {
+      "id": "manuals-v1",
+      "source_roots": [
+        "unpublished predecessor Manuals sources"
+      ],
+      "destination_roots": [
+        "modules/manuals"
+      ],
+      "disposition": "adapted",
+      "notes": "The semantic contract and tests were relocated; Manuals remains a contract-stage module."
+    },
+    {
+      "id": "supersymmetry-source-locks",
+      "source_roots": [
+        "unpublished predecessor Supersymmetry source-lock records"
+      ],
+      "destination_roots": [
+        "profiles/packs/supersymmetry/source-locks/legacy-forge"
+      ],
+      "disposition": "adapted",
+      "notes": "Only the strict current V3 machine-readable source lock is retained. The predecessor YAML registry, phase-era mapping reports, and internal scope notes are intentionally omitted from the public repository."
+    },
+    {
+      "id": "supersymmetry-current-registration-observations",
+      "source_roots": [
+        "https://github.com/SymmetricDevs/Supersymmetry@97a44866fe2079f30b4a89721a2625d2dd02f411",
+        "https://github.com/SymmetricDevs/Susy-Core@587132a6b1b9b095142f802d3393a786a01868a5"
+      ],
+      "destination_roots": [
+        "profiles/packs/supersymmetry/registration",
+        "profiles/packs/supersymmetry/blueprints/experimental/patterns/material-backed-fluid-v1.json"
+      ],
+      "disposition": "derived-source-observation",
+      "notes": "Only compact construction-family, source-path, lifecycle, and census observations were retained. The cloned source trees remained under ignored .workbench research state and were not imported."
+    },
+    {
+      "id": "supersymmetry-first-release-blueprint-examples",
+      "source_roots": [
+        "https://github.com/SymmetricDevs/Supersymmetry/pull/1451@b1b1a0f4c282a0d4a6ca068c07fd32521c83b935..25d53ad77e458399c8e58e45ba8c21ddc44c99d5",
+        "https://github.com/SymmetricDevs/Supersymmetry/pull/1978@b4338ef203ef40452a62e48019dd8f7b21bf496e..ef7d3f4f65d12d5fdf3d8f83607a5c2da18c6ea9"
+      ],
+      "destination_roots": [
+        "profiles/packs/supersymmetry/blueprints/examples/recipe-change-copper-sulfate-solution.json",
+        "profiles/packs/supersymmetry/blueprints/examples/quest-for-process-gas-atomizer.json"
+      ],
+      "disposition": "derived-historical-change-examples",
+      "notes": "Workbench retains compact, non-identity-bearing request examples and exact revision/blob provenance, not upstream source files. Each example is one bounded change extracted from its pull request and does not claim current runtime support or replay the complete upstream change."
+    },
+    {
+      "id": "strata-external-observation-interface-v2",
+      "source": "external sibling project without Git metadata",
+      "source_roots": [
+        "external sibling Strata checkout: tools"
+      ],
+      "destination_roots": [
+        "modules/crucible/src/workbench_crucible_strata_micro_region",
+        "modules/crucible/contracts/strata-micro-region-receipt-v1.md",
+        "modules/crucible/schemas/strata-micro-region-receipt-v1.schema.json",
+        "modules/crucible/tools/serve_strata_observation.py",
+        "modules/manuals/guides/experimental/worldgen-cleanmix/observe-world-studio-with-strata.md"
+      ],
+      "disposition": "external-interface-adapter",
+      "notes": "No Strata source or binary was copied into Workbench. Receipts dynamically bind the selected external interface files; generated captures and screenshots remain ignored."
+    },
+    {
+      "id": "gtceu-2.8.10-worldgen-case-study",
+      "source": "https://github.com/GregTechCEu/GregTech/tree/v2.8.10",
+      "source_commit": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "source_roots": [
+        "src/main/java/gregtech/api/worldgen",
+        "exact local GTCEu 2.8.10-beta jar and config/gregtech evidence"
+      ],
+      "destination_roots": [
+        "modules/crucible/src/workbench_crucible_gtceu_worldgen",
+        "modules/crucible/src/workbench_crucible_gtceu_worldgen_impact",
+        "modules/crucible/contracts/gtceu-worldgen-inventory-v1.md",
+        "modules/crucible/contracts/gtceu-worldgen-impact-inventory-v2.md",
+        "modules/crucible/schemas/gtceu-worldgen-inventory-v1.schema.json",
+        "modules/crucible/schemas/gtceu-worldgen-impact-inventory-v2.schema.json",
+        "modules/crucible/schemas/gtceu-worldgen-overlay-v1.schema.json",
+        "modules/crucible/schemas/gtceu-worldgen-overlay-materialization-v1.schema.json",
+        "modules/crucible/tools/inventory_gtceu_worldgen_impact.py",
+        "modules/manuals/guides/experimental/worldgen-cleanmix/inspect-gtceu-worldgen.md"
+      ],
+      "disposition": "derived-version-profile-and-adapter",
+      "notes": "No upstream source, jar, pack config, runtime log, or generated inventory is committed. V1 handles definition inventory and checked overlays; additive V2 binds the broader effect/API surface, reload hazards, and candidate integrations from exact locally bound inputs."
+    },
+    {
+      "id": "cleanmix-x02-runtime-investigation",
+      "source_roots": [
+        "https://github.com/CleanroomMC/CleanMix/tree/24898e32adc735fe48f4a3732b1831bd566c4626",
+        "https://github.com/CleanroomMC/CleanMix/commit/ac2b06c920608d566efe57386bf6b9b88552b02d",
+        ".workbench/evidence/cleanmix-runtime-conformance/x01-execution-v4",
+        ".workbench/evidence/cleanmix-runtime-conformance/x02-execution-v4"
+      ],
+      "source_artifacts": [
+        {
+          "identity": "CleanMix 0.7.0 candidate",
+          "sha256": "a41daa71398e948bc09fa578ae2460be639df0fa82fccdb630b316418d5a4a36"
+        },
+        {
+          "identity": "CleanMix pre-PR base ac2b06c920608d566efe57386bf6b9b88552b02d",
+          "sha256": "2ef7b9718506b6f56b55c87c45d280809ab055abc43dd4545a423eba86c3883c"
+        },
+        {
+          "identity": "Foundation 0.19.11 candidate",
+          "sha256": "a9f5cf9cb54715edf22d6bcb49bae50f281f818b1731f53f22aab85a48a7b54b"
+        },
+        {
+          "identity": "Foundation 0.19.9 historical control",
+          "sha256": "1023225a4504d2a28bd2949a3d673ade89fefb0cee7ef2f2c13621989a883548"
+        }
+      ],
+      "source_evidence": [
+        "cleanmix-p0-runtime-matrix-execution:sha256:4558726335039b53c0c4d228f26376b3a79e54530824e2f21c78d1d2ba91c7db",
+        "cleanmix-x02-bounded-control-execution:sha256:9e0bcc18dbd51c94cba1f09c5481dd023779b55f1c653e94e3f4fb6be8864779"
+      ],
+      "destination_roots": [
+        "profiles/platforms/cleanroom/mixins/cleanmix-x02-investigation-report-v1.json",
+        "profiles/platforms/cleanroom/fixtures/cleanmix-handler-regression",
+        "profiles/platforms/cleanroom/fixtures/cleanmix-p0-regression",
+        "profiles/platforms/cleanroom/candidates/0.6.8-alpha/worldgen-observatory-fixture",
+        "profiles/platforms/cleanroom/tools/run_cleanmix_x02_investigation.py",
+        "modules/crucible/src/workbench_crucible_mixins/direct_application.py",
+        "modules/crucible/contracts/mixin-direct-application-receipt-v1.md",
+        "modules/crucible/tests/test_cleanmix_x02_investigation.py",
+        "modules/crucible/tests/test_mixin_direct_application.py"
+      ],
+      "disposition": "derived-external-runtime-observation",
+      "notes": "Only Workbench-authored fixtures, observer/receipt code, tests, and the content-addressed derived investigation report are checked in. External source, artifacts, generated class bytes, logs, and raw execution evidence remain outside Git under ignored custody. The source repositories retain their own licensing; this group does not copy upstream source and therefore does not invent a separate license assertion."
+    },
+    {
+      "id": "supersymmetry-historical-runtime-fluid-observations",
+      "source_roots": [
+        "ignored external EVID-9089 COMMON_FINAL_STATE/DEDICATED_SERVER runtime-graph projection",
+        ".workbench/atlas/light-oil-capture",
+        ".workbench/atlas/fluid-classification"
+      ],
+      "source_artifacts": [
+        {
+          "identity": "historical Supersymmetry EVID-9089 runtime-graph query projection",
+          "byte_count": 33449480192,
+          "sha256": "fc01689dfa76b386e78814343b629e0f4fccd865d1e60d6ee7d19d9e564d193e"
+        }
+      ],
+      "source_evidence": [
+        "bounded-light-oil-route-dag:sha256:01ceada46ddbbe505820363cdd4d85e9248d41a9ab1baec98d05b70f582c0f07",
+        "light-oil-capture-semantics:sha256:fd0de1550e2cb3c0ef4355984f811e0ad0a69ae6a1460bf1dda8d37410cc0ff8",
+        "runtime-fluid-classification-census:sha256:d34e7128f52fac69b0c16ab57703b4cc691dec16f5cc27bd700e2f9a0be438c8"
+      ],
+      "destination_roots": [
+        "modules/atlas/src/workbench_atlas/runtime_graph_fluid_classification.py",
+        "modules/atlas/tests/test_runtime_graph_fluid_classification.py",
+        "profiles/packs/supersymmetry/atlas/src/light_oil_capture_experiment.py",
+        "profiles/packs/supersymmetry/atlas/tests/test_light_oil_capture_experiment.py",
+        "modules/atlas/README.md",
+        "profiles/packs/supersymmetry/README.md"
+      ],
+      "disposition": "derived-external-runtime-observation",
+      "notes": "Only Workbench-authored read-only experiment/classifier code, tests, and bounded documentation are checked in. The 33,449,480,192-byte historical database, raw capture, generated semantic reports, 7,233,776-byte census, and timing sidecars remain under ignored custody. Stable capture, traversal, and census digests are migration evidence; elapsed time and RSS are operational baselines excluded from semantic and graph identity. The observations bind only legacy-forge-0.1.16.11 COMMON_FINAL_STATE/DEDICATED_SERVER and do not establish a C01/V2 resource graph, current Cleanroom behavior, or a realized bedrock-fluid deposit."
+    },
+    {
+      "id": "recurrent-complex-external-decorator-f01-p01",
+      "source_roots": [
+        "ignored .workbench exact-runtime sessions, captures, worlds, and proof inputs bound by the cited receipts",
+        "stock Recurrent Complex 1.4.8.6 and IvToolkit 1.3.3-1.12 runtime artifacts"
+      ],
+      "source_artifacts": [
+        {
+          "identity": "Recurrent Complex 1.4.8.6",
+          "sha256": "253226e6c7efe61ae255df0cc2e19d1420945cb7e86f7cd79f51d5db10fd9de8"
+        },
+        {
+          "identity": "IvToolkit 1.3.3-1.12",
+          "sha256": "ffb745111790e27cb7810a2e03d5270265dee7ebd3ef98fde897c409d58b1e59"
+        },
+        {
+          "identity": "generic Worldgen Observatory fixture",
+          "sha256": "0f1f50597e7f591e91d369e41c5d23b4723a5f424d573e58a525e8dbfa2e1883"
+        }
+      ],
+      "source_evidence": [
+        "crucible-exact-runtime-session-audit:sha256:a68d0d4803a5607fe54965955fd0af4e011c068405bb45e095fc90c24021ecea",
+        "crucible-exact-runtime-session-audit:sha256:64223aed3b69b108c233ef5bdcbcaafaa2eeda5869f3ee7252df45d22ca06295",
+        "crucible-external-decorator-fixture-evaluation:sha256:485d1eaf0f062d81a43b15de6a5163084c7121df1e95186fd72c06d92fd2ea38",
+        "crucible-external-decorator-compatibility-proof:sha256:9c12e0f8e266405968e590abc3c503183b4e475d052982c675eeaf88385151b5"
+      ],
+      "destination_roots": [
+        "profiles/platforms/cleanroom/candidates/0.6.8-alpha/worldgen-observatory-fixture",
+        "profiles/packs/supersymmetry/compatibility/recurrent-complex-1.4.8.6-cleanroom-0.6.8-alpha.md",
+        "profiles/packs/supersymmetry/worldgen/recurrent-complex-diagnostic-health-policy-v1.json",
+        "profiles/packs/supersymmetry/worldgen/tools/inspect_recurrent_complex_structure_data.py"
+      ],
+      "disposition": "derived-external-runtime-observation",
+      "notes": "No Recurrent Complex or IvToolkit source, binary, resource pack, world, log, raw capture, or generated proof is committed. The retained compatibility warning, diagnostic policy, structure-data inspector, and shared fixture derive from exact artifact identities and ignored observations. Upstream repository and license identities were not established by this runtime exercise and are intentionally not invented here."
+    },
+    {
+      "id": "cleanroom-candidate-and-daily-loop-evidence",
+      "source_roots": [
+        "https://github.com/SymmetricDevs/Supersymmetry@97a44866fe2079f30b4a89721a2625d2dd02f411",
+        "https://github.com/CleanroomMC/Cleanroom@9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+        "locally observed PrismLauncher 11.0.3 executable",
+        "Workbench-authored generic Cleanroom daily-loop fixture"
+      ],
+      "source_artifacts": [
+        {
+          "identity": "PrismLauncher 11.0.3 Windows x86_64",
+          "sha256": "c24c7c84fce7ff1d12c709e0bcc8993aaa2a8cb662381c960ccb7d93c88bc2e3"
+        },
+        {
+          "identity": "Cleanroom 0.6.8-alpha client bootstrap",
+          "sha256": "64e4d8af4f117224f7b69efb5e270f75b05feef7fd034fcce185ae2e5b5ec9eb"
+        },
+        {
+          "identity": "Cleanroom 0.6.8-alpha server installer",
+          "sha256": "7a68129c889fdba0c0feb3262760e465a35abe5b95b29d6876ecb608a6bbcc29"
+        },
+        {
+          "identity": "Temurin JDK 25.0.4+7 Linux x86_64 archive",
+          "sha256": "e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94"
+        },
+        {
+          "identity": "Gradle 9.6.1 binary distribution",
+          "sha256": "9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14"
+        }
+      ],
+      "destination_roots": [
+        "profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop",
+        "profiles/platforms/cleanroom/candidates/0.6.8-alpha/qualification-owner-attestation-v1.json"
+      ],
+      "disposition": "derived-external-identities-and-authored-fixture",
+      "notes": "The retained candidate attestation records the exact external artifact identity used by the profile fixture; its historical B00 wording is not an active construction or release path. The generic daily-loop fixture remains authored source. No launcher, JDK, Gradle, Minecraft, Cleanroom, or Supersymmetry checkout bytes are imported; downloads, builds, runtimes, worlds, and raw evidence remain under ignored custody."
+    },
+    {
+      "id": "workbench-mvp-supersymmetry-acquisition-and-manual-payload-2026-08-31",
+      "source": "https://github.com/SymmetricDevs/Supersymmetry.git",
+      "source_commit": "0d703a9f6bca0a1649edd13f3d7e034b7017757a",
+      "source_roots": [
+        "pack.toml",
+        "mods/commons0815.pw.toml",
+        "mods/openglasses2.pw.toml",
+        "mods/scape-and-run-parasites.pw.toml"
+      ],
+      "source_artifacts": [
+        {
+          "identity": "CurseForge project 346326 file 3248796 / Commons0815-1.12.2-1.4.0.jar",
+          "project_id": 346326,
+          "file_id": 3248796,
+          "filename": "Commons0815-1.12.2-1.4.0.jar",
+          "sha1": "076ed53a86f503add06c252856a1a8ad7b0d2667",
+          "imported": false
+        },
+        {
+          "identity": "CurseForge project 300957 file 3143467 / OpenGlasses-MC1.12.2-2.2-53.jar",
+          "project_id": 300957,
+          "file_id": 3143467,
+          "filename": "OpenGlasses-MC1.12.2-2.2-53.jar",
+          "sha1": "b8fb78b8b7e7486a40966cf283833fa04abc84b6",
+          "imported": false
+        },
+        {
+          "identity": "CurseForge project 348025 file 5370258 / SRParasites-1.12.2v1.9.21.jar",
+          "project_id": 348025,
+          "file_id": 5370258,
+          "filename": "SRParasites-1.12.2v1.9.21.jar",
+          "sha1": "17225b532334c4652a698be3d41d819af2b0f051",
+          "imported": false
+        }
+      ],
+      "destination_roots": [
+        "profiles/packs/supersymmetry/acquisition-v1.json",
+        "profiles/packs/supersymmetry/runtime/manual-artifacts-v1.json",
+        "profiles/packs/supersymmetry/schemas/workbench-manual-artifact-profile-v1.schema.json",
+        "profiles/packs/supersymmetry/schemas/workbench-supersymmetry-acquisition-profile-v1.schema.json"
+      ],
+      "destination_files": [
+        {
+          "path": "profiles/packs/supersymmetry/acquisition-v1.json",
+          "sha256": "8cb3bdad199d0785d4bcc099e74db2023a7bcafbbb043d828913202b7a79e095"
+        },
+        {
+          "path": "profiles/packs/supersymmetry/runtime/manual-artifacts-v1.json",
+          "sha256": "2db3dd1ebd297abe5119fbbbf95a07ea42d1ad432494cf08d9ae78912e86db7b"
+        },
+        {
+          "path": "profiles/packs/supersymmetry/schemas/workbench-manual-artifact-profile-v1.schema.json",
+          "sha256": "870c46ccdd6fa516da3b7efe27ea4c6b59739fc8312edea862a59aa4d5c8650c"
+        },
+        {
+          "path": "profiles/packs/supersymmetry/schemas/workbench-supersymmetry-acquisition-profile-v1.schema.json",
+          "sha256": "9326a05f09fbb38c6800dd83893b3819bb14206c1246aac75f0061e9193fb6b5"
+        }
+      ],
+      "disposition": "derived-profile-metadata-no-binaries",
+      "notes": "Workbench imports only the public Git channel identity and Packwiz/CurseForge metadata needed to explain manual payload prerequisites. No mod JAR, checkout, game artifact, credential, or publisher-hosted byte is committed. User-supplied files remain external and must match the declared hashes before materialization."
+    },
+    {
+      "id": "workbench-mvp-supersymmetry-github-pr-provider-2026-08-31",
+      "source": "https://api.github.com/repos/SymmetricDevs/Supersymmetry/pulls/2002",
+      "source_commit": "d0f67535bab6e619bf5ad4a0d2c57da34f510579",
+      "source_roots": [
+        "GitHub pull-request base/head/state/merge response fields",
+        "refs/pull/{number}/head",
+        "refs/pull/{number}/merge"
+      ],
+      "destination_roots": [
+        "profiles/packs/supersymmetry/github-pr-provider-v1.json",
+        "profiles/packs/supersymmetry/schemas/workbench-supersymmetry-github-pr-provider-v1.schema.json"
+      ],
+      "destination_files": [
+        {
+          "path": "profiles/packs/supersymmetry/github-pr-provider-v1.json",
+          "sha256": "1498f390d1f7a081265439318f9a2c366ea7957c17a9a1adb36708a6f4c82d44"
+        },
+        {
+          "path": "profiles/packs/supersymmetry/schemas/workbench-supersymmetry-github-pr-provider-v1.schema.json",
+          "sha256": "a131218b75892c3577d1d95cca9880fdb8987a727922d8bc99772571c46935f0"
+        }
+      ],
+      "disposition": "derived-provider-profile-metadata-no-credentials",
+      "notes": "Workbench retains only public provider endpoint/ref conventions and repository identity needed to observe an exact pull request. No provider response cache, access token, credential, checkout, or Git object is committed; preparation re-observes live provider state and retains fetched objects only under ignored external Workbench state and repository refs."
+    }
+  ],
+  "excluded": [
+    ".git",
+    "private coordination and recovery state",
+    "live Supersymmetry pack and game-instance files",
+    "mods, worlds, logs, caches, and build output",
+    "generated large runtime captures and inventories",
+    "downloaded JDK, Gradle, Minecraft, and mod artifacts",
+    "embedded RetroFuturaGradle forks and JARs",
+    "packwiz executables"
+  ]
+}

@@ -1,0 +1,1315 @@
+{
+  "buses": [
+    {
+      "applicability": "General Forge events, including chunk lifecycle and selected terrain pre/post events.",
+      "callsite": "Direct posts to net.minecraftforge.common.MinecraftForge.EVENT_BUS.",
+      "field": "net.minecraftforge.common.MinecraftForge.EVENT_BUS",
+      "id": "forge.event_bus",
+      "probe_target": "net.minecraftforge.common.MinecraftForge#EVENT_BUS",
+      "semantics": "Synchronous listener dispatch on the posting thread.",
+      "source_refs": [
+        "minecraft_forge"
+      ]
+    },
+    {
+      "applicability": "Terrain-generation replacement and per-feature decision events.",
+      "callsite": "TerrainGen helpers and direct posts to net.minecraftforge.common.MinecraftForge.TERRAIN_GEN_BUS.",
+      "field": "net.minecraftforge.common.MinecraftForge.TERRAIN_GEN_BUS",
+      "id": "forge.terrain_gen_bus",
+      "probe_target": "net.minecraftforge.common.MinecraftForge#TERRAIN_GEN_BUS",
+      "semantics": "Synchronous Forge bus dedicated to terrain generation.",
+      "source_refs": [
+        "minecraft_forge",
+        "terrain_gen"
+      ]
+    },
+    {
+      "applicability": "Ore generation pre/post and GenerateMinable decisions.",
+      "callsite": "TerrainGen.generateOre and direct posts to net.minecraftforge.common.MinecraftForge.ORE_GEN_BUS.",
+      "field": "net.minecraftforge.common.MinecraftForge.ORE_GEN_BUS",
+      "id": "forge.ore_gen_bus",
+      "probe_target": "net.minecraftforge.common.MinecraftForge#ORE_GEN_BUS",
+      "semantics": "Synchronous Forge bus dedicated to ore generation.",
+      "source_refs": [
+        "minecraft_forge",
+        "terrain_gen"
+      ]
+    }
+  ],
+  "call_orders": [
+    {
+      "applicability": "Server-side chunk request which misses both loaded and persisted chunks.",
+      "id": "server_chunk_generation",
+      "steps": [
+        {
+          "operation": "ChunkProviderServer.provideChunk resolves or requests the chunk",
+          "ordinal": 10,
+          "related_hook": "chunk_provider_server.provide_chunk"
+        },
+        {
+          "operation": "The selected IChunkGenerator creates the base Chunk",
+          "ordinal": 20,
+          "related_hook": "i_chunk_generator.generate_chunk"
+        },
+        {
+          "operation": "Chunk writes and ChunkPrimer writes occur inside the generator's implementation",
+          "ordinal": 30,
+          "related_hook": "chunk_primer.set_block_state"
+        },
+        {
+          "operation": "ChunkProviderServer inserts the returned Chunk into its loaded map",
+          "ordinal": 40,
+          "related_hook": "chunk_provider_server.provide_chunk"
+        },
+        {
+          "operation": "Chunk.onLoad posts ChunkEvent.Load for the newly generated Chunk",
+          "ordinal": 50,
+          "related_hook": "chunk_event.load"
+        },
+        {
+          "operation": "The public Chunk population router evaluates neighbor readiness",
+          "ordinal": 60,
+          "related_hook": "chunk.populate"
+        }
+      ]
+    },
+    {
+      "applicability": "First Forge-patched Chunk population after the public 2x2-neighbor router selects an eligible target Chunk.",
+      "id": "chunk_population",
+      "steps": [
+        {
+          "operation": "Chunk.populate(IChunkProvider,IChunkGenerator) checks four possible 2x2 neighborhoods and selects an eligible Chunk",
+          "ordinal": 10,
+          "related_hook": "chunk.populate"
+        },
+        {
+          "operation": "Chunk.populate(IChunkGenerator) observes that the selected Chunk is not terrain-populated and checks lighting",
+          "ordinal": 20,
+          "related_hook": "chunk.populate_owned"
+        },
+        {
+          "operation": "IChunkGenerator.populate runs generator-owned structures and decoration",
+          "ordinal": 30,
+          "related_hook": "i_chunk_generator.populate"
+        },
+        {
+          "operation": "GameRegistry.generateWorld runs registered IWorldGenerator instances",
+          "ordinal": 40,
+          "related_hook": "game_registry.generate_world"
+        },
+        {
+          "operation": "Chunk is marked dirty after generator-owned population and every registered IWorldGenerator return",
+          "ordinal": 50,
+          "related_hook": "chunk.populate_owned"
+        }
+      ]
+    },
+    {
+      "applicability": "An eligible Chunk which is already terrain-populated.",
+      "id": "chunk_structure_maintenance",
+      "steps": [
+        {
+          "operation": "Chunk.populate(IChunkGenerator) selects the already-terrain-populated branch",
+          "ordinal": 10,
+          "related_hook": "chunk.populate_owned"
+        },
+        {
+          "operation": "IChunkGenerator.generateStructures performs any deferred structure maintenance",
+          "ordinal": 20,
+          "related_hook": "i_chunk_generator.generate_structures"
+        },
+        {
+          "operation": "Chunk is marked dirty only when generateStructures returns true; GameRegistry.generateWorld is not called",
+          "ordinal": 30,
+          "related_hook": "chunk.populate_owned"
+        }
+      ]
+    },
+    {
+      "applicability": "A persisted Anvil chunk completed on the synchronous ChunkIOProvider callback.",
+      "id": "persisted_chunk_admission",
+      "steps": [
+        {
+          "operation": "ChunkDataEvent.Load exposes the persisted NBT on the synchronous callback",
+          "ordinal": 10,
+          "related_hook": "chunk_data_event.load"
+        },
+        {
+          "operation": "IChunkGenerator.recreateStructures restores generator structure bookkeeping",
+          "ordinal": 20,
+          "related_hook": "i_chunk_generator.recreate_structures"
+        },
+        {
+          "operation": "Chunk.onLoad posts ChunkEvent.Load after the chunk enters the provider map",
+          "ordinal": 30,
+          "related_hook": "chunk_event.load"
+        },
+        {
+          "operation": "The public Chunk population router evaluates neighbor readiness",
+          "ordinal": 40,
+          "related_hook": "chunk.populate"
+        }
+      ]
+    },
+    {
+      "applicability": "Each first-population call to GameRegistry.generateWorld.",
+      "id": "forge_world_generator_dispatch",
+      "steps": [
+        {
+          "operation": "GameRegistry computes the ascending-weight generator list when its cache is absent",
+          "ordinal": 10,
+          "related_hook": "game_registry.generate_world"
+        },
+        {
+          "operation": "GameRegistry resets the Forge Random to the same chunk seed before each registered generator",
+          "ordinal": 20,
+          "related_hook": "game_registry.generate_world"
+        },
+        {
+          "operation": "Each IWorldGenerator.generate callback runs in sorted order; a thrown exception prevents later callbacks",
+          "ordinal": 30,
+          "related_hook": "i_world_generator.generate"
+        }
+      ]
+    },
+    {
+      "applicability": "Every event posted through a Forge EventBus.",
+      "id": "forge_event_dispatch",
+      "steps": [
+        {
+          "operation": "EventBus.post resolves the listener array for its bus id",
+          "ordinal": 10,
+          "related_hook": "event_bus.post"
+        },
+        {
+          "operation": "EventBus.post invokes each listener in array order",
+          "ordinal": 20,
+          "related_hook": "asm_event_handler.invoke"
+        },
+        {
+          "operation": "EventBus.post returns the event cancellation state after all permitted listeners",
+          "ordinal": 30,
+          "related_hook": "event_bus.post"
+        }
+      ]
+    }
+  ],
+  "candidate_lock_sha256": "d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541",
+  "format": "workbench-worldgen-hook-spec-v1",
+  "hooks": [
+    {
+      "applicability": "Logical server chunk acquisition; generation occurs only on a cache and disk miss.",
+      "callsite": "net.minecraft.world.gen.ChunkProviderServer#provideChunk(int,int)",
+      "id": "chunk_provider_server.provide_chunk",
+      "probe_target": "net.minecraft.world.gen.ChunkProviderServer#provideChunk(int,int)",
+      "semantics": "Observe the server boundary that selects loaded, persisted, or newly generated chunks; this is not itself a terrain customization API.",
+      "source_refs": [
+        "chunk_provider_server_patch"
+      ],
+      "stability": "invasive-observation"
+    },
+    {
+      "applicability": "Logical server chunk acquisition after a loaded-chunk miss; may resolve persisted data or generate when invoked synchronously.",
+      "callsite": "net.minecraft.world.gen.ChunkProviderServer#provideChunk(int,int) and explicit load requests",
+      "id": "chunk_provider_server.load_chunk",
+      "probe_target": "net.minecraft.world.gen.ChunkProviderServer#loadChunk(int,int,Runnable)",
+      "semantics": "Observe the persisted-load versus generation fork, including callback-driven requests; this is not a terrain customization API.",
+      "source_refs": [
+        "chunk_provider_server_patch"
+      ],
+      "stability": "invasive-observation"
+    },
+    {
+      "applicability": "Every newly loaded or generated Chunk; the method may select the current, west, north, or northwest Chunk when the corresponding 2x2 neighborhood is ready.",
+      "callsite": "net.minecraft.world.chunk.Chunk#populate(IChunkProvider,IChunkGenerator)",
+      "id": "chunk.populate",
+      "probe_target": "net.minecraft.world.chunk.Chunk#populate(IChunkProvider,IChunkGenerator)",
+      "semantics": "Invasive observation boundary for the public neighbor-readiness router. One invocation can cause zero or multiple protected owned-population calls and must not be treated as the generator-owned population phase itself.",
+      "source_refs": [
+        "chunk_unresolved",
+        "chunk_patch"
+      ],
+      "stability": "invasive-observation"
+    },
+    {
+      "applicability": "A Chunk selected by the public 2x2-neighbor router.",
+      "callsite": "net.minecraft.world.chunk.Chunk#populate(IChunkGenerator)",
+      "id": "chunk.populate_owned",
+      "probe_target": "net.minecraft.world.chunk.Chunk#populate(IChunkGenerator)",
+      "semantics": "Invasive observation boundary for the protected owned-population method. A first population runs checkLight, IChunkGenerator.populate, GameRegistry.generateWorld, and markDirty; an already-populated Chunk instead runs IChunkGenerator.generateStructures and marks dirty only when it returns true.",
+      "source_refs": [
+        "chunk_patch"
+      ],
+      "stability": "invasive-observation"
+    },
+    {
+      "applicability": "A persisted server Chunk after asynchronous-safe NBT and entity loading reaches the synchronous callback.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraftforge.common.chunkio.ChunkIOProvider#syncCallback()",
+      "id": "chunk_data_event.load",
+      "probe_target": "net.minecraftforge.event.world.ChunkDataEvent$Load",
+      "semantics": "Supported persisted-input observation and NBT extension seam. Unlike ChunkEvent.Load, its presence proves a persisted load; Forge deliberately posts it synchronously rather than on the Chunk I/O worker.",
+      "source_refs": [
+        "chunk_data_event",
+        "chunk_io_provider"
+      ],
+      "stability": "supported-forge-event"
+    },
+    {
+      "applicability": "A server Chunk serialized by AnvilChunkLoader before the compound is queued for disk output.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.chunk.storage.AnvilChunkLoader#saveChunk(World,Chunk)",
+      "id": "chunk_data_event.save",
+      "probe_target": "net.minecraftforge.event.world.ChunkDataEvent$Save",
+      "semantics": "Supported persistence observation and NBT extension seam. The event is non-cancelable and mutations to its NBT payload become part of the pending save.",
+      "source_refs": [
+        "anvil_chunk_loader_patch",
+        "chunk_data_event"
+      ],
+      "stability": "supported-forge-event"
+    },
+    {
+      "applicability": "A generated or persisted Chunk entering a client or server world's loaded set.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.chunk.Chunk#onLoad() and client ChunkProviderClient loading",
+      "id": "chunk_event.load",
+      "probe_target": "net.minecraftforge.event.world.ChunkEvent$Load",
+      "semantics": "Supported loaded-lifecycle observation event. It does not distinguish fresh generation from persisted admission because both server paths call Chunk.onLoad; correlate ChunkDataEvent.Load or the invasive provider fork when provenance matters.",
+      "source_refs": [
+        "chunk_event",
+        "chunk_patch"
+      ],
+      "stability": "supported-forge-event"
+    },
+    {
+      "applicability": "A loaded Chunk leaving a client or server world.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.chunk.Chunk#onUnload()",
+      "id": "chunk_event.unload",
+      "probe_target": "net.minecraftforge.event.world.ChunkEvent$Unload",
+      "semantics": "Supported non-cancelable unload observation event; it is not a terrain-generation decision seam.",
+      "source_refs": [
+        "chunk_event",
+        "chunk_patch"
+      ],
+      "stability": "supported-forge-event"
+    },
+    {
+      "applicability": "A WorldServer registered as loaded by DimensionManager.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraftforge.common.DimensionManager#setWorld(int,WorldServer,MinecraftServer)",
+      "id": "world_event.load",
+      "probe_target": "net.minecraftforge.event.world.WorldEvent$Load",
+      "semantics": "Supported world-lifecycle observation event after the world is registered; generator selection has already occurred and cannot be replaced here.",
+      "source_refs": [
+        "dimension_manager",
+        "world_event"
+      ],
+      "stability": "supported-forge-event"
+    },
+    {
+      "applicability": "A WorldServer save after its ChunkProvider saves chunks.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.WorldServer#saveAllChunks(boolean,IProgressUpdate)",
+      "id": "world_event.save",
+      "probe_target": "net.minecraftforge.event.world.WorldEvent$Save",
+      "semantics": "Supported non-cancelable world-save observation event; it occurs after the ChunkProvider save call and is not a per-chunk completion boundary.",
+      "source_refs": [
+        "world_event",
+        "world_server_patch"
+      ],
+      "stability": "supported-forge-event"
+    },
+    {
+      "applicability": "A WorldServer removed from DimensionManager's loaded-world set.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraftforge.common.DimensionManager unload processing",
+      "id": "world_event.unload",
+      "probe_target": "net.minecraftforge.event.world.WorldEvent$Unload",
+      "semantics": "Supported world-lifecycle observation event; it is not a generator replacement seam.",
+      "source_refs": [
+        "dimension_manager",
+        "world_event"
+      ],
+      "stability": "supported-forge-event"
+    },
+    {
+      "applicability": "Every chunk created by the selected generator.",
+      "callsite": "ChunkProviderServer invokes the active IChunkGenerator on a generation miss.",
+      "id": "i_chunk_generator.generate_chunk",
+      "probe_target": "net.minecraft.world.gen.IChunkGenerator#generateChunk(int,int)",
+      "semantics": "Authoritative supported replacement seam for base terrain, biomes in the chunk, carving, and structure primer passes.",
+      "source_refs": [
+        "i_chunk_generator_unresolved"
+      ],
+      "stability": "supported-interface"
+    },
+    {
+      "applicability": "Chunk population after neighbor-readiness checks.",
+      "callsite": "net.minecraft.world.chunk.Chunk#populate(IChunkProvider,IChunkGenerator)",
+      "id": "i_chunk_generator.populate",
+      "probe_target": "net.minecraft.world.gen.IChunkGenerator#populate(int,int)",
+      "semantics": "Authoritative supported seam for generator-owned structures, biome decoration, spawning, ice, and other population. Custom implementations must emit desired Forge compatibility events themselves.",
+      "compatibility_delivery": "framework-callback-generator-owned",
+      "source_refs": [
+        "i_chunk_generator_unresolved",
+        "chunk_patch"
+      ],
+      "stability": "supported-interface"
+    },
+    {
+      "applicability": "A Chunk selected for owned population after it is already marked terrain-populated.",
+      "callsite": "net.minecraft.world.chunk.Chunk#populate(IChunkGenerator)",
+      "id": "i_chunk_generator.generate_structures",
+      "probe_target": "net.minecraft.world.gen.IChunkGenerator#generateStructures(Chunk,int,int)",
+      "semantics": "Supported generator contract for deferred structure maintenance. Returning true causes the Chunk to be marked dirty; this branch does not invoke GameRegistry.generateWorld.",
+      "source_refs": [
+        "chunk_patch",
+        "i_chunk_generator_unresolved"
+      ],
+      "stability": "supported-interface"
+    },
+    {
+      "applicability": "A persisted Chunk after its entities and ChunkDataEvent.Load payload are admitted on the synchronous loading callback.",
+      "callsite": "net.minecraftforge.common.chunkio.ChunkIOProvider#syncCallback() and synchronous ChunkProviderServer file loads",
+      "id": "i_chunk_generator.recreate_structures",
+      "probe_target": "net.minecraft.world.gen.IChunkGenerator#recreateStructures(Chunk,int,int)",
+      "semantics": "Supported generator contract for rebuilding structure indexes from loaded chunk state before Chunk.onLoad and neighbor population.",
+      "source_refs": [
+        "chunk_io_provider",
+        "chunk_provider_server_unresolved",
+        "i_chunk_generator_unresolved"
+      ],
+      "stability": "supported-interface"
+    },
+    {
+      "applicability": "Creature-spawn list queries delegated by ChunkProviderServer.",
+      "callsite": "net.minecraft.world.gen.ChunkProviderServer#getPossibleCreatures(EnumCreatureType,BlockPos)",
+      "id": "i_chunk_generator.get_possible_creatures",
+      "probe_target": "net.minecraft.world.gen.IChunkGenerator#getPossibleCreatures(EnumCreatureType,BlockPos)",
+      "semantics": "Supported generator query contract. A total replacement must return a valid list consistent with its biome and structure model.",
+      "source_refs": [
+        "chunk_provider_server_unresolved",
+        "i_chunk_generator_unresolved",
+        "world_server_patch"
+      ],
+      "stability": "supported-interface"
+    },
+    {
+      "applicability": "Structure-location queries delegated by ChunkProviderServer, including locate-style commands.",
+      "callsite": "net.minecraft.world.gen.ChunkProviderServer#getNearestStructurePos(World,String,BlockPos,boolean)",
+      "id": "i_chunk_generator.get_nearest_structure_pos",
+      "probe_target": "net.minecraft.world.gen.IChunkGenerator#getNearestStructurePos(World,String,BlockPos,boolean)",
+      "semantics": "Supported generator query contract. Return null for unsupported structure names rather than claiming unrelated independently generated structures.",
+      "source_refs": [
+        "chunk_provider_server_unresolved",
+        "i_chunk_generator_unresolved"
+      ],
+      "stability": "supported-interface"
+    },
+    {
+      "applicability": "Structure-membership queries delegated by ChunkProviderServer.",
+      "callsite": "net.minecraft.world.gen.ChunkProviderServer#isInsideStructure(World,String,BlockPos)",
+      "id": "i_chunk_generator.is_inside_structure",
+      "probe_target": "net.minecraft.world.gen.IChunkGenerator#isInsideStructure(World,String,BlockPos)",
+      "semantics": "Supported generator query contract. It describes structures owned by this generator and must not infer ownership of independent Forge decorators.",
+      "source_refs": [
+        "chunk_provider_server_unresolved",
+        "i_chunk_generator_unresolved"
+      ],
+      "stability": "supported-interface"
+    },
+    {
+      "applicability": "After IChunkGenerator.populate returns from Forge-patched Chunk.populate.",
+      "callsite": "net.minecraft.world.chunk.Chunk#populate(IChunkProvider,IChunkGenerator)",
+      "id": "game_registry.generate_world",
+      "probe_target": "net.minecraftforge.fml.common.registry.GameRegistry#generateWorld(int,int,World,IChunkGenerator,IChunkProvider)",
+      "semantics": "Framework-owned dispatch after IChunkGenerator.populate. It resets one Forge Random to the same derived chunk seed before every registered IWorldGenerator, runs ascending weights, and provides no stable equal-weight order. A custom IChunkGenerator must not call this method itself.",
+      "compatibility_delivery": "framework-automatic",
+      "source_refs": [
+        "game_registry",
+        "i_world_generator",
+        "chunk_patch"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "Mod initialization before the first GameRegistry world-generator dispatch.",
+      "callsite": "Mod initialization code calls GameRegistry.registerWorldGenerator.",
+      "id": "game_registry.register_world_generator",
+      "probe_target": "net.minecraftforge.fml.common.registry.GameRegistry#registerWorldGenerator(IWorldGenerator,int)",
+      "semantics": "Supported registration seam for independent Forge world decorators. Registration adds the generator instance and its weight and invalidates the cached sorted list; there is no supported unregister path.",
+      "compatibility_delivery": "independent-registration",
+      "source_refs": [
+        "game_registry",
+        "i_world_generator"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "Each registered Forge world generator during first Chunk population.",
+      "callsite": "net.minecraftforge.fml.common.registry.GameRegistry#generateWorld(int,int,World,IChunkGenerator,IChunkProvider) invokeinterface call",
+      "id": "i_world_generator.generate",
+      "probe_target": "net.minecraftforge.fml.common.IWorldGenerator#generate(Random,int,int,World,IChunkGenerator,IChunkProvider)",
+      "semantics": "Supported independent decorator callback and per-generator observation seam. One thrown callback aborts all later generators for that dispatch; compatibility must remain interface-based with no direct dependency on any particular structure mod.",
+      "compatibility_delivery": "framework-automatic",
+      "observation_stability": "invasive-callsite",
+      "source_refs": [
+        "game_registry",
+        "i_world_generator"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "Any event posted to this EventBus instance.",
+      "callsite": "All MinecraftForge bus posting helpers and direct bus posts.",
+      "id": "event_bus.post",
+      "probe_target": "net.minecraftforge.fml.common.eventhandler.EventBus#post(Event)",
+      "semantics": "Dispatch boundary with event type, cancellation/result state, posting thread, and complete listener-array visibility.",
+      "source_refs": [
+        "event_bus"
+      ],
+      "stability": "invasive-observation"
+    },
+    {
+      "applicability": "Each ASM-backed subscribed method reached by EventBus.post.",
+      "callsite": "net.minecraftforge.fml.common.eventhandler.EventBus#post(Event) listener loop",
+      "id": "asm_event_handler.invoke",
+      "probe_target": "net.minecraftforge.fml.common.eventhandler.ASMEventHandler#invoke(Event)",
+      "semantics": "Per-listener boundary for owner, method, priority, duration, exception, and before/after event state; instrumenting here is global and invasive.",
+      "source_refs": [
+        "asm_event_handler",
+        "event_bus"
+      ],
+      "stability": "invasive-observation"
+    },
+    {
+      "applicability": "Uncommitted 16x256x16 generation buffer writes.",
+      "callsite": "Terrain, surface, cave, ravine, and structure-primer generation.",
+      "id": "chunk_primer.set_block_state",
+      "probe_target": "net.minecraft.world.chunk.ChunkPrimer#setBlockState(int,int,int,IBlockState)",
+      "semantics": "Lowest practical block-write probe before Chunk construction; extremely hot and unsuitable for unbounded logging.",
+      "source_refs": [
+        "chunk_primer_unresolved"
+      ],
+      "stability": "invasive-hot-path"
+    },
+    {
+      "applicability": "High-level world mutation, including population and structure placement.",
+      "callsite": "Generators and features calling World#setBlockState.",
+      "id": "world.set_block_state",
+      "probe_target": "net.minecraft.world.World#setBlockState(BlockPos,IBlockState,int)",
+      "semantics": "Captures placement position, state, flags, and caller after a Chunk exists; extremely hot and may include non-worldgen writes. The normal World path nests Chunk#setBlockState, so both observations must share one write-chain identity rather than count as two mutations.",
+      "source_refs": [
+        "world_patch"
+      ],
+      "stability": "invasive-hot-path"
+    },
+    {
+      "applicability": "Direct mutation of an instantiated Chunk.",
+      "callsite": "World and generator code delegating to Chunk#setBlockState.",
+      "id": "chunk.set_block_state",
+      "probe_target": "net.minecraft.world.chunk.Chunk#setBlockState(BlockPos,IBlockState)",
+      "semantics": "Lower-level instantiated-chunk write boundary; extremely hot and not sufficient by itself to attribute a phase. It is normally nested below World#setBlockState but can also be called directly.",
+      "source_refs": [
+        "chunk_patch"
+      ],
+      "stability": "invasive-hot-path"
+    },
+    {
+      "applicability": "BiomeDecorator feature work after a generator explicitly invokes biome decoration.",
+      "callsite": "net.minecraft.world.biome.BiomeDecorator#genDecorations(Biome,World,Random)",
+      "id": "biome_decorator.gen_decorations",
+      "probe_target": "net.minecraft.world.biome.BiomeDecorator#genDecorations(Biome,World,Random)",
+      "semantics": "Invasive phase observation boundary around ore generation and named biome features. A custom IChunkGenerator reaches it only when it deliberately invokes the selected Biome decorator.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "biome_decorator_patch"
+      ],
+      "stability": "invasive-observation"
+    },
+    {
+      "applicability": "BiomeDecorator ore work reached from genDecorations.",
+      "callsite": "net.minecraft.world.biome.BiomeDecorator#generateOres(World,Random)",
+      "id": "biome_decorator.generate_ores",
+      "probe_target": "net.minecraft.world.biome.BiomeDecorator#generateOres(World,Random)",
+      "semantics": "Invasive phase observation boundary around the OreGenEvent Pre, GenerateMinable, and Post sequence. Custom generators do not receive it automatically.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "biome_decorator_patch"
+      ],
+      "stability": "invasive-observation"
+    },
+    {
+      "applicability": "Mod initialization before WorldInfo resolves the selected terrain type.",
+      "callsite": "A mod constructs a WorldType subclass with WorldType(String).",
+      "id": "world_type.create",
+      "probe_target": "net.minecraft.world.WorldType#WorldType(String)",
+      "semantics": "Forge-added supported creation and registration seam. Construction allocates a WORLD_TYPES slot; names are limited to 16 characters, resolve case-insensitively, and must be unique. Selection is persisted in WorldInfo and must occur before world loading.",
+      "source_refs": [
+        "world_info_unresolved",
+        "world_type_patch",
+        "world_type_unresolved"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "World creation using this WorldType.",
+      "callsite": "net.minecraft.world.WorldProvider#init()",
+      "id": "world_type.get_biome_provider",
+      "probe_target": "net.minecraft.world.WorldType#getBiomeProvider(World)",
+      "semantics": "Supported replacement seam for biome lookup and GenLayer ownership without replacing unrelated dimensions.",
+      "source_refs": [
+        "world_type_patch",
+        "world_provider_patch"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "Default GenLayer construction for a WorldType-backed BiomeProvider.",
+      "callsite": "net.minecraft.world.gen.layer.GenLayer#initializeAllBiomeGenerators(long,WorldType,ChunkGeneratorSettings)",
+      "id": "world_type.get_biome_layer",
+      "probe_target": "net.minecraft.world.WorldType#getBiomeLayer(long,GenLayer,ChunkGeneratorSettings)",
+      "semantics": "Forge-added supported override seam for the biome GenLayer inserted before hills, rivers, zoom, and voronoi layers. A custom BiomeProvider may bypass this route entirely.",
+      "compatibility_delivery": "default-implementation-only",
+      "source_refs": [
+        "gen_layer_patch",
+        "world_type_patch"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "World creation using this WorldType.",
+      "callsite": "net.minecraft.world.WorldProvider#createChunkGenerator()",
+      "id": "world_type.get_chunk_generator",
+      "probe_target": "net.minecraft.world.WorldType#getChunkGenerator(World,String)",
+      "semantics": "Preferred supported seam for a complete Overworld generator replacement selected by explicit world type.",
+      "source_refs": [
+        "world_type_patch",
+        "world_provider_patch"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "WorldProvider initialization for every dimension.",
+      "callsite": "World construction attaches and initializes its provider.",
+      "id": "world_provider.init",
+      "probe_target": "net.minecraft.world.WorldProvider#init()",
+      "semantics": "Binds the provider's BiomeProvider through the selected WorldType by default; custom providers may override dimension behavior.",
+      "source_refs": [
+        "world_provider_patch"
+      ],
+      "stability": "supported-subclass-seam"
+    },
+    {
+      "applicability": "Generator creation for a WorldProvider/dimension.",
+      "callsite": "Server world setup requests the provider's chunk generator.",
+      "id": "world_provider.create_chunk_generator",
+      "probe_target": "net.minecraft.world.WorldProvider#createChunkGenerator()",
+      "semantics": "Supported dimension-specific override seam; the default delegates to WorldType#getChunkGenerator.",
+      "source_refs": [
+        "world_provider_patch"
+      ],
+      "stability": "supported-subclass-seam"
+    },
+    {
+      "applicability": "Vanilla initial-spawn search and later coordinate-spawn checks.",
+      "callsite": "net.minecraft.world.WorldServer initial-spawn search delegates to its WorldProvider.",
+      "id": "world_provider.can_coordinate_be_spawn",
+      "probe_target": "net.minecraft.world.WorldProvider#canCoordinateBeSpawn(int,int)",
+      "semantics": "Supported provider override seam for determining viable spawn columns. A non-vanilla terrain model must implement a terminating viable rule or take ownership through WorldEvent.CreateSpawnPosition.",
+      "source_refs": [
+        "world_provider_patch",
+        "world_provider_unresolved",
+        "world_server_patch"
+      ],
+      "stability": "supported-subclass-seam"
+    },
+    {
+      "applicability": "Initial spawn creation for a new WorldServer before the vanilla biome and coordinate search begins.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraftforge.event.ForgeEventFactory#onCreateWorldSpawn(World,WorldSettings)",
+      "id": "world_event.create_spawn_position",
+      "probe_target": "net.minecraftforge.event.world.WorldEvent$CreateSpawnPosition",
+      "semantics": "Supported cancelable Forge event. Canceling suppresses the vanilla spawn search, so the listener must establish a valid spawn position itself.",
+      "source_refs": [
+        "forge_event_factory",
+        "world_event",
+        "world_server_patch"
+      ],
+      "stability": "supported-forge-event"
+    },
+    {
+      "applicability": "Creation of a distinct dimension type before worlds of that type load.",
+      "callsite": "Mod initialization.",
+      "id": "dimension_type.register",
+      "probe_target": "net.minecraft.world.DimensionType#register(String,String,int,Class,boolean)",
+      "semantics": "Registers a provider class and dimension-type identity; it does not replace an already loaded world's generator.",
+      "source_refs": [
+        "dimension_type_patch"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "Dimension id binding before the dimension is requested or loaded.",
+      "callsite": "Mod initialization.",
+      "id": "dimension_manager.register_dimension",
+      "probe_target": "net.minecraftforge.common.DimensionManager#registerDimension(int,DimensionType)",
+      "semantics": "Binds an integer dimension id to a registered DimensionType; replacing dimension zero is global and conflict-prone.",
+      "source_refs": [
+        "dimension_manager"
+      ],
+      "stability": "supported-forge-api"
+    },
+    {
+      "applicability": "Default BiomeProvider construction for a world type.",
+      "callsite": "net.minecraft.world.biome.BiomeProvider#BiomeProvider(long,WorldType,String)",
+      "id": "biome_provider.init_layers",
+      "probe_target": "net.minecraft.world.biome.BiomeProvider#BiomeProvider(long,WorldType,String)",
+      "semantics": "Constructs base GenLayers and applies WorldTypeEvent.InitBiomeGens; a custom BiomeProvider can replace the complete routing model.",
+      "source_refs": [
+        "biome_provider_patch",
+        "world_type_event"
+      ],
+      "stability": "supported-subclass-and-event-seam"
+    },
+    {
+      "applicability": "Every biome lookup, generation-area query, spawn-biome search, viability query, and cache cleanup routed through a custom BiomeProvider.",
+      "callsite": "WorldProvider and IChunkGenerator consumers query the selected BiomeProvider virtual methods.",
+      "id": "biome_provider.override_surface",
+      "probe_target": "net.minecraft.world.biome.BiomeProvider virtual query surface",
+      "subclass_constructor": "BiomeProvider()",
+      "methods": [
+        "getBiomesToSpawnIn()",
+        "getBiome(BlockPos)",
+        "getBiome(BlockPos,Biome)",
+        "getTemperatureAtHeight(float,int)",
+        "getBiomesForGeneration(Biome[],int,int,int,int)",
+        "getBiomes(Biome[],int,int,int,int)",
+        "getBiomes(Biome[],int,int,int,int,boolean)",
+        "areBiomesViable(int,int,int,List<Biome>)",
+        "findBiomePosition(int,int,int,List<Biome>,Random)",
+        "cleanupCache()",
+        "getModdedBiomeGenerators(WorldType,long,GenLayer[])",
+        "isFixedBiome()",
+        "getFixedBiome()"
+      ],
+      "semantics": "Supported subclass contract for a complete biome-routing replacement. The protected no-argument constructor bypasses default GenLayer initialization, so a subclass must override every method whose private default state it does not initialize; spawn methods must remain consistent with WorldProvider.canCoordinateBeSpawn.",
+      "source_refs": [
+        "biome_provider_patch",
+        "biome_provider_unresolved"
+      ],
+      "stability": "supported-subclass-seam"
+    }
+  ],
+  "schema_version": 1,
+  "sources": {
+    "anvil_chunk_loader_patch": {
+      "path": "patches/minecraft/net/minecraft/world/chunk/storage/AnvilChunkLoader.java.patch",
+      "sha256": "01da0675c5a96a999489a4373093a8fc7c5810b792782a5a32261c1a2f679cd1",
+      "status": "bound"
+    },
+    "asm_event_handler": {
+      "path": "src/main/java/net/minecraftforge/fml/common/eventhandler/ASMEventHandler.java",
+      "sha256": "22ca66105b6b04b0729e5f5009b5eb2719f8763a9d99382a7be7f8fb35a67957",
+      "status": "bound"
+    },
+    "biome_decorator_patch": {
+      "path": "patches/minecraft/net/minecraft/world/biome/BiomeDecorator.java.patch",
+      "sha256": "dd396548a5fb02a7fe69849d790c1b8fc7b4cc0ca92a90ffc055f99dfb06723f",
+      "status": "bound"
+    },
+    "biome_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/BiomeEvent.java",
+      "sha256": "d96521bee6ed26ab899e721a699a105f78723e0e044cd3e8a3c94b8b0796687f",
+      "status": "bound"
+    },
+    "biome_patch": {
+      "path": "patches/minecraft/net/minecraft/world/biome/Biome.java.patch",
+      "sha256": "c945b9e4da955f8ef7cc5c347e2e2661ffad1e90b40dc091d6f9e398ae9596ca",
+      "status": "bound"
+    },
+    "biome_provider_patch": {
+      "path": "patches/minecraft/net/minecraft/world/biome/BiomeProvider.java.patch",
+      "sha256": "9c6b1d68c0191ed81b164487ebb312215e6d3159d76d48d3ddc351d1d646b571",
+      "status": "bound"
+    },
+    "biome_provider_unresolved": {
+      "path": "net/minecraft/world/biome/BiomeProvider.java",
+      "reason": "The unpatched Minecraft class source is generated by the MCP toolchain and is not present in the bound Cleanroom source repository; the exact profile therefore exposes but does not source-prove the inherited virtual query surface.",
+      "sha256": null,
+      "status": "unresolved"
+    },
+    "block_sapling_patch": {
+      "path": "patches/minecraft/net/minecraft/block/BlockSapling.java.patch",
+      "sha256": "74c7c89beb028a1c1202f675061ce0a198ed9d8c4b1ea8bc51094b0f5220be88",
+      "status": "bound"
+    },
+    "chunk_generator_end_patch": {
+      "path": "patches/minecraft/net/minecraft/world/gen/ChunkGeneratorEnd.java.patch",
+      "sha256": "9778a2deb1191de790a65a105b4a4996ecb7413c2ddbd103f69d9e67ab7f457e",
+      "status": "bound"
+    },
+    "chunk_generator_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/ChunkGeneratorEvent.java",
+      "sha256": "17b7d7b3a414a8dba56d517f60979d8e510c7fbe9b93d0151f3bc54008063854",
+      "status": "bound"
+    },
+    "chunk_generator_hell_patch": {
+      "path": "patches/minecraft/net/minecraft/world/gen/ChunkGeneratorHell.java.patch",
+      "sha256": "a296ba67708491f9d9f42f037e4e579049623afbd6d781e8907d53a856f92a7e",
+      "status": "bound"
+    },
+    "chunk_generator_overworld_patch": {
+      "path": "patches/minecraft/net/minecraft/world/gen/ChunkGeneratorOverworld.java.patch",
+      "sha256": "d0ea084fdb0e05ecf5f3c7da40c796135bbe80b5f0b680795a7ff907a61d6f7f",
+      "status": "bound"
+    },
+    "chunk_data_event": {
+      "path": "src/main/java/net/minecraftforge/event/world/ChunkDataEvent.java",
+      "sha256": "6ff1ee3151a6bec00589e8e72ddbf47571dfe315b5b6d789be316ebfb843be4f",
+      "status": "bound"
+    },
+    "chunk_event": {
+      "path": "src/main/java/net/minecraftforge/event/world/ChunkEvent.java",
+      "sha256": "19b8ad7985ececaadf8bc0e89b06f9debaab4bc22e0d175263ce659f01362dec",
+      "status": "bound"
+    },
+    "chunk_io_provider": {
+      "path": "src/main/java/net/minecraftforge/common/chunkio/ChunkIOProvider.java",
+      "sha256": "303572f155b07bdf36ade7b3f56081aba3efce9899c758c18aa5a0adc807df29",
+      "status": "bound"
+    },
+    "chunk_patch": {
+      "path": "patches/minecraft/net/minecraft/world/chunk/Chunk.java.patch",
+      "sha256": "fde88420b5bafdc7ea5271e1f14b2e19ae17026ca2bbe03208532691be36583d",
+      "status": "bound"
+    },
+    "chunk_primer_unresolved": {
+      "path": "net/minecraft/world/chunk/ChunkPrimer.java",
+      "reason": "The unpatched Minecraft source is generated by the MCP toolchain and is not present in the bound Cleanroom source repository.",
+      "sha256": null,
+      "status": "unresolved"
+    },
+    "chunk_provider_server_patch": {
+      "path": "patches/minecraft/net/minecraft/world/gen/ChunkProviderServer.java.patch",
+      "sha256": "affeb351ea33664175087e03ea6f1e2f9a7c2c093a4bdf1de356e814453fa169",
+      "status": "bound"
+    },
+    "chunk_provider_server_unresolved": {
+      "path": "net/minecraft/world/gen/ChunkProviderServer.java",
+      "reason": "The unpatched Minecraft class source is generated by the MCP toolchain and is not present in the bound Cleanroom source repository; interface query delegation and the synchronous base load path remain declared uncertainty.",
+      "sha256": null,
+      "status": "unresolved"
+    },
+    "chunk_unresolved": {
+      "path": "net/minecraft/world/chunk/Chunk.java",
+      "reason": "The unpatched Minecraft class source is generated by the MCP toolchain and is not present in the bound Cleanroom source repository; the public 2x2-neighbor population router remains declared uncertainty outside its exact patch.",
+      "sha256": null,
+      "status": "unresolved"
+    },
+    "decorate_biome_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/DecorateBiomeEvent.java",
+      "sha256": "e3b592a28a1a0059eeb73005d49721dcce9f8366b2b31b5b07a69deb01104daa",
+      "status": "bound"
+    },
+    "deferred_biome_decorator": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/DeferredBiomeDecorator.java",
+      "sha256": "5f35f024c3ca135ce13f0ca8ad1436b29af5ad644c616e08b8c5aa8d15888bef",
+      "status": "bound"
+    },
+    "dimension_manager": {
+      "path": "src/main/java/net/minecraftforge/common/DimensionManager.java",
+      "sha256": "a2ea192d9108c65aadf88fa9c1243c8ff0057710e8a414fa463c1c348879b53e",
+      "status": "bound"
+    },
+    "dimension_type_patch": {
+      "path": "patches/minecraft/net/minecraft/world/DimensionType.java.patch",
+      "sha256": "26ae17c9328a597e42e50b5c66d7f33ac9b52ab7e5bcf91022c314ee19a565ef",
+      "status": "bound"
+    },
+    "event_bus": {
+      "path": "src/main/java/net/minecraftforge/fml/common/eventhandler/EventBus.java",
+      "sha256": "bdeb5ae37f450918ed17251d77b77285b3123b812687bd7ae9cbc95480f35eec",
+      "status": "bound"
+    },
+    "forge_event_factory": {
+      "path": "src/main/java/net/minecraftforge/event/ForgeEventFactory.java",
+      "sha256": "d48acd6b08183951e99e9cb8cf1a561fce44068ce9a202909fcd969c6ea41a5c",
+      "status": "bound"
+    },
+    "game_registry": {
+      "path": "src/main/java/net/minecraftforge/fml/common/registry/GameRegistry.java",
+      "sha256": "b3ff9f75ce2038345d6ab3ba62577cf8396a1c05c72426b32bf5f13ffbbba9ff",
+      "status": "bound"
+    },
+    "gen_layer_patch": {
+      "path": "patches/minecraft/net/minecraft/world/gen/layer/GenLayer.java.patch",
+      "sha256": "c037ed6e808fe18830f2363e6a05d6d7e57da4bc98909972c0a728e8f072fc31",
+      "status": "bound"
+    },
+    "gradle_properties": {
+      "path": "gradle.properties",
+      "sha256": "d27e6fba2fc7e0455b7ed0a9ce221a55b9563311a21246ca6bab542e56bb788d",
+      "status": "bound"
+    },
+    "i_chunk_generator_unresolved": {
+      "path": "net/minecraft/world/gen/IChunkGenerator.java",
+      "reason": "The unpatched Minecraft interface source is generated by the MCP toolchain and is not present in the bound Cleanroom source repository.",
+      "sha256": null,
+      "status": "unresolved"
+    },
+    "i_world_generator": {
+      "path": "src/main/java/net/minecraftforge/fml/common/IWorldGenerator.java",
+      "sha256": "3fc7b15a8772d60dddc62630cc75a3c4186031caa5ab8eb6960c9abf900b5594",
+      "status": "bound"
+    },
+    "init_map_gen_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/InitMapGenEvent.java",
+      "sha256": "f679f169ae9202b5d4c1b8fce8d06d56edae4d29226b3ec372ecca1943deb135",
+      "status": "bound"
+    },
+    "init_noise_gens_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/InitNoiseGensEvent.java",
+      "sha256": "f2dfa68e5a85ebaa753cb82fefc3e97535a55c97e7d07d235465e58ac5168781",
+      "status": "bound"
+    },
+    "minecraft_forge": {
+      "path": "src/main/java/net/minecraftforge/common/MinecraftForge.java",
+      "sha256": "f164f74b8a13f687082c538721f2d1193c1e3c3cdf7743564dde1ecf429ab823",
+      "status": "bound"
+    },
+    "ore_gen_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/OreGenEvent.java",
+      "sha256": "2aaf465aee52a7595916869bac6b4ddd999f72b8090311d501945074b2d794dd",
+      "status": "bound"
+    },
+    "populate_chunk_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/PopulateChunkEvent.java",
+      "sha256": "43f3cfe3c3d532e71dfe0b71c21ef0d8dbe6fa690827171104b041209a87b8e9",
+      "status": "bound"
+    },
+    "sapling_grow_tree_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/SaplingGrowTreeEvent.java",
+      "sha256": "426e1a421868c023959eea216b04978e567aa3e860e3e3cf60d1f31c0706bfd0",
+      "status": "bound"
+    },
+    "structure_village_patch": {
+      "path": "patches/minecraft/net/minecraft/world/gen/structure/StructureVillagePieces.java.patch",
+      "sha256": "d87504d297d5569d1c679f4bf317347538213cbbffa98d8edec87f817c585dde",
+      "status": "bound"
+    },
+    "terrain_gen": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/TerrainGen.java",
+      "sha256": "e04a615cc8985198f3c80de88afa87567b32c015dd1e3cb916f54e6c3b784fe1",
+      "status": "bound"
+    },
+    "world_patch": {
+      "path": "patches/minecraft/net/minecraft/world/World.java.patch",
+      "sha256": "3e571f29fd9ee9ecf8773eca9da8de54add41dbbd4b32eb7bd7844cdab9d1682",
+      "status": "bound"
+    },
+    "world_event": {
+      "path": "src/main/java/net/minecraftforge/event/world/WorldEvent.java",
+      "sha256": "acd2864cce191de9193d6dcb1d77184aa91b6e9f4d617187cb7085ee271359e3",
+      "status": "bound"
+    },
+    "world_info_unresolved": {
+      "path": "net/minecraft/world/storage/WorldInfo.java",
+      "reason": "The unpatched Minecraft class source is generated by the MCP toolchain and is not present in the bound Cleanroom source repository; persisted WorldType name, version, and generator-option selection remain declared uncertainty.",
+      "sha256": null,
+      "status": "unresolved"
+    },
+    "world_provider_patch": {
+      "path": "patches/minecraft/net/minecraft/world/WorldProvider.java.patch",
+      "sha256": "72a0f2418085fe6cb7e7ee30f25c957b83141fb317d005c4fb0e9a2e678523c9",
+      "status": "bound"
+    },
+    "world_provider_unresolved": {
+      "path": "net/minecraft/world/WorldProvider.java",
+      "reason": "The unpatched Minecraft class source is generated by the MCP toolchain and is not present in the bound Cleanroom source repository; base spawn-coordinate behavior remains declared uncertainty outside its exact patch.",
+      "sha256": null,
+      "status": "unresolved"
+    },
+    "world_server_patch": {
+      "path": "patches/minecraft/net/minecraft/world/WorldServer.java.patch",
+      "sha256": "25d95eff9fc2cbf45a3d26ad01dca1807ea003ac43b6441ae9548a23517a4a99",
+      "status": "bound"
+    },
+    "world_type_event": {
+      "path": "src/main/java/net/minecraftforge/event/terraingen/WorldTypeEvent.java",
+      "sha256": "dc9d9245686a877c3d1f3ec8bffd867f6faeca0bb5ee243fcc1972c3c2ab648a",
+      "status": "bound"
+    },
+    "world_type_patch": {
+      "path": "patches/minecraft/net/minecraft/world/WorldType.java.patch",
+      "sha256": "422b9f4f9e05c102747e68179a9de28822d5a29fb9cd53beff5ae858d4105758",
+      "status": "bound"
+    },
+    "world_type_unresolved": {
+      "path": "net/minecraft/world/WorldType.java",
+      "reason": "The unpatched Minecraft class source is generated by the MCP toolchain and is not present in the bound Cleanroom source repository; WORLD_TYPES insertion, case-insensitive lookup, and WorldInfo selection are exposed with declared source uncertainty.",
+      "sha256": null,
+      "status": "unresolved"
+    }
+  },
+  "terraingen_events": [
+    {
+      "applicability": "First use of a DeferredBiomeDecorator for a biome singleton.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraftforge.event.terraingen.DeferredBiomeDecorator#fireCreateEventAndReplace(Biome)",
+      "id": "terraingen.biome.create_decorator",
+      "probe_target": "net.minecraftforge.event.terraingen.BiomeEvent$CreateDecorator",
+      "semantics": "Mutable decorator replacement event; lazy first-use timing means the replacement becomes global for that biome instance.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "biome_event",
+        "deferred_biome_decorator"
+      ]
+    },
+    {
+      "applicability": "Village palette block selection.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraft.world.gen.structure.StructureVillagePieces$Village#getBiomeSpecificBlockState(IBlockState)",
+      "id": "terraingen.biome.get_village_block_id",
+      "probe_target": "net.minecraftforge.event.terraingen.BiomeEvent$GetVillageBlockID",
+      "semantics": "HasResult event that can supply a replacement biome-specific village block state.",
+      "source_refs": [
+        "biome_event",
+        "structure_village_patch"
+      ]
+    },
+    {
+      "applicability": "Client or server biome grass-color query.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.biome.Biome#getGrassColorAtPos(BlockPos)",
+      "id": "terraingen.biome.get_grass_color",
+      "probe_target": "net.minecraftforge.event.terraingen.BiomeEvent$GetGrassColor",
+      "semantics": "Mutable color event; presentation/query hook rather than terrain generation authority.",
+      "source_refs": [
+        "biome_event",
+        "biome_patch"
+      ]
+    },
+    {
+      "applicability": "Client or server biome foliage-color query.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.biome.Biome#getFoliageColorAtPos(BlockPos)",
+      "id": "terraingen.biome.get_foliage_color",
+      "probe_target": "net.minecraftforge.event.terraingen.BiomeEvent$GetFoliageColor",
+      "semantics": "Mutable color event; presentation/query hook rather than terrain generation authority.",
+      "source_refs": [
+        "biome_event",
+        "biome_patch"
+      ]
+    },
+    {
+      "applicability": "Client or server biome water-color query.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.biome.Biome#getWaterColorMultiplier()",
+      "id": "terraingen.biome.get_water_color",
+      "probe_target": "net.minecraftforge.event.terraingen.BiomeEvent$GetWaterColor",
+      "semantics": "Mutable color event; presentation/query hook rather than terrain generation authority.",
+      "source_refs": [
+        "biome_event",
+        "biome_patch"
+      ]
+    },
+    {
+      "applicability": "Overworld, Nether, and End vanilla generator surface replacement passes.",
+      "bus": "forge.event_bus",
+      "callsite": "ForgeEventFactory#onReplaceBiomeBlocks from vanilla ChunkGenerator implementations",
+      "id": "terraingen.chunk_generator.replace_biome_blocks",
+      "probe_target": "net.minecraftforge.event.terraingen.ChunkGeneratorEvent$ReplaceBiomeBlocks",
+      "semantics": "HasResult event; DENY skips the default surface replacement after a listener mutates the ChunkPrimer.",
+      "compatibility_delivery": "default-implementation-only",
+      "source_refs": [
+        "chunk_generator_event",
+        "forge_event_factory",
+        "chunk_generator_overworld_patch",
+        "chunk_generator_hell_patch",
+        "chunk_generator_end_patch"
+      ]
+    },
+    {
+      "applicability": "Vanilla Nether and End density-field initialization; no exact Overworld callsite exists in this source revision.",
+      "bus": "forge.event_bus",
+      "callsite": "ChunkGeneratorHell#initializeNoiseField and ChunkGeneratorEnd#getHeights",
+      "id": "terraingen.chunk_generator.init_noise_field",
+      "probe_target": "net.minecraftforge.event.terraingen.ChunkGeneratorEvent$InitNoiseField",
+      "semantics": "HasResult event; DENY selects the supplied noise array. Overworld density formula replacement requires a custom generator or invasive transform.",
+      "compatibility_delivery": "default-implementation-only",
+      "source_refs": [
+        "chunk_generator_event",
+        "chunk_generator_hell_patch",
+        "chunk_generator_end_patch"
+      ]
+    },
+    {
+      "applicability": "Start of BiomeDecorator#genDecorations.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.biome.BiomeDecorator#genDecorations(Biome,World,Random)",
+      "id": "terraingen.decorate.pre",
+      "probe_target": "net.minecraftforge.event.terraingen.DecorateBiomeEvent$Pre",
+      "semantics": "Non-cancelable pre boundary. The exact patch posts this event on EVENT_BUS despite contradictory class Javadoc.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "decorate_biome_event",
+        "biome_decorator_patch"
+      ]
+    },
+    {
+      "applicability": "End of BiomeDecorator#genDecorations after ore and feature work returns.",
+      "bus": "forge.event_bus",
+      "callsite": "net.minecraft.world.biome.BiomeDecorator#genDecorations(Biome,World,Random)",
+      "id": "terraingen.decorate.post",
+      "probe_target": "net.minecraftforge.event.terraingen.DecorateBiomeEvent$Post",
+      "semantics": "Non-cancelable post boundary. The exact patch posts this event on EVENT_BUS despite contradictory class Javadoc.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "decorate_biome_event",
+        "biome_decorator_patch"
+      ]
+    },
+    {
+      "applicability": "A named biome-decoration feature attempted through TerrainGen.decorate.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraftforge.event.terraingen.TerrainGen#decorate(World,Random,ChunkPos,EventType) from the default BiomeDecorator; placement-aware custom callers may use the five-argument ChunkPos/BlockPos overload",
+      "event_types": [
+        "BIG_SHROOM",
+        "CACTUS",
+        "CLAY",
+        "CUSTOM",
+        "DEAD_BUSH",
+        "DESERT_WELL",
+        "FLOWERS",
+        "FOSSIL",
+        "GRASS",
+        "ICE",
+        "LAKE_LAVA",
+        "LAKE_WATER",
+        "LILYPAD",
+        "PUMPKIN",
+        "REED",
+        "ROCK",
+        "SAND",
+        "SAND_PASS2",
+        "SHROOM",
+        "TREE"
+      ],
+      "id": "terraingen.decorate.feature",
+      "probe_target": "net.minecraftforge.event.terraingen.DecorateBiomeEvent$Decorate",
+      "semantics": "HasResult feature decision; DENY suppresses the named default feature and skipped RNG consumption can shift later output. Default BiomeDecorator calls use a ChunkPos and expose null placementPos.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "biome_decorator_patch",
+        "decorate_biome_event",
+        "terrain_gen"
+      ]
+    },
+    {
+      "applicability": "Vanilla generator construction when a map generator is passed through TerrainGen.getModdedMapGen.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraftforge.event.terraingen.TerrainGen#getModdedMapGen(MapGenBase,EventType)",
+      "event_types": [
+        "CAVE",
+        "CUSTOM",
+        "END_CITY",
+        "MINESHAFT",
+        "NETHER_BRIDGE",
+        "NETHER_CAVE",
+        "OCEAN_MONUMENT",
+        "RAVINE",
+        "SCATTERED_FEATURE",
+        "STRONGHOLD",
+        "VILLAGE",
+        "WOODLAND_MANSION"
+      ],
+      "id": "terraingen.init_map_gen",
+      "probe_target": "net.minecraftforge.event.terraingen.InitMapGenEvent",
+      "semantics": "Mutable replacement event for MapGenBase. Vanilla generator constructors may cast the result, so replacement type and nullability must remain compatible.",
+      "compatibility_delivery": "default-implementation-only",
+      "source_refs": [
+        "init_map_gen_event",
+        "terrain_gen",
+        "chunk_generator_overworld_patch",
+        "chunk_generator_hell_patch",
+        "chunk_generator_end_patch"
+      ]
+    },
+    {
+      "applicability": "Vanilla Overworld, Nether, and End generator construction.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraftforge.event.terraingen.TerrainGen#getModdedNoiseGenerators(World,Random,Context)",
+      "context_types": [
+        "ContextEnd",
+        "ContextHell",
+        "ContextOverworld"
+      ],
+      "id": "terraingen.init_noise_gens",
+      "probe_target": "net.minecraftforge.event.terraingen.InitNoiseGensEvent",
+      "semantics": "Replaces individual NoiseGeneratorOctaves objects through a mutable cloned context; it does not replace the complete density formula.",
+      "compatibility_delivery": "default-implementation-only",
+      "source_refs": [
+        "init_noise_gens_event",
+        "terrain_gen",
+        "chunk_generator_overworld_patch",
+        "chunk_generator_hell_patch",
+        "chunk_generator_end_patch"
+      ]
+    },
+    {
+      "applicability": "Start of BiomeDecorator ore generation where the vanilla decorator emits the lifecycle.",
+      "bus": "forge.ore_gen_bus",
+      "callsite": "net.minecraft.world.biome.BiomeDecorator#genDecorations(Biome,World,Random)",
+      "id": "terraingen.ore.pre",
+      "probe_target": "net.minecraftforge.event.terraingen.OreGenEvent$Pre",
+      "semantics": "Non-cancelable ore lifecycle pre boundary.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "ore_gen_event",
+        "biome_decorator_patch"
+      ]
+    },
+    {
+      "applicability": "End of BiomeDecorator ore generation where the vanilla decorator emits the lifecycle.",
+      "bus": "forge.ore_gen_bus",
+      "callsite": "net.minecraft.world.biome.BiomeDecorator#genDecorations(Biome,World,Random)",
+      "id": "terraingen.ore.post",
+      "probe_target": "net.minecraftforge.event.terraingen.OreGenEvent$Post",
+      "semantics": "Non-cancelable ore lifecycle post boundary; specialized Nether calls may emit GenerateMinable without this outer pair.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "ore_gen_event",
+        "biome_decorator_patch",
+        "chunk_generator_hell_patch"
+      ]
+    },
+    {
+      "applicability": "A named ore/minable attempt routed through TerrainGen.generateOre.",
+      "bus": "forge.ore_gen_bus",
+      "callsite": "net.minecraftforge.event.terraingen.TerrainGen#generateOre(World,Random,WorldGenerator,BlockPos,EventType)",
+      "event_types": [
+        "ANDESITE",
+        "COAL",
+        "CUSTOM",
+        "DIAMOND",
+        "DIORITE",
+        "DIRT",
+        "EMERALD",
+        "GOLD",
+        "GRANITE",
+        "GRAVEL",
+        "IRON",
+        "LAPIS",
+        "QUARTZ",
+        "REDSTONE",
+        "SILVERFISH"
+      ],
+      "id": "terraingen.ore.generate_minable",
+      "probe_target": "net.minecraftforge.event.terraingen.OreGenEvent$GenerateMinable",
+      "semantics": "HasResult ore decision; DENY suppresses the named generator and skipped RNG consumption can shift later output.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "ore_gen_event",
+        "terrain_gen"
+      ]
+    },
+    {
+      "applicability": "Beginning of vanilla chunk-generator population when that generator emits Forge lifecycle events.",
+      "bus": "forge.event_bus",
+      "callsite": "ForgeEventFactory#onChunkPopulate(true,...) from vanilla IChunkGenerator implementations",
+      "id": "terraingen.populate.pre",
+      "probe_target": "net.minecraftforge.event.terraingen.PopulateChunkEvent$Pre",
+      "semantics": "Non-cancelable population pre boundary. A custom IChunkGenerator must post its own compatibility lifecycle if required.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "populate_chunk_event",
+        "forge_event_factory",
+        "chunk_generator_overworld_patch",
+        "chunk_generator_hell_patch",
+        "chunk_generator_end_patch"
+      ]
+    },
+    {
+      "applicability": "A vanilla chunk generator's declared population post point.",
+      "bus": "forge.event_bus",
+      "callsite": "ForgeEventFactory#onChunkPopulate(false,...) from vanilla IChunkGenerator implementations",
+      "id": "terraingen.populate.post",
+      "probe_target": "net.minecraftforge.event.terraingen.PopulateChunkEvent$Post",
+      "semantics": "Non-cancelable post boundary. In the exact Nether generator it occurs before some later decoration and ore work, so it is not a universal population-complete signal.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "populate_chunk_event",
+        "forge_event_factory",
+        "chunk_generator_overworld_patch",
+        "chunk_generator_hell_patch",
+        "chunk_generator_end_patch"
+      ]
+    },
+    {
+      "applicability": "A named population feature attempted through TerrainGen.populate.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraftforge.event.terraingen.TerrainGen#populate(IChunkGenerator,World,Random,int,int,boolean,EventType)",
+      "event_types": [
+        "ANIMALS",
+        "CUSTOM",
+        "DUNGEON",
+        "FIRE",
+        "GLOWSTONE",
+        "ICE",
+        "LAKE",
+        "LAVA",
+        "NETHER_LAVA",
+        "NETHER_LAVA2",
+        "NETHER_MAGMA"
+      ],
+      "id": "terraingen.populate.feature",
+      "probe_target": "net.minecraftforge.event.terraingen.PopulateChunkEvent$Populate",
+      "semantics": "HasResult feature decision; DENY suppresses the named default feature and skipped RNG consumption can shift later output.",
+      "compatibility_delivery": "generator-opt-in",
+      "source_refs": [
+        "populate_chunk_event",
+        "terrain_gen"
+      ]
+    },
+    {
+      "applicability": "Sapling growth, not initial chunk generation.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraft.block.BlockSapling#generateTree(World,BlockPos,IBlockState,Random)",
+      "id": "terraingen.sapling_grow_tree",
+      "probe_target": "net.minecraftforge.event.terraingen.SaplingGrowTreeEvent",
+      "semantics": "HasResult decision controlling whether a sapling growth attempt proceeds.",
+      "source_refs": [
+        "sapling_grow_tree_event",
+        "terrain_gen",
+        "block_sapling_patch"
+      ]
+    },
+    {
+      "applicability": "Only code that explicitly calls GenLayer.getModdedBiomeSize.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraft.world.gen.layer.GenLayer#getModdedBiomeSize(WorldType,int)",
+      "id": "terraingen.world_type.biome_size",
+      "probe_target": "net.minecraftforge.event.terraingen.WorldTypeEvent$BiomeSize",
+      "semantics": "Mutable biome-size value. No in-tree caller exists in the exact bound Cleanroom revision, so treat this declaration as dormant unless external code calls the helper.",
+      "source_refs": [
+        "world_type_event",
+        "gen_layer_patch"
+      ]
+    },
+    {
+      "applicability": "Default BiomeProvider construction.",
+      "bus": "forge.terrain_gen_bus",
+      "callsite": "net.minecraft.world.biome.BiomeProvider#BiomeProvider(long,WorldType,String)",
+      "id": "terraingen.world_type.init_biome_gens",
+      "probe_target": "net.minecraftforge.event.terraingen.WorldTypeEvent$InitBiomeGens",
+      "semantics": "Mutable GenLayer array replacement after WorldType#getBiomeLayer constructs the base layers.",
+      "compatibility_delivery": "default-implementation-only",
+      "source_refs": [
+        "world_type_event",
+        "biome_provider_patch"
+      ]
+    }
+  ]
+}

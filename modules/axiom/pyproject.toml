@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "workbench-axiom"
+version = "0.1.1"
+description = "Thin Workbench integration for the independent Axiom Java engine"
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.1,<0.2.0"]
+
+[project.entry-points."workbench.modules"]
+axiom = "workbench_axiom:module"
+
+[tool.setuptools]
+packages = ["workbench_axiom", "workbench_resources.modules.axiom"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.axiom" = "."
+
+[tool.setuptools.package-data]
+workbench_axiom = ["engine-contract.json"]
+"workbench_resources.modules.axiom" = ["tests/oracles/NativeIdentityInputs.java", "jvm/src/materialProgramTooling/java/NativeAddonInventory.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeRootClassSpace.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeCoremodPrefix.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeEarlyLaunchPrefix.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeEarlyClassSpace.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeLoaderPrefix.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeServerOwnerPrefix.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeSelectionClassSpace.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeServerOwnerClassSpace.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeConstructionClassSpace.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeConfigurationObservations.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeSelectedMaterialObservations.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeGroovyInitializationPrefix.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeGroovyClassSpace.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeProgramObservations.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeObservationAccess.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeMaterialObservations.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeMaterialPropertyState.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeRegistrationEffects.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeMetaItemObservations.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeFluidObservations.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeGeneratedContentObservations.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeBiomeObservations.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeRecipeValues.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeEffectiveRecipeObservations.java", "jvm/src/materialRuntime/java/research/orthrus/axiom/materialhost/NativeVanillaRecipeObservations.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeFoundationBootstrap.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialCallGate.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialBytecodeGate.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialRecordBytecode.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialTraitClasses.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialTraitLoaderHook.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialAdmissionPolicy.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialMapperBindings.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialPropertyBindings.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialScriptBindings.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/RecipeStateCatalog.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeRecipeFunctionObservations.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeDiagnosticOrigins.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/NativeContainedArtifacts.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialDiagnosticCauses.java", "jvm/src/main/java/research/orthrus/axiom/materialhost/MaterialDiagnosticGroups.java"]
+
+[tool.workbench]
+module-id = "axiom"
+requires = []

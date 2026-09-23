@@ -1,0 +1,45 @@
+{
+  "artifacts": [
+    {
+      "display_name": "Commons0815",
+      "download_page_url": "https://www.curseforge.com/minecraft/mc-mods/commons0815/files/3248796",
+      "file_id": 3248796,
+      "filename": "Commons0815-1.12.2-1.4.0.jar",
+      "hash": "076ed53a86f503add06c252856a1a8ad7b0d2667",
+      "hash_format": "sha1",
+      "id": "commons0815-1.12.2-1.4.0",
+      "metadata_path": "mods/commons0815.pw.toml",
+      "output_path": "mods/Commons0815-1.12.2-1.4.0.jar",
+      "project_id": 346326
+    },
+    {
+      "display_name": "OpenGlasses2",
+      "download_page_url": "https://www.curseforge.com/minecraft/mc-mods/openglasses2/files/3143467",
+      "file_id": 3143467,
+      "filename": "OpenGlasses-MC1.12.2-2.2-53.jar",
+      "hash": "b8fb78b8b7e7486a40966cf283833fa04abc84b6",
+      "hash_format": "sha1",
+      "id": "openglasses2-2.2-53",
+      "metadata_path": "mods/openglasses2.pw.toml",
+      "output_path": "mods/OpenGlasses-MC1.12.2-2.2-53.jar",
+      "project_id": 300957
+    },
+    {
+      "display_name": "Scape and Run: Parasites",
+      "download_page_url": "https://www.curseforge.com/minecraft/mc-mods/scape-and-run-parasites/files/5370258",
+      "file_id": 5370258,
+      "filename": "SRParasites-1.12.2v1.9.21.jar",
+      "hash": "17225b532334c4652a698be3d41d819af2b0f051",
+      "hash_format": "sha1",
+      "id": "scape-and-run-parasites-1.9.21",
+      "metadata_path": "mods/scape-and-run-parasites.pw.toml",
+      "output_path": "mods/SRParasites-1.12.2v1.9.21.jar",
+      "project_id": 348025
+    }
+  ],
+  "format": "workbench-manual-artifact-profile-v1",
+  "profile_id": "workbench-pack:supersymmetry:manual-artifacts-v1",
+  "project_id": "supersymmetry",
+  "schema_version": 1,
+  "seed_layout": "minecraft-root"
+}

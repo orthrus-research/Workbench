@@ -1,0 +1,490 @@
+{
+  "contract_id": "MANUALS-IMPLEMENTATION-GUIDE-V1",
+  "fixture_version": 1,
+  "invalid_cases": [
+    {
+      "base_case_id": "valid-all-requirement-classes",
+      "case_id": "unsupported-authority-promotion",
+      "expected_error_codes": [
+        "authority-role-basis-mismatch"
+      ],
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/evidence/0/basis",
+          "value": "runtime-mechanics"
+        }
+      ]
+    },
+    {
+      "base_case_id": "valid-all-requirement-classes",
+      "case_id": "missing-conditional-predicate",
+      "expected_error_codes": [
+        "conditional-predicate-required"
+      ],
+      "mutations": [
+        {
+          "op": "remove",
+          "path": "/steps/0/requirements/5/condition"
+        }
+      ]
+    },
+    {
+      "base_case_id": "valid-all-requirement-classes",
+      "case_id": "example-promoted-to-normative",
+      "expected_error_codes": [
+        "requirement-support-threshold"
+      ],
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/steps/0/requirements/0/support_evidence_ids",
+          "value": [
+            "fixture:evidence:example"
+          ]
+        }
+      ]
+    },
+    {
+      "base_case_id": "valid-all-requirement-classes",
+      "case_id": "disconnected-evidence",
+      "expected_error_codes": [
+        "unused-evidence"
+      ],
+      "mutations": [
+        {
+          "op": "add",
+          "path": "/evidence/-",
+          "value": {
+            "authority": "synthetic-contract-fixture",
+            "authority_role": "explanation",
+            "basis": "curated-interpretation",
+            "derived_from": [],
+            "id": "fixture:evidence:unused",
+            "record": {
+              "fixture": true,
+              "statement": "This record is intentionally disconnected."
+            },
+            "record_kind": "synthetic-contract-fixture",
+            "record_sha256": "1c42d3cdc9a930b2d2befa3a430d636c8d4cebc436451e485dd70fd82d107e28",
+            "scope": {
+              "fixture_id": "fixture:all-requirement-classes"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "base_case_id": "valid-all-requirement-classes",
+      "case_id": "false-closed-world-negative",
+      "expected_error_codes": [
+        "omission-proof-required"
+      ],
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/steps/0/requirements/0/omission",
+          "value": {
+            "closed_scope": true,
+            "evidence_ids": [
+              "fixture:evidence:enforcement"
+            ],
+            "outcome": "The fixture cannot compile in any environment.",
+            "status": "proven"
+          }
+        }
+      ]
+    }
+  ],
+  "policy_id": "MANUALS-REQUIREMENT-POLICY-V1",
+  "valid_cases": [
+    {
+      "case_id": "valid-all-requirement-classes",
+      "document": {
+        "manual_id": "manual:sha256:b418c30c3055dca60ce415929bd089c62973da76e417107e977914db30a0b1c9",
+        "contract_id": "MANUALS-IMPLEMENTATION-GUIDE-V1",
+        "evidence": [
+          {
+            "authority": "synthetic-contract-fixture",
+            "authority_role": "api-contract",
+            "basis": "pinned-source",
+            "derived_from": [],
+            "id": "fixture:evidence:api-contract",
+            "record": {
+              "fixture": true,
+              "rule": "The synthetic API requires the declared input type."
+            },
+            "record_kind": "synthetic-contract-fixture",
+            "record_sha256": "02f719fc54a57a23bd30e8e74559f12fd66a97788048771d731d3eefe4c5d92b",
+            "scope": {
+              "fixture_id": "fixture:all-requirement-classes"
+            }
+          },
+          {
+            "authority": "synthetic-contract-fixture",
+            "authority_role": "source-enforcement",
+            "basis": "pinned-source",
+            "derived_from": [],
+            "id": "fixture:evidence:enforcement",
+            "record": {
+              "fixture": true,
+              "rule": "The synthetic lifecycle enforces registration and integration."
+            },
+            "record_kind": "synthetic-contract-fixture",
+            "record_sha256": "34c795d9d898b31a54ac43920d20162d262eae1190660f1b46162b06c411368c",
+            "scope": {
+              "fixture_id": "fixture:all-requirement-classes"
+            }
+          },
+          {
+            "authority": "synthetic-contract-fixture",
+            "authority_role": "example-only",
+            "basis": "pinned-source",
+            "derived_from": [],
+            "id": "fixture:evidence:example",
+            "record": {
+              "fixture": true,
+              "rule": "The synthetic example uses a conventional name."
+            },
+            "record_kind": "synthetic-contract-fixture",
+            "record_sha256": "41439e8e69a7833e555c3192e20f2ac8d0e0a1dd3de0d0e5528e37fb7bca83e8",
+            "scope": {
+              "fixture_id": "fixture:all-requirement-classes"
+            }
+          },
+          {
+            "authority": "synthetic-contract-fixture",
+            "authority_role": "explanation",
+            "basis": "curated-interpretation",
+            "derived_from": [
+              "fixture:evidence:example"
+            ],
+            "id": "fixture:evidence:explanation",
+            "record": {
+              "fixture": true,
+              "rule": "The conventional name improves navigation but is not enforced."
+            },
+            "record_kind": "synthetic-contract-fixture",
+            "record_sha256": "4ccf3943ab641df19a779db36f190fd7668786f9a4a838cc168f492cae22b5ec",
+            "scope": {
+              "fixture_id": "fixture:all-requirement-classes"
+            }
+          }
+        ],
+        "examples": [
+          {
+            "evidence_ids": [
+              "fixture:evidence:example"
+            ],
+            "example_id": "fixture:example:contract-surface",
+            "family_id": "fixture:all-requirement-classes",
+            "fixture": true,
+            "normative": false,
+            "step_ids": [
+              "manual-step:sha256:40ffe1525600ac35d49264e2449dccef47fdd36dc7c909f046c73a8fe1ec7719"
+            ],
+            "version_scope_id": "fixture:version-scope"
+          }
+        ],
+        "expected_observations": [
+          {
+            "basis": "pinned-source",
+            "evidence_ids": [
+              "fixture:evidence:enforcement"
+            ],
+            "expected_status": "available",
+            "observation_id": "fixture:observation:registered",
+            "scope": {
+              "fixture_id": "fixture:all-requirement-classes"
+            },
+            "selector": {
+              "key": "fixture:registered-artifact",
+              "kind": "fixture-artifact"
+            },
+            "verification_method": "synthetic-contract-check"
+          }
+        ],
+        "family": {
+          "id": "fixture:all-requirement-classes",
+          "kind": "contract-fixture",
+          "title": "All requirement classes"
+        },
+        "fixture": true,
+        "format": "susy-manual-family-v1",
+        "known_unknowns": [],
+        "policy_id": "MANUALS-REQUIREMENT-POLICY-V1",
+        "prerequisites": [
+          {
+            "artifact_id": "fixture:input:api",
+            "kind": "fixture-api",
+            "status": "available"
+          }
+        ],
+        "request": {
+          "authority_requirements": {
+            "optional": [
+              "curated-interpretation"
+            ],
+            "required": [
+              "pinned-source"
+            ]
+          },
+          "contract_id": "MANUALS-IMPLEMENTATION-GUIDE-V1",
+          "format": "susy-manual-request-v1",
+          "implementation_family": {
+            "key": "fixture:all-requirement-classes",
+            "kind": "contract-fixture"
+          },
+          "outcome": {
+            "id": "fixture:exercise-contract-surface",
+            "statement": "Exercise every Manual requirement class without making a game implementation claim."
+          },
+          "policy_id": "MANUALS-REQUIREMENT-POLICY-V1",
+          "profile_scopes": [
+            {
+              "physical_side": "OFFLINE",
+              "profile": "CONTRACT_FIXTURE"
+            }
+          ],
+          "request_id": "manual-request:sha256:0bc22f3af8d5840dfb98528f03b8231214626b1abf336e0926249a28c3fd0436",
+          "schema_version": 1,
+          "version_scope": {
+            "forge_version": "14.23.5.2860",
+            "minecraft_version": "1.12.2",
+            "pack_commit": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972",
+            "pack_version": "0.1.16.11",
+            "runtime_snapshot_id": "fixture:runtime-snapshot",
+            "source_set_id": "fixture:source-set"
+          }
+        },
+        "schema_version": 1,
+        "status": "resolved",
+        "steps": [
+          {
+            "action": "fixture:declare-and-register",
+            "evidence_ids": [
+              "fixture:evidence:api-contract",
+              "fixture:evidence:enforcement",
+              "fixture:evidence:example",
+              "fixture:evidence:explanation"
+            ],
+            "inputs": [
+              {
+                "artifact_id": "fixture:input:api",
+                "kind": "fixture-api"
+              }
+            ],
+            "lifecycle_stage": "CONTRACT_FIXTURE",
+            "omission": {
+              "closed_scope": false,
+              "evidence_ids": [],
+              "outcome": "Step-level omission is represented by its individual requirement outcomes.",
+              "status": "unknown"
+            },
+            "ordinal": 0,
+            "outputs": [
+              {
+                "artifact_id": "fixture:registered-artifact",
+                "kind": "fixture-artifact"
+              }
+            ],
+            "physical_side": "OFFLINE",
+            "requirements": [
+              {
+                "classification": "compile-required",
+                "condition": null,
+                "modal": "must",
+                "omission": {
+                  "closed_scope": false,
+                  "evidence_ids": [
+                    "fixture:evidence:api-contract"
+                  ],
+                  "outcome": "Compilation is expected to fail against the synthetic API.",
+                  "status": "expected"
+                },
+                "requirement_id": "manual-requirement:sha256:a3024d0f2d8e4ed57f97378d52e76e5a5e92abb80553134689c4c947b07b4e13",
+                "scope": {
+                  "fixture_id": "fixture:all-requirement-classes"
+                },
+                "statement": "Supply the synthetic API input type.",
+                "support_evidence_ids": [
+                  "fixture:evidence:api-contract"
+                ]
+              },
+              {
+                "classification": "runtime-required",
+                "condition": null,
+                "modal": "must",
+                "omission": {
+                  "closed_scope": false,
+                  "evidence_ids": [
+                    "fixture:evidence:enforcement"
+                  ],
+                  "outcome": "Registration is expected not to complete.",
+                  "status": "expected"
+                },
+                "requirement_id": "manual-requirement:sha256:3e4205e136a8adfe7b2e35ea00fe460dcbb295180757f18b9a907e83e4286e1c",
+                "scope": {
+                  "fixture_id": "fixture:all-requirement-classes"
+                },
+                "statement": "Invoke the synthetic registration lifecycle.",
+                "support_evidence_ids": [
+                  "fixture:evidence:enforcement"
+                ]
+              },
+              {
+                "classification": "identity-required",
+                "condition": null,
+                "modal": "must",
+                "omission": {
+                  "closed_scope": false,
+                  "evidence_ids": [
+                    "fixture:evidence:api-contract"
+                  ],
+                  "outcome": "Stable lookup identity is expected to be unavailable.",
+                  "status": "expected"
+                },
+                "requirement_id": "manual-requirement:sha256:4dfea94fb3594ec798033056a63e5e90d101c727fdef3ebf84352e5df27f96a4",
+                "scope": {
+                  "fixture_id": "fixture:all-requirement-classes"
+                },
+                "statement": "Allocate the exact fixture identity.",
+                "support_evidence_ids": [
+                  "fixture:evidence:api-contract"
+                ]
+              },
+              {
+                "classification": "presentation-required",
+                "condition": null,
+                "modal": "must",
+                "omission": {
+                  "closed_scope": false,
+                  "evidence_ids": [
+                    "fixture:evidence:enforcement"
+                  ],
+                  "outcome": "The requested fixture presentation is expected to be absent.",
+                  "status": "expected"
+                },
+                "requirement_id": "manual-requirement:sha256:c6525b7a91bde75e79f314f8a4b6365ef9784bb10978d5a011c4f23b96346f1b",
+                "scope": {
+                  "fixture_id": "fixture:all-requirement-classes"
+                },
+                "statement": "Register the requested fixture presentation.",
+                "support_evidence_ids": [
+                  "fixture:evidence:enforcement"
+                ]
+              },
+              {
+                "classification": "integration-required",
+                "condition": null,
+                "modal": "must",
+                "omission": {
+                  "closed_scope": false,
+                  "evidence_ids": [
+                    "fixture:evidence:enforcement"
+                  ],
+                  "outcome": "The requested fixture integration is expected to be unavailable.",
+                  "status": "expected"
+                },
+                "requirement_id": "manual-requirement:sha256:aa34d5232a732debc8603ae7829016dde7461f736f8aec30daa4cc48ddf22f24",
+                "scope": {
+                  "fixture_id": "fixture:all-requirement-classes"
+                },
+                "statement": "Connect the requested fixture integration.",
+                "support_evidence_ids": [
+                  "fixture:evidence:enforcement"
+                ]
+              },
+              {
+                "classification": "conditional",
+                "condition": {
+                  "inputs": [
+                    {
+                      "key": "fixture:presentation-enabled",
+                      "value": true
+                    }
+                  ],
+                  "predicate_id": "fixture:when-presentation-enabled",
+                  "statement": "The caller requests fixture presentation.",
+                  "when_true_class": "presentation-required"
+                },
+                "modal": "must-when",
+                "omission": {
+                  "closed_scope": false,
+                  "evidence_ids": [
+                    "fixture:evidence:enforcement"
+                  ],
+                  "outcome": "Presentation is expected to be absent when the predicate is true.",
+                  "status": "expected"
+                },
+                "requirement_id": "manual-requirement:sha256:4a4d60e5d28589c63e2a17243a4b184f16adbf5d8264b65a526554125cb452de",
+                "scope": {
+                  "fixture_id": "fixture:all-requirement-classes"
+                },
+                "statement": "Supply the fixture presentation resource when requested.",
+                "support_evidence_ids": [
+                  "fixture:evidence:enforcement"
+                ]
+              },
+              {
+                "classification": "conventional",
+                "condition": null,
+                "modal": "should",
+                "omission": {
+                  "closed_scope": false,
+                  "evidence_ids": [],
+                  "outcome": "No mechanical failure is established.",
+                  "status": "unknown"
+                },
+                "requirement_id": "manual-requirement:sha256:8969811740d36718fb07ecb3e0ce2abfbd4f99efaa328ca215c74b1ef9ee3ba0",
+                "scope": {
+                  "fixture_id": "fixture:all-requirement-classes"
+                },
+                "statement": "Use the conventional fixture display name.",
+                "support_evidence_ids": [
+                  "fixture:evidence:example",
+                  "fixture:evidence:explanation"
+                ]
+              },
+              {
+                "classification": "optional",
+                "condition": null,
+                "modal": "may",
+                "omission": {
+                  "closed_scope": false,
+                  "evidence_ids": [
+                    "fixture:evidence:api-contract"
+                  ],
+                  "outcome": "The defined core fixture outcome is expected to remain available.",
+                  "status": "expected"
+                },
+                "requirement_id": "manual-requirement:sha256:421b2a66a8aa6dfa01afaa9a5ed1caa939ce01346906ed9fafffb517daed6b87",
+                "scope": {
+                  "fixture_id": "fixture:all-requirement-classes"
+                },
+                "statement": "Add the synthetic extension.",
+                "support_evidence_ids": [
+                  "fixture:evidence:api-contract"
+                ]
+              }
+            ],
+            "status": "specified",
+            "step_id": "manual-step:sha256:40ffe1525600ac35d49264e2449dccef47fdd36dc7c909f046c73a8fe1ec7719"
+          }
+        ],
+        "validation": [
+          {
+            "check_id": "fixture:check:contract-surface",
+            "evidence_ids": [
+              "fixture:evidence:api-contract",
+              "fixture:evidence:enforcement",
+              "fixture:evidence:example",
+              "fixture:evidence:explanation"
+            ],
+            "status": "pass"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.org/workbench/schemas/workbench-supersymmetry-staged-pack-execution-request-v1.schema.json",
+  "title": "Supersymmetry staged Packwiz execution request V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "ordinal", "pair_request_id", "plan_id", "request_id", "required_assertions", "role", "schema_version", "side", "stage_id"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-staged-pack-execution-request-v1"},
+    "schema_version": {"const": 1},
+    "request_id": {"pattern": "^workbench-supersymmetry-staged-pack-execution-request:sha256:[0-9a-f]{64}$"},
+    "pair_request_id": {"pattern": "^workbench-feature-runtime-pair-request:sha256:[0-9a-f]{64}$"},
+    "plan_id": {"pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"},
+    "stage_id": {"pattern": "^workbench-supersymmetry-staged-material-fluid-pack:sha256:[0-9a-f]{64}$"},
+    "ordinal": {"type": "integer", "minimum": 0, "maximum": 1},
+    "role": {"enum": ["baseline", "candidate"]},
+    "side": {"enum": ["client", "server"]},
+    "required_assertions": {"type": "array", "minItems": 6, "maxItems": 6, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  }
+}

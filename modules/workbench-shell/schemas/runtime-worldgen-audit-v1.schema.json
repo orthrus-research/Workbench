@@ -1,0 +1,966 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/runtime-worldgen-audit-v1.schema.json",
+  "title": "Workbench read-only runtime world-generation audit V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "audit_id",
+    "operation_class",
+    "authority",
+    "state",
+    "source",
+    "evidence",
+    "script_bindings",
+    "profile_expectations",
+    "artifact_observations",
+    "source_alignments",
+    "biome_registry",
+    "log_observations",
+    "configuration_observations",
+    "findings",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-runtime-worldgen-audit-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "audit_id": {
+      "$ref": "#/$defs/sha256Id"
+    },
+    "operation_class": {
+      "const": "read-only"
+    },
+    "authority": {
+      "$ref": "#/$defs/authority"
+    },
+    "state": {
+      "enum": [
+        "findings-observed",
+        "no-findings-observed",
+        "inconclusive",
+        "insufficient-evidence"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "script_bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scriptBinding"
+      }
+    },
+    "profile_expectations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/profileExpectation"
+      }
+    },
+    "artifact_observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactObservation"
+      }
+    },
+    "source_alignments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourceAlignment"
+      }
+    },
+    "biome_registry": {
+      "$ref": "#/$defs/biomeRegistry"
+    },
+    "log_observations": {
+      "$ref": "#/$defs/logObservations"
+    },
+    "configuration_observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/configurationObservation"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonempty"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sha256Id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "fileUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^file:"
+    },
+    "nullableString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableEvidenceId": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^evidence:[1-9][0-9]*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "normative",
+        "atlas_publication",
+        "sentinel_policy_finding"
+      ],
+      "properties": {
+        "classification": {
+          "const": "atlas-derived-observation"
+        },
+        "normative": {
+          "const": false
+        },
+        "atlas_publication": {
+          "const": false
+        },
+        "sentinel_policy_finding": {
+          "const": false
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace",
+        "project",
+        "pack_profile",
+        "runtime_root_uri",
+        "runtime_binding",
+        "audit_profile"
+      ],
+      "properties": {
+        "workspace": {
+          "type": "object",
+          "required": [
+            "root_uri",
+            "revision"
+          ],
+          "properties": {
+            "root_uri": {
+              "$ref": "#/$defs/fileUri"
+            },
+            "revision": {
+              "$ref": "#/$defs/nonempty"
+            }
+          }
+        },
+        "project": {
+          "type": "object",
+          "required": [
+            "name",
+            "version",
+            "minecraft_version"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "version": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "minecraft_version": {
+              "$ref": "#/$defs/nonempty"
+            }
+          }
+        },
+        "pack_profile": {
+          "type": "object",
+          "required": [
+            "profile_family_id",
+            "selected_profile"
+          ],
+          "properties": {
+            "profile_family_id": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "selected_profile": {
+              "$ref": "#/$defs/nonempty"
+            }
+          }
+        },
+        "runtime_root_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "runtime_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "basis"
+          ],
+          "properties": {
+            "state": {
+              "const": "unverified"
+            },
+            "basis": {
+              "const": "user-selected-runtime-root"
+            }
+          }
+        },
+        "audit_profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "uri",
+            "sha256",
+            "size",
+            "profile_id",
+            "maturity"
+          ],
+          "properties": {
+            "uri": {
+              "$ref": "#/$defs/fileUri"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "profile_id": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "maturity": {
+              "$ref": "#/$defs/nonempty"
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "kind",
+        "uri",
+        "sha256",
+        "size"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^evidence:[1-9][0-9]*$"
+        },
+        "kind": {
+          "enum": [
+            "biometweaker-script",
+            "biometweaker-biome-report",
+            "runtime-log",
+            "forge-configuration",
+            "runtime-artifact",
+            "project-source"
+          ]
+        },
+        "uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "climateWeights": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "ICY",
+          "COOL",
+          "WARM",
+          "DESERT"
+        ]
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minItems": 1
+      }
+    },
+    "scriptBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "line",
+        "variable",
+        "selector",
+        "arguments",
+        "generation_line",
+        "climate",
+        "weight"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^evidence:[1-9][0-9]*$"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "variable": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "selector": {
+          "enum": [
+            "forBiomes",
+            "forAllBiomesExcept"
+          ]
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        },
+        "generation_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "climate": {
+          "enum": [
+            "ICY",
+            "COOL",
+            "WARM",
+            "DESERT"
+          ]
+        },
+        "weight": {
+          "type": "integer"
+        }
+      }
+    },
+    "profileExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "variable",
+        "climate",
+        "expected_selector",
+        "state",
+        "observed_selector",
+        "evidence_id",
+        "assignment_line",
+        "generation_line"
+      ],
+      "properties": {
+        "kind": {
+          "const": "biometweaker-generation-selector"
+        },
+        "variable": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "climate": {
+          "enum": [
+            "ICY",
+            "COOL",
+            "WARM",
+            "DESERT"
+          ]
+        },
+        "expected_selector": {
+          "enum": [
+            "forBiomes",
+            "forAllBiomesExcept"
+          ]
+        },
+        "state": {
+          "enum": [
+            "matched",
+            "mismatched",
+            "unobserved"
+          ]
+        },
+        "observed_selector": {
+          "oneOf": [
+            {
+              "enum": [
+                "forBiomes",
+                "forAllBiomesExcept"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_id": {
+          "$ref": "#/$defs/nullableEvidenceId"
+        },
+        "assignment_line": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generation_line": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "artifactObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "required",
+        "state",
+        "expected_sha256",
+        "observed_sha256",
+        "evidence_ids"
+      ],
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "verified",
+            "drifted",
+            "unavailable",
+            "ambiguous"
+          ]
+        },
+        "expected_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "observed_sha256": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evidence:[1-9][0-9]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "sourceAlignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "state",
+        "source_evidence_id",
+        "runtime_evidence_id"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "state": {
+          "enum": [
+            "matched",
+            "drifted",
+            "unavailable"
+          ]
+        },
+        "source_evidence_id": {
+          "$ref": "#/$defs/nullableEvidenceId"
+        },
+        "runtime_evidence_id": {
+          "$ref": "#/$defs/nullableEvidenceId"
+        }
+      }
+    },
+    "membership": {
+      "type": "object",
+      "required": [
+        "resource_location",
+        "evidence_id"
+      ],
+      "properties": {
+        "resource_location": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^evidence:[1-9][0-9]*$"
+        },
+        "climate": {
+          "enum": [
+            "ICY",
+            "COOL",
+            "WARM",
+            "DESERT"
+          ]
+        },
+        "weights": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1
+        },
+        "climates": {
+          "$ref": "#/$defs/climateWeights"
+        },
+        "dictionary_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "uniqueItems": true
+        },
+        "basis": {
+          "enum": [
+            "dictionary",
+            "profile",
+            "dictionary-and-profile"
+          ]
+        }
+      }
+    },
+    "biomeRegistry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "report_count",
+        "climate_totals",
+        "duplicate_memberships",
+        "cross_climate_memberships",
+        "non_overworld_memberships"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "observed",
+            "unavailable"
+          ]
+        },
+        "report_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "climate_totals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "climate",
+              "biome_count",
+              "entry_count"
+            ],
+            "properties": {
+              "climate": {
+                "enum": [
+                  "ICY",
+                  "COOL",
+                  "WARM",
+                  "DESERT"
+                ]
+              },
+              "biome_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "entry_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "duplicate_memberships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/membership"
+          }
+        },
+        "cross_climate_memberships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/membership"
+          }
+        },
+        "non_overworld_memberships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/membership"
+          }
+        }
+      }
+    },
+    "logEvidence": {
+      "type": "object",
+      "required": [
+        "evidence_id",
+        "line"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^evidence:[1-9][0-9]*$"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "logObservations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "unsupported_biomes",
+        "missing_events",
+        "noise_state_warnings",
+        "server_ready_markers",
+        "world_seeds"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "observed",
+            "unavailable"
+          ]
+        },
+        "unsupported_biomes": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/logEvidence"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "biome_id",
+                  "biome_class",
+                  "resource_location"
+                ],
+                "properties": {
+                  "biome_id": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "biome_class": {
+                    "$ref": "#/$defs/nonempty"
+                  },
+                  "resource_location": {
+                    "$ref": "#/$defs/nonempty"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "missing_events": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/logEvidence"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "generator",
+                  "event",
+                  "reporter",
+                  "severity"
+                ],
+                "properties": {
+                  "generator": {
+                    "$ref": "#/$defs/nonempty"
+                  },
+                  "event": {
+                    "$ref": "#/$defs/nonempty"
+                  },
+                  "reporter": {
+                    "$ref": "#/$defs/nonempty"
+                  },
+                  "severity": {
+                    "$ref": "#/$defs/nonempty"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "noise_state_warnings": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/logEvidence"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "dimension_id",
+                  "dimension_name",
+                  "reporter",
+                  "severity",
+                  "consequence_observed",
+                  "consequence_line"
+                ],
+                "properties": {
+                  "dimension_id": {
+                    "type": "integer"
+                  },
+                  "dimension_name": {
+                    "$ref": "#/$defs/nonempty"
+                  },
+                  "reporter": {
+                    "$ref": "#/$defs/nonempty"
+                  },
+                  "severity": {
+                    "$ref": "#/$defs/nonempty"
+                  },
+                  "consequence_observed": {
+                    "type": "boolean"
+                  },
+                  "consequence_line": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "server_ready_markers": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/logEvidence"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "reporter"
+                ],
+                "properties": {
+                  "reporter": {
+                    "$ref": "#/$defs/nonempty"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "world_seeds": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/logEvidence"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "seed"
+                ],
+                "properties": {
+                  "seed": {
+                    "type": "integer"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "configurationObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "state",
+        "configured",
+        "config_evidence_id",
+        "artifact_evidence_id",
+        "configured_type",
+        "configured_value"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "state": {
+          "enum": [
+            "class-literal-observed",
+            "class-literal-not-observed",
+            "binding-unresolved",
+            "unavailable"
+          ]
+        },
+        "configured": {
+          "type": "boolean"
+        },
+        "config_evidence_id": {
+          "$ref": "#/$defs/nullableEvidenceId"
+        },
+        "artifact_evidence_id": {
+          "$ref": "#/$defs/nullableEvidenceId"
+        },
+        "configured_type": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "configured_value": {
+          "$ref": "#/$defs/nullableString"
+        }
+      }
+    },
+    "guidance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "interpretation",
+        "developer_actions"
+      ],
+      "properties": {
+        "profile_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "interpretation": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "developer_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "confidence",
+        "summary",
+        "facts",
+        "evidence_ids"
+      ],
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "confidence": {
+          "enum": [
+            "confirmed",
+            "observed"
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "facts": {
+          "type": "object"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evidence:[1-9][0-9]*$"
+          },
+          "uniqueItems": true
+        },
+        "guidance": {
+          "$ref": "#/$defs/guidance"
+        }
+      }
+    }
+  }
+}

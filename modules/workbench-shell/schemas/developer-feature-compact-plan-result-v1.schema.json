@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.dev/workbench/schemas/developer-feature-compact-plan-result-v1.schema.json",
+  "title": "Workbench developer feature compact plan result V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority_boundary",
+    "diagnostic",
+    "example",
+    "family",
+    "format",
+    "id",
+    "kind",
+    "limitations",
+    "plan",
+    "retained_plan_uri",
+    "review",
+    "schema_version",
+    "state",
+    "transaction"
+  ],
+  "properties": {
+    "authority_boundary": {
+      "const": {
+        "complete_owner_plan_omitted": true,
+        "owner_plan_remains_construction_authority": true,
+        "retained_plan_remains_action_authority": true,
+        "release_or_publication_authorized": false
+      }
+    },
+    "diagnostic": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "reason"],
+          "properties": {
+            "code": {"const": "example-not-applicable"},
+            "reason": {"type": "string", "minLength": 1, "maxLength": 4096}
+          }
+        },
+        {"type": "null"}
+      ]
+    },
+    "example": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "current_applicability_state",
+            "example_key",
+            "historical_applicability_state"
+          ],
+          "properties": {
+            "current_applicability_state": {
+              "enum": ["owner-plan-validated", "owner-plan-rejected"]
+            },
+            "example_key": {"type": "string", "minLength": 1},
+            "historical_applicability_state": {
+              "enum": ["not-declared", "provenance-only"]
+            }
+          }
+        },
+        {"type": "null"}
+      ]
+    },
+    "family": {
+      "enum": ["material-fluid-recipe", "recipe-change", "quest-for-process"]
+    },
+    "format": {"const": "workbench-developer-feature-compact-plan-result-v1"},
+    "id": {
+      "type": "string",
+      "pattern": "^workbench-developer-feature-compact-plan-result:sha256:[0-9a-f]{64}$"
+    },
+    "kind": {"const": "workbench-developer-feature-compact-plan-result"},
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "plan": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["format", "id", "state", "workspace_uri"],
+          "properties": {
+            "format": {
+              "enum": [
+                "workbench-developer-material-fluid-recipe-plan-v1",
+                "workbench-supersymmetry-recipe-change-plan-v1",
+                "workbench-developer-source-feature-plan-v1"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+            },
+            "state": {
+              "enum": ["experimental-ready", "experimental-ready-runtime-unverified"]
+            },
+            "workspace_uri": {"type": "string", "pattern": "^file:"}
+          }
+        },
+        {"type": "null"}
+      ]
+    },
+    "retained_plan_uri": {
+      "anyOf": [
+        {"type": "string", "pattern": "^file:"},
+        {"type": "null"}
+      ]
+    },
+    "review": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["additions", "changed_files", "deletions", "operation_count"],
+          "properties": {
+            "additions": {"type": "integer", "minimum": 0},
+            "changed_files": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1}
+            },
+            "deletions": {"type": "integer", "minimum": 0},
+            "operation_count": {"type": "integer", "minimum": 1, "maximum": 64}
+          }
+        },
+        {"type": "null"}
+      ]
+    },
+    "schema_version": {"const": 1},
+    "state": {"enum": ["ready", "not-applicable"]},
+    "transaction": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "current_effective_state",
+            "plan_freshness_state",
+            "workspace_match_state"
+          ],
+          "properties": {
+            "current_effective_state": {
+              "enum": [
+                "applied",
+                "drifted",
+                "interrupted",
+                "matches-after-without-receipt",
+                "mixed",
+                "planned",
+                "restored",
+                "unavailable"
+              ]
+            },
+            "plan_freshness_state": {"enum": ["ready", "stale"]},
+            "workspace_match_state": {
+              "enum": ["matches-before", "matches-after", "mixed", "drifted", "unavailable"]
+            }
+          }
+        },
+        {"type": "null"}
+      ]
+    }
+  }
+}

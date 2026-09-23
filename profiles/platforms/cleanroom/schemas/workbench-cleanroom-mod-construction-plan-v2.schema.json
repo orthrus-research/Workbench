@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/profiles/cleanroom/workbench-cleanroom-mod-construction-plan-v2.schema.json",
+  "title": "Cleanroom mod fresh-project construction plan V2",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "bare_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "file": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$",
+          "type": "string"
+        },
+        "sha256": {"$ref": "#/$defs/digest"},
+        "size": {"minimum": 0, "type": "integer"}
+      },
+      "required": ["path", "sha256", "size"],
+      "type": "object"
+    },
+    "identity": {
+      "additionalProperties": false,
+      "properties": {
+        "device": {"minimum": 0, "type": "integer"},
+        "inode": {"minimum": 0, "type": "integer"}
+      },
+      "required": ["device", "inode"],
+      "type": "object"
+    },
+    "limitations": {
+      "const": [
+        "This constructor writes only the exact 19-file generic Cleanroom fixture projection to an absent, empty-directory, or clean unborn Git target.",
+        "The portable transform changes only the fixture build output and artifact-allowlist roots to target-local ignored .workbench storage.",
+        "Construction does not qualify Gradle dependency resolution, compilation, remapping, a client, a dedicated server, IDE integration, publication, or arbitrary templates.",
+        "Direct apply requires exact plan consent; Blueprints owns fresh-target bootstrap, byte transactions, and recovery, while the Cleanroom profile owns admitted source bytes and rendering."
+      ]
+    },
+    "manifest": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {"const": "sha256-file-tree-v1"},
+        "files": {
+          "items": {"$ref": "#/$defs/file"},
+          "maxItems": 19,
+          "minItems": 19,
+          "type": "array"
+        },
+        "tree_digest": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["algorithm", "files", "tree_digest"],
+      "type": "object"
+    },
+    "target_observation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"state": {"const": "absent"}}},
+          "then": {
+            "properties": {
+              "git": {"type": "null"},
+              "target_identity": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"state": {"const": "empty-directory"}}},
+          "then": {
+            "properties": {
+              "git": {"type": "null"},
+              "target_identity": {"$ref": "#/$defs/identity"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"state": {"const": "unborn-git"}}},
+          "then": {
+            "properties": {
+              "git": {"$ref": "#/$defs/unborn_git"},
+              "target_identity": {"$ref": "#/$defs/identity"}
+            }
+          }
+        }
+      ],
+      "properties": {
+        "format": {"const": "workbench-blueprints-fresh-target-observation-v2"},
+        "git": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/unborn_git"}
+          ]
+        },
+        "id": {
+          "pattern": "^workbench-blueprints-fresh-target-observation:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "parent_identity": {"$ref": "#/$defs/identity"},
+        "schema_version": {"const": 2},
+        "state": {"enum": ["absent", "empty-directory", "unborn-git"]},
+        "target_identity": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/identity"}
+          ]
+        },
+        "target_uri": {
+          "minLength": 8,
+          "pattern": "^file://",
+          "type": "string"
+        }
+      },
+      "required": [
+        "format",
+        "git",
+        "id",
+        "parent_identity",
+        "schema_version",
+        "state",
+        "target_identity",
+        "target_uri"
+      ],
+      "type": "object"
+    },
+    "unborn_git": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "exclude_sha256": {"type": "null"},
+            "exclude_size": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "exclude_sha256": {"$ref": "#/$defs/bare_digest"},
+            "exclude_size": {"minimum": 0, "type": "integer"}
+          }
+        }
+      ],
+      "properties": {
+        "exclude_sha256": {
+          "anyOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/bare_digest"}
+          ]
+        },
+        "exclude_size": {
+          "anyOf": [
+            {"type": "null"},
+            {"minimum": 0, "type": "integer"}
+          ]
+        },
+        "git_directory_identity": {"$ref": "#/$defs/identity"},
+        "head_state": {"const": "unborn"},
+        "object_format": {"const": "sha1"}
+      },
+      "required": [
+        "exclude_sha256",
+        "exclude_size",
+        "git_directory_identity",
+        "head_state",
+        "object_format"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "adapter": {
+      "const": {
+        "hook_id": "cleanroom-generic-mod-fixture-render-v2",
+        "owner_id": "cleanroom-platform-profile",
+        "render_mode": "locked-fixture-portable-transform-v2"
+      }
+    },
+    "authority_boundary": {
+      "const": {
+        "construction_owner": "Blueprints",
+        "profile_owner": "cleanroom-platform-profile",
+        "publication_authorized": false,
+        "scope": "exact-owner-admitted-fresh-project",
+        "transaction_owner": "Blueprints"
+      }
+    },
+    "direct_apply_authorized": {"type": "boolean"},
+    "format": {"const": "workbench-cleanroom-mod-construction-plan-v2"},
+    "id": {
+      "pattern": "^workbench-cleanroom-mod-construction-plan:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "kind": {"const": "workbench-cleanroom-mod-construction-plan"},
+    "kind_id": {"const": "workbench-new-project-kind:cleanroom-mod"},
+    "limitations": {"$ref": "#/$defs/limitations"},
+    "operations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "after_base64": {
+            "contentEncoding": "base64",
+            "minLength": 1,
+            "type": "string"
+          },
+          "after_sha256": {"$ref": "#/$defs/bare_digest"},
+          "after_size": {"minimum": 0, "type": "integer"},
+          "before_base64": {"type": "null"},
+          "before_sha256": {"type": "null"},
+          "before_size": {"const": 0},
+          "ordinal": {"minimum": 0, "type": "integer"},
+          "path": {
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$)|\\.workbench(?:/|$)|\\.deconstruction(?:/|$))[A-Za-z0-9._/-]+$",
+            "type": "string"
+          },
+          "source_path": {
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$",
+            "type": "string"
+          },
+          "source_sha256": {"$ref": "#/$defs/digest"},
+          "transform_id": {
+            "anyOf": [
+              {"type": "null"},
+              {"const": "cleanroom-generic-mod-portable-build-root-v2"}
+            ]
+          }
+        },
+        "required": [
+          "after_base64",
+          "after_sha256",
+          "after_size",
+          "before_base64",
+          "before_sha256",
+          "before_size",
+          "ordinal",
+          "path",
+          "source_path",
+          "source_sha256",
+          "transform_id"
+        ],
+        "type": "object"
+      },
+      "maxItems": 19,
+      "minItems": 19,
+      "type": "array"
+    },
+    "output_mode": {"enum": ["instructions", "direct-apply"]},
+    "output_manifest": {"$ref": "#/$defs/manifest"},
+    "owner_record_id": {
+      "pattern": "^workbench-cleanroom-mod-construction-owner:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "portable_transform": {
+      "const": {
+        "output_sha256": "sha256:c3ce8cb08875039d79e86d246d673624ac89fd6d31c6139c72962701aedfc268",
+        "output_size": 7690,
+        "path": "build.gradle",
+        "replacements": [
+          {
+            "after_sha256": "sha256:ed5934dfaa4e849d4bec37bf7d2a013c5d89ff8df829a45a85e83fb78752ce76",
+            "after_size": 71,
+            "before_sha256": "sha256:887bf905aee8219fb3ab6b9ff527026106a9a64f3ed14e6513cc0e220cb1c725",
+            "before_size": 114
+          },
+          {
+            "after_sha256": "sha256:ba865d1f2165a1b660388cae3230851b54afc9fafff8a59a11cd0834c4a4744d",
+            "after_size": 69,
+            "before_sha256": "sha256:78dcfd0e471cbf8a618f17d26a903f4ebf85767e33e35f727f337373de089f4e",
+            "before_size": 84
+          }
+        ],
+        "source_sha256": "sha256:11fd814d04441e23480ccedddcac0e23f3ae644b69053e8fcc7eef0e2eb50914",
+        "substitutions": [
+          {
+            "replacement_utf8": "layout.buildDirectory = layout.projectDirectory.dir('.workbench/build')",
+            "source_utf8": "layout.buildDirectory = file(\n    '../../../../../.workbench/build/cleanroom/0.6.8-alpha/generic-mod-daily-loop'\n)"
+          },
+          {
+            "replacement_utf8": "def ignoredRoot = rootProject.file('.workbench').toPath().normalize()",
+            "source_utf8": "def ignoredRoot = rootProject.file('../../../../../.workbench').toPath().normalize()"
+          }
+        ],
+        "transform_id": "cleanroom-generic-mod-portable-build-root-v2"
+      }
+    },
+    "request_id": {
+      "pattern": "^workbench-cleanroom-mod-construction-request:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema_version": {"const": 2},
+    "source_lock": {
+      "const": {
+        "fixture_id": "workbench-fixture:cleanroom:generic-mod-daily-loop",
+        "path": "profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop/fixture-lock-v1.json",
+        "schema_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-generic-mod-fixture-lock-v1.schema.json",
+        "schema_sha256": "sha256:362e5eb800cf6803ecc15b29192b7c627c47f57f48cb3eecb0d283c3168b66ba",
+        "sha256": "sha256:fc0845123d2a9b833a63b2d49a29a38b39388e8ac24a810dcc07e87a6fbad8d2",
+        "tree_digest": "sha256:21c67a6372b57aa538853458eef8a7ade5f30b6079b4a2c476a5d75c5769b157"
+      }
+    },
+    "target_observation": {"$ref": "#/$defs/target_observation"},
+    "target_uri": {
+      "minLength": 8,
+      "pattern": "^file://",
+      "type": "string"
+    }
+  },
+  "required": [
+    "adapter",
+    "authority_boundary",
+    "direct_apply_authorized",
+    "format",
+    "id",
+    "kind",
+    "kind_id",
+    "limitations",
+    "operations",
+    "output_mode",
+    "output_manifest",
+    "owner_record_id",
+    "portable_transform",
+    "request_id",
+    "schema_version",
+    "source_lock",
+    "target_observation",
+    "target_uri"
+  ]
+}

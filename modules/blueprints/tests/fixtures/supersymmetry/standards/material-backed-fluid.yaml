@@ -1,0 +1,206 @@
+schema_version: 1
+format: susy-blueprints-standard-authoring-v1
+contract_id: BLUEPRINTS-IMPLEMENTATION-STANDARD-V1
+standard_key: material-backed-fluid
+version: 1.0.0
+lifecycle: active
+kind: primary
+feature_family: material-backed-fluid
+priority: 100
+specificity: 50
+mandatory_core:
+  id: material-core
+  path: modules/blueprints/tests/fixtures/supersymmetry/standards/core-template.tpl
+  sha256: 97c1094f004a8a9216e6616d48d4ef71a446a85b7941f1fae62731ff890b9f29
+variants:
+  - id: liquid
+    priority: 20
+    specificity: 10
+    when:
+      - parameter: generate_fluid
+        operator: equals
+        value: true
+    template:
+      id: liquid-template
+      path: modules/blueprints/tests/fixtures/supersymmetry/standards/liquid-template.tpl
+      sha256: d4ff62c1942f96c33254eadc682bd07a35f8fe8ee6076e1295046b1fb4ac4afe
+    compatible_components:
+      - localization-component
+parameters:
+  - name: translation
+    class: optional
+    value_type: string
+    description: Optional translated name.
+    constraints: {}
+  - name: registry_name
+    class: derived
+    value_type: string
+    description: Normalized registry name.
+    constraints:
+      pattern: "^[a-z0-9_]+$"
+    derivation:
+      operator: slugify
+      arguments:
+        - operator: parameter
+          arguments:
+            - name
+  - name: name
+    class: required
+    value_type: string
+    description: Developer-facing material name.
+    constraints:
+      min_length: 1
+  - name: material_id
+    class: allocated
+    value_type: integer
+    description: Numeric material registry identity.
+    constraints:
+      minimum: 4000
+      maximum: 32766
+    allocation_domain: susy-material-id
+  - name: generate_fluid
+    class: defaulted
+    value_type: boolean
+    description: Whether to generate the fluid property.
+    constraints: {}
+    default: true
+targets:
+  - repository_id: pack
+    integration_surface: material-registration
+    allowed_paths:
+      - groovy/material/
+      - assets/susy/lang/
+composition:
+  allowed:
+    - standard_key: localization-component
+      versions:
+        - 1.0.0
+      required: false
+      primary_variants:
+        - liquid
+      component_variants:
+        - default
+  precedence:
+    - surface: localization
+      winner: primary
+      loser: localization-component
+atlas:
+  baseline_id: atlas-synthetic-baseline
+  queries:
+    - id: material-builder
+      query_id: atlas-query:synthetic-material-builder
+      result_id: atlas-result:synthetic-material-builder
+      invariants:
+        - id: explicit-builder-id
+          result_path: /registration/id_argument
+          operator: exists
+          expected: true
+          required: true
+rendering:
+  outputs:
+    - id: material-source
+      repository_id: pack
+      integration_surface: material-registration
+      operation: create
+      path:
+        operator: concat
+        arguments:
+          - operator: literal
+            arguments:
+              - groovy/material/
+          - operator: parameter
+            arguments:
+              - registry_name
+          - operator: literal
+            arguments:
+              - .groovy
+      source:
+        kind: template
+        id: material-core
+      variants: []
+    - id: material-fluid-source
+      repository_id: pack
+      integration_surface: material-registration
+      operation: create
+      path:
+        operator: concat
+        arguments:
+          - operator: literal
+            arguments:
+              - groovy/material/
+          - operator: parameter
+            arguments:
+              - registry_name
+          - operator: literal
+            arguments:
+              - Fluid.groovy
+      source:
+        kind: template
+        id: liquid-template
+      variants:
+        - liquid
+validation:
+  formatters:
+    - id: groovy-format
+      repository_id: pack
+      command:
+        - synthetic-formatter
+        - --check
+      paths:
+        - groovy/material/
+      lock_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  tests:
+    - id: registration-test
+      repository_id: pack
+      command:
+        - synthetic-test
+      fixture_ids:
+        - material-fixture
+  fixtures:
+    - id: material-fixture
+      kind: source
+      repository_id: pack
+      paths:
+        - groovy/material/SyntheticMaterial.groovy
+      disposable: true
+  gates:
+    - id: registration-gate
+      stage: test
+      runner: test
+      runner_id: registration-test
+      required: true
+      diagnostic_code: registration-failed
+diagnostics:
+  - code: registration-failed
+    severity: error
+    template: "Registration failed for {name}."
+    arguments:
+      - name
+reconciliation:
+  - id: new-material
+    when:
+      kind: identity-absent
+      fields:
+        - registry_name
+    outcome: create
+    diagnostic_code: registration-failed
+  - id: existing-material
+    when:
+      kind: identity-equivalent
+      fields:
+        - registry_name
+    outcome: equivalent
+    diagnostic_code: registration-failed
+migrations: []
+hooks: []
+allocation:
+  domains:
+    - name: susy-material-id
+      mode: blueprints-ledger
+      authority_id: blueprints-allocation-ledger-v1
+      evidence:
+        - SRC-GTCEU@9fe140febe8747bbe2f06dfd570421331ec06f4b
+        - SRC-PACK@9d3aa7ae0294bf27f0b8acbb893d61da23a06972
+      pool:
+        minimum: 4000
+        maximum: 32766

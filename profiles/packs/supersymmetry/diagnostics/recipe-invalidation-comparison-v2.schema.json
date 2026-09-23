@@ -1,0 +1,546 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/supersymmetry-recipe-invalidation-comparison-v2.schema.json",
+  "title": "Supersymmetry recipe invalidation comparison V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "comparison_id",
+    "operation_class",
+    "authority",
+    "state",
+    "profile",
+    "source",
+    "compatibility",
+    "channels",
+    "recommendation",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-supersymmetry-recipe-invalidation-comparison-v2"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "comparison_id": {
+      "$ref": "#/$defs/sha256Id"
+    },
+    "operation_class": {
+      "const": "read-only"
+    },
+    "authority": {
+      "$ref": "#/$defs/authority"
+    },
+    "state": {
+      "enum": [
+        "more-observed",
+        "fewer-observed",
+        "same-counts",
+        "same-counts-with-resolution-count-changes",
+        "incomparable"
+      ]
+    },
+    "profile": {
+      "$ref": "#/$defs/boundObject"
+    },
+    "source": {
+      "$ref": "#/$defs/boundObject"
+    },
+    "compatibility": {
+      "$ref": "#/$defs/compatibility"
+    },
+    "channels": {
+      "$ref": "#/$defs/channels"
+    },
+    "recommendation": {
+      "$ref": "#/$defs/recommendation"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonempty"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256Id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "boundObject": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "owner",
+        "normative",
+        "atlas_publication"
+      ],
+      "properties": {
+        "classification": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "owner": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "normative": {
+          "const": false
+        },
+        "atlas_publication": {
+          "const": false
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "summary",
+        "actions"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "summary": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        }
+      }
+    },
+    "notCompared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "const": "not-compared"
+        }
+      }
+    },
+    "channelComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "comparison_id",
+        "operation_class",
+        "authority",
+        "state",
+        "profile",
+        "source",
+        "scope",
+        "summary",
+        "groups",
+        "recommendation",
+        "limitations"
+      ],
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "comparison_id": {
+          "$ref": "#/$defs/sha256Id"
+        },
+        "operation_class": {
+          "const": "read-only"
+        },
+        "authority": {
+          "$ref": "#/$defs/authority"
+        },
+        "state": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "profile": {
+          "$ref": "#/$defs/boundObject"
+        },
+        "source": {
+          "$ref": "#/$defs/boundObject"
+        },
+        "scope": {
+          "$ref": "#/$defs/boundObject"
+        },
+        "summary": {
+          "type": "object",
+          "minProperties": 1,
+          "required": [
+            "group_count"
+          ],
+          "properties": {
+            "group_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/boundObject"
+          }
+        },
+        "recommendation": {
+          "$ref": "#/$defs/recommendation"
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "nonnegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lineOrNull": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "classification": {
+      "enum": [
+        "newly-observed",
+        "increased",
+        "decreased",
+        "no-longer-observed",
+        "same-count"
+      ]
+    },
+    "groovyComparisonGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "script_logger",
+        "recipe_map",
+        "classification",
+        "baseline_count",
+        "candidate_count",
+        "delta",
+        "baseline_first_line",
+        "candidate_first_line",
+        "resolution_count_delta",
+        "resolution_counts_changed"
+      ],
+      "properties": {
+        "kind": {
+          "const": "gt-recipe-duplicate-or-conflict"
+        },
+        "script_logger": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "recipe_map": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "classification": {
+          "$ref": "#/$defs/classification"
+        },
+        "baseline_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "candidate_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "delta": {
+          "type": "integer"
+        },
+        "baseline_first_line": {
+          "$ref": "#/$defs/lineOrNull"
+        },
+        "candidate_first_line": {
+          "$ref": "#/$defs/lineOrNull"
+        },
+        "resolution_count_delta": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact-conflict",
+            "conflict-not-identified"
+          ],
+          "properties": {
+            "exact-conflict": {
+              "type": "integer"
+            },
+            "conflict-not-identified": {
+              "type": "integer"
+            }
+          }
+        },
+        "resolution_counts_changed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "gtComparisonGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "reason_code",
+        "observed_owner_class",
+        "observed_owner_method",
+        "classification",
+        "baseline_count",
+        "candidate_count",
+        "delta",
+        "baseline_first_line",
+        "candidate_first_line"
+      ],
+      "properties": {
+        "kind": {
+          "const": "gt-recipe-registration"
+        },
+        "reason_code": {
+          "enum": [
+            "empty-recipe-outputs",
+            "duplicate-furnace-recipe"
+          ]
+        },
+        "observed_owner_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "observed_owner_method": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "classification": {
+          "$ref": "#/$defs/classification"
+        },
+        "baseline_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "candidate_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "delta": {
+          "type": "integer"
+        },
+        "baseline_first_line": {
+          "$ref": "#/$defs/lineOrNull"
+        },
+        "candidate_first_line": {
+          "$ref": "#/$defs/lineOrNull"
+        }
+      }
+    },
+    "groovyComparison": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/channelComparison"
+        },
+        {
+          "properties": {
+            "format": {
+              "const": "workbench-supersymmetry-groovy-conflict-group-comparison-v1"
+            },
+            "state": {
+              "enum": [
+                "more-observed",
+                "fewer-observed",
+                "same-counts",
+                "same-counts-with-resolution-count-changes"
+              ]
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/groovyComparisonGroup"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "gtComparison": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/channelComparison"
+        },
+        {
+          "properties": {
+            "format": {
+              "const": "workbench-supersymmetry-gt-recipe-registration-comparison-v1"
+            },
+            "state": {
+              "enum": [
+                "more-observed",
+                "fewer-observed",
+                "same-counts"
+              ]
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/gtComparisonGroup"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "findings"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "comparable",
+            "incomparable"
+          ]
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "incomparable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "findings": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "findings": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "channels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "groovy_postinit",
+        "gt_startup_registration"
+      ],
+      "properties": {
+        "groovy_postinit": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/groovyComparison"
+            },
+            {
+              "$ref": "#/$defs/notCompared"
+            }
+          ]
+        },
+        "gt_startup_registration": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/gtComparison"
+            },
+            {
+              "$ref": "#/$defs/notCompared"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "compatibility": {
+            "properties": {
+              "state": {
+                "const": "incomparable"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "incomparable"
+          },
+          "channels": {
+            "properties": {
+              "groovy_postinit": {
+                "$ref": "#/$defs/notCompared"
+              },
+              "gt_startup_registration": {
+                "$ref": "#/$defs/notCompared"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "state": {
+            "enum": [
+              "more-observed",
+              "fewer-observed",
+              "same-counts",
+              "same-counts-with-resolution-count-changes"
+            ]
+          },
+          "channels": {
+            "properties": {
+              "groovy_postinit": {
+                "$ref": "#/$defs/groovyComparison"
+              },
+              "gt_startup_registration": {
+                "$ref": "#/$defs/gtComparison"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

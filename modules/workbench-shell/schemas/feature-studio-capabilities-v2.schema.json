@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/feature-studio-capabilities-v2.schema.json",
+  "title": "Workbench Feature Studio capability projection V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projection_id",
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "descriptors",
+    "limitations"
+  ],
+  "properties": {
+    "projection_id": {"type": "string", "pattern": "^feature-studio-capability-projection:sha256:[0-9a-f]{64}$"},
+    "format": {"const": "workbench-feature-studio-capability-projection-v2"},
+    "schema_version": {"const": 2},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "descriptors": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"$ref": "#/$defs/descriptor"}
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "sha256Id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "descriptor_id",
+        "canonicalizer",
+        "operation",
+        "catalog_action_id",
+        "protocol_method",
+        "request_schema_id",
+        "result_schema_id",
+        "risk",
+        "embedded_state"
+      ],
+      "properties": {
+        "descriptor_id": {"type": "string", "pattern": "^feature-studio-capability-binding:sha256:[0-9a-f]{64}$"},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "operation": {"enum": ["inspect", "plan", "verify", "explain", "export"]},
+        "catalog_action_id": {"type": "string", "pattern": "^feature-studio\\.[a-z]+$"},
+        "protocol_method": {"enum": ["operation/plan", "operation/commit"]},
+        "request_schema_id": {"const": "workbench://schemas/workbench-shell/feature-studio-request-v2.schema.json"},
+        "result_schema_id": {"const": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json"},
+        "risk": {"enum": ["read-only", "writes-output", "mutating"]},
+        "embedded_state": {"const": "embedded"}
+      }
+    }
+  }
+}

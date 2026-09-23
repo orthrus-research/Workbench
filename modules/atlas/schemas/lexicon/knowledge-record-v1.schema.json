@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/knowledge-record-v1.schema.json",
+  "title": "Supersymmetry canonical knowledge record v1",
+  "type": "object",
+  "required": ["id", "kind", "name", "snapshot_id", "status", "aliases", "attributes", "provenance"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]+$"},
+    "kind": {"enum": ["snapshot", "source", "artifact", "file", "symbol", "owner", "knowledge_page", "generated_fact", "lifecycle_event", "identifier", "namespace", "registry", "extension_surface", "material", "property", "ore_prefix", "recipe_map", "recipe", "machine", "tier", "configuration", "serialization", "resource", "network", "integration_seam", "evidence"]},
+    "name": {"type": "string", "minLength": 1},
+    "snapshot_id": {"type": "string", "minLength": 1},
+    "status": {"enum": ["planned", "researching", "inferred", "verified", "stale"]},
+    "aliases": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "attributes": {"type": "object"},
+    "provenance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_id", "revision", "path"],
+        "additionalProperties": false,
+        "properties": {
+          "source_id": {"type": "string"},
+          "revision": {"type": ["string", "null"]},
+          "path": {"type": "string"},
+          "symbol": {"type": ["string", "null"]},
+          "line_start": {"type": ["integer", "null"], "minimum": 1},
+          "line_end": {"type": ["integer", "null"], "minimum": 1},
+          "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-groovyscript-managed-session-profile-v1.schema.json",
+  "title": "Workbench GroovyScript managed language-session profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile_id", "platform_profile_id", "language_service_profile_id", "launcher", "overlay", "lifecycle", "ide_handoff", "limitations"],
+  "properties": {
+    "format": {"const": "workbench-groovyscript-managed-session-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"$ref": "#/$defs/nonempty"},
+    "platform_profile_id": {"$ref": "#/$defs/nonempty"},
+    "language_service_profile_id": {"$ref": "#/$defs/nonempty"},
+    "launcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "accepted_receipt_formats", "launch_flag", "data_root_flag", "instance_config", "jvm_arguments_key", "override_jvm_arguments_key", "disposable_instance_prefix", "windows_process_tracker"],
+      "properties": {
+        "family": {"const": "prism"},
+        "accepted_receipt_formats": {"const": ["workbench-runtime-launch-receipt-v3"]},
+        "launch_flag": {"const": "--launch"},
+        "data_root_flag": {"const": "--dir"},
+        "instance_config": {"$ref": "#/$defs/relative"},
+        "jvm_arguments_key": {"const": "JvmArgs"},
+        "override_jvm_arguments_key": {"const": "OverrideJavaArgs"},
+        "disposable_instance_prefix": {"type": "string", "pattern": "^workbench-", "maxLength": 128},
+        "windows_process_tracker": {"const": "windows-cim-instance-id-or-upstream-port"}
+      }
+    },
+    "overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime_config", "port_property_type", "port_property_key", "start_jvm_argument"],
+      "properties": {
+        "runtime_config": {"$ref": "#/$defs/relative"},
+        "port_property_type": {"const": "forge-int"},
+        "port_property_key": {"const": "languageServerPort"},
+        "start_jvm_argument": {"const": "-Dgroovyscript.run_ls=true"}
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_readiness_timeout_seconds", "default_session_timeout_seconds", "readiness_poll_interval_seconds", "client_attach_timeout_seconds", "graceful_shutdown_seconds", "force_shutdown_seconds"],
+      "properties": {
+        "default_readiness_timeout_seconds": {"type": "number", "minimum": 1, "maximum": 3600},
+        "default_session_timeout_seconds": {"type": "number", "minimum": 1, "maximum": 86400},
+        "readiness_poll_interval_seconds": {"type": "number", "minimum": 0.05, "maximum": 5},
+        "client_attach_timeout_seconds": {"type": "number", "minimum": 1, "maximum": 600},
+        "graceful_shutdown_seconds": {"type": "number", "minimum": 0.1, "maximum": 120},
+        "force_shutdown_seconds": {"type": "number", "minimum": 0.1, "maximum": 120}
+      }
+    },
+    "ide_handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["descriptor_format", "transport", "connection_model", "consumers"],
+      "properties": {
+        "descriptor_format": {"const": "workbench-groovy-language-session-descriptor-v1"},
+        "transport": {"const": "lsp-jsonrpc-tcp"},
+        "connection_model": {"const": "one-active-client-sequential-reaccept"},
+        "consumers": {"const": ["terminal", "intellij", "vscode"]}
+      }
+    },
+    "limitations": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 8192}}
+  },
+  "$defs": {
+    "nonempty": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "relative": {"type": "string", "minLength": 1, "maxLength": 1024, "not": {"pattern": "(?:^/|(^|/)\\.\\.(/|$))"}}
+  }
+}

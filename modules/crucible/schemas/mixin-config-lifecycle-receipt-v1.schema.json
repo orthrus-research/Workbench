@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/mixin-config-lifecycle-receipt-v1.schema.json",
+  "title": "Workbench Crucible Mixin Configuration Lifecycle Receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "canonicalization_id", "receipt_id", "session", "inputs", "artifacts", "observation", "configurations", "failures", "health", "summary", "limitations", "boundaries"],
+  "properties": {
+    "format": {"const": "workbench-crucible-mixin-config-lifecycle-receipt-v1"},
+    "schema_version": {"const": 1},
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "receipt_id": {"type": "string", "pattern": "^crucible-mixin-config-lifecycle:sha256:[0-9a-f]{64}$"},
+    "session": {"$ref": "#/$defs/session"},
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_artifact", "candidate_lock", "fixture_result", "launch_log", "raw_trace", "toolchain_lock"],
+      "properties": {
+        "agent_artifact": {"$ref": "#/$defs/file"},
+        "candidate_lock": {"$ref": "#/$defs/file"},
+        "fixture_result": {"$ref": "#/$defs/file"},
+        "launch_log": {"$ref": "#/$defs/file"},
+        "raw_trace": {"$ref": "#/$defs/file"},
+        "toolchain_lock": {"$ref": "#/$defs/file"}
+      }
+    },
+    "artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}},
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mechanism", "agent_id", "java_version", "targets"],
+      "properties": {
+        "mechanism": {"const": "java_instrument_exact_cleanmix_config_lifecycle_weave"},
+        "agent_id": {"$ref": "#/$defs/text"},
+        "java_version": {"$ref": "#/$defs/text"},
+        "targets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/target"}}
+      }
+    },
+    "configurations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/configuration"}},
+    "failures": {"type": "array", "items": {"$ref": "#/$defs/failure"}},
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "end_health", "write_failure", "observer_failure_count"],
+      "properties": {
+        "state": {"enum": ["complete", "failed"]},
+        "end_health": {"enum": ["healthy", "failed"]},
+        "write_failure": {"type": "boolean"},
+        "observer_failure_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempt_count", "admitted_count", "terminal_outcomes", "verified_resource_count", "failure_count"],
+      "properties": {
+        "attempt_count": {"type": "integer", "minimum": 1},
+        "admitted_count": {"type": "integer", "minimum": 0},
+        "terminal_outcomes": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
+        "verified_resource_count": {"type": "integer", "minimum": 0},
+        "failure_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "limitations": {"type": "array", "minItems": 4, "uniqueItems": true, "items": {"$ref": "#/$defs/text"}},
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configuration_lifecycle_proved", "transformer_order_proved", "mixin_transformation_completion_proved", "final_class_bytes_proved"],
+      "properties": {
+        "configuration_lifecycle_proved": {"type": "boolean"},
+        "transformer_order_proved": {"const": false},
+        "mixin_transformation_completion_proved": {"const": false},
+        "final_class_bytes_proved": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 8192, "pattern": "^[^\\r\\n\\u0000]+$"},
+    "nullableText": {"oneOf": [{"$ref": "#/$defs/text"}, {"type": "null"}]},
+    "nullableBoolean": {"oneOf": [{"type": "boolean"}, {"type": "null"}]},
+    "nullableSha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["label", "sha256", "size_bytes"],
+      "properties": {"label": {"$ref": "#/$defs/text"}, "sha256": {"$ref": "#/$defs/sha256"}, "size_bytes": {"type": "integer", "minimum": 0}}
+    },
+    "session": {
+      "type": "object", "additionalProperties": false,
+      "required": ["capture_id", "launch_id", "profile_id", "side", "candidate_lock_sha256", "toolchain_lock_sha256"],
+      "properties": {
+        "capture_id": {"$ref": "#/$defs/text"}, "launch_id": {"$ref": "#/$defs/text"}, "profile_id": {"$ref": "#/$defs/text"},
+        "side": {"enum": ["client", "dedicated_server", "integrated_server"]},
+        "candidate_lock_sha256": {"$ref": "#/$defs/sha256"}, "toolchain_lock_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["artifact_sha256", "size_bytes", "label", "code_source_uri"],
+      "properties": {"artifact_sha256": {"$ref": "#/$defs/sha256"}, "size_bytes": {"type": "integer", "minimum": 0}, "label": {"$ref": "#/$defs/text"}, "code_source_uri": {"$ref": "#/$defs/text"}}
+    },
+    "target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["target_class", "expected_input_sha256", "observed_input_sha256", "instrumented_output_sha256", "defining_loader_class", "code_source_uri", "artifact_sha256"],
+      "properties": {"target_class": {"$ref": "#/$defs/text"}, "expected_input_sha256": {"$ref": "#/$defs/sha256"}, "observed_input_sha256": {"$ref": "#/$defs/sha256"}, "instrumented_output_sha256": {"$ref": "#/$defs/sha256"}, "defining_loader_class": {"$ref": "#/$defs/text"}, "code_source_uri": {"$ref": "#/$defs/text"}, "artifact_sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "resource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["url", "url_basis", "owner_id", "owner_description", "artifact_sha256", "entry_sha256"],
+      "properties": {"url": {"$ref": "#/$defs/nullableText"}, "url_basis": {"$ref": "#/$defs/nullableText"}, "owner_id": {"$ref": "#/$defs/nullableText"}, "owner_description": {"$ref": "#/$defs/nullableText"}, "artifact_sha256": {"$ref": "#/$defs/nullableSha256"}, "entry_sha256": {"$ref": "#/$defs/nullableSha256"}}
+    },
+    "feature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "normalized_id", "active"],
+      "properties": {"id": {"$ref": "#/$defs/text"}, "normalized_id": {"$ref": "#/$defs/text"}, "active": {"type": "boolean"}}
+    },
+    "featureCheck": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "outcome", "features"],
+      "properties": {"state": {"enum": ["observed", "not_run_cached"]}, "outcome": {"oneOf": [{"enum": ["passed", "failed", "threw"]}, {"type": "null"}]}, "features": {"type": "array", "items": {"$ref": "#/$defs/feature"}}}
+    },
+    "admission": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision", "reason_code", "required", "queued_phase"],
+      "properties": {"decision": {"enum": ["admitted", "duplicate", "rejected", "threw"]}, "reason_code": {"$ref": "#/$defs/text"}, "required": {"$ref": "#/$defs/nullableBoolean"}, "queued_phase": {"$ref": "#/$defs/nullableText"}}
+    },
+    "phaseCheck": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sequence", "queued_phase", "consumption_phase", "eligible", "outcome", "reason_code"],
+      "properties": {"sequence": {"type": "integer", "minimum": 0}, "queued_phase": {"$ref": "#/$defs/text"}, "consumption_phase": {"$ref": "#/$defs/text"}, "eligible": {"type": "boolean"}, "outcome": {"enum": ["consumed", "deferred"]}, "reason_code": {"$ref": "#/$defs/text"}}
+    },
+    "stage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sequence", "stage", "outcome", "consumption_phase"],
+      "properties": {"sequence": {"type": "integer", "minimum": 0}, "stage": {"enum": ["onSelect", "prepare", "post_initialise"]}, "outcome": {"enum": ["completed", "threw"]}, "consumption_phase": {"$ref": "#/$defs/nullableText"}}
+    },
+    "terminal": {
+      "type": "object", "additionalProperties": false,
+      "required": ["outcome", "reason_code"],
+      "properties": {"outcome": {"enum": ["active", "deferred", "duplicate", "rejected", "threw"]}, "reason_code": {"$ref": "#/$defs/text"}}
+    },
+    "configuration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attempt", "requested_config", "fallback_phase", "resource", "feature_check", "admission", "phase_checks", "stages", "terminal", "sequence_start", "sequence_end", "config_name", "create_outcome"],
+      "properties": {"attempt": {"type": "integer", "minimum": 1}, "requested_config": {"$ref": "#/$defs/text"}, "fallback_phase": {"$ref": "#/$defs/text"}, "resource": {"$ref": "#/$defs/resource"}, "feature_check": {"$ref": "#/$defs/featureCheck"}, "admission": {"$ref": "#/$defs/admission"}, "phase_checks": {"type": "array", "items": {"$ref": "#/$defs/phaseCheck"}}, "stages": {"type": "array", "items": {"$ref": "#/$defs/stage"}}, "terminal": {"$ref": "#/$defs/terminal"}, "sequence_start": {"type": "integer", "minimum": 0}, "sequence_end": {"type": "integer", "minimum": 0}, "config_name": {"$ref": "#/$defs/nullableText"}, "create_outcome": {"$ref": "#/$defs/text"}}
+    },
+    "failure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sequence", "event", "attempt", "reason_code", "exception_class", "message"],
+      "properties": {"sequence": {"type": "integer", "minimum": 0}, "event": {"$ref": "#/$defs/text"}, "attempt": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]}, "reason_code": {"$ref": "#/$defs/nullableText"}, "exception_class": {"$ref": "#/$defs/nullableText"}, "message": {"$ref": "#/$defs/nullableText"}}
+    }
+  }
+}

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Workbench support guide
+    url: https://github.com/orthrus-research/workbench/blob/main/SUPPORT.md
+    about: Check support scope and the information needed for a useful report.
+  - name: Private vulnerability reporting
+    url: https://github.com/orthrus-research/workbench/blob/main/SECURITY.md
+    about: Read the private reporting process; do not disclose vulnerabilities in an issue.

@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-work-session-event-v1.schema.json",
+  "title": "Workbench Work Session immutable event V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "event_id",
+    "session_id",
+    "session_record_id",
+    "sequence",
+    "previous_event_id",
+    "occurred_at",
+    "frontend",
+    "kind",
+    "task_id",
+    "lifecycle",
+    "stage",
+    "action",
+    "result_refs",
+    "problems",
+    "next_actions",
+    "owner_record_refs",
+    "recovery",
+    "workspace_observation",
+    "closed",
+    "message",
+    "limitations",
+    "unknowns"
+  ],
+  "properties": {
+    "format_version": {"const": "workbench-work-session-event-v1"},
+    "event_id": {"pattern": "^work-session-event:sha256:[0-9a-f]{64}$", "type": "string"},
+    "session_id": {"pattern": "^work-session-v2-[0-9a-f]{32}$", "type": "string"},
+    "session_record_id": {"pattern": "^work-session-record:sha256:[0-9a-f]{64}$", "type": "string"},
+    "sequence": {"minimum": 0, "maximum": 99999, "type": "integer"},
+    "previous_event_id": {
+      "oneOf": [
+        {"pattern": "^work-session-event:sha256:[0-9a-f]{64}$", "type": "string"},
+        {"type": "null"}
+      ]
+    },
+    "occurred_at": {"format": "date-time", "type": "string"},
+    "frontend": {"$ref": "#/$defs/frontend"},
+    "kind": {"$ref": "#/$defs/identity"},
+    "task_id": {"$ref": "#/$defs/identity"},
+    "lifecycle": {"$ref": "#/$defs/lifecycle"},
+    "stage": {"oneOf": [{"$ref": "#/$defs/stage"}, {"type": "null"}]},
+    "action": {"oneOf": [{"$ref": "#/$defs/action"}, {"type": "null"}]},
+    "result_refs": {"items": {"$ref": "#/$defs/resultRef"}, "maxItems": 256, "type": "array", "uniqueItems": true},
+    "problems": {"items": {"$ref": "#/$defs/problem"}, "maxItems": 256, "type": "array", "uniqueItems": true},
+    "next_actions": {"items": {"$ref": "#/$defs/action"}, "maxItems": 128, "type": "array", "uniqueItems": true},
+    "owner_record_refs": {"items": {"$ref": "#/$defs/ownerRef"}, "maxItems": 256, "type": "array", "uniqueItems": true},
+    "recovery": {"oneOf": [{"$ref": "#/$defs/recovery"}, {"type": "null"}]},
+    "workspace_observation": {"oneOf": [{"$ref": "#/$defs/workspace"}, {"type": "null"}]},
+    "closed": {"type": "boolean"},
+    "message": {"oneOf": [{"maxLength": 4096, "minLength": 1, "type": "string"}, {"type": "null"}]},
+    "limitations": {"items": {"maxLength": 4096, "minLength": 1, "type": "string"}, "maxItems": 128, "type": "array"},
+    "unknowns": {"items": {"maxLength": 4096, "minLength": 1, "type": "string"}, "maxItems": 128, "type": "array"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"sequence": {"const": 0}}, "required": ["sequence"]},
+      "then": {"properties": {"kind": {"const": "session-created"}, "previous_event_id": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"lifecycle": {"const": "recoverable"}}, "required": ["lifecycle"]},
+      "then": {"properties": {"recovery": {"$ref": "#/$defs/requiredRecovery"}}}
+    }
+  ],
+  "$defs": {
+    "identity": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/+@=-]*$"},
+    "nullableIdentity": {"oneOf": [{"$ref": "#/$defs/identity"}, {"type": "null"}]},
+    "lifecycle": {"enum": ["discovered", "ready", "attention", "blocked", "running", "complete", "failed", "cancelled", "incomplete", "recoverable"]},
+    "ownerRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_id", "record_id", "record_kind", "uri", "digest", "last_verified_state", "verified_at"],
+      "properties": {
+        "owner_id": {"$ref": "#/$defs/identity"},
+        "record_id": {"$ref": "#/$defs/identity"},
+        "record_kind": {"$ref": "#/$defs/identity"},
+        "uri": {"format": "uri", "maxLength": 8192, "minLength": 3, "type": "string"},
+        "digest": {"$ref": "#/$defs/nullableIdentity"},
+        "last_verified_state": {"$ref": "#/$defs/nullableIdentity"},
+        "verified_at": {"oneOf": [{"format": "date-time", "type": "string"}, {"type": "null"}]}
+      }
+    },
+    "frontend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frontend_id", "kind", "version", "instance_id", "process_id"],
+      "properties": {
+        "frontend_id": {"$ref": "#/$defs/identity"},
+        "kind": {"enum": ["cli", "vscode", "intellij-community", "service", "test"]},
+        "version": {"maxLength": 256, "minLength": 1, "type": "string"},
+        "instance_id": {"$ref": "#/$defs/nullableIdentity"},
+        "process_id": {"oneOf": [{"minimum": 1, "type": "integer"}, {"type": "null"}]}
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_id", "canonical_root", "root_uri", "source_revision", "dirty_fingerprint"],
+      "properties": {
+        "identity_id": {"$ref": "#/$defs/identity"},
+        "canonical_root": {"maxLength": 8192, "minLength": 1, "type": "string"},
+        "root_uri": {"format": "uri", "maxLength": 8192, "type": "string"},
+        "source_revision": {"$ref": "#/$defs/nullableIdentity"},
+        "dirty_fingerprint": {"$ref": "#/$defs/nullableIdentity"}
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage_id", "state"],
+      "properties": {
+        "stage_id": {"$ref": "#/$defs/identity"},
+        "state": {"enum": ["pending", "running", "complete", "failed", "cancelled", "incomplete", "blocked"]}
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_id", "action_digest", "owner_id", "availability", "mutation_budget", "arguments"],
+      "properties": {
+        "action_id": {"$ref": "#/$defs/identity"},
+        "action_digest": {"$ref": "#/$defs/identity"},
+        "owner_id": {"$ref": "#/$defs/identity"},
+        "availability": {"enum": ["available", "unavailable", "experimental", "blocked", "stale", "unknown"]},
+        "mutation_budget": {"enum": ["read-only", "writes-output", "mutating", "destructive"]},
+        "arguments": {
+          "type": "object",
+          "maxProperties": 256,
+          "propertyNames": {"not": {"pattern": "(?i)(^|[-_.])(auth|credential|password|secret|token|api[-_]?key)($|[-_.])"}}
+        }
+      }
+    },
+    "resultRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_id", "owner_record_ref"],
+      "properties": {"result_id": {"$ref": "#/$defs/identity"}, "owner_record_ref": {"$ref": "#/$defs/ownerRef"}}
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["problem_id", "code", "severity", "message", "affected_identity", "evidence_refs", "next_action_id"],
+      "properties": {
+        "problem_id": {"$ref": "#/$defs/identity"},
+        "code": {"$ref": "#/$defs/identity"},
+        "severity": {"enum": ["info", "warning", "error", "fatal"]},
+        "message": {"maxLength": 4096, "minLength": 1, "type": "string"},
+        "affected_identity": {"$ref": "#/$defs/nullableIdentity"},
+        "evidence_refs": {"items": {"$ref": "#/$defs/ownerRef"}, "maxItems": 256, "type": "array"},
+        "next_action_id": {"$ref": "#/$defs/nullableIdentity"}
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason", "owner_record_refs", "safe_action_ids"],
+      "properties": {
+        "state": {"enum": ["required", "recovering", "resolved"]},
+        "reason": {"maxLength": 4096, "minLength": 1, "type": "string"},
+        "owner_record_refs": {"items": {"$ref": "#/$defs/ownerRef"}, "maxItems": 256, "type": "array"},
+        "safe_action_ids": {"items": {"$ref": "#/$defs/identity"}, "maxItems": 128, "type": "array", "uniqueItems": true}
+      }
+    },
+    "requiredRecovery": {
+      "allOf": [
+        {"$ref": "#/$defs/recovery"},
+        {"properties": {"state": {"const": "required"}, "safe_action_ids": {"minItems": 1}}}
+      ]
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "format": "workbench-runtime-diagnostic-guidance-v1",
+  "schema_version": 1,
+  "pattern_id": "workbench-pack:supersymmetry:susy-reccomplex-named-variable-v1",
+  "match": {
+    "category": "mixin-local-variable-discriminator",
+    "project_name": "Supersymmetry",
+    "project_version": "0.1.16.11",
+    "mixin_config": "mixins.susy.reccomplex.json",
+    "mixin_class": "supersymmetry.mixins.reccomplex.StructureSpawnContextMixin",
+    "target_class": "ivorius/reccomplex/world/gen/feature/structure/context/StructureSpawnContext",
+    "target_entry_sha256": "3690b5852458c0dac37e5ef4fdb5ab38faee7bbea94351bae41211dea7902be1",
+    "mixin_entry_sha256": "77208fc27f343b1b42a24e0073c68d65e1feab2f6bbc9cdc81af01fd86da1f5d",
+    "requested_names": [
+      "arg3"
+    ]
+  },
+  "interpretation": "The target class is present. This exact SusyCore mixin requires a local variable named arg3, while the exact Recurrent Complex target exposes the third setBlock argument as flag. The class-loading exceptions are consequences of the failed transformation, not proof of a missing JAR.",
+  "developer_actions": [
+    "Compare the mixin selector with the exact target bytecode or source before changing dependency versions.",
+    "Keep any compatibility experiment explicit and confined to a disposable projection; do not rewrite the canonical Supersymmetry checkout or materialization.",
+    "Launch again after an explicit experiment and diagnose the new retained receipt instead of treating this finding as general compatibility approval."
+  ],
+  "related_experiments": [
+    "compatibility/recurrent-complex-1.4.8.6-structure-context-arg3-v1.json"
+  ]
+}

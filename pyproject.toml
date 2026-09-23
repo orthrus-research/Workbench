@@ -1,0 +1,4 @@
+# Workspace marker only. Build each native project from its own manifest.
+# The sole workbench-core distribution is core/pyproject.toml.
+[tool.workbench.workspace]
+members = ["api", "core", "modules/*", "profiles/*/*"]

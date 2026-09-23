@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/gtceu-worldgen-impact-inventory-v2.schema.json",
+  "title": "Workbench Crucible GTCEu worldgen impact inventory V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "inventory_id",
+    "canonicalization_id",
+    "adapter_profile",
+    "definition_inventory",
+    "impact_class_surface",
+    "runtime_controls",
+    "definition_controls",
+    "api_surface",
+    "effect_catalog",
+    "reload_and_persistence",
+    "runtime_integration_scan",
+    "pack_context",
+    "source_audit",
+    "summary",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {"const": "workbench-crucible-gtceu-worldgen-impact-inventory-v2"},
+    "schema_version": {"const": 2},
+    "inventory_id": {
+      "type": "string",
+      "pattern": "^crucible-gtceu-worldgen-impact:sha256:[0-9a-f]{64}$"
+    },
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "adapter_profile": {
+      "type": "object",
+      "required": ["id", "minecraft_version", "gregtech_version", "source_tag", "source_commit"]
+    },
+    "definition_inventory": {
+      "$ref": "gtceu-worldgen-inventory-v1.schema.json"
+    },
+    "impact_class_surface": {"$ref": "#/$defs/tree"},
+    "runtime_controls": {
+      "type": "object",
+      "required": ["artifact", "values", "derived"]
+    },
+    "definition_controls": {
+      "type": "object",
+      "required": ["ore_definitions", "bedrock_fluid_definitions", "component_usage"]
+    },
+    "api_surface": {
+      "type": "object",
+      "required": [
+        "forge_entrypoints",
+        "registered_component_factories",
+        "registry_methods",
+        "bedrock_fluid_methods",
+        "spatial_and_state_constants",
+        "groovyscript_boundary"
+      ]
+    },
+    "effect_catalog": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "effect_id",
+          "classification",
+          "status",
+          "active_basis",
+          "writes_blocks",
+          "timing",
+          "spatial_model",
+          "control_surface",
+          "observation_surface",
+          "recommended_modification_seam",
+          "source_classes"
+        ],
+        "properties": {
+          "effect_id": {"type": "string", "minLength": 1},
+          "classification": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "minLength": 1},
+          "active_basis": {"type": "string", "minLength": 1},
+          "writes_blocks": {"type": "boolean"},
+          "timing": {"type": "string", "minLength": 1},
+          "spatial_model": {"type": "string", "minLength": 1},
+          "control_surface": {"type": "string", "minLength": 1},
+          "observation_surface": {"type": "string", "minLength": 1},
+          "recommended_modification_seam": {"type": "string", "minLength": 1},
+          "source_classes": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+        }
+      }
+    },
+    "reload_and_persistence": {
+      "type": "object",
+      "required": ["command", "state_matrix", "source_derived_hazards"]
+    },
+    "runtime_integration_scan": {"type": ["object", "null"]},
+    "pack_context": {"type": ["object", "null"]},
+    "source_audit": {
+      "type": "object",
+      "required": ["upstream_tag", "upstream_commit", "upstream_url", "method", "audited_effect_packages", "direct_generator_search_result"]
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "effect_count",
+        "effect_statuses",
+        "ore_definition_count",
+        "bedrock_fluid_definition_count",
+        "active_weight_random_definition_count",
+        "runtime_integration_candidate_count",
+        "source_derived_hazard_count"
+      ]
+    },
+    "boundaries": {
+      "const": {
+        "behavioral_completeness_claimed": false,
+        "bytecode_token_match_proves_behavior": false,
+        "configuration_was_modified": false,
+        "fresh_world_runtime_probe_completed": false,
+        "gregtech_version_specific": true,
+        "recurrent_complex_integration_added": false,
+        "reload_hazards_are_source_derived_not_runtime_proven": true,
+        "structure_loot_target_reachability_proven": false
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "sha256", "size_bytes"],
+      "properties": {
+        "relative_path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "tree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tree_sha256", "file_count", "files"],
+      "properties": {
+        "tree_sha256": {"$ref": "#/$defs/sha256"},
+        "file_count": {"type": "integer", "minimum": 1},
+        "files": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/binding"}}
+      }
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "declarations": [
+    {
+      "alias": "clarified_sugary_water_recipe",
+      "attributes": {
+        "intended_stage": "LV",
+        "label": "clarified sugary water 10,000 mB recipe",
+        "machine_feasibility": {
+          "candidate_machine_aliases": [
+            "lv_mixer"
+          ],
+          "required_fluid_capacity_mb": 10000
+        },
+        "semantic_role": "recipe"
+      },
+      "descriptor": {
+        "domain": "recipe-process",
+        "key": {
+          "recipe_id": "supersymmetry:clarified_sugary_water_10000"
+        },
+        "kind": "machine-recipe"
+      },
+      "lifecycle": {
+        "stage": "postInit"
+      },
+      "provenance": {
+        "commit": "34935d1",
+        "line": 637,
+        "path": "groovy/postInit/mod/Vanilla.groovy",
+        "source_url": "https://github.com/SymmetricDevs/Supersymmetry/pull/1910"
+      }
+    },
+    {
+      "alias": "lv_mixer",
+      "attributes": {
+        "label": "LV Mixer"
+      },
+      "descriptor": {
+        "domain": "machine-capability",
+        "key": {
+          "machine": "gregtech:mixer",
+          "tier": "LV"
+        },
+        "kind": "machine"
+      },
+      "lifecycle": {
+        "stage": "registry"
+      },
+      "provenance": {
+        "source_url": "https://github.com/SymmetricDevs/Supersymmetry/pull/1910"
+      }
+    }
+  ],
+  "expected": {
+    "diagnostic_codes": [
+      "RECIPE_MACHINE_MISMATCH"
+    ],
+    "failed_aliases": [
+      "clarified_sugary_water_recipe"
+    ]
+  },
+  "fixture": "lv-mixer-capacity",
+  "format": "workbench-supersymmetry-semantic-regression-fixture-v1",
+  "historical_evidence": {
+    "fix_commit": "b63d226",
+    "fix_summary": "Add a quarter-scale 2,500 mB alternative because the 10,000 mB recipe exceeds the LV Mixer 8,000 mB limit.",
+    "pull_request": 1910,
+    "replay_ref": "34935d1",
+    "source_profile": "legacy-forge-0.1.16.11"
+  },
+  "runtime": {
+    "capture": {
+      "capture_id": "supersymmetry-history:lv-mixer-capacity:pre-fix",
+      "evidence_kind": "historical-regression-replay"
+    },
+    "effects": [],
+    "registry": [
+      {
+        "descriptor_alias": "clarified_sugary_water_recipe",
+        "provenance": {
+          "observation": "The original recipe is registered."
+        },
+        "state": {
+          "registered": true
+        }
+      },
+      {
+        "descriptor_alias": "lv_mixer",
+        "provenance": {
+          "observation": "PR #1910 records an 8,000 mB aggregate LV fluid limit, even across multiple slots."
+        },
+        "state": {
+          "max_fluid_input_mb": 8000,
+          "progression_stage": "LV",
+          "registered": true
+        }
+      }
+    ],
+    "stage": "postInit"
+  },
+  "schema_version": 1
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "axiom.integration.v1",
+  "engineComponent": "workbench-axiom-engine",
+  "engineVersions": ">=0.1.0,<0.2.0",
+  "requestSchema": "axiom.request.v1",
+  "resultSchema": "axiom.result.v1",
+  "installationSchema": "axiom.installation.v1",
+  "mainClass": "research.orthrus.axiom.Main",
+  "platforms": ["linux"],
+  "javaMinimum": 17
+}

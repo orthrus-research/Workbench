@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/feature-studio-request-v2.schema.json",
+  "title": "Workbench Feature Studio operation request V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "operation",
+    "feature_kind",
+    "selection_mode",
+    "workspace_uri",
+    "receipt_uri",
+    "name",
+    "color",
+    "translation",
+    "symbol",
+    "launcher",
+    "reviewed_plan_id",
+    "export_uri",
+    "runtime"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-feature-studio-request-v2"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "canonicalizer": {
+      "const": "workbench-canonical-json-v2"
+    },
+    "operation": {
+      "enum": [
+        "inspect",
+        "plan",
+        "verify",
+        "explain",
+        "export"
+      ]
+    },
+    "feature_kind": {
+      "const": "material-backed-fluid"
+    },
+    "selection_mode": {
+      "enum": ["source-plan", "retained-receipt"]
+    },
+    "workspace_uri": {
+      "type": ["string", "null"],
+      "format": "uri"
+    },
+    "receipt_uri": {
+      "type": ["string", "null"],
+      "format": "uri"
+    },
+    "name": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "color": {
+      "type": ["string", "null"],
+      "pattern": "^0x[0-9a-f]{6}$"
+    },
+    "translation": {
+      "type": ["string", "null"],
+      "maxLength": 1024
+    },
+    "symbol": {
+      "type": ["string", "null"],
+      "maxLength": 256
+    },
+    "launcher": {
+      "enum": ["prism", "multimc", null]
+    },
+    "reviewed_plan_id": {
+      "anyOf": [
+        {"$ref": "#/$defs/sha256Id"},
+        {"type": "null"}
+      ]
+    },
+    "export_uri": {
+      "type": ["string", "null"],
+      "format": "uri"
+    },
+    "runtime": {
+      "anyOf": [
+        {"$ref": "#/$defs/runtime"},
+        {"type": "null"}
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {"enum": ["plan", "verify", "explain", "export"]}
+        }
+      },
+      "then": {
+        "properties": {"selection_mode": {"const": "source-plan"}}
+      }
+    },
+    {
+      "if": {"properties": {"selection_mode": {"const": "source-plan"}}},
+      "then": {
+        "properties": {
+          "workspace_uri": {"type": "string", "format": "uri"},
+          "receipt_uri": {"type": "null"},
+          "name": {"type": "string", "minLength": 1, "maxLength": 256},
+          "color": {"type": "string", "pattern": "^0x[0-9a-f]{6}$"},
+          "launcher": {"enum": ["prism", "multimc"]}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"selection_mode": {"const": "retained-receipt"}}},
+      "then": {
+        "properties": {
+          "workspace_uri": {"type": "null"},
+          "receipt_uri": {"type": "string", "format": "uri"},
+          "name": {"type": "null"},
+          "color": {"type": "null"},
+          "translation": {"type": "null"},
+          "symbol": {"type": "null"},
+          "launcher": {"type": "null"},
+          "reviewed_plan_id": {"type": "null"},
+          "export_uri": {"type": "null"},
+          "runtime": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {"enum": ["inspect", "plan", "explain"]}
+        }
+      },
+      "then": {
+        "properties": {
+          "reviewed_plan_id": {"type": "null"},
+          "export_uri": {"type": "null"},
+          "runtime": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"operation": {"const": "verify"}}},
+      "then": {
+        "properties": {
+          "reviewed_plan_id": {"$ref": "#/$defs/sha256Id"},
+          "runtime": {"$ref": "#/$defs/runtime"},
+          "export_uri": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"operation": {"const": "export"}}},
+      "then": {
+        "properties": {
+          "reviewed_plan_id": {"$ref": "#/$defs/sha256Id"},
+          "export_uri": {"type": "string", "format": "uri"},
+          "runtime": {"type": "null"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256Id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "launcher_executable_uri",
+        "launcher_root_uri",
+        "launcher_java_uri",
+        "launcher_java_state_uri",
+        "launcher_profile",
+        "packwiz_uri",
+        "seed_uris",
+        "memory_mib",
+        "offline_name",
+        "launch_timeout_milliseconds",
+        "attach_timeout_milliseconds",
+        "session_timeout_milliseconds",
+        "state_root_uri"
+      ],
+      "properties": {
+        "launcher_executable_uri": {"type": "string", "format": "uri"},
+        "launcher_root_uri": {"type": "string", "format": "uri"},
+        "launcher_java_uri": {"type": ["string", "null"], "format": "uri"},
+        "launcher_java_state_uri": {"type": ["string", "null"], "format": "uri"},
+        "launcher_profile": {"type": ["string", "null"], "maxLength": 256},
+        "packwiz_uri": {"type": ["string", "null"], "format": "uri"},
+        "seed_uris": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {"type": "string", "format": "uri"}
+        },
+        "memory_mib": {"type": "integer", "minimum": 1024, "maximum": 65536},
+        "offline_name": {"type": "string", "minLength": 1, "maxLength": 64},
+        "launch_timeout_milliseconds": {"type": "integer", "minimum": 1, "maximum": 3600000},
+        "attach_timeout_milliseconds": {"type": "integer", "minimum": 1, "maximum": 600000},
+        "session_timeout_milliseconds": {"type": "integer", "minimum": 1, "maximum": 86400000},
+        "state_root_uri": {"type": ["string", "null"], "format": "uri"}
+      }
+    }
+  }
+}

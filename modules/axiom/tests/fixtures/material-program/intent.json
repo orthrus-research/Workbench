@@ -1,0 +1,20 @@
+{
+  "expectations": [
+    {"id":"registered", "material":"supersymmetry:developer_aluminosilicate", "kind":"registration", "equals":true},
+    {"id":"storage-owner", "material":"supersymmetry:developer_aluminosilicate", "kind":"value", "key":"storageRegistry", "equals":"gregtech"},
+    {"id":"native-id", "material":"supersymmetry:developer_aluminosilicate", "kind":"value", "key":"id", "equals":31000},
+    {"id":"post-material-color", "material":"supersymmetry:developer_aluminosilicate", "kind":"value", "key":"color", "equals":10079419},
+    {"id":"post-material-formula", "material":"supersymmetry:developer_phosphate", "kind":"value", "key":"formula", "equals":"(Li,Na)AlPO₄(F,OH)"},
+    {"id":"dust-property", "material":"supersymmetry:developer_aluminosilicate", "kind":"property", "key":"dust", "equals":true},
+    {"id":"ore-property", "material":"supersymmetry:developer_aluminosilicate", "kind":"property", "key":"ore", "equals":true},
+    {"id":"absent-gem-property", "material":"supersymmetry:developer_aluminosilicate", "kind":"property", "key":"gem", "equals":false},
+    {"id":"post-material-flag", "material":"supersymmetry:developer_titanate", "kind":"flag", "key":"no_smelting", "equals":true},
+    {"id":"generated-dust", "material":"supersymmetry:developer_aluminosilicate", "kind":"form", "family":"gt-prefix-items", "prefix":"dust", "fact":"generated", "equals":true},
+    {"id":"selected-dust", "material":"supersymmetry:developer_aluminosilicate", "kind":"form", "family":"gt-prefix-items", "prefix":"dust", "fact":"selected", "equals":true},
+    {"id":"plate-not-eligible", "material":"supersymmetry:developer_aluminosilicate", "kind":"form", "family":"gt-prefix-items", "prefix":"plate", "fact":"eligible", "equals":false},
+    {"id":"plate-not-generated", "material":"supersymmetry:developer_aluminosilicate", "kind":"form", "family":"gt-prefix-items", "prefix":"plate", "fact":"generated", "equals":false},
+    {"id":"no-compressed-block", "material":"supersymmetry:developer_aluminosilicate", "kind":"form", "family":"gt-material-blocks", "prefix":"block", "fact":"generated", "equals":false},
+    {"id":"stone-ore", "material":"supersymmetry:developer_aluminosilicate", "kind":"form", "family":"gt-ore-blocks", "prefix":"ore", "stone":"stone", "fact":"generated", "equals":true},
+    {"id":"stone-ore-drop", "material":"supersymmetry:developer_aluminosilicate", "kind":"form", "family":"gt-ore-blocks", "prefix":"ore", "stone":"stone", "fact":"ordinaryDrop", "equals":true}
+  ]
+}

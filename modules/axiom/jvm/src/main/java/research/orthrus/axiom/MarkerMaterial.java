@@ -1,0 +1,35 @@
+// Extracted from pinned GTCEu/Cleanroom source. See spec/native-fluids.md and sources/NOTICE.md.
+package research.orthrus.axiom;
+
+
+
+/**
+ * MarkerMaterial is type of material used for generic things like material re-registration and use in recipes
+ * Marker material cannot be used to generate any meta items
+ * Marker material can be used only for marking other materials (re-registering) equal to it and then using it in
+ * recipes or in getting items
+ * Marker material is not presented in material registry and cannot be used for persistence
+ */
+final class MarkerMaterial extends FluidMaterial {
+
+    private MarkerMaterial( String name) {
+        super(FluidSupport.gregtechId(name));
+    }
+
+    /**
+     * Create a new MarkerMaterial
+     *
+     * @param name the name of the MarkerMaterial
+     * @return the new MarkerMaterial
+     */
+    public static  MarkerMaterial create( String name) {
+        MarkerMaterial markerMaterial = new MarkerMaterial(name);
+        return FluidEnvironment.current().markers().registerMarkerMaterial(markerMaterial);
+    }
+
+    @Override
+    protected void registerMaterial() {}
+
+    @Override
+    public void verifyMaterial() {}
+}

@@ -1,0 +1,160 @@
+{
+  "format": "workbench-cleanroom-runtime-analysis-epoch-catalog-v1",
+  "schema_version": 1,
+  "catalog_id": "workbench-cleanroom-runtime-analysis-epoch-catalog:sha256:b50be876670a71e847eb9e65b3c236872a9a8f52162205a044adad0523523ece",
+  "platform_kind": "cleanroom",
+  "common_capabilities": [
+    "mixin.config-lifecycle",
+    "mixin.final-class-definition",
+    "mixin.runtime-service",
+    "mixin.service-components",
+    "mixin.service-discovery",
+    "mixin.transformation-lifecycle",
+    "mixin.transformer-chain"
+  ],
+  "epochs": [
+    {
+      "epoch_id": "cleanroom-0.5.17-alpha-mixinbooter-launchwrapper",
+      "support_state": "source-grounded-unproven",
+      "selector": {
+        "cleanroom": "0.5.17-alpha",
+        "cleanmix": null,
+        "foundation": "unresolved",
+        "mixin_distribution": "com.cleanroommc:sponge-mixin:0.20.12+mixin.0.8.7"
+      },
+      "ownership": {
+        "bootstrap": "net.minecraftforge.fml.relauncher.MixinBooterPlugin",
+        "service": "upstream LaunchWrapper Mixin service; exact selected provider remains runtime-unobserved",
+        "class_provider": "LaunchWrapper-owned; exact provider remains runtime-unobserved",
+        "bytecode_provider": "LaunchWrapper-owned; exact provider remains runtime-unobserved",
+        "transformer_provider": "LaunchWrapper-owned; exact provider remains runtime-unobserved",
+        "class_tracker": "LaunchWrapper-owned; exact provider remains runtime-unobserved",
+        "final_definition": "LaunchWrapper class-definition path; exact boundary remains runtime-unobserved"
+      },
+      "adapter": {
+        "adapter_id": "workbench-cleanroom-runtime-adapter:mixinbooter-launchwrapper-v1",
+        "implementation_state": "not-implemented",
+        "mechanisms": [
+          "FML MixinBooter compatibility bootstrap",
+          "Launch.classLoader bridge"
+        ]
+      },
+      "source_evidence": [
+        {
+          "revision": "14deae3957865fc69e77b464396c2d69733fd585",
+          "url": "https://github.com/CleanroomMC/Cleanroom/blob/14deae3957865fc69e77b464396c2d69733fd585/projects/cleanroom/build.gradle"
+        },
+        {
+          "revision": "14deae3957865fc69e77b464396c2d69733fd585",
+          "url": "https://github.com/CleanroomMC/Cleanroom/blob/14deae3957865fc69e77b464396c2d69733fd585/src/main/java/net/minecraftforge/fml/relauncher/MixinBooterPlugin.java"
+        }
+      ]
+    },
+    {
+      "epoch_id": "cleanroom-0.6.0-alpha-cleanmix-launchwrapper-providers",
+      "support_state": "source-grounded-unproven",
+      "selector": {
+        "cleanroom": "0.6.0-alpha",
+        "cleanmix": "0.4.6",
+        "foundation": "unresolved",
+        "mixin_distribution": "CleanMix-bundled Mixin"
+      },
+      "ownership": {
+        "bootstrap": "com.cleanroommc.cleanmix.service.CleanMixBootstrap",
+        "service": "com.cleanroommc.cleanmix.service.CleanMixService",
+        "class_provider": "inherited from AbstractMixinServiceLaunchWrapper",
+        "bytecode_provider": "inherited from AbstractMixinServiceLaunchWrapper",
+        "transformer_provider": "inherited from AbstractMixinServiceLaunchWrapper",
+        "class_tracker": "inherited from AbstractMixinServiceLaunchWrapper",
+        "final_definition": "Foundation/LaunchWrapper bridge; exact boundary remains runtime-unobserved"
+      },
+      "adapter": {
+        "adapter_id": "workbench-cleanroom-runtime-adapter:cleanmix-launchwrapper-v1",
+        "implementation_state": "not-implemented",
+        "mechanisms": [
+          "Cleanroom-owned Mixin service selection",
+          "inherited LaunchWrapper component providers"
+        ]
+      },
+      "source_evidence": [
+        {
+          "revision": "a476dbe805853de6af764e2d85cd66beb2303532",
+          "url": "https://github.com/CleanroomMC/Cleanroom/blob/a476dbe805853de6af764e2d85cd66beb2303532/src/main/java/com/cleanroommc/cleanmix/service/CleanMixService.java"
+        }
+      ]
+    },
+    {
+      "epoch_id": "cleanroom-0.6.8-alpha-cleanmix-0.7-foundation-providers",
+      "support_state": "exact-candidate-bound",
+      "selector": {
+        "cleanroom": "0.6.8-alpha",
+        "cleanmix": "0.7.0",
+        "foundation": "0.19.11",
+        "mixin_distribution": "CleanMix 0.7.0 with upstream Sponge Mixin 0.8.7"
+      },
+      "candidate_binding": {
+        "candidate_lock_sha256": "d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541",
+        "transformer_toolchain_lock_sha256": "ca1651c337d3bf8df6e4d1df2d919b87db40853ed566a9c0cd8f0c3dfadd16f3",
+        "cleanmix_artifact_sha256": "a41daa71398e948bc09fa578ae2460be639df0fa82fccdb630b316418d5a4a36",
+        "foundation_artifact_sha256": "a9f5cf9cb54715edf22d6bcb49bae50f281f818b1731f53f22aab85a48a7b54b"
+      },
+      "ownership": {
+        "bootstrap": "com.cleanroommc.cleanmix.service.CleanMixBootstrap",
+        "service": "com.cleanroommc.cleanmix.service.CleanMixService",
+        "class_provider": "com.cleanroommc.cleanmix.service.FoundationClassProvider",
+        "bytecode_provider": "com.cleanroommc.cleanmix.service.FoundationBytecodeProvider",
+        "transformer_provider": "com.cleanroommc.cleanmix.service.FoundationTransformerProvider",
+        "class_tracker": "com.cleanroommc.cleanmix.service.FoundationClassTracker",
+        "final_definition": "top.outlands.foundation.boot.ActualClassLoader"
+      },
+      "bridges": [
+        "Cleanroom owns the Mixin service component providers.",
+        "The providers still bridge through Launch.classLoader, ActualClassLoader, and TransformerDelegate; this is an ownership transition, not proof that LaunchWrapper compatibility vanished."
+      ],
+      "adapter": {
+        "adapter_id": "workbench-cleanroom-runtime-adapter:cleanmix-foundation-v1",
+        "implementation_state": "implemented",
+        "implemented_capabilities": [
+          "mixin.config-lifecycle",
+          "mixin.final-class-definition",
+          "mixin.runtime-service",
+          "mixin.service-components",
+          "mixin.service-discovery",
+          "mixin.transformation-lifecycle",
+          "mixin.transformer-chain"
+        ],
+        "pending_capabilities": []
+      },
+      "source_evidence": [
+        {
+          "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+          "url": "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/java/com/cleanroommc/cleanmix/service/CleanMixService.java"
+        },
+        {
+          "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+          "url": "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/java/com/cleanroommc/cleanmix/service/FoundationTransformerProvider.java"
+        },
+        {
+          "revision": "518565d49cd67eb48d025110855e0904956b2104",
+          "url": "https://github.com/CleanroomMC/Foundation/blob/518565d49cd67eb48d025110855e0904956b2104/src/main/java/top/outlands/foundation/boot/ActualClassLoader.java"
+        },
+        {
+          "revision": "518565d49cd67eb48d025110855e0904956b2104",
+          "url": "https://github.com/CleanroomMC/Foundation/blob/518565d49cd67eb48d025110855e0904956b2104/src/main/java/top/outlands/foundation/TransformerDelegate.java"
+        }
+      ]
+    }
+  ],
+  "unresolved_targets": [
+    {
+      "cleanroom_version_family": "0.7.x",
+      "state": "no-exact-candidate",
+      "admission_requirement": "Add an exact Cleanroom release/source/artifact lock and a profile-owned epoch adapter before runtime snapshots may claim 0.7.x support. CleanMix 0.7.x is a separate version axis and is already present in the 0.6.8-alpha candidate."
+    }
+  ],
+  "boundaries": [
+    "The catalog records source-grounded ownership seams, not runtime observations.",
+    "Only the exact 0.6.8-alpha epoch is candidate-bound; the older epochs require exact artifact locks and fresh-JVM conformance evidence before support claims.",
+    "Concrete implementation classes remain profile knowledge and never enter the generic Crucible runtime snapshot contract."
+  ]
+}

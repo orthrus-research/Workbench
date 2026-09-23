@@ -1,0 +1,59 @@
+{
+  "class_cache": {
+    "cache_version": 4,
+    "identity_inputs": [
+      "source last-modified time",
+      "Java version"
+    ],
+    "source_content_hash_bound": false
+  },
+  "format": "workbench-groovyscript-platform-profile-v1",
+  "groovyscript": {
+    "source_commit": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4",
+    "version": "1.4.3"
+  },
+  "limitations": [
+    "postInit is the only reloadable GroovyScript 1.4.3 loader stage.",
+    "Stage reloadability does not establish that every compat registry restores its prior state transactionally.",
+    "The class cache is not content-addressed and may require explicit invalidation."
+  ],
+  "load_stages": {
+    "init": {
+      "order": 1,
+      "reload": "restart-required",
+      "roles": [
+        "late non-reloadable initialization"
+      ]
+    },
+    "postInit": {
+      "order": 2,
+      "reload": "reload-candidate",
+      "roles": [
+        "recipes",
+        "reloadable compat mutations"
+      ]
+    },
+    "preInit": {
+      "order": 0,
+      "reload": "restart-required",
+      "roles": [
+        "classes",
+        "items",
+        "blocks",
+        "materials",
+        "early event registration"
+      ]
+    }
+  },
+  "platform_profile_id": "workbench-platform:cleanroom:provisional",
+  "preprocessors": [
+    "no_run",
+    "debug_only",
+    "no_reload",
+    "mods_loaded",
+    "side",
+    "packmode"
+  ],
+  "profile_id": "workbench-platform:cleanroom:groovyscript:1.4.3",
+  "schema_version": 1
+}

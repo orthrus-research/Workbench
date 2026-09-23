@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-admission-record-v2.schema.json",
+  "title": "Workbench Crucible evidence admission record V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "decision_owner",
+    "candidate_record_id",
+    "candidate_kind",
+    "context_ref_id",
+    "validator_ids",
+    "evaluated_schema_object_descriptor_ids",
+    "policy_ids",
+    "profile_adapter_bindings",
+    "outcome",
+    "eligible_for_materialization",
+    "diagnostics",
+    "limitations",
+    "prior_admission_record_id",
+    "validation_result_object_descriptor_id",
+    "supporting_receipt_ids"
+  ],
+  "properties": {
+    "kind": {"const": "admission-record"},
+    "format": {"const": "workbench-crucible-admission-record-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-admission-record-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {
+      "type": "string",
+      "pattern": "^admission-record:sha256:[0-9a-f]{64}$"
+    },
+    "decision_owner": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorityBinding"},
+    "candidate_record_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/admissionCandidateId"},
+    "candidate_kind": {"enum": ["object-descriptor", "evidence-record"]},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/contextRefId"},
+    "validator_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/validatorId"}
+    },
+    "evaluated_schema_object_descriptor_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"}
+    },
+    "policy_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"}
+    },
+    "profile_adapter_bindings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/profileAdapterBinding"}
+    },
+    "outcome": {"enum": ["admitted", "rejected", "quarantined"]},
+    "eligible_for_materialization": {"type": "boolean"},
+    "diagnostics": {
+      "type": "array",
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/diagnostic"}
+    },
+    "limitations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/limitation"}
+    },
+    "prior_admission_record_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableAdmissionRecordId"},
+    "validation_result_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "supporting_receipt_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/validationReceiptId"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"candidate_kind": {"const": "object-descriptor"}}},
+      "then": {
+        "properties": {
+          "candidate_record_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"}
+        }
+      },
+      "else": {
+        "properties": {
+          "candidate_record_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceRecordId"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"outcome": {"const": "admitted"}}},
+      "then": {"properties": {"eligible_for_materialization": {"const": true}}},
+      "else": {"properties": {"eligible_for_materialization": {"const": false}}}
+    }
+  ]
+}

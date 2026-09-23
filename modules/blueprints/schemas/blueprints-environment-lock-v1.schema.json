@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-environment-lock-v1.schema.json",
+  "title": "Supersymmetry Blueprints simulation environment lock v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "isolation",
+    "limits",
+    "dependencies",
+    "commands"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-environment-lock-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "isolation": {
+      "type": "object",
+      "required": [
+        "kind",
+        "executable",
+        "executable_sha256",
+        "network",
+        "environment"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "bubblewrap"
+        },
+        "executable": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "executable_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "network": {
+          "const": "disabled"
+        },
+        "environment": {
+          "const": "cleared"
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "command_timeout_seconds",
+        "max_output_bytes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "command_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777216
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "sha256",
+          "size",
+          "executable"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          },
+          "executable": {
+            "const": true
+          }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "stage_id",
+          "argv",
+          "dependency_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "stage_id": {
+            "enum": [
+              "isolated-compilation",
+              "target-existing-tests"
+            ]
+          },
+          "argv": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          },
+          "dependency_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]*$",
+      "maxLength": 128
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

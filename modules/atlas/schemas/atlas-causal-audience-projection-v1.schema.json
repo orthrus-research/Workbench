@@ -1,0 +1,647 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-causal-audience-projection-v1.schema.json",
+  "title": "Atlas causal audience projection v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "projection_id",
+    "source_result",
+    "binding",
+    "developer",
+    "player"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-atlas-causal-audience-projection-v1"
+    },
+    "projection_id": {
+      "type": "string",
+      "pattern": "^atlas-causal-audience-projection:sha256:[0-9a-f]{64}$"
+    },
+    "source_result": {
+      "type": "object"
+    },
+    "binding": {
+      "$ref": "#/$defs/binding"
+    },
+    "developer": {
+      "$ref": "#/$defs/developer"
+    },
+    "player": {
+      "$ref": "#/$defs/player"
+    }
+  },
+  "$defs": {
+    "status": {
+      "enum": [
+        "closed",
+        "partial",
+        "bounded",
+        "unresolved",
+        "unavailable"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "profile",
+        "physical_side"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "enum": [
+            "COMMON_FINAL_STATE",
+            "CLIENT_JEI_FINAL_STATE",
+            "OFFLINE_ARTIFACT_STATE"
+          ]
+        },
+        "physical_side": {
+          "enum": [
+            "CLIENT",
+            "DEDICATED_SERVER",
+            "OFFLINE"
+          ]
+        }
+      }
+    },
+    "node_scope": {
+      "type": "object",
+      "required": [
+        "snapshot_id",
+        "profile",
+        "physical_side"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+        },
+        "profile": {
+          "enum": [
+            "COMMON_FINAL_STATE",
+            "CLIENT_JEI_FINAL_STATE",
+            "OFFLINE_ARTIFACT_STATE"
+          ]
+        },
+        "physical_side": {
+          "enum": [
+            "CLIENT",
+            "DEDICATED_SERVER",
+            "OFFLINE"
+          ]
+        }
+      }
+    },
+    "final_runtime_record": {
+      "type": "object",
+      "required": [
+        "runtime_node_id",
+        "runtime_kind",
+        "runtime_record_sha256",
+        "capture_evidence_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "runtime_node_id": {
+          "type": "string",
+          "pattern": "^rg:(?:common_final_state_client|common_final_state_dedicated_server|client_jei_final_state_client|offline_artifact_state_offline):[a-z][a-z0-9_]*:.+$"
+        },
+        "runtime_kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "runtime_record_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "capture_evidence_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-evidence:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "required": [
+        "result_id",
+        "request_id",
+        "query_instance_id",
+        "snapshot_id",
+        "scope",
+        "final_runtime_record",
+        "final_node_id",
+        "policy_id",
+        "policy_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "result_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-result:sha256:[0-9a-f]{64}$"
+        },
+        "request_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-request:sha256:[0-9a-f]{64}$"
+        },
+        "query_instance_id": {
+          "type": "string",
+          "pattern": "^atlas-query:sha256:[0-9a-f]{64}$"
+        },
+        "snapshot_id": {
+          "type": "string",
+          "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "final_runtime_record": {
+          "$ref": "#/$defs/final_runtime_record"
+        },
+        "final_node_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+        },
+        "policy_id": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9-]+$"
+        },
+        "policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "summary_code": {
+      "enum": [
+        "causal-path-closed",
+        "causal-path-partial",
+        "causal-path-bounded",
+        "causal-path-unresolved",
+        "causal-evidence-unavailable"
+      ]
+    },
+    "evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^atlas-provenance-evidence:sha256:[0-9a-f]{64}$"
+      }
+    },
+    "reason_codes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "dynamic-script-unresolved",
+          "source-span-unavailable",
+          "runtime-transition-unobserved",
+          "lifecycle-order-unresolved",
+          "identity-reconciliation-unresolved",
+          "required-evidence-unavailable",
+          "path-bound-reached",
+          "node-bound-reached",
+          "relation-bound-reached",
+          "evidence-bound-reached"
+        ]
+      }
+    },
+    "truncation": {
+      "type": "object",
+      "required": [
+        "truncated",
+        "reason",
+        "emitted_paths",
+        "emitted_nodes",
+        "emitted_relations",
+        "emitted_evidence_records",
+        "omitted_at_least"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "truncated": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emitted_paths": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "emitted_nodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "emitted_relations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "emitted_evidence_records": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "omitted_at_least": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "limitations": {
+      "type": "object",
+      "required": [
+        "reason_codes",
+        "open_frontier_node_ids",
+        "truncation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "reason_codes": {
+          "$ref": "#/$defs/reason_codes"
+        },
+        "open_frontier_node_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+          }
+        },
+        "truncation": {
+          "$ref": "#/$defs/truncation"
+        }
+      }
+    },
+    "statement": {
+      "type": "object",
+      "required": [
+        "statement_id",
+        "kind",
+        "subject_node_id",
+        "bounded_wording",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "statement_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-statement:sha256:[0-9a-f]{64}$"
+        },
+        "kind": {
+          "enum": [
+            "not-found-in-closed-source-scope",
+            "not-observed-in-final-capture",
+            "removed-before-final",
+            "no-closed-causal-path"
+          ]
+        },
+        "subject_node_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bounded_wording": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidence_ids"
+        }
+      }
+    },
+    "developer_node": {
+      "type": "object",
+      "required": [
+        "position",
+        "node_id",
+        "node_class",
+        "scope",
+        "identity",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "node_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+        },
+        "node_class": {
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/node_scope"
+        },
+        "identity": {
+          "type": "object"
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidence_ids"
+        }
+      }
+    },
+    "developer_step": {
+      "type": "object",
+      "required": [
+        "step_id",
+        "position",
+        "relation_id",
+        "predicate",
+        "causal_strength",
+        "lifecycle_stage_id",
+        "subject_node_id",
+        "object_node_id",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "pattern": "^atlas-causal-explanation-step:sha256:[0-9a-f]{64}$"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "relation_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-relation:sha256:[0-9a-f]{64}$"
+        },
+        "predicate": {
+          "type": "string"
+        },
+        "causal_strength": {
+          "type": "string"
+        },
+        "lifecycle_stage_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subject_node_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+        },
+        "object_node_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidence_ids"
+        }
+      }
+    },
+    "player_step": {
+      "type": "object",
+      "required": [
+        "step_id",
+        "position",
+        "relation_id",
+        "action_code",
+        "wording",
+        "causal_strength",
+        "lifecycle_stage_id",
+        "subject_node_id",
+        "object_node_id",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "pattern": "^atlas-causal-explanation-step:sha256:[0-9a-f]{64}$"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "relation_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-relation:sha256:[0-9a-f]{64}$"
+        },
+        "action_code": {
+          "type": "string"
+        },
+        "wording": {
+          "type": "string",
+          "minLength": 1
+        },
+        "causal_strength": {
+          "type": "string"
+        },
+        "lifecycle_stage_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subject_node_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+        },
+        "object_node_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidence_ids"
+        }
+      }
+    },
+    "developer_path": {
+      "type": "object",
+      "required": [
+        "projection_path_id",
+        "path_id",
+        "closure_state",
+        "open_reason_codes",
+        "nodes",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "projection_path_id": {
+          "type": "string",
+          "pattern": "^atlas-causal-audience-path:sha256:[0-9a-f]{64}$"
+        },
+        "path_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-path:sha256:[0-9a-f]{64}$"
+        },
+        "closure_state": {
+          "enum": [
+            "closed",
+            "partial"
+          ]
+        },
+        "open_reason_codes": {
+          "$ref": "#/$defs/reason_codes"
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/developer_node"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/developer_step"
+          }
+        }
+      }
+    },
+    "player_path": {
+      "type": "object",
+      "required": [
+        "projection_path_id",
+        "path_id",
+        "closure_state",
+        "open_reason_codes",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "projection_path_id": {
+          "type": "string",
+          "pattern": "^atlas-causal-audience-path:sha256:[0-9a-f]{64}$"
+        },
+        "path_id": {
+          "type": "string",
+          "pattern": "^atlas-provenance-path:sha256:[0-9a-f]{64}$"
+        },
+        "closure_state": {
+          "enum": [
+            "closed",
+            "partial"
+          ]
+        },
+        "open_reason_codes": {
+          "$ref": "#/$defs/reason_codes"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/player_step"
+          }
+        }
+      }
+    },
+    "developer": {
+      "type": "object",
+      "required": [
+        "audience",
+        "summary_code",
+        "summary",
+        "status",
+        "paths",
+        "statements",
+        "limitations",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "audience": {
+          "const": "developer"
+        },
+        "summary_code": {
+          "$ref": "#/$defs/summary_code"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/developer_path"
+          }
+        },
+        "statements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/statement"
+          }
+        },
+        "limitations": {
+          "$ref": "#/$defs/limitations"
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidence_ids"
+        }
+      }
+    },
+    "player": {
+      "type": "object",
+      "required": [
+        "audience",
+        "summary_code",
+        "summary",
+        "status",
+        "final_runtime_node_id",
+        "paths",
+        "statements",
+        "limitations",
+        "evidence_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "audience": {
+          "const": "player"
+        },
+        "summary_code": {
+          "$ref": "#/$defs/summary_code"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "final_runtime_node_id": {
+          "type": "string",
+          "pattern": "^rg:(?:common_final_state_client|common_final_state_dedicated_server|client_jei_final_state_client|offline_artifact_state_offline):[a-z][a-z0-9_]*:.+$"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/player_path"
+          }
+        },
+        "statements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/statement"
+          }
+        },
+        "limitations": {
+          "$ref": "#/$defs/limitations"
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/evidence_ids"
+        }
+      }
+    }
+  }
+}

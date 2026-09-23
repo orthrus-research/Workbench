@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-work-session-summary-v1.schema.json",
+  "title": "Workbench Work Session disposable summary V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version", "summary_id", "session_id", "session_record_id",
+    "task", "workspace", "identities", "lifecycle", "created_at", "updated_at",
+    "latest_sequence", "latest_event_id", "event_count", "closed", "frontend_ids",
+    "owner_record_refs", "result_refs", "problems", "next_actions", "recovery",
+    "limitations", "unknowns", "integrity_state", "integrity_problem_ids"
+  ],
+  "properties": {
+    "format_version": {"const": "workbench-work-session-summary-v1"},
+    "summary_id": {"pattern": "^work-session-summary:sha256:[0-9a-f]{64}$", "type": "string"},
+    "session_id": {"pattern": "^work-session-v2-[0-9a-f]{32}$", "type": "string"},
+    "session_record_id": {"pattern": "^work-session-record:sha256:[0-9a-f]{64}$", "type": "string"},
+    "task": {"$ref": "#/$defs/task"},
+    "workspace": {"$ref": "#/$defs/workspace"},
+    "identities": {"$ref": "#/$defs/identities"},
+    "lifecycle": {"$ref": "#/$defs/lifecycle"},
+    "created_at": {"format": "date-time", "type": "string"},
+    "updated_at": {"format": "date-time", "type": "string"},
+    "latest_sequence": {"minimum": -1, "maximum": 99999, "type": "integer"},
+    "latest_event_id": {"oneOf": [{"pattern": "^work-session-event:sha256:[0-9a-f]{64}$", "type": "string"}, {"type": "null"}]},
+    "event_count": {"minimum": 0, "maximum": 100000, "type": "integer"},
+    "closed": {"type": "boolean"},
+    "frontend_ids": {"items": {"$ref": "#/$defs/identity"}, "maxItems": 128, "type": "array", "uniqueItems": true},
+    "owner_record_refs": {"items": {"$ref": "#/$defs/ownerRef"}, "maxItems": 256, "type": "array", "uniqueItems": true},
+    "result_refs": {"items": {"$ref": "#/$defs/resultRef"}, "maxItems": 256, "type": "array", "uniqueItems": true},
+    "problems": {"items": {"$ref": "#/$defs/problem"}, "maxItems": 256, "type": "array", "uniqueItems": true},
+    "next_actions": {"items": {"$ref": "#/$defs/action"}, "maxItems": 128, "type": "array", "uniqueItems": true},
+    "recovery": {"oneOf": [{"$ref": "#/$defs/recovery"}, {"type": "null"}]},
+    "limitations": {"items": {"maxLength": 4096, "minLength": 1, "type": "string"}, "maxItems": 128, "type": "array"},
+    "unknowns": {"items": {"maxLength": 4096, "minLength": 1, "type": "string"}, "maxItems": 128, "type": "array"},
+    "integrity_state": {"enum": ["verified", "recoverable", "corrupt"]},
+    "integrity_problem_ids": {"items": {"$ref": "#/$defs/identity"}, "maxItems": 256, "type": "array", "uniqueItems": true}
+  },
+  "$defs": {
+    "identity": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/+@=-]*$"},
+    "nullableIdentity": {"oneOf": [{"$ref": "#/$defs/identity"}, {"type": "null"}]},
+    "lifecycle": {"enum": ["discovered", "ready", "attention", "blocked", "running", "complete", "failed", "cancelled", "incomplete", "recoverable"]},
+    "ownerRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["owner_id", "record_id", "record_kind", "uri", "digest", "last_verified_state", "verified_at"],
+      "properties": {
+        "owner_id": {"$ref": "#/$defs/identity"}, "record_id": {"$ref": "#/$defs/identity"},
+        "record_kind": {"$ref": "#/$defs/identity"}, "uri": {"format": "uri", "maxLength": 8192, "minLength": 3, "type": "string"},
+        "digest": {"$ref": "#/$defs/nullableIdentity"}, "last_verified_state": {"$ref": "#/$defs/nullableIdentity"},
+        "verified_at": {"oneOf": [{"format": "date-time", "type": "string"}, {"type": "null"}]}
+      }
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["task_id", "owner_id", "label", "owner_record_ref"],
+      "properties": {
+        "task_id": {"$ref": "#/$defs/identity"}, "owner_id": {"$ref": "#/$defs/identity"},
+        "label": {"oneOf": [{"maxLength": 1024, "minLength": 1, "type": "string"}, {"type": "null"}]},
+        "owner_record_ref": {"oneOf": [{"$ref": "#/$defs/ownerRef"}, {"type": "null"}]}
+      }
+    },
+    "workspace": {
+      "type": "object", "additionalProperties": false,
+      "required": ["identity_id", "canonical_root", "root_uri", "source_revision", "dirty_fingerprint"],
+      "properties": {
+        "identity_id": {"$ref": "#/$defs/identity"}, "canonical_root": {"maxLength": 8192, "minLength": 1, "type": "string"},
+        "root_uri": {"format": "uri", "maxLength": 8192, "type": "string"},
+        "source_revision": {"$ref": "#/$defs/nullableIdentity"}, "dirty_fingerprint": {"$ref": "#/$defs/nullableIdentity"}
+      }
+    },
+    "identities": {
+      "type": "object", "additionalProperties": false,
+      "required": ["core_id", "catalog_id", "host_adapter_id", "platform_profile_id", "pack_profile_id"],
+      "properties": {
+        "core_id": {"$ref": "#/$defs/identity"}, "catalog_id": {"$ref": "#/$defs/identity"},
+        "host_adapter_id": {"$ref": "#/$defs/identity"}, "platform_profile_id": {"anyOf": [{"$ref": "#/$defs/identity"}, {"type": "null"}]},
+        "pack_profile_id": {"$ref": "#/$defs/nullableIdentity"},
+        "developer_selection": {"type":"object","additionalProperties":false,"required":["pack_uri","pack_profile","platform_profile","variant","mod_uri"],"properties":{"pack_uri":{"type":"string","minLength":1},"pack_profile":{"type":"string","minLength":1},"platform_profile":{"type":"string","minLength":1},"variant":{"type":"string","minLength":1},"mod_uri":{"type":["string","null"]}}}
+      }
+    },
+    "action": {
+      "type": "object", "additionalProperties": false,
+      "required": ["action_id", "action_digest", "owner_id", "availability", "mutation_budget", "arguments"],
+      "properties": {
+        "action_id": {"$ref": "#/$defs/identity"}, "action_digest": {"$ref": "#/$defs/identity"}, "owner_id": {"$ref": "#/$defs/identity"},
+        "availability": {"enum": ["available", "unavailable", "experimental", "blocked", "stale", "unknown"]},
+        "mutation_budget": {"enum": ["read-only", "writes-output", "mutating", "destructive"]},
+        "arguments": {"type": "object", "maxProperties": 256}
+      }
+    },
+    "resultRef": {
+      "type": "object", "additionalProperties": false, "required": ["result_id", "owner_record_ref"],
+      "properties": {"result_id": {"$ref": "#/$defs/identity"}, "owner_record_ref": {"$ref": "#/$defs/ownerRef"}}
+    },
+    "problem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["problem_id", "code", "severity", "message", "affected_identity", "evidence_refs", "next_action_id"],
+      "properties": {
+        "problem_id": {"$ref": "#/$defs/identity"}, "code": {"$ref": "#/$defs/identity"},
+        "severity": {"enum": ["info", "warning", "error", "fatal"]}, "message": {"maxLength": 4096, "minLength": 1, "type": "string"},
+        "affected_identity": {"$ref": "#/$defs/nullableIdentity"},
+        "evidence_refs": {"items": {"$ref": "#/$defs/ownerRef"}, "maxItems": 256, "type": "array"},
+        "next_action_id": {"$ref": "#/$defs/nullableIdentity"}
+      }
+    },
+    "recovery": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "reason", "owner_record_refs", "safe_action_ids"],
+      "properties": {
+        "state": {"enum": ["required", "recovering", "resolved"]}, "reason": {"maxLength": 4096, "minLength": 1, "type": "string"},
+        "owner_record_refs": {"items": {"$ref": "#/$defs/ownerRef"}, "maxItems": 256, "type": "array"},
+        "safe_action_ids": {"items": {"$ref": "#/$defs/identity"}, "maxItems": 128, "type": "array", "uniqueItems": true}
+      }
+    }
+  }
+}

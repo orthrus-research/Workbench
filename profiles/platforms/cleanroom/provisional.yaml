@@ -1,0 +1,54 @@
+schema_version: 1
+profile_id: workbench-platform:cleanroom:provisional
+kind: cleanroom
+status: provisional
+minecraft_version: 1.12.2
+cleanroom_version: 0.6.12-alpha
+build_provider: github-release:CleanroomMC/Cleanroom@0.6.12-alpha
+java:
+  host: unresolved
+  build: unresolved
+  source: unresolved
+  bytecode: unresolved
+  runtime: eclipse-temurin-25.0.4+7
+  runtime_provision:
+    distribution: eclipse-temurin
+    feature_version: 25
+    release_name: jdk-25.0.4+7
+    release_type: ga
+    image_type: jdk
+    jvm_impl: hotspot
+    heap_size: normal
+    project: jdk
+    vendor: eclipse
+    java_vendor: Eclipse Adoptium
+    api_base_url: https://api.adoptium.net/v3
+runtime_artifacts:
+  packwiz_installer:
+    url: https://github.com/packwiz/packwiz-installer/releases/download/v0.5.14/packwiz-installer.jar
+    source_revision: 7420866dfc6ae1f68079a166e9804b7ec31a59ca
+    size: 4378828
+    sha256: c9f646908d340d84773948a9a7d98bc1dae250d35e1016dc6e2b8459760b5598
+  cleanroom_client:
+    url: https://github.com/CleanroomMC/Cleanroom/releases/download/0.6.12-alpha/cleanroom-0.6.12-alpha.zip
+    source_revision: fe78db8dc4fcee47df7549230858f4c064208d73
+    size: 58132
+    sha256: d6536796df0ce02e043f7cec59d344fca7c0dee00f013dd4d89a7a0db4c4cb32
+  cleanroom_server:
+    url: https://github.com/CleanroomMC/Cleanroom/releases/download/0.6.12-alpha/cleanroom-0.6.12-alpha-installer.jar
+    source_revision: fe78db8dc4fcee47df7549230858f4c064208d73
+    size: 6837743
+    sha256: 72ab384dd30b876eec5604c7c74c7c5e1567a80a3749ea5f752e2df50d2ffbc6
+supported_lanes:
+  - experimental
+required_checks:
+  - compile
+  - disposable-client-smoke
+  - disposable-server-smoke
+notes:
+  - Cleanroom and Packwiz artifacts are exact bootstrap candidates, not a stable runtime claim.
+  - Cleanroom documents Java 25 as tested and recommends Temurin or Zulu, but does not publish a patch-level compatibility matrix.
+  - Temurin 25.0.4+7 is the current Workbench candidate; its exact host archive is resolved and retained per provision receipt.
+  - Replace remaining unresolved fields with observed values during the first runnable setup.
+  - Crashes and failed required checks are blocking failures for that candidate.
+  - The active native runtime uses runtime-toolchain.json; historical 0.6.8-alpha candidate evidence does not qualify 0.6.12-alpha.

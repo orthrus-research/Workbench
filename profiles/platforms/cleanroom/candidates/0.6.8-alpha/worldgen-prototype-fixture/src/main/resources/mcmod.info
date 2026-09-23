@@ -1,0 +1,14 @@
+[
+  {
+    "modid": "workbench_worldgen_prototype",
+    "name": "Workbench Worldgen Prototype",
+    "version": "0.4.0",
+    "mcversion": "1.12.2",
+    "description": "World Studio mega-region, climate, hydrology, and BOP-biome prototype.",
+    "authorList": ["Workbench"],
+    "credits": "Cleanroom 0.6.8-alpha candidate experimentation only",
+    "url": "",
+    "updateJSON": "",
+    "logoFile": ""
+  }
+]

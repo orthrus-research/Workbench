@@ -1,0 +1,107 @@
+schema_version: 1
+format: susy-blueprints-standard-authoring-v1
+contract_id: BLUEPRINTS-IMPLEMENTATION-STANDARD-V1
+standard_key: localization-component
+version: 1.0.0
+lifecycle: active
+kind: component
+feature_family: material-backed-fluid
+priority: 10
+specificity: 5
+mandatory_core:
+  id: localization-core
+  path: modules/blueprints/tests/fixtures/supersymmetry/standards/component-template.tpl
+  sha256: 60e406467f6a342098da175d9970b9db75b747d16229ee9bf5663539cd83f2fa
+variants:
+  - id: default
+    priority: 10
+    specificity: 1
+    when: []
+    template:
+      id: localization-template
+      path: modules/blueprints/tests/fixtures/supersymmetry/standards/component-template.tpl
+      sha256: 60e406467f6a342098da175d9970b9db75b747d16229ee9bf5663539cd83f2fa
+    compatible_components: []
+parameters:
+  - name: locale
+    class: defaulted
+    value_type: string
+    description: Localization locale.
+    constraints:
+      enum:
+        - en_us
+    default: en_us
+targets:
+  - repository_id: pack
+    integration_surface: localization
+    allowed_paths:
+      - assets/susy/lang/
+composition:
+  allowed: []
+  precedence: []
+atlas:
+  baseline_id: atlas-synthetic-baseline
+  queries:
+    - id: language-root
+      query_id: atlas-query:synthetic-language-root
+      result_id: atlas-result:synthetic-language-root
+      invariants:
+        - id: language-path
+          result_path: /paths/language
+          operator: equals
+          expected: assets/susy/lang/
+          required: true
+rendering:
+  outputs:
+    - id: localization-core-output
+      repository_id: pack
+      integration_surface: localization
+      operation: create
+      path:
+        operator: concat
+        arguments:
+          - operator: literal
+            arguments:
+              - assets/susy/lang/component-
+          - operator: parameter
+            arguments:
+              - locale
+          - operator: literal
+            arguments:
+              - .lang
+      source:
+        kind: template
+        id: localization-core
+      variants: []
+    - id: localization-default-output
+      repository_id: pack
+      integration_surface: localization
+      operation: create
+      path:
+        operator: concat
+        arguments:
+          - operator: literal
+            arguments:
+              - assets/susy/lang/component-default-
+          - operator: parameter
+            arguments:
+              - locale
+          - operator: literal
+            arguments:
+              - .lang
+      source:
+        kind: template
+        id: localization-template
+      variants:
+        - default
+validation:
+  formatters: []
+  tests: []
+  fixtures: []
+  gates: []
+diagnostics: []
+reconciliation: []
+migrations: []
+hooks: []
+allocation:
+  domains: []

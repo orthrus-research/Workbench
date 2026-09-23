@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-core/workbench-check-snapshot-response-v1.schema.json",
+  "title": "Workbench snapshot-bound read response V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "snapshot_id",
+    "view_id",
+    "query_id",
+    "state",
+    "payload",
+    "complete",
+    "next_cursor",
+    "reason",
+    "request_id"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-check-snapshot-response-v1"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^check-snapshot:sha256:[0-9a-f]{64}$"
+    },
+    "view_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_id": {
+      "type": "string",
+      "pattern": "^check-snapshot-query:sha256:[0-9a-f]{64}$"
+    },
+    "state": {
+      "enum": [
+        "ready",
+        "unavailable",
+        "unsupported",
+        "expired",
+        "cancelled",
+        "incomplete"
+      ]
+    },
+    "payload": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "next_cursor": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "snapshot_id",
+            "query_id",
+            "offset"
+          ],
+          "properties": {
+            "snapshot_id": {
+              "type": "string",
+              "pattern": "^check-snapshot:sha256:[0-9a-f]{64}$"
+            },
+            "query_id": {
+              "type": "string",
+              "pattern": "^check-snapshot-query:sha256:[0-9a-f]{64}$"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^check-snapshot-read:sha256:[0-9a-f]{64}$"
+    }
+  }
+}

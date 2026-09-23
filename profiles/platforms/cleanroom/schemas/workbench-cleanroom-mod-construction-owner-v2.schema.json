@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/profiles/cleanroom/workbench-cleanroom-mod-construction-owner-v2.schema.json",
+  "title": "Cleanroom mod fresh-project construction owner V2",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "file": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$",
+          "type": "string"
+        },
+        "sha256": {"$ref": "#/$defs/digest"},
+        "size": {"minimum": 0, "type": "integer"}
+      },
+      "required": ["path", "sha256", "size"],
+      "type": "object"
+    },
+    "limitations": {
+      "const": [
+        "This constructor writes only the exact 19-file generic Cleanroom fixture projection to an absent, empty-directory, or clean unborn Git target.",
+        "The portable transform changes only the fixture build output and artifact-allowlist roots to target-local ignored .workbench storage.",
+        "Construction does not qualify Gradle dependency resolution, compilation, remapping, a client, a dedicated server, IDE integration, publication, or arbitrary templates.",
+        "Direct apply requires exact plan consent; Blueprints owns fresh-target bootstrap, byte transactions, and recovery, while the Cleanroom profile owns admitted source bytes and rendering."
+      ]
+    },
+    "schema_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "^profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-(?:owner|request|plan|result)-v2\\.schema\\.json$",
+          "type": "string"
+        },
+        "sha256": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["path", "sha256"],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "adapter_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_set_contract_id": {"const": "BLUEPRINTS-ADAPTER-SET-V1"},
+        "hook_id": {"const": "cleanroom-generic-mod-fixture-render-v2"},
+        "source_path": {
+          "const": "profiles/platforms/cleanroom/src/workbench_cleanroom_new_project/construction.py"
+        },
+        "source_sha256": {"$ref": "#/$defs/digest"},
+        "symbol": {"const": "cleanroom_mod_adapter_set"}
+      },
+      "required": [
+        "adapter_set_contract_id",
+        "hook_id",
+        "source_path",
+        "source_sha256",
+        "symbol"
+      ],
+      "type": "object"
+    },
+    "authority_boundary": {
+      "const": {
+        "construction_owner": "Blueprints",
+        "profile_owner": "cleanroom-platform-profile",
+        "publication_authorized": false,
+        "scope": "exact-owner-admitted-fresh-project",
+        "transaction_owner": "Blueprints"
+      }
+    },
+    "blueprints_mechanics_refs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "enum": [
+              "modules/blueprints/src/workbench_blueprints/application_transaction.py",
+              "modules/blueprints/src/workbench_blueprints/fresh_project.py"
+            ]
+          },
+          "sha256": {"$ref": "#/$defs/digest"}
+        },
+        "required": ["path", "sha256"],
+        "type": "object"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "construction_contract_id": {
+      "const": "BLUEPRINTS-FRESH-PROJECT-CONSTRUCTION-V2"
+    },
+    "constructor_component_id": {"const": "blueprints"},
+    "contract_schemas": {
+      "additionalProperties": false,
+      "properties": {
+        "owner_schema_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/schema_ref"},
+            {
+              "properties": {
+                "path": {
+                  "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json"
+                }
+              }
+            }
+          ]
+        },
+        "plan_schema_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/schema_ref"},
+            {
+              "properties": {
+                "path": {
+                  "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-plan-v2.schema.json"
+                }
+              }
+            }
+          ]
+        },
+        "request_schema_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/schema_ref"},
+            {
+              "properties": {
+                "path": {
+                  "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-request-v2.schema.json"
+                }
+              }
+            }
+          ]
+        },
+        "result_schema_ref": {
+          "allOf": [
+            {"$ref": "#/$defs/schema_ref"},
+            {
+              "properties": {
+                "path": {
+                  "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-result-v2.schema.json"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "owner_schema_ref",
+        "plan_schema_ref",
+        "request_schema_ref",
+        "result_schema_ref"
+      ],
+      "type": "object"
+    },
+    "format": {"const": "workbench-cleanroom-mod-construction-owner-v2"},
+    "id": {
+      "pattern": "^workbench-cleanroom-mod-construction-owner:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "kind_id": {"const": "workbench-new-project-kind:cleanroom-mod"},
+    "limitations": {"$ref": "#/$defs/limitations"},
+    "output_manifest": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {"const": "sha256-file-tree-v1"},
+        "files": {
+          "items": {"$ref": "#/$defs/file"},
+          "maxItems": 19,
+          "minItems": 19,
+          "type": "array"
+        },
+        "tree_digest": {"$ref": "#/$defs/digest"}
+      },
+      "required": ["algorithm", "files", "tree_digest"],
+      "type": "object"
+    },
+    "owner_id": {"const": "cleanroom-platform-profile"},
+    "portable_transform": {
+      "additionalProperties": false,
+      "properties": {
+        "output_sha256": {
+          "const": "sha256:c3ce8cb08875039d79e86d246d673624ac89fd6d31c6139c72962701aedfc268"
+        },
+        "output_size": {"const": 7690},
+        "path": {"const": "build.gradle"},
+        "replacements": {
+          "const": [
+            {
+              "after_sha256": "sha256:ed5934dfaa4e849d4bec37bf7d2a013c5d89ff8df829a45a85e83fb78752ce76",
+              "after_size": 71,
+              "before_sha256": "sha256:887bf905aee8219fb3ab6b9ff527026106a9a64f3ed14e6513cc0e220cb1c725",
+              "before_size": 114
+            },
+            {
+              "after_sha256": "sha256:ba865d1f2165a1b660388cae3230851b54afc9fafff8a59a11cd0834c4a4744d",
+              "after_size": 69,
+              "before_sha256": "sha256:78dcfd0e471cbf8a618f17d26a903f4ebf85767e33e35f727f337373de089f4e",
+              "before_size": 84
+            }
+          ]
+        },
+        "source_sha256": {
+          "const": "sha256:11fd814d04441e23480ccedddcac0e23f3ae644b69053e8fcc7eef0e2eb50914"
+        },
+        "substitutions": {
+          "const": [
+            {
+              "replacement_utf8": "layout.buildDirectory = layout.projectDirectory.dir('.workbench/build')",
+              "source_utf8": "layout.buildDirectory = file(\n    '../../../../../.workbench/build/cleanroom/0.6.8-alpha/generic-mod-daily-loop'\n)"
+            },
+            {
+              "replacement_utf8": "def ignoredRoot = rootProject.file('.workbench').toPath().normalize()",
+              "source_utf8": "def ignoredRoot = rootProject.file('../../../../../.workbench').toPath().normalize()"
+            }
+          ]
+        },
+        "transform_id": {
+          "const": "cleanroom-generic-mod-portable-build-root-v2"
+        }
+      },
+      "required": [
+        "output_sha256",
+        "output_size",
+        "path",
+        "replacements",
+        "source_sha256",
+        "substitutions",
+        "transform_id"
+      ],
+      "type": "object"
+    },
+    "schema_version": {"const": 2},
+    "slot_id": {"const": "new-kind.cleanroom-mod.construction"},
+    "template_lock_ref": {
+      "const": {
+        "fixture_id": "workbench-fixture:cleanroom:generic-mod-daily-loop",
+        "path": "profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop/fixture-lock-v1.json",
+        "schema_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-generic-mod-fixture-lock-v1.schema.json",
+        "schema_sha256": "sha256:362e5eb800cf6803ecc15b29192b7c627c47f57f48cb3eecb0d283c3168b66ba",
+        "sha256": "sha256:fc0845123d2a9b833a63b2d49a29a38b39388e8ac24a810dcc07e87a6fbad8d2",
+        "tree_digest": "sha256:21c67a6372b57aa538853458eef8a7ade5f30b6079b4a2c476a5d75c5769b157"
+      }
+    }
+  },
+  "required": [
+    "adapter_ref",
+    "authority_boundary",
+    "blueprints_mechanics_refs",
+    "construction_contract_id",
+    "constructor_component_id",
+    "contract_schemas",
+    "format",
+    "id",
+    "kind_id",
+    "limitations",
+    "output_manifest",
+    "owner_id",
+    "portable_transform",
+    "schema_version",
+    "slot_id",
+    "template_lock_ref"
+  ]
+}

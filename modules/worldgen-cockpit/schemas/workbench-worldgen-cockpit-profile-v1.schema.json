@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-worldgen-cockpit-profile-v1.schema.json",
+  "title": "Workbench Worldgen Cockpit pack profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "profile_id",
+    "pack_profile",
+    "iteration_profile",
+    "subsurface_profile",
+    "dimension_id",
+    "modes",
+    "thresholds",
+    "limits",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {"const": "workbench-worldgen-cockpit-pack-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1},
+    "pack_profile": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+    "iteration_profile": {"$ref": "#/$defs/relativePath"},
+    "subsurface_profile": {"$ref": "#/$defs/relativePath"},
+    "dimension_id": {"type": "integer"},
+    "modes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fast", "debug", "performance"],
+      "properties": {
+        "fast": {"$ref": "#/$defs/mode"},
+        "debug": {"$ref": "#/$defs/mode"},
+        "performance": {"$ref": "#/$defs/mode"}
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "performance_regression_ratio",
+        "performance_regression_min_us",
+        "chunk_outlier_mad",
+        "height_mean_abs_blocks",
+        "cave_volume_relative",
+        "ore_mass_relative"
+      ],
+      "properties": {
+        "performance_regression_ratio": {"type": "number", "minimum": 1},
+        "performance_regression_min_us": {"type": "number", "minimum": 0},
+        "chunk_outlier_mad": {"type": "number", "minimum": 0},
+        "height_mean_abs_blocks": {"type": "number", "minimum": 0},
+        "cave_volume_relative": {"type": "number", "minimum": 0},
+        "ore_mass_relative": {"type": "number", "minimum": 0}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_chunks", "max_exact_block_comparisons", "max_topology_blocks", "max_samples_per_chunk", "max_outliers"],
+      "properties": {
+        "max_chunks": {"type": "integer", "minimum": 1, "maximum": 1024},
+        "max_exact_block_comparisons": {"type": "integer", "minimum": 1},
+        "max_topology_blocks": {"type": "integer", "minimum": 1},
+        "max_samples_per_chunk": {"type": "integer", "minimum": 1},
+        "max_outliers": {"type": "integer", "minimum": 1}
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["atlas_remains_causal_authority", "strata_remains_final_state_authority", "crucible_remains_experiment_authority", "profile_is_pack_specific"],
+      "properties": {
+        "atlas_remains_causal_authority": {"const": true},
+        "strata_remains_final_state_authority": {"const": true},
+        "crucible_remains_experiment_authority": {"const": true},
+        "profile_is_pack_specific": {"const": true}
+      }
+    }
+  },
+  "$defs": {
+    "relativePath": {"type": "string", "minLength": 1, "not": {"pattern": "^(?:/|.*(?:^|/)\\.\\.(?:/|$))"}},
+    "mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_default", "required_evidence"],
+      "properties": {
+        "region_default": {"enum": ["fast_region", "debug_region"]},
+        "required_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["semantic", "final_state", "statistical", "causal", "performance", "observer_overhead"]}
+        }
+      }
+    }
+  }
+}

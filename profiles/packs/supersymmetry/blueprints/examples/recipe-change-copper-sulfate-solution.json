@@ -1,0 +1,96 @@
+{
+  "format": "workbench-blueprints-current-example-v1",
+  "schema_version": 1,
+  "record_class": "mutable-current-example",
+  "identity_bearing": false,
+  "example_key": "supersymmetry-recipe-change-copper-sulfate-solution",
+  "researched_on": "2026-08-16",
+  "example_scope": "one-machine-recipe-extracted-from-a-larger-pull-request",
+  "source_reference": {
+    "repository": "https://github.com/SymmetricDevs/Supersymmetry",
+    "pull_request": 1451,
+    "pull_request_url": "https://github.com/SymmetricDevs/Supersymmetry/pull/1451",
+    "effective_base_revision": "b1b1a0f4c282a0d4a6ca068c07fd32521c83b935",
+    "result_revision": "25d53ad77e458399c8e58e45ba8c21ddc44c99d5",
+    "path": "groovy/postInit/chemistry/ChemistryOverhaul.groovy",
+    "before_blob_sha1": "2f97b8e3ad5974279d85c30dd4f699b309ac1426",
+    "after_blob_sha1": "74d13a9897ca9b1031216a05cc5b516d29cb6354"
+  },
+  "request": {
+    "mutation": "add",
+    "script": "groovy/postInit/chemistry/ChemistryOverhaul.groovy",
+    "recipe_map": "MIXER",
+    "item_inputs": [
+      {
+        "kind": "ore",
+        "name": "dustCopperSulfate",
+        "amount": 6
+      }
+    ],
+    "fluid_inputs": [
+      {
+        "name": "water",
+        "amount": 1000
+      }
+    ],
+    "item_outputs": [],
+    "fluid_outputs": [
+      {
+        "name": "copper_sulfate_solution",
+        "amount": 1000
+      }
+    ],
+    "duration": 60,
+    "voltage_tier": "LV"
+  },
+  "source_translation": {
+    "historical_voltage_expression": "Globals.voltAmps[1]",
+    "current_profile_renderer_expression": "VA[LV]",
+    "semantic_change": "MIXER: 6 dustCopperSulfate plus 1000 mB water produces 1000 mB copper_sulfate_solution in 60 ticks at LV"
+  },
+  "excluded_pull_request_changes": [
+    "the batch-reactor copper-sulfate recipe added by the same pull request",
+    "whitespace changes to the preceding distillery recipe"
+  ],
+  "runtime_observation": {
+    "contract_format": "workbench-supersymmetry-recipe-observation-contract-v1",
+    "mode": "disposable-cold-start",
+    "physical_sides": [
+      "client",
+      "dedicated-server"
+    ],
+    "state": "required-not-observed",
+    "required_checks": {
+      "competing_input_match_count": 0,
+      "declared_identities_resolve": true,
+      "exact_recipe_match_count": 1,
+      "groovy_origin": true,
+      "lookup_resolves_exact_recipe": true,
+      "recipe_map_alias_binding": true,
+      "recipe_signature": true,
+      "source_owner_compiled": true,
+      "unresolved_input_expansion_count": 0
+    }
+  },
+  "authority_boundary": {
+    "historical_source_change_observed": true,
+    "current_source_renderer_implemented": true,
+    "current_transactional_flow_implemented": true,
+    "current_client_runtime_observed": false,
+    "current_dedicated_server_runtime_observed": false,
+    "replace_supported": false,
+    "remove_supported": false,
+    "profile_tested_support": false,
+    "profile_action_authorized": false,
+    "release_qualified": false,
+    "publication_authorized": false
+  },
+  "reuse_requirements": [
+    "treat this as one recipe extracted from pull request 1451, not as a replay of the whole pull request",
+    "treat the effective base as provenance because it may predate the current Workbench Packwiz profile",
+    "capture the current checkout and resolve its live recipe-map alias and owner bytes",
+    "choose a signature not already present in the target checkout",
+    "review the exact additive diff and retain the transaction plan before applying",
+    "observe exact recipe presence and collision behavior on every required physical side"
+  ]
+}

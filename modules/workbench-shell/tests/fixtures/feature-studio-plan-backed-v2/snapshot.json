@@ -1,0 +1,269 @@
+{
+  "actions": [
+    {
+      "action_id": "feature-studio.inspect",
+      "availability_reason": "feature-studio.embedded-owner-composition",
+      "descriptor_id": "feature-studio-capability-binding:sha256:fb5ed9273d1c1bd8e9793870b20f1aa4d2ff1dd44afd261ae86d3c47e9206ccc",
+      "operation": "inspect",
+      "risk": "read-only",
+      "state": "embedded"
+    },
+    {
+      "action_id": "feature-studio.plan",
+      "availability_reason": "feature-studio.embedded-owner-composition",
+      "descriptor_id": "feature-studio-capability-binding:sha256:c771c36a7c62c29323c09ac19cdf7065856b215a86597d54fecab74a3808a91b",
+      "operation": "plan",
+      "risk": "read-only",
+      "state": "embedded"
+    },
+    {
+      "action_id": "feature-studio.verify",
+      "availability_reason": "feature-studio.embedded-owner-composition",
+      "descriptor_id": "feature-studio-capability-binding:sha256:48f26cbb7295758e8b42aa27b421cc9da5ebe1da7e55b14b2b21d716e16339b0",
+      "operation": "verify",
+      "risk": "mutating",
+      "state": "embedded"
+    },
+    {
+      "action_id": "feature-studio.explain",
+      "availability_reason": "feature-studio.embedded-owner-composition",
+      "descriptor_id": "feature-studio-capability-binding:sha256:ea248eb9c7c76382ca932ce96694afc1ce7da9d1fc58386a204178754797778e",
+      "operation": "explain",
+      "risk": "read-only",
+      "state": "embedded"
+    },
+    {
+      "action_id": "feature-studio.export",
+      "availability_reason": "feature-studio.embedded-owner-composition",
+      "descriptor_id": "feature-studio-capability-binding:sha256:42d9e55e14b68a72c05a3119c34cd375228518dfb0364795c1f316dcbf678efc",
+      "operation": "export",
+      "risk": "writes-output",
+      "state": "embedded"
+    }
+  ],
+  "assertions": [
+    {
+      "assertion_key": "fluid_registration",
+      "meaning": "the material-backed Forge fluid identity is registered",
+      "state": "pending"
+    },
+    {
+      "assertion_key": "fml_client_load",
+      "meaning": "the disposable client reaches the exact FML loaded marker",
+      "state": "pending"
+    },
+    {
+      "assertion_key": "groovy_compilation",
+      "meaning": "the changed Groovy program compiles in the projected client",
+      "state": "pending"
+    },
+    {
+      "assertion_key": "localization",
+      "meaning": "the requested client translation resolves to its intended label",
+      "state": "pending"
+    },
+    {
+      "assertion_key": "material_registration",
+      "meaning": "the requested GregTech material identity is registered",
+      "state": "pending"
+    }
+  ],
+  "availability": {
+    "plan_state": "ready",
+    "planned_state": "ready",
+    "platform_profile_state": "pending-verification",
+    "result_state": "ready",
+    "runtime_state": "pending",
+    "source_state": "observed-by-owner-census"
+  },
+  "canonicalizer": "workbench-canonical-json-v2",
+  "context": {
+    "crucible_snapshot_id": null,
+    "evidence_layers": {
+      "planned": "ready",
+      "runtime": "pending",
+      "source": "observed-by-owner-census"
+    },
+    "final_launch_id": null,
+    "materialization_id": null,
+    "pack_profile_family_id": "workbench-pack:supersymmetry",
+    "pack_profile_id": null,
+    "physical_side": "client",
+    "platform_profile_id": null,
+    "platform_profile_state": "pending-verification",
+    "profile_assessment_format": null,
+    "profile_assessment_id": null,
+    "runtime_launcher": "prism",
+    "runtime_plan_id": null,
+    "runtime_session_id": null,
+    "runtime_target_policy": "fresh-unique-disposable-projection",
+    "source_revision": "ffffffffffffffffffffffffffffffffffffffff",
+    "source_snapshot_id": "sha256:1b8c894a9e5cc8e1a71434a5b10042dcfdb148d90459a21c97f339eb656204f3",
+    "workspace_uri": "file:///tmp/workbench-fixtures/feature-studio-plan-backed-v2/workspace"
+  },
+  "export": null,
+  "feature": {
+    "color": "0x425d73",
+    "feature_kind": "material-backed-fluid",
+    "material_id": 20008,
+    "name": "Workbench Pilot Coolant",
+    "planned_fluid_registry_name": "workbench_pilot_coolant",
+    "planned_material_resource": "susy:workbench_pilot_coolant",
+    "registry_name": "workbench_pilot_coolant",
+    "symbol_name": "WorkbenchPilotCoolant",
+    "translation": "Workbench Pilot Coolant"
+  },
+  "format": "workbench-feature-studio-snapshot-v2",
+  "identities": {
+    "blueprint_plan_id": "sha256:f9e3421d1cdc6c50786033f8210da0ae7e18d65348e75d6ada171de91e3c41ff",
+    "blueprint_stage_id": null,
+    "candidate_id": null,
+    "crucible_snapshot_id": null,
+    "export_receipt_id": null,
+    "final_launch_id": null,
+    "flow_plan_id": "sha256:4f77bc4a70cf2c17cd7f3a159d5961ca7093845118d7984bdfcff251140b8c00",
+    "material_flow_receipt_id": null,
+    "materialization_id": null,
+    "pack_profile_family_id": "workbench-pack:supersymmetry",
+    "pack_profile_id": null,
+    "platform_profile_id": null,
+    "profile_assessment_id": null,
+    "result_id": "feature-studio-result:sha256:6cf12689c5a2d0b3769c150a033b47d269bc2fe78a7f401bc8fd8a17767bade8",
+    "runtime_plan_id": null,
+    "runtime_session_id": null,
+    "semantic_projection_id": "feature-studio-semantic-projection:sha256:94d7299d44c1bf59c8f3e04d6b189f22355c99f839d2c327cd7103133e86ba18",
+    "source_snapshot_id": "sha256:1b8c894a9e5cc8e1a71434a5b10042dcfdb148d90459a21c97f339eb656204f3",
+    "staged_tree_id": null
+  },
+  "limitations": [
+    "Synthetic owner-generated conformance fixture; it is not runtime evidence."
+  ],
+  "origin": {
+    "kind": "feature-studio-result-value",
+    "refresh": {
+      "reason_code": "feature-studio.snapshot-value-has-no-retained-source",
+      "state": "unavailable"
+    },
+    "sha256": null,
+    "size": null,
+    "uri": null
+  },
+  "owner_links": [
+    {
+      "canonical_sha256": "8b448953c8f81f98695db4fc76ae278c7e39a690e05779902e7821f860ee6419",
+      "canonical_size": 3377,
+      "format": "workbench-material-fluid-flow-plan-v2",
+      "owner_id": "sha256:4f77bc4a70cf2c17cd7f3a159d5961ca7093845118d7984bdfcff251140b8c00",
+      "projection_encoding": "workbench-canonical-json-v2",
+      "retained": null,
+      "role": "material-fluid-plan"
+    }
+  ],
+  "plan": {
+    "blueprint_plan_id": "sha256:f9e3421d1cdc6c50786033f8210da0ae7e18d65348e75d6ada171de91e3c41ff",
+    "flow_plan_id": "sha256:4f77bc4a70cf2c17cd7f3a159d5961ca7093845118d7984bdfcff251140b8c00",
+    "state": "ready"
+  },
+  "planned_changes": [
+    {
+      "operation": "update",
+      "planned_sha256": "7f5dfca886c42a8f423cabb065f3a3ac5e2dc0e07a3d6b823d9086737807ae38",
+      "planned_size": 442,
+      "relative_path": "groovy/material/PetrochemistryMaterials.groovy",
+      "source_sha256": "24e37d9daaa47ec2f1d834a1e2b4de237fb91c529457aa451dfe6c5fffee113f",
+      "unified_diff": "--- a/groovy/material/PetrochemistryMaterials.groovy\n+++ b/groovy/material/PetrochemistryMaterials.groovy\n@@ -6,5 +6,10 @@\n                 .liquid()\n                 .color(0x111111)\n                 .build()\n+\n+        WorkbenchPilotCoolant = new Material.Builder(20008, SuSyUtility.susyId('workbench_pilot_coolant'))\n+                .liquid()\n+                .color(0x425d73)\n+                .build()\n     }\n }\n"
+    },
+    {
+      "operation": "update",
+      "planned_sha256": "261cd5adf1c1ee355df190e6776739644646f01a7aa6b7cd0423476d556df0f1",
+      "planned_size": 127,
+      "relative_path": "groovy/material/SuSyMaterials.groovy",
+      "source_sha256": "54d5886e4a08df3954215c376bf8faccfd499992691c6481fd45243d45a60264",
+      "unified_diff": "--- a/groovy/material/SuSyMaterials.groovy\n+++ b/groovy/material/SuSyMaterials.groovy\n@@ -2,4 +2,5 @@\n \n class SuSyMaterials {\n     public static Material Existing\n+    public static Material WorkbenchPilotCoolant\n }\n"
+    },
+    {
+      "operation": "update",
+      "planned_sha256": "080e0c7e35de09a24fb841ded06f12e199fbf0f68c964bf3d64d2d462dc75fbe",
+      "planned_size": 103,
+      "relative_path": "resources/langfiles/lang/en_us.lang",
+      "source_sha256": "b3d4a6d4471d41e52046d77e09ba12f193b6e4fd0f68189329b29db950f9f6fc",
+      "unified_diff": "--- a/resources/langfiles/lang/en_us.lang\n+++ b/resources/langfiles/lang/en_us.lang\n@@ -1,2 +1,3 @@\n # Fluids\n susy.material.existing=Existing\n+susy.material.workbench_pilot_coolant=Workbench Pilot Coolant\n"
+    }
+  ],
+  "result": {
+    "format": "workbench-feature-studio-result-v2",
+    "operation": "plan",
+    "result_id": "feature-studio-result:sha256:6cf12689c5a2d0b3769c150a033b47d269bc2fe78a7f401bc8fd8a17767bade8",
+    "semantic_projection_id": "feature-studio-semantic-projection:sha256:94d7299d44c1bf59c8f3e04d6b189f22355c99f839d2c327cd7103133e86ba18",
+    "state": "ready"
+  },
+  "review_binding": {
+    "action_digest": null,
+    "catalog_digest": null,
+    "command_id": null,
+    "flow_plan_id": "sha256:4f77bc4a70cf2c17cd7f3a159d5961ca7093845118d7984bdfcff251140b8c00",
+    "review_digest": null,
+    "source_snapshot_id": "sha256:1b8c894a9e5cc8e1a71434a5b10042dcfdb148d90459a21c97f339eb656204f3",
+    "state": "direct-cli"
+  },
+  "schema_version": 2,
+  "snapshot_id": "feature-studio-snapshot:sha256:63aaf7e583167b978ca103f3f5df50b2920ba8fcb06827bc61806897f71599da",
+  "source_locations": [
+    {
+      "hunk_index": 0,
+      "operation": "update",
+      "planned_range": {
+        "coordinate_system": "unified-diff-lines-one-based-zero-for-empty-inclusive",
+        "end_line": 15,
+        "start_line": 6
+      },
+      "planned_sha256": "7f5dfca886c42a8f423cabb065f3a3ac5e2dc0e07a3d6b823d9086737807ae38",
+      "range": {
+        "coordinate_system": "unified-diff-lines-one-based-zero-for-empty-inclusive",
+        "end_line": 10,
+        "start_line": 6
+      },
+      "relative_path": "groovy/material/PetrochemistryMaterials.groovy",
+      "source_sha256": "24e37d9daaa47ec2f1d834a1e2b4de237fb91c529457aa451dfe6c5fffee113f",
+      "workspace_uri": "file:///tmp/workbench-fixtures/feature-studio-plan-backed-v2/workspace"
+    },
+    {
+      "hunk_index": 0,
+      "operation": "update",
+      "planned_range": {
+        "coordinate_system": "unified-diff-lines-one-based-zero-for-empty-inclusive",
+        "end_line": 6,
+        "start_line": 2
+      },
+      "planned_sha256": "261cd5adf1c1ee355df190e6776739644646f01a7aa6b7cd0423476d556df0f1",
+      "range": {
+        "coordinate_system": "unified-diff-lines-one-based-zero-for-empty-inclusive",
+        "end_line": 5,
+        "start_line": 2
+      },
+      "relative_path": "groovy/material/SuSyMaterials.groovy",
+      "source_sha256": "54d5886e4a08df3954215c376bf8faccfd499992691c6481fd45243d45a60264",
+      "workspace_uri": "file:///tmp/workbench-fixtures/feature-studio-plan-backed-v2/workspace"
+    },
+    {
+      "hunk_index": 0,
+      "operation": "update",
+      "planned_range": {
+        "coordinate_system": "unified-diff-lines-one-based-zero-for-empty-inclusive",
+        "end_line": 3,
+        "start_line": 1
+      },
+      "planned_sha256": "080e0c7e35de09a24fb841ded06f12e199fbf0f68c964bf3d64d2d462dc75fbe",
+      "range": {
+        "coordinate_system": "unified-diff-lines-one-based-zero-for-empty-inclusive",
+        "end_line": 2,
+        "start_line": 1
+      },
+      "relative_path": "resources/langfiles/lang/en_us.lang",
+      "source_sha256": "b3d4a6d4471d41e52046d77e09ba12f193b6e4fd0f68189329b29db950f9f6fc",
+      "workspace_uri": "file:///tmp/workbench-fixtures/feature-studio-plan-backed-v2/workspace"
+    }
+  ],
+  "timings": [],
+  "workspace_label": "Materials & Recipes"
+}

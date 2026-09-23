@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-atlas-semantic-projection-v1.schema.json",
+  "title": "Workbench Atlas Semantic Projection V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "projection_id", "authority", "binding", "layers", "diagnostics", "summary", "limitations"],
+  "properties": {
+    "format": {"const": "workbench-atlas-semantic-projection-v1"},
+    "schema_version": {"const": 1},
+    "projection_id": {"type": "string", "pattern": "^workbench-atlas-semantic-projection:sha256:[0-9a-f]{64}$"},
+    "authority": {"type": "object"},
+    "binding": {"type": "object"},
+    "layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["SOURCE", "RUNTIME", "PLAYABLE"],
+      "properties": {
+        "SOURCE": {"$ref": "#/$defs/layer"},
+        "RUNTIME": {"$ref": "#/$defs/layer"},
+        "PLAYABLE": {"$ref": "#/$defs/layer"}
+      }
+    },
+    "diagnostics": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "object"},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority", "evidence_state", "records"],
+      "properties": {
+        "authority": {"type": "string"},
+        "evidence_state": {"enum": ["static-candidate", "runtime-observed", "derived"]},
+        "records": {"type": "array", "items": {"type": "object"}}
+      }
+    }
+  }
+}

@@ -1,0 +1,270 @@
+{
+  "schema": "axiom.jvm-runtime.v1",
+  "profile": "cleanroom",
+  "selectionStatus": "selected-workbench-mvp-runtime",
+  "qualificationStatus": "unqualified-installed-native-runtime",
+  "runtimeVersion": "25.0.4+7-LTS",
+  "vendor": "Eclipse Adoptium",
+  "vmName": "OpenJDK 64-Bit Server VM",
+  "os": "Linux",
+  "architecture": "amd64",
+  "javaRelease": 25,
+  "archive": {
+    "archive_root": "jdk-25.0.4+7",
+    "archive_sha256": "e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94",
+    "archive_url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4%2B7/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4_7.tar.gz",
+    "platform": "linux-x86_64",
+    "runtime_build": "Temurin-25.0.4+7",
+    "version": "25.0.4"
+  },
+  "runtimeFiles": [
+    {
+      "path": "conf/security/java.security",
+      "sha256": "7c43432bc33b890d4e750f6886f383785a35a9b6021c34c84fcde11bb15c152d",
+      "size": 74132
+    },
+    {
+      "path": "release",
+      "sha256": "4a79cdc145b89cc8ef94788332f782338a55eeb1993bcd4921bb0dc3290ae0c6",
+      "size": 1603
+    },
+    {
+      "path": "bin/java",
+      "sha256": "6927a29ecce72639d355f1acc0e5588a54f920185bb2a5c944af81578cf46b63",
+      "size": 16264
+    },
+    {
+      "path": "lib/modules",
+      "sha256": "2430129d8e616cb3e401eb695a5a97c40ad4c3d3e9f140a96d9e0cdff26e8427",
+      "size": 146006585
+    },
+    {
+      "path": "lib/libattach.so",
+      "sha256": "44111de73613ef3772b3470fb184ca6a61be437c5813d5be69a35e93ffd4420f",
+      "size": 16784
+    },
+    {
+      "path": "lib/libawt.so",
+      "sha256": "667190948b6302c5bc261badd03a53cb7b2f68ecf1588581a8e26009bf3b9afd",
+      "size": 928312
+    },
+    {
+      "path": "lib/libawt_headless.so",
+      "sha256": "ba9f1f1ab5317094bd3f3191a7f7dcc9e2f56c3d7b6c4a1263565ba558a77d5d",
+      "size": 39880
+    },
+    {
+      "path": "lib/libawt_xawt.so",
+      "sha256": "16fc9c0d68cb214a16f18cad48cfe7fcf2683212b8a8c609f64d4442e1b37374",
+      "size": 525032
+    },
+    {
+      "path": "lib/libdt_socket.so",
+      "sha256": "9ac3c2703990148dc8dbebfa28226b433fda6d51a07c9020f6a99990b3d9c13c",
+      "size": 35992
+    },
+    {
+      "path": "lib/libextnet.so",
+      "sha256": "595adc84c601c1d396b44880529946ed3cd2e28ba9562f5e6fad045e531eb948",
+      "size": 16776
+    },
+    {
+      "path": "lib/libfontmanager.so",
+      "sha256": "cddd0663dc4877f393617c298728e5bd689a3db2a3d023c50541517704ccaeb6",
+      "size": 2017800
+    },
+    {
+      "path": "lib/libfreetype.so",
+      "sha256": "65d7116d7751e43c1152f791c63b3e61ad0800398ed3b00e8bf028203b1b25b5",
+      "size": 779680
+    },
+    {
+      "path": "lib/libinstrument.so",
+      "sha256": "e5a274e8e98e9d71fdc00ad1c1b4ddd1ec16276144c01de5c5d6d6554b753ef2",
+      "size": 54528
+    },
+    {
+      "path": "lib/libj2gss.so",
+      "sha256": "1a5226a3b2bbbe0c930241cb31f726588609fa816508d9290366f62f3f3b1812",
+      "size": 55064
+    },
+    {
+      "path": "lib/libj2pcsc.so",
+      "sha256": "0b6660c56ead1b685ebd73623af55c6d7e823eeb61a3fb991c2c2c0692aa5e58",
+      "size": 21336
+    },
+    {
+      "path": "lib/libj2pkcs11.so",
+      "sha256": "72efe97a06b33b589d8501089ff81cdd359973e9d255801bb703caa4d28ccfce",
+      "size": 100696
+    },
+    {
+      "path": "lib/libjaas.so",
+      "sha256": "e6b53e8f0a8dfa8759acbb06b8d939bac6180aaf475f00543d5508ecf11ab7aa",
+      "size": 15664
+    },
+    {
+      "path": "lib/libjava.so",
+      "sha256": "ae8711213fe5c7e0ed0b6f4f83a935595ce8bf256843ec83c3afd7839262cead",
+      "size": 180056
+    },
+    {
+      "path": "lib/libjavajpeg.so",
+      "sha256": "72bdbaa90caf10ece6cc299f5f0f1bf9e6f2a0a8d7ba3d2c8b86e9d03c79fa7d",
+      "size": 243800
+    },
+    {
+      "path": "lib/libjawt.so",
+      "sha256": "ae227837b97a2cf472cb0c149903fc63bfe6ec6ba88825520fb83de2839d9a2d",
+      "size": 15600
+    },
+    {
+      "path": "lib/libjdwp.so",
+      "sha256": "717d8d0fe5afc3cbb11a744b5c5c00db9f938dbde8b78f6c671ad88d784056db",
+      "size": 306840
+    },
+    {
+      "path": "lib/libjimage.so",
+      "sha256": "88ced83e4ab71de48bc47768dd45f5519bd73d7d0364bff4aa871de3552b6016",
+      "size": 171704
+    },
+    {
+      "path": "lib/libjli.so",
+      "sha256": "7e7f36f97914708f5289433fc52b0787ffc66ecb0f4f31d09ad16bcd9e3c25aa",
+      "size": 124736
+    },
+    {
+      "path": "lib/libjsig.so",
+      "sha256": "3c4f21f2abe887d0fa0ceb684dd118d01eae32e3a8b5763003ffa469b757c2cb",
+      "size": 16728
+    },
+    {
+      "path": "lib/libjsound.so",
+      "sha256": "69e75046580e329b84d604762654ca8bf7ed7ae38387d6b39b628414e5ebcfd9",
+      "size": 85328
+    },
+    {
+      "path": "lib/libjsvml.so",
+      "sha256": "78b01e97225d0fc216bb4cff6ac5ab4a6344c6b3679946871ca71dd381c86e75",
+      "size": 871040
+    },
+    {
+      "path": "lib/liblcms.so",
+      "sha256": "9d9b1cb669d34e2d6f361d280685cbe8f7f51d178d1fe6f093123125d4b3d4c6",
+      "size": 537312
+    },
+    {
+      "path": "lib/libmanagement.so",
+      "sha256": "283a2b46bf8302cfbfcc8312e19c42256ecdf052e1d4d131bb154d98a77c8f7f",
+      "size": 29344
+    },
+    {
+      "path": "lib/libmanagement_agent.so",
+      "sha256": "35600925316a0159f0c978fb4dec2135e2df68e6a630095883cc5d1da47c035f",
+      "size": 15600
+    },
+    {
+      "path": "lib/libmanagement_ext.so",
+      "sha256": "97e135f7b5b670a8449ecf9c524c9dca9067299347d05055fee268b6f1f6f83a",
+      "size": 37032
+    },
+    {
+      "path": "lib/libmlib_image.so",
+      "sha256": "6c8104c4acbd27b5856d90473cba7d05d0a73d1d062286c7caeaaf030da03bbe",
+      "size": 606840
+    },
+    {
+      "path": "lib/libnet.so",
+      "sha256": "b93f8922ffb1d602604aff1e9a1a7d1ceea6b0c799b4fc3cdf0d166a608568df",
+      "size": 65680
+    },
+    {
+      "path": "lib/libnio.so",
+      "sha256": "1db89f7ef9251543c9bf46c6355046d8ba8b6620ed908c7f9487e52db3ecee08",
+      "size": 114144
+    },
+    {
+      "path": "lib/libprefs.so",
+      "sha256": "ffab93dea02811e17e21155713fb27dca043613b9919082c1eba4d995ba8cd67",
+      "size": 15792
+    },
+    {
+      "path": "lib/librmi.so",
+      "sha256": "91ab379200ebc5175a15ba2e62fda14e3efd14894062ab98c420b5810300068e",
+      "size": 15336
+    },
+    {
+      "path": "lib/libsaproc.so",
+      "sha256": "0cbe824edda716ec176fbee8c04019c765c4ceef0d4c6d38abd1f9d6b9ab5152",
+      "size": 210744
+    },
+    {
+      "path": "lib/libsctp.so",
+      "sha256": "630dc5dc0e5fbbb33362b8bf06d92a33142d2851565f0619065ed9a628a705da",
+      "size": 36048
+    },
+    {
+      "path": "lib/libsimdsort.so",
+      "sha256": "14d6082adcb8410b5a4662f481c23bb5f7136b684b2249844d499d4384c7b29a",
+      "size": 270368
+    },
+    {
+      "path": "lib/libsplashscreen.so",
+      "sha256": "a27c075c3580c8107ade6ef2e236a74755764ad92e1790fdbbc83c01d0f67c65",
+      "size": 366696
+    },
+    {
+      "path": "lib/libsyslookup.so",
+      "sha256": "ef610c7baf17cc1d417ba790ec4838db94b439d3e45aba43aea2be4ed7b86cc2",
+      "size": 15232
+    },
+    {
+      "path": "lib/libverify.so",
+      "sha256": "684d95cb32ec9985d75932c4ee2e53ab832a27e241adc5b792951e604f72583a",
+      "size": 72232
+    },
+    {
+      "path": "lib/libzip.so",
+      "sha256": "eb75b9f1aba8dec701a294abad3ac99e687e5e364b0656aed86f407a766a73e1",
+      "size": 132712
+    },
+    {
+      "path": "lib/server/classes.jsa",
+      "sha256": "998bce4e1d4a127b9e0ca18aeac245e5a6a8df0f225e5eed9a682b56de3de9fc",
+      "size": 15654912
+    },
+    {
+      "path": "lib/server/classes_coh.jsa",
+      "sha256": "566591788e1b67debf1fb04a8f5cde453003eb9376dc7258b446a26303f11872",
+      "size": 16351232
+    },
+    {
+      "path": "lib/server/classes_nocoops.jsa",
+      "sha256": "37403256e9dd6fe8681caac102abadb849b22d33492609b737b98a286fee9455",
+      "size": 16048128
+    },
+    {
+      "path": "lib/server/classes_nocoops_coh.jsa",
+      "sha256": "c1a129993e60f398413994ebbca2f05481f8c7c845e31e90d8f53cab17b4ee5d",
+      "size": 16687104
+    },
+    {
+      "path": "lib/server/libjsig.so",
+      "sha256": "3c4f21f2abe887d0fa0ceb684dd118d01eae32e3a8b5763003ffa469b757c2cb",
+      "size": 16728
+    },
+    {
+      "path": "lib/server/libjvm.so",
+      "sha256": "7149e80a0197b22f0e8b956dbc3f2e92f11e3fdf7e33b25a196eac4ac3b44ebc",
+      "size": 29875592
+    }
+  ],
+  "compilerFiles": [
+    {
+      "path": "bin/javac",
+      "size": 16360,
+      "sha256": "388ba387293bee2fdfe5789e9115ff04f42bf1c1a91128717db86ba34003e330"
+    }
+  ],
+  "identityScope": "selected-runtime-files; trusted-unchanged-installation; not OS or loaded-memory attestation"
+}

@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-repair-result-v1.schema.json",
+  "title": "Workbench host repair result V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "outcome",
+    "applied_plan_id",
+    "installed",
+    "git",
+    "setup_record_id",
+    "recovered_setup_record",
+    "failure",
+    "next_commands"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-repair-result-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "outcome": {
+      "enum": [
+        "ready",
+        "repaired",
+        "partial"
+      ]
+    },
+    "applied_plan_id": {
+      "$ref": "#/$defs/planId"
+    },
+    "installed": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "$ref": "#/$defs/installOutcome"
+      }
+    },
+    "git": {
+      "$ref": "#/$defs/gitResult"
+    },
+    "setup_record_id": {
+      "$ref": "#/$defs/nullableSetupRecordId"
+    },
+    "recovered_setup_record": {
+      "$ref": "#/$defs/nullableString"
+    },
+    "failure": {
+      "$ref": "#/$defs/nullableString"
+    },
+    "next_commands": {
+      "$ref": "#/$defs/nextCommands"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "partial"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "installed": {
+            "minItems": 1
+          },
+          "failure": {
+            "$ref": "#/$defs/nonemptyString"
+          },
+          "next_commands": {
+            "const": [
+              [
+                "workbench",
+                "repair",
+                "--check"
+              ]
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "git": {
+            "$ref": "#/$defs/gitReady"
+          },
+          "failure": {
+            "type": "null"
+          },
+          "next_commands": {
+            "$ref": "#/$defs/successNextCommands"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "ready"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "installed": {
+            "maxItems": 0
+          },
+          "recovered_setup_record": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "repaired"
+          },
+          "installed": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "outcome",
+          "installed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "installed": {
+            "items": {
+              "properties": {
+                "outcome": {
+                  "const": "installed"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonemptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32768
+    },
+    "nullableString": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "planId": {
+      "type": "string",
+      "pattern": "^workbench-repair-plan:sha256:[0-9a-f]{64}$"
+    },
+    "setupRecordId": {
+      "type": "string",
+      "pattern": "^workbench-user-setup:sha256:[0-9a-f]{64}$"
+    },
+    "nullableSetupRecordId": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/setupRecordId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "manager": {
+      "enum": [
+        "apt-get",
+        "dnf",
+        "yum",
+        "zypper",
+        "pacman",
+        "winget",
+        "chocolatey"
+      ]
+    },
+    "installOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "manager",
+        "outcome"
+      ],
+      "properties": {
+        "component": {
+          "const": "git"
+        },
+        "manager": {
+          "$ref": "#/$defs/manager"
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "enum": [
+                "installed",
+                "timed-out",
+                "spawn-failed"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^failed-exit--?[0-9]+$"
+            }
+          ]
+        }
+      }
+    },
+    "gitReady": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "executable",
+        "version"
+      ],
+      "properties": {
+        "state": {
+          "const": "ready"
+        },
+        "executable": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^git version ",
+          "maxLength": 512
+        }
+      }
+    },
+    "gitUnavailable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "executable",
+        "version"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "missing",
+            "incompatible",
+            "unknown"
+          ]
+        },
+        "executable": {
+          "type": "null"
+        },
+        "version": {
+          "type": "null"
+        }
+      }
+    },
+    "gitResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/gitReady"
+        },
+        {
+          "$ref": "#/$defs/gitUnavailable"
+        }
+      ]
+    },
+    "successNextCommands": {
+      "oneOf": [
+        {
+          "const": [
+            [
+              "workbench",
+              "setup"
+            ]
+          ]
+        },
+        {
+          "const": [
+            [
+              "workbench",
+              "setup",
+              "--check"
+            ],
+            [
+              "workbench",
+              "open"
+            ]
+          ]
+        }
+      ]
+    },
+    "nextCommands": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/successNextCommands"
+        },
+        {
+          "const": [
+            [
+              "workbench",
+              "repair",
+              "--check"
+            ]
+          ]
+        }
+      ]
+    }
+  }
+}

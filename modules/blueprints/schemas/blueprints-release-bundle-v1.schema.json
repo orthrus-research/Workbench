@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-release-bundle-v1.schema.json",
+  "title": "Supersymmetry Blueprints released operation bundle v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "candidate_id",
+    "target_state_id",
+    "operations_sha256",
+    "operations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-release-bundle-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^blueprints-candidate:sha256:[0-9a-f]{64}$"
+    },
+    "target_state_id": {
+      "type": "string",
+      "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+    },
+    "operations_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "ordinal",
+          "operation",
+          "path",
+          "before",
+          "after"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation": {
+            "enum": [
+              "create",
+              "update",
+              "delete"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[^/\\\\](?:.*[^/\\\\])?$"
+          },
+          "before": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/content"
+              }
+            ]
+          },
+          "after": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/content"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content": {
+      "type": "object",
+      "required": [
+        "kind",
+        "mode",
+        "sha256",
+        "content_base64"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "file",
+            "symlink"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "pattern": "^[0-7]{6}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "content_base64": {
+          "type": "string",
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        }
+      }
+    }
+  }
+}

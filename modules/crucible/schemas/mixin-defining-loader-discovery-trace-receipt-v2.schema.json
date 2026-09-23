@@ -1,0 +1,856 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/mixin-defining-loader-discovery-trace-receipt-v2.schema.json",
+  "title": "Workbench Crucible Mixin defining-loader discovery trace receipt V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "receipt_id",
+    "canonicalization_id",
+    "session",
+    "inputs",
+    "observation",
+    "bypass_properties",
+    "ordered_attempts",
+    "selection",
+    "failures",
+    "health",
+    "summary",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-crucible-mixin-defining-loader-discovery-trace-receipt-v2"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^crucible-mixin-defining-loader-discovery-trace:sha256:[0-9a-f]{64}$"
+    },
+    "canonicalization_id": {
+      "const": "workbench-canonical-json-v1"
+    },
+    "session": {
+      "$ref": "#/$defs/session"
+    },
+    "inputs": {
+      "$ref": "#/$defs/inputs"
+    },
+    "observation": {
+      "$ref": "#/$defs/observation"
+    },
+    "bypass_properties": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/bypassProperty"
+      }
+    },
+    "ordered_attempts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/attempt"
+      }
+    },
+    "selection": {
+      "$ref": "#/$defs/selection"
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/failureRecord"
+      }
+    },
+    "health": {
+      "$ref": "#/$defs/health"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "boundaries": {
+      "$ref": "#/$defs/boundaries"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000]+$"
+    },
+    "nullableNonempty": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/nonempty"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_id",
+        "launch_id",
+        "profile_id",
+        "side",
+        "candidate_lock_sha256",
+        "toolchain_lock_sha256"
+      ],
+      "properties": {
+        "capture_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "launch_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "side": {
+          "enum": [
+            "client",
+            "dedicated_server",
+            "integrated_server"
+          ]
+        },
+        "candidate_lock_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "toolchain_lock_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_trace",
+        "candidate_lock",
+        "toolchain_lock",
+        "observer_agent",
+        "mixin_engine_artifact",
+        "selected_provider_artifact",
+        "launch_log",
+        "fixture_result"
+      ],
+      "properties": {
+        "raw_trace": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "candidate_lock": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "toolchain_lock": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "observer_agent": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "mixin_engine_artifact": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "selected_provider_artifact": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "launch_log": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "fixture_result": {
+          "$ref": "#/$defs/fileBinding"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism",
+        "target_class",
+        "target_input_sha256",
+        "target_output_sha256",
+        "target_code_source_uri",
+        "defining_loader_class",
+        "defining_loader_identity",
+        "defining_loader_parent_class",
+        "defining_loader_parent_identity",
+        "java_version"
+      ],
+      "properties": {
+        "mechanism": {
+          "const": "java_instrument_exact_class_substitution"
+        },
+        "target_class": {
+          "const": "org.spongepowered.asm.service.MixinService"
+        },
+        "target_input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_output_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_code_source_uri": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_identity": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_parent_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "defining_loader_parent_identity": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "java_version": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "bypassProperty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "property_name",
+        "property_value",
+        "mechanism"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "bootstrap",
+            "service"
+          ]
+        },
+        "property_name": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "property_value": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "mechanism": {
+          "enum": [
+            "service_loader",
+            "system_property"
+          ]
+        }
+      }
+    },
+    "providerPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_class",
+        "provider_loader_class",
+        "provider_loader_identity",
+        "provider_code_source_uri"
+      ],
+      "properties": {
+        "provider_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_loader_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_loader_identity": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_code_source_uri": {
+          "$ref": "#/$defs/nullableNonempty"
+        }
+      }
+    },
+    "bootstrapClassPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_class",
+        "provider_loader_class",
+        "provider_loader_identity",
+        "provider_code_source_uri",
+        "service_class_name"
+      ],
+      "properties": {
+        "provider_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_loader_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_loader_identity": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_code_source_uri": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "service_class_name": {
+          "$ref": "#/$defs/nullableNonempty"
+        }
+      }
+    },
+    "serviceNamePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_class",
+        "provider_loader_class",
+        "provider_loader_identity",
+        "provider_code_source_uri",
+        "service_name"
+      ],
+      "properties": {
+        "provider_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_loader_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_loader_identity": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_code_source_uri": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "service_name": {
+          "$ref": "#/$defs/nullableNonempty"
+        }
+      }
+    },
+    "validityPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_class",
+        "provider_loader_class",
+        "provider_loader_identity",
+        "provider_code_source_uri",
+        "valid"
+      ],
+      "properties": {
+        "provider_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_loader_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_loader_identity": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "provider_code_source_uri": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "valid": {
+          "type": "boolean"
+        }
+      }
+    },
+    "outcomePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome"
+      ],
+      "properties": {
+        "outcome": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "exceptionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exception_class",
+        "message",
+        "stack_top",
+        "operation"
+      ],
+      "properties": {
+        "exception_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "message": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "stack_top": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "operation": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "attemptEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "event",
+        "payload"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event": {
+          "enum": [
+            "provider_constructed",
+            "bootstrap_returned",
+            "bootstrap_service_class_name",
+            "service_name_returned",
+            "validity_returned",
+            "provider_selected",
+            "attempt_end",
+            "attempt_failure"
+          ]
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/providerPayload"
+            },
+            {
+              "$ref": "#/$defs/bootstrapClassPayload"
+            },
+            {
+              "$ref": "#/$defs/serviceNamePayload"
+            },
+            {
+              "$ref": "#/$defs/validityPayload"
+            },
+            {
+              "$ref": "#/$defs/outcomePayload"
+            },
+            {
+              "$ref": "#/$defs/exceptionPayload"
+            }
+          ]
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "stage",
+        "mechanism",
+        "start_sequence",
+        "terminal_sequence",
+        "terminal_outcome",
+        "events"
+      ],
+      "properties": {
+        "attempt_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stage": {
+          "enum": [
+            "bootstrap",
+            "service"
+          ]
+        },
+        "mechanism": {
+          "enum": [
+            "service_loader",
+            "system_property"
+          ]
+        },
+        "start_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "terminal_sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "terminal_outcome": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/attemptEvent"
+          }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "attempt_id",
+        "provider_class",
+        "provider_loader_class",
+        "provider_loader_identity",
+        "provider_code_source_uri",
+        "provider_artifact_sha256",
+        "provider_artifact_size_bytes"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attempt_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "provider_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "provider_loader_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "provider_loader_identity": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "provider_code_source_uri": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "provider_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "provider_artifact_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "transformRejectedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_class",
+        "defining_loader_class",
+        "defining_loader_identity",
+        "defining_loader_parent_class",
+        "defining_loader_parent_identity",
+        "target_code_source_uri",
+        "input_sha256",
+        "output_sha256",
+        "reason"
+      ],
+      "properties": {
+        "target_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_identity": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_parent_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "defining_loader_parent_identity": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "target_code_source_uri": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "output_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "reason": {
+          "$ref": "#/$defs/nullableNonempty"
+        }
+      }
+    },
+    "transformFailurePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_class",
+        "defining_loader_class",
+        "defining_loader_identity",
+        "defining_loader_parent_class",
+        "defining_loader_parent_identity",
+        "target_code_source_uri",
+        "input_sha256",
+        "output_sha256",
+        "reason",
+        "exception_class",
+        "message",
+        "stack_top"
+      ],
+      "properties": {
+        "target_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_identity": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "defining_loader_parent_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "defining_loader_parent_identity": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "target_code_source_uri": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "output_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "reason": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "exception_class": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "message": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "stack_top": {
+          "$ref": "#/$defs/nullableNonempty"
+        }
+      }
+    },
+    "failureRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "event",
+        "stage",
+        "attempt",
+        "payload"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event": {
+          "enum": [
+            "transform_rejected",
+            "transform_failure",
+            "attempt_failure",
+            "stage_failure",
+            "observer_failure"
+          ]
+        },
+        "stage": {
+          "oneOf": [
+            {
+              "enum": [
+                "bootstrap",
+                "service"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/transformRejectedPayload"
+            },
+            {
+              "$ref": "#/$defs/transformFailurePayload"
+            },
+            {
+              "$ref": "#/$defs/exceptionPayload"
+            }
+          ]
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_health",
+        "end_health",
+        "transform_applied_count",
+        "bootstrap_started",
+        "bootstrap_outcome",
+        "service_started",
+        "service_outcome",
+        "selected_count",
+        "stage_failure",
+        "write_failure"
+      ],
+      "properties": {
+        "start_health": {
+          "const": "starting"
+        },
+        "end_health": {
+          "enum": [
+            "healthy",
+            "failed"
+          ]
+        },
+        "transform_applied_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bootstrap_started": {
+          "type": "boolean"
+        },
+        "bootstrap_outcome": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "service_started": {
+          "type": "boolean"
+        },
+        "service_outcome": {
+          "$ref": "#/$defs/nullableNonempty"
+        },
+        "selected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stage_failure": {
+          "type": "boolean"
+        },
+        "write_failure": {
+          "type": "boolean"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_event_count",
+        "bootstrap_attempt_count",
+        "service_attempt_count",
+        "failed_attempt_count",
+        "failure_event_count"
+      ],
+      "properties": {
+        "raw_event_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bootstrap_attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "service_attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failure_event_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cleanmix_defining_loader_path_observed",
+        "thread_context_enumeration_performed",
+        "provider_or_descriptor_injected",
+        "bypass_property_modified",
+        "selected_service_proved_for_this_launch",
+        "mixin_transformation_completion_proved",
+        "final_class_bytes_proved"
+      ],
+      "properties": {
+        "cleanmix_defining_loader_path_observed": {
+          "const": true
+        },
+        "thread_context_enumeration_performed": {
+          "const": false
+        },
+        "provider_or_descriptor_injected": {
+          "const": false
+        },
+        "bypass_property_modified": {
+          "const": false
+        },
+        "selected_service_proved_for_this_launch": {
+          "type": "boolean"
+        },
+        "mixin_transformation_completion_proved": {
+          "const": false
+        },
+        "final_class_bytes_proved": {
+          "const": false
+        }
+      }
+    }
+  }
+}

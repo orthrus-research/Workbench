@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": "instance-select-1",
+  "method": "instance/select",
+  "params": {
+    "instance_uri": "file:///launcher/instances/Supersymmetry"
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/strata-observation-receipt-v1.schema.json",
+  "title": "Workbench Crucible Strata observation receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "receipt_id",
+    "canonicalization_id",
+    "adapter",
+    "runtime",
+    "capture",
+    "artifacts",
+    "checks",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-crucible-strata-observation-receipt-v1"
+    },
+    "schema_version": {"const": 1},
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^crucible-strata-observation:sha256:[0-9a-f]{64}$"
+    },
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "adapter": {"$ref": "#/$defs/adapter"},
+    "runtime": {"$ref": "#/$defs/runtime"},
+    "capture": {"$ref": "#/$defs/capture"},
+    "artifacts": {"$ref": "#/$defs/artifacts"},
+    "checks": {"$ref": "#/$defs/checks"},
+    "boundaries": {"$ref": "#/$defs/boundaries"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "sha256", "size_bytes"],
+      "properties": {
+        "relative_path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "strata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interface_id", "tree_sha256", "file_count", "files"],
+      "properties": {
+        "interface_id": {"const": "strata-dense-capture-cli-v1"},
+        "tree_sha256": {"$ref": "#/$defs/sha256"},
+        "file_count": {"type": "integer", "minimum": 1},
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/binding"}
+        }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter_id", "strata"],
+      "properties": {
+        "adapter_id": {"const": "workbench-strata-external-adapter-v1"},
+        "strata": {"$ref": "#/$defs/strata"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "server_jar", "observer_jar", "installed_mods"],
+      "properties": {
+        "relative_path": {"type": "string", "pattern": "^\\.workbench/"},
+        "server_jar": {"$ref": "#/$defs/binding"},
+        "observer_jar": {"$ref": "#/$defs/binding"},
+        "installed_mods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/binding"}
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minChunkX", "minChunkZ", "chunkSizeX", "chunkSizeZ", "haloChunks"],
+      "properties": {
+        "minChunkX": {"type": "integer"},
+        "minChunkZ": {"type": "integer"},
+        "chunkSizeX": {"type": "integer", "minimum": 1},
+        "chunkSizeZ": {"type": "integer", "minimum": 1},
+        "haloChunks": {"type": "integer", "minimum": 1}
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension_id",
+        "world_seed",
+        "terrain_type",
+        "provider_class",
+        "chunk_generator_class",
+        "chunk_window",
+        "terrain_populated_chunks",
+        "dense_world_api_checks",
+        "dense_world_api_mismatches",
+        "sparse_world_api_mismatches"
+      ],
+      "properties": {
+        "dimension_id": {"type": "integer"},
+        "world_seed": {"type": "integer"},
+        "terrain_type": {"type": "string", "minLength": 1},
+        "provider_class": {"type": "string", "minLength": 1},
+        "chunk_generator_class": {"type": "string", "minLength": 1},
+        "chunk_window": {"$ref": "#/$defs/window"},
+        "terrain_populated_chunks": {"type": "integer", "minimum": 1},
+        "dense_world_api_checks": {"type": "integer", "minimum": 1},
+        "dense_world_api_mismatches": {"const": 0},
+        "sparse_world_api_mismatches": {"const": 0}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scan",
+        "package",
+        "manifest",
+        "capture_report",
+        "launch_log",
+        "capture_driver_log",
+        "renderer_build_log",
+        "screenshot"
+      ],
+      "properties": {
+        "scan": {"$ref": "#/$defs/binding"},
+        "package": {"$ref": "#/$defs/binding"},
+        "manifest": {"$ref": "#/$defs/binding"},
+        "capture_report": {"$ref": "#/$defs/binding"},
+        "launch_log": {"$ref": "#/$defs/binding"},
+        "capture_driver_log": {"$ref": "#/$defs/binding"},
+        "renderer_build_log": {"$ref": "#/$defs/binding"},
+        "screenshot": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/binding"}
+          ]
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "driver_exit_code",
+        "extraction_validation",
+        "package_validation",
+        "shard_validation",
+        "renderer_build",
+        "renderer_smoke",
+        "timings"
+      ],
+      "properties": {
+        "driver_exit_code": {"const": 0},
+        "extraction_validation": {"const": "pass"},
+        "package_validation": {"const": "pass"},
+        "shard_validation": {"const": "pass"},
+        "renderer_build": {"const": "pass"},
+        "renderer_smoke": {"enum": ["pass", "not_run"]},
+        "timings": {
+          "type": "object",
+          "minProperties": 5,
+          "additionalProperties": {"type": "number", "minimum": 0}
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atlas_admission_proved",
+        "causal_attribution_proved",
+        "exact_chunk_state_is_source",
+        "gregtech_fluid_capture_required",
+        "recurrent_complex_integration_added",
+        "renderer_simplification_is_display_only",
+        "request_scope_is_bounded",
+        "visual_quality_approved",
+        "world_may_generate_or_populate_requested_chunks"
+      ],
+      "properties": {
+        "atlas_admission_proved": {"const": false},
+        "causal_attribution_proved": {"const": false},
+        "exact_chunk_state_is_source": {"const": true},
+        "gregtech_fluid_capture_required": {"const": false},
+        "recurrent_complex_integration_added": {"const": false},
+        "renderer_simplification_is_display_only": {"const": true},
+        "request_scope_is_bounded": {"const": true},
+        "visual_quality_approved": {"const": false},
+        "world_may_generate_or_populate_requested_chunks": {"const": true}
+      }
+    }
+  }
+}

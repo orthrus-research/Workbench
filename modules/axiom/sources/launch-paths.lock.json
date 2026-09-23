@@ -1,0 +1,49 @@
+{
+  "schema": "axiom.launch-paths-lock.v1",
+  "selectedLauncher": {
+    "version": "11.1.0",
+    "path": "NewLaunch.jar",
+    "sha256": "116258fc5e26fb4144a67a8feec8f1110e754ce681b9d20e6b74ce68ecd58b36",
+    "size": 14008
+  },
+  "prism": {
+    "repository": "https://github.com/PrismLauncher/PrismLauncher",
+    "revision": "ea87ffcfbc22c3bb37c75b97160fe836aeb130be",
+    "references": [
+      {"path": "launcher/minecraft/launch/LauncherPartLaunch.cpp", "sha256": "4488d469b3b971dd7d814398d48e60a03da904eb162e424fe2145fb43923a7cf"},
+      {"path": "launcher/minecraft/MinecraftInstance.cpp", "sha256": "73fd67f50cc793e70ad8a24e9e82549b06e1a9176770907aa375cb8ea007ed42"},
+      {"path": "launcher/minecraft/LaunchProfile.cpp", "sha256": "81157555c1d7ad93f613b57d18e892b2f4b41d274cddd9dd0fa69cb27b31a30b"},
+      {"path": "libraries/launcher/CMakeLists.txt", "sha256": "0a54fb28471ba2b79c7ee846c688628ecc0d1846d131e3028f93ba9329c68055"},
+      {"path": "libraries/launcher/org/prismlauncher/EntryPoint.java", "sha256": "b3fef437ba982f14b73b584e51463c8f6856a3077d576dcfd6bc7f9c9149c0da"},
+      {"path": "libraries/launcher/org/prismlauncher/SystemProperties.java", "sha256": "f09b96d5a4955b3b4649460553ce8d756a23cdafe166ca92015d0e7da896688d"},
+      {"path": "libraries/launcher/org/prismlauncher/launcher/impl/StandardLauncher.java", "sha256": "74e7901d3a95fe3b7c1db7a7f93bce16f26bc044b94e5369d93e2cc6cad0f5fd"},
+      {"path": "libraries/launcher/org/prismlauncher/launcher/impl/AbstractLauncher.java", "sha256": "11048b030dbab4560e5fb1ea2bac903044ac95e134d1c89b158740ee2e0a7294"},
+      {"path": "libraries/launcher/org/prismlauncher/utils/ReflectionUtils.java", "sha256": "f45c8732153fb9b3dc5bceff21ac09197c1d9f63433d644b1d23fc14bf359d6d"},
+      {"path": "libraries/launcher/org/prismlauncher/legacy/LegacyProxy.java", "sha256": "136eef7820e0c0041d838d3aff6add7b7ffca9dffb74b2562816a4958054d359"}
+    ]
+  },
+  "foundation": {
+    "repository": "https://github.com/CleanroomMC/Foundation",
+    "revision": "518565d49cd67eb48d025110855e0904956b2104",
+    "references": [
+      {"path": "src/main/java/top/outlands/foundation/boot/Foundation.java", "sha256": "2457b0dd37dd0e9f5385595cbac2ed01eb96440146eb96f5a91555f088ff319a"},
+      {"path": "src/main/java/net/minecraft/launchwrapper/Launch.java", "sha256": "2bc45e0ae24ac3c13aa88e226536c54c00eb927a386780b573ec5db260d342e4"},
+      {"path": "src/main/java/top/outlands/foundation/LaunchHandler.java", "sha256": "e77ab96c9053bd9e39921c24cf45fe07ee79e5a957472ac3ad186fb6f2b32936"}
+    ]
+  },
+  "cleanroomLogging": {
+    "repository": "https://github.com/CleanroomMC/Cleanroom",
+    "revision": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "selectedArtifact": {
+      "path": "com/cleanroommc/cleanroom/0.6.12-alpha/cleanroom-0.6.12-alpha.jar",
+      "sha256": "48043f4ea69605ec9b1250b9bd01106b07023b78614bac734a8a296e690e7893",
+      "size": 6502296
+    },
+    "references": [
+      {"path": "src/main/java/net/minecraftforge/server/terminalconsole/util/LoggerNamePatternSelector.java", "sha256": "509ec129485892e917bd2eba17ab549bd38b53f2f2e33c93f9ac696511456074"},
+      {"path": "src/main/resources/log4j2.xml", "sha256": "2ca5dc81f35c800bd0403d90a046c47601f6e337c4303096c10803ec331a8aa3"}
+    ]
+  },
+  "sourceArtifactCorrespondenceQualified": false,
+  "wholeInstalledNamespaceQualified": false
+}

@@ -1,0 +1,62 @@
+{
+  "claims": {
+    "publication_approval": false,
+    "stable_support": false,
+    "worldgen_semantic_admission": false
+  },
+  "format": "workbench-supersymmetry-worldgen-action-policy-draft-v1",
+  "owner_profile_id": "workbench-pack:supersymmetry",
+  "rules": [
+    {
+      "action": "read-query-visualize",
+      "disposition": "allow",
+      "scope": "revision-pinned-evidence"
+    },
+    {
+      "action": "plan-review",
+      "disposition": "allow",
+      "scope": "experimental-candidate"
+    },
+    {
+      "action": "apply",
+      "disposition": "allow-with-guardrails",
+      "requires": [
+        "exact-context-ref",
+        "exact-input-binding",
+        "disposable-staging-world",
+        "reversible-change-set",
+        "rollback-plan"
+      ]
+    },
+    {
+      "action": "rollback",
+      "disposition": "allow",
+      "scope": "same-disposable-staging-world"
+    },
+    {
+      "action": "apply-to-protected-world",
+      "disposition": "block"
+    },
+    {
+      "action": "promote-stable-support",
+      "disposition": "block"
+    },
+    {
+      "action": "publish-authoritative-worldgen-semantics",
+      "disposition": "block"
+    }
+  ],
+  "schema_version": 1,
+  "resource_bounds": {
+    "minecraft_watchdog_max_tick_time_ms": -1,
+    "rationale": "Exact tracing runs only in a disposable world and is bounded by the external scan timeout.",
+    "scan_timeout_seconds": 600
+  },
+  "scope": {
+    "generator_id": "dev.workbench.worldgenprototype.world.PrototypeChunkGenerator",
+    "physical_side": "dedicated-server",
+    "platform_profile_id": "workbench-platform:cleanroom:0.6.8-alpha",
+    "world_type": "wb_proto"
+  },
+  "state": "experimental-draft"
+}

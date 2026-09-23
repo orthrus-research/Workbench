@@ -1,0 +1,44 @@
+{
+  "mappings": {
+    "dev/workbench/worldgenobservatory/probe/mixin/MixinChunkProviderServer": {
+      "provideChunk(II)Lnet/minecraft/world/chunk/Chunk;": "Lnet/minecraft/world/gen/ChunkProviderServer;func_186025_d(II)Lnet/minecraft/world/chunk/Chunk;",
+      "loadChunk(II)Lnet/minecraft/world/chunk/Chunk;": "Lnet/minecraft/world/gen/ChunkProviderServer;func_186028_c(II)Lnet/minecraft/world/chunk/Chunk;",
+      "loadChunk(IILjava/lang/Runnable;)Lnet/minecraft/world/chunk/Chunk;": "Lnet/minecraft/world/gen/ChunkProviderServer;loadChunk(IILjava/lang/Runnable;)Lnet/minecraft/world/chunk/Chunk;",
+      "Lnet/minecraft/world/gen/IChunkGenerator;generateChunk(II)Lnet/minecraft/world/chunk/Chunk;": "Lnet/minecraft/world/gen/IChunkGenerator;func_185932_a(II)Lnet/minecraft/world/chunk/Chunk;"
+    },
+    "dev/workbench/worldgenobservatory/probe/mixin/MixinChunk": {
+      "populate(Lnet/minecraft/world/chunk/IChunkProvider;Lnet/minecraft/world/gen/IChunkGenerator;)V": "Lnet/minecraft/world/chunk/Chunk;func_186030_a(Lnet/minecraft/world/chunk/IChunkProvider;Lnet/minecraft/world/gen/IChunkGenerator;)V",
+      "populate(Lnet/minecraft/world/gen/IChunkGenerator;)V": "Lnet/minecraft/world/chunk/Chunk;func_186034_a(Lnet/minecraft/world/gen/IChunkGenerator;)V",
+      "Lnet/minecraft/world/gen/IChunkGenerator;populate(II)V": "Lnet/minecraft/world/gen/IChunkGenerator;func_185931_b(II)V",
+      "setBlockState(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;)Lnet/minecraft/block/state/IBlockState;": "Lnet/minecraft/world/chunk/Chunk;func_177436_a(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;)Lnet/minecraft/block/state/IBlockState;"
+    },
+    "dev/workbench/worldgenobservatory/probe/mixin/MixinChunkPrimer": {
+      "setBlockState(IIILnet/minecraft/block/state/IBlockState;)V": "Lnet/minecraft/world/chunk/ChunkPrimer;func_177855_a(IIILnet/minecraft/block/state/IBlockState;)V"
+    },
+    "dev/workbench/worldgenobservatory/probe/mixin/MixinWorld": {
+      "setBlockState(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;I)Z": "Lnet/minecraft/world/World;func_180501_a(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;I)Z"
+    }
+  },
+  "data": {
+    "searge": {
+      "dev/workbench/worldgenobservatory/probe/mixin/MixinChunkProviderServer": {
+        "provideChunk(II)Lnet/minecraft/world/chunk/Chunk;": "Lnet/minecraft/world/gen/ChunkProviderServer;func_186025_d(II)Lnet/minecraft/world/chunk/Chunk;",
+        "loadChunk(II)Lnet/minecraft/world/chunk/Chunk;": "Lnet/minecraft/world/gen/ChunkProviderServer;func_186028_c(II)Lnet/minecraft/world/chunk/Chunk;",
+        "loadChunk(IILjava/lang/Runnable;)Lnet/minecraft/world/chunk/Chunk;": "Lnet/minecraft/world/gen/ChunkProviderServer;loadChunk(IILjava/lang/Runnable;)Lnet/minecraft/world/chunk/Chunk;",
+        "Lnet/minecraft/world/gen/IChunkGenerator;generateChunk(II)Lnet/minecraft/world/chunk/Chunk;": "Lnet/minecraft/world/gen/IChunkGenerator;func_185932_a(II)Lnet/minecraft/world/chunk/Chunk;"
+      },
+      "dev/workbench/worldgenobservatory/probe/mixin/MixinChunk": {
+        "populate(Lnet/minecraft/world/chunk/IChunkProvider;Lnet/minecraft/world/gen/IChunkGenerator;)V": "Lnet/minecraft/world/chunk/Chunk;func_186030_a(Lnet/minecraft/world/chunk/IChunkProvider;Lnet/minecraft/world/gen/IChunkGenerator;)V",
+        "populate(Lnet/minecraft/world/gen/IChunkGenerator;)V": "Lnet/minecraft/world/chunk/Chunk;func_186034_a(Lnet/minecraft/world/gen/IChunkGenerator;)V",
+        "Lnet/minecraft/world/gen/IChunkGenerator;populate(II)V": "Lnet/minecraft/world/gen/IChunkGenerator;func_185931_b(II)V",
+        "setBlockState(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;)Lnet/minecraft/block/state/IBlockState;": "Lnet/minecraft/world/chunk/Chunk;func_177436_a(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;)Lnet/minecraft/block/state/IBlockState;"
+      },
+      "dev/workbench/worldgenobservatory/probe/mixin/MixinChunkPrimer": {
+        "setBlockState(IIILnet/minecraft/block/state/IBlockState;)V": "Lnet/minecraft/world/chunk/ChunkPrimer;func_177855_a(IIILnet/minecraft/block/state/IBlockState;)V"
+      },
+      "dev/workbench/worldgenobservatory/probe/mixin/MixinWorld": {
+        "setBlockState(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;I)Z": "Lnet/minecraft/world/World;func_180501_a(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;I)Z"
+      }
+    }
+  }
+}

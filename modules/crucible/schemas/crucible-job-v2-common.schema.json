@@ -1,0 +1,387 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-job-v2-common.schema.json",
+  "title": "Workbench Crucible durable job and runtime session V2 common definitions",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "contextRefId": {
+      "$ref": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json#/$defs/contextRefId"
+    },
+    "inputBindingId": {
+      "$ref": "workbench://schemas/crucible/crucible-input-binding-v2.schema.json#/$defs/inputBindingId"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^job-v2:[0-9a-f]{32}$"
+    },
+    "attemptId": {
+      "type": "string",
+      "pattern": "^attempt-v2:[0-9a-f]{32}$"
+    },
+    "sessionId": {
+      "type": "string",
+      "pattern": "^session-v2:[0-9a-f]{32}$"
+    },
+    "processInstanceId": {
+      "type": "string",
+      "pattern": "^process-v2:[0-9a-f]{32}$"
+    },
+    "resourceClaimId": {
+      "type": "string",
+      "pattern": "^resource-claim-v2:[0-9a-f]{32}$"
+    },
+    "cancellationRequestId": {
+      "type": "string",
+      "pattern": "^cancellation-v2:[0-9a-f]{32}$"
+    },
+    "recoveryId": {
+      "type": "string",
+      "pattern": "^recovery-v2:[0-9a-f]{32}$"
+    },
+    "serviceInstanceId": {
+      "type": "string",
+      "pattern": "^service-instance-v2:[0-9a-f]{32}$"
+    },
+    "jobSubmissionId": {
+      "type": "string",
+      "pattern": "^job-submission:sha256:[0-9a-f]{64}$"
+    },
+    "jobAttemptRecordId": {
+      "type": "string",
+      "pattern": "^job-attempt:sha256:[0-9a-f]{64}$"
+    },
+    "runtimeSessionRecordId": {
+      "type": "string",
+      "pattern": "^runtime-session:sha256:[0-9a-f]{64}$"
+    },
+    "processIdentityRecordId": {
+      "type": "string",
+      "pattern": "^process-identity:sha256:[0-9a-f]{64}$"
+    },
+    "jobEventId": {
+      "type": "string",
+      "pattern": "^job-event:sha256:[0-9a-f]{64}$"
+    },
+    "jobTerminalSealId": {
+      "type": "string",
+      "pattern": "^job-terminal-seal:sha256:[0-9a-f]{64}$"
+    },
+    "jobEventLedgerRoot": {
+      "type": "string",
+      "pattern": "^job-event-ledger-root-v2:sha256:[0-9a-f]{64}$"
+    },
+    "objectDescriptorId": {
+      "type": "string",
+      "pattern": "^object-descriptor:sha256:[0-9a-f]{64}$"
+    },
+    "capabilityId": {
+      "type": "string",
+      "pattern": "^capability:sha256:[0-9a-f]{64}$"
+    },
+    "handlerId": {
+      "type": "string",
+      "pattern": "^handler:sha256:[0-9a-f]{64}$"
+    },
+    "implementationId": {
+      "type": "string",
+      "pattern": "^implementation:sha256:[0-9a-f]{64}$"
+    },
+    "actorId": {
+      "type": "string",
+      "pattern": "^actor:sha256:[0-9a-f]{64}$"
+    },
+    "policyId": {
+      "type": "string",
+      "pattern": "^policy:sha256:[0-9a-f]{64}$"
+    },
+    "componentId": {
+      "type": "string",
+      "pattern": "^component:sha256:[0-9a-f]{64}$"
+    },
+    "operationPlanId": {
+      "type": "string",
+      "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"
+    },
+    "consentDecisionId": {
+      "type": "string",
+      "pattern": "^consent-decision:sha256:[0-9a-f]{64}$"
+    },
+    "retryDecisionId": {
+      "type": "string",
+      "pattern": "^retry-decision:sha256:[0-9a-f]{64}$"
+    },
+    "readinessObservationId": {
+      "type": "string",
+      "pattern": "^readiness-observation:sha256:[0-9a-f]{64}$"
+    },
+    "processLaunchObservationId": {
+      "type": "string",
+      "pattern": "^process-launch-observation:sha256:[0-9a-f]{64}$"
+    },
+    "nullableProcessLaunchObservationId": {
+      "oneOf": [
+        {"$ref": "#/$defs/processLaunchObservationId"},
+        {"type": "null"}
+      ]
+    },
+    "processAdoptionReconciliationId": {
+      "type": "string",
+      "pattern": "^process-adoption-reconciliation:sha256:[0-9a-f]{64}$"
+    },
+    "nullableProcessAdoptionReconciliationId": {
+      "oneOf": [
+        {"$ref": "#/$defs/processAdoptionReconciliationId"},
+        {"type": "null"}
+      ]
+    },
+    "resourceReleaseObservationId": {
+      "type": "string",
+      "pattern": "^resource-release-observation:sha256:[0-9a-f]{64}$"
+    },
+    "resourceClaimReconciliationId": {
+      "type": "string",
+      "pattern": "^resource-claim-reconciliation:sha256:[0-9a-f]{64}$"
+    },
+    "nullableResourceClaimReconciliationId": {
+      "oneOf": [
+        {"$ref": "#/$defs/resourceClaimReconciliationId"},
+        {"type": "null"}
+      ]
+    },
+    "mutationObservationId": {
+      "type": "string",
+      "pattern": "^mutation-observation:sha256:[0-9a-f]{64}$"
+    },
+    "terminationObservationId": {
+      "type": "string",
+      "pattern": "^termination-observation:sha256:[0-9a-f]{64}$"
+    },
+    "recoveryDecisionId": {
+      "type": "string",
+      "pattern": "^recovery-decision:sha256:[0-9a-f]{64}$"
+    },
+    "referenceEventId": {
+      "type": "string",
+      "pattern": "^reference-event:sha256:[0-9a-f]{64}$"
+    },
+    "nullableOperationPlanId": {
+      "oneOf": [
+        {"$ref": "#/$defs/operationPlanId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableConsentDecisionId": {
+      "oneOf": [
+        {"$ref": "#/$defs/consentDecisionId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableRetryDecisionId": {
+      "oneOf": [
+        {"$ref": "#/$defs/retryDecisionId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableReferenceEventId": {
+      "oneOf": [
+        {"$ref": "#/$defs/referenceEventId"},
+        {"type": "null"}
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$"
+    },
+    "semanticIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]*$"
+    },
+    "semanticText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "nullableAttemptId": {
+      "oneOf": [
+        {"$ref": "#/$defs/attemptId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableSessionId": {
+      "oneOf": [
+        {"$ref": "#/$defs/sessionId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableJobAttemptRecordId": {
+      "oneOf": [
+        {"$ref": "#/$defs/jobAttemptRecordId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableRuntimeSessionRecordId": {
+      "oneOf": [
+        {"$ref": "#/$defs/runtimeSessionRecordId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableProcessIdentityRecordId": {
+      "oneOf": [
+        {"$ref": "#/$defs/processIdentityRecordId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableJobEventId": {
+      "oneOf": [
+        {"$ref": "#/$defs/jobEventId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableJobTerminalSealId": {
+      "oneOf": [
+        {"$ref": "#/$defs/jobTerminalSealId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableObjectDescriptorId": {
+      "oneOf": [
+        {"$ref": "#/$defs/objectDescriptorId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        {"$ref": "#/$defs/timestamp"},
+        {"type": "null"}
+      ]
+    },
+    "lifecycleState": {
+      "enum": [
+        "queued",
+        "starting",
+        "running",
+        "recovering",
+        "retrying",
+        "orphaned",
+        "terminal"
+      ]
+    },
+    "mutationState": {
+      "enum": [
+        "not-started",
+        "temporary-residue",
+        "immutable-output-published",
+        "reference-committed",
+        "protected-mutation-started",
+        "protected-mutation-partial",
+        "protected-mutation-completed",
+        "external-mutation-started",
+        "external-mutation-partial",
+        "external-mutation-completed",
+        "external-mutation-indeterminate"
+      ]
+    },
+    "terminalOutcome": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "cancelled-before-mutation",
+        "cancelled-after-mutation",
+        "indeterminate"
+      ]
+    },
+    "resourceRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_key",
+        "resource_class",
+        "scope_id",
+        "mode",
+        "quantity",
+        "unit",
+        "limit_kind"
+      ],
+      "properties": {
+        "claim_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "resource_class": {
+          "enum": [
+            "cpu",
+            "memory",
+            "io",
+            "process",
+            "store-writer",
+            "world-writer",
+            "network",
+            "gpu",
+            "custom"
+          ]
+        },
+        "scope_id": {"$ref": "#/$defs/semanticIdentifier"},
+        "mode": {"enum": ["shared", "exclusive"]},
+        "quantity": {"$ref": "#/$defs/positiveInteger"},
+        "unit": {"enum": ["slots", "bytes", "millicores", "processes", "operations"]},
+        "limit_kind": {"enum": ["hard", "soft"]}
+      }
+    },
+    "jobRecordReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_kind", "record_id"],
+      "properties": {
+        "record_kind": {"enum": ["job-submission", "job-attempt", "runtime-session", "process-identity", "job-event", "job-terminal-seal", "object-descriptor"]},
+        "record_id": {
+          "type": "string",
+          "pattern": "^(?:job-submission|job-attempt|runtime-session|process-identity|job-event|job-terminal-seal|object-descriptor):sha256:[0-9a-f]{64}$"
+        }
+      },
+      "allOf": [
+        {"if": {"properties": {"record_kind": {"const": "job-submission"}}}, "then": {"properties": {"record_id": {"$ref": "#/$defs/jobSubmissionId"}}}},
+        {"if": {"properties": {"record_kind": {"const": "job-attempt"}}}, "then": {"properties": {"record_id": {"$ref": "#/$defs/jobAttemptRecordId"}}}},
+        {"if": {"properties": {"record_kind": {"const": "runtime-session"}}}, "then": {"properties": {"record_id": {"$ref": "#/$defs/runtimeSessionRecordId"}}}},
+        {"if": {"properties": {"record_kind": {"const": "process-identity"}}}, "then": {"properties": {"record_id": {"$ref": "#/$defs/processIdentityRecordId"}}}},
+        {"if": {"properties": {"record_kind": {"const": "job-event"}}}, "then": {"properties": {"record_id": {"$ref": "#/$defs/jobEventId"}}}},
+        {"if": {"properties": {"record_kind": {"const": "job-terminal-seal"}}}, "then": {"properties": {"record_id": {"$ref": "#/$defs/jobTerminalSealId"}}}},
+        {"if": {"properties": {"record_kind": {"const": "object-descriptor"}}}, "then": {"properties": {"record_id": {"$ref": "#/$defs/objectDescriptorId"}}}}
+      ]
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "severity", "code", "message", "related_records"],
+      "properties": {
+        "ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "severity": {"enum": ["info", "warning", "error", "critical"]},
+        "code": {"$ref": "#/$defs/semanticIdentifier"},
+        "message": {"$ref": "#/$defs/semanticText"},
+        "related_records": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/jobRecordReference"}
+        }
+      }
+    },
+    "limitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "detail"],
+      "properties": {
+        "code": {"$ref": "#/$defs/semanticIdentifier"},
+        "detail": {"$ref": "#/$defs/semanticText"}
+      }
+    }
+  }
+}

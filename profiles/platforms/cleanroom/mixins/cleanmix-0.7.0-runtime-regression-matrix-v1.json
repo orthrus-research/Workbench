@@ -1,0 +1,615 @@
+{
+  "format": "workbench-cleanroom-cleanmix-runtime-regression-matrix-v1",
+  "schema_version": 1,
+  "matrix_id": "cleanroom-cleanmix-runtime-regression-matrix:sha256:58ef3afb69e6293e88fa1418e99edb42f339ea3b65dab79c7d7f883c0e41e6d7",
+  "lifecycle_state": "incomplete",
+  "scope": {
+    "purpose": "Executable specification plus a partial source-fixture contract for a future external CleanMix 0.7.0 runtime-conformance harness.",
+    "included": "Exact-profile process isolation, stimuli, runtime oracles, and evidence requirements for the bounded P0 and P1 cases below.",
+    "excluded": [
+      "A claim that a complete runtime harness, valid row execution, or runtime receipt exists.",
+      "A claim that any matrix row has executed.",
+      "A replacement for CleanMix, Cleanroom, or their service-selection behavior.",
+      "A Recurrent Complex adapter, dependency, or special-case execution path.",
+      "Consumer-mod-specific compatibility conclusions."
+    ]
+  },
+  "identity_axes": {
+    "distribution": {
+      "axis_state": "byte_locked",
+      "coordinate": "com.cleanroommc:cleanmix:0.7.0",
+      "filename": "cleanmix-0.7.0.jar",
+      "sha1": "78fa8926fd9579caf4e02b2e6e6d36e5594ae602",
+      "sha256": "a41daa71398e948bc09fa578ae2460be639df0fa82fccdb630b316418d5a4a36",
+      "size": 1094214,
+      "url": "https://maven.cleanroommc.com/com/cleanroommc/cleanmix/0.7.0/cleanmix-0.7.0.jar",
+      "source_byte_equivalence": "not_proven",
+      "runtime_behavior_claim": "not_claimed"
+    },
+    "upstream": {
+      "id": "cleanmix-0.7.0-release-source",
+      "axis_state": "source_bound",
+      "repository": "https://github.com/CleanroomMC/CleanMix.git",
+      "tag": "0.7.0",
+      "revision": "24898e32adc735fe48f4a3732b1831bd566c4626",
+      "tree_sha1": "7bdf03df469a1bbcf4cf5cba93f74e6bc1641218",
+      "url": "https://github.com/CleanroomMC/CleanMix/tree/24898e32adc735fe48f4a3732b1831bd566c4626",
+      "published_byte_equivalence": "not_proven",
+      "runtime_behavior_claim": "not_claimed"
+    },
+    "behavior": {
+      "axis_state": "unexecuted",
+      "runtime_epoch": "cleanmix-release-0.7.x",
+      "compatibility_metadata_default": "0.1.0",
+      "latest_declared_compatibility_boundary": "0.6.0",
+      "harness_state": "partial_source_fixture_compile_tested",
+      "claim_boundary": "The rows remain planned runtime oracles. Compile-tested fixture source and invalid attempts are not row observations or receipts."
+    }
+  },
+  "exact_profile": {
+    "candidate_id": "workbench-platform:cleanroom:0.6.8-alpha+mc-1.12.2+forge-14.23.5.2864+mcp-9.42-stable_39",
+    "minecraft": "1.12.2",
+    "forge": "14.23.5.2864",
+    "mappings": "mcp-9.42-stable_39",
+    "java_major": 25,
+    "cleanroom": {
+      "version": "0.6.8-alpha",
+      "source_revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+      "url": "https://github.com/CleanroomMC/Cleanroom/tree/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc"
+    },
+    "cleanmix_0_7_0_selection": {
+      "revision": "2d83b071fc959a4885eb1049258bb6900d7ff4d5",
+      "url": "https://github.com/CleanroomMC/Cleanroom/commit/2d83b071fc959a4885eb1049258bb6900d7ff4d5"
+    },
+    "candidate_lock": {
+      "path": "profiles/platforms/cleanroom/candidates/0.6.8-alpha/candidate-lock-v1.json",
+      "sha256": "d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541"
+    },
+    "transformer_toolchain_lock": {
+      "path": "profiles/platforms/cleanroom/candidates/0.6.8-alpha/transformer-toolchain-lock-v1.json",
+      "sha256": "ca1651c337d3bf8df6e4d1df2d919b87db40853ed566a9c0cd8f0c3dfadd16f3"
+    },
+    "physical_sides": [
+      "dedicated_server",
+      "client"
+    ]
+  },
+  "audited_change_identities": {
+    "phase_fixes": [
+      {
+        "id": "phase-gated-consumption",
+        "ordinal": 1,
+        "revision": "0be24ae04cbf027da2fe78f36f6f0ea45192096b",
+        "url": "https://github.com/CleanroomMC/CleanMix/commit/0be24ae04cbf027da2fe78f36f6f0ea45192096b",
+        "role": "Gate pending configuration consumption by PREINIT, INIT, and DEFAULT eligibility."
+      },
+      {
+        "id": "phase-transition-refresh-intermediate",
+        "ordinal": 2,
+        "revision": "a86fa8cc559343a8a9cca62d439e82cdf78a7d6f",
+        "url": "https://github.com/CleanroomMC/CleanMix/commit/a86fa8cc559343a8a9cca62d439e82cdf78a7d6f",
+        "role": "Intermediate transition and refresh restructuring.",
+        "standalone_behavior_evaluation": "invalid_intermediate_state"
+      },
+      {
+        "id": "phase-forward-transition-refresh-final",
+        "ordinal": 3,
+        "revision": "24ef30c41c23d778b3fd5ee9606f7965391618d0",
+        "url": "https://github.com/CleanroomMC/CleanMix/commit/24ef30c41c23d778b3fd5ee9606f7965391618d0",
+        "role": "Final forward-transition fix that prompts refresh and eligible pending-config processing."
+      }
+    ],
+    "injector_handler_conformance": {
+      "id": "cleanmix-pr-3-handler-conformance",
+      "pull_request": 3,
+      "title": "Conform injector handler names during config preparation",
+      "url": "https://github.com/CleanroomMC/CleanMix/pull/3",
+      "base_revision": "ac2b06c920608d566efe57386bf6b9b88552b02d",
+      "head_revision": "376c68778694569c7f9bbbb5fabf279a115f285a",
+      "merge_revision": "26adacb0944b81b700d5902789c68cfbf01abda2",
+      "files_changed": 3,
+      "additions": 57,
+      "deletions": 0,
+      "head_actions_runs": 0,
+      "head_check_runs": 0,
+      "head_status_contexts": 0,
+      "patched_jar_game_rerun": "not_performed",
+      "behavioral_proof": "not_claimed"
+    }
+  },
+  "execution_contract": {
+    "matrix_execution_state": "unexecuted",
+    "harness_state": "not_implemented",
+    "fixture_state": "partial_source_fixture_compile_tested",
+    "runtime_execution": "no_valid_row_execution",
+    "row_isolation": "fresh_jvm_per_row",
+    "accepted_runtime_distribution": {
+      "coordinate": "com.cleanroommc:cleanmix:0.7.0",
+      "sha256": "a41daa71398e948bc09fa578ae2460be639df0fa82fccdb630b316418d5a4a36",
+      "size": 1094214
+    },
+    "required_process_evidence": [
+      "process exit and launch identity",
+      "physical side and exact Java runtime",
+      "exact installed component paths, sizes, and SHA-256 digests",
+      "ordered defining-loader service discovery and selected service",
+      "ordered configuration admission, queued phase, consumption phase, and failure events",
+      "ordered transformer-chain epochs, exclusions, and refresh reasons",
+      "forced target loads and Foundation-custodied final defined class bytes",
+      "ordered no-op target transform-entry observations proving actual target order independently of request labels and CleanMix APPLY lines",
+      "fixture invocation counters and assertion output",
+      "observer start, end, and health independent of cleanmix.log"
+    ],
+    "insufficient_evidence": [
+      "a successful upstream build",
+      "a CleanMix APPLY or GENERATE audit line",
+      "a requested-order property or class-loading API call without matching no-op transform-entry observations",
+      "thread-context ServiceLoader provider enumeration",
+      "source-versus-distribution version correspondence"
+    ],
+    "xfail_policy": {
+      "expected_failure": "Record XFAIL only when the row's named defect oracle is observed with complete required evidence.",
+      "unexpected_pass": "Record XPASS and require drift review; do not silently promote the row.",
+      "missing_or_incomplete_evidence": "Leave the row unexecuted or mark the future execution invalid, never XFAIL or PASS."
+    },
+    "historical_control_requirement": {
+      "state": "unresolved",
+      "purpose": "A future harness must first reproduce the two-level load-order defect on a byte-locked historical control.",
+      "upstream_0_6_0_revision": "ac2b06c920608d566efe57386bf6b9b88552b02d",
+      "published_artifact_identity": "not_bound_by_this_asset",
+      "matrix_row": "intentionally_omitted_until_byte_locked"
+    }
+  },
+  "rows": [
+    {
+      "id": "P0-HANDLER-PARENT-FIRST-SERVER",
+      "priority": "P0",
+      "category": "injector_handler_load_order",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "pass",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "cleanmix-pr-3-handler-conformance"
+      ],
+      "fixture_spec": {
+        "hierarchy": "two-level parent and child targets with overriding injector handlers",
+        "target_order": "parent_then_child",
+        "handler_body_markers": "independent parent and child counters"
+      },
+      "stimulus": [
+        "Force transformation and definition of the parent target before the child target.",
+        "Invoke the injected path once on a parent instance and once on a child instance."
+      ],
+      "oracle": {
+        "required": [
+          "The independent no-op chain observer records ParentTarget entry before ChildTarget entry.",
+          "The final parent and child handler names conform as one override chain.",
+          "The parent invocation increments only the parent marker once.",
+          "The child invocation increments only the child marker once.",
+          "Foundation retains final defined bytes for both targets."
+        ],
+        "forbidden": [
+          "a parent-first claim inferred only from a request label or class-loading API call",
+          "parent-body dispatch for the child invocation",
+          "duplicate handler invocation",
+          "a successful result based only on CleanMix audit output"
+        ]
+      }
+    },
+    {
+      "id": "P0-HANDLER-CHILD-FIRST-SERVER",
+      "priority": "P0",
+      "category": "injector_handler_load_order",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "pass",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "cleanmix-pr-3-handler-conformance"
+      ],
+      "fixture_spec": {
+        "hierarchy": "two-level parent and child targets with overriding injector handlers",
+        "target_order": "child_transformation_requested_before_explicit_parent_target_transformation",
+        "handler_body_markers": "independent parent and child counters"
+      },
+      "stimulus": [
+        "Request transformation of the child target before an explicit parent-target request.",
+        "Complete valid JVM definition order and invoke the injected path on both target types."
+      ],
+      "oracle": {
+        "required": [
+          "The independent no-op chain observer records ChildTarget entry before ParentTarget entry.",
+          "The final parent and child handler names conform as one override chain independent of target request order.",
+          "Each invocation dispatches exactly once to the body for its runtime target type.",
+          "Foundation retains final defined bytes for both targets."
+        ],
+        "forbidden": [
+          "a child-first claim inferred only from a request label or class-loading API call",
+          "order-dependent final handler names",
+          "parent-body dispatch for the child invocation",
+          "duplicate handler invocation"
+        ]
+      }
+    },
+    {
+      "id": "P0-PHASE-SEQUENCE-SERVER",
+      "priority": "P0",
+      "category": "phase_consumption",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "pass",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "phase-gated-consumption",
+        "phase-transition-refresh-intermediate",
+        "phase-forward-transition-refresh-final"
+      ],
+      "fixture_spec": {
+        "configs": [
+          "one PREINIT config with a unique target and marker",
+          "one INIT config with a unique target and marker",
+          "one DEFAULT config with a unique target and marker"
+        ],
+        "phase_order": [
+          "PREINIT",
+          "INIT",
+          "DEFAULT"
+        ],
+        "pending_counts_by_boundary": {
+          "before_initial_consumption": 3,
+          "after_PREINIT_consumption": 2,
+          "after_INIT_refresh": 1,
+          "after_DEFAULT_refresh": 0
+        },
+        "physical_side": "dedicated_server"
+      },
+      "stimulus": [
+        "Register all three configs before advancing the phase sequence.",
+        "Advance PREINIT to INIT to DEFAULT and force each target only at its eligible phase."
+      ],
+      "oracle": {
+        "required": [
+          "Prepared config sets and pending counts match every declared boundary exactly.",
+          "Each config is consumed exactly once, at its declared phase and never earlier.",
+          "For INIT and DEFAULT, phase-current set precedes service beginPhase, delegated-transformer refresh, and eligible config preparation.",
+          "INIT and DEFAULT mixin bytecode is not read before its phase is reached.",
+          "Each target marker appears exactly once in final defined bytes."
+        ],
+        "forbidden": [
+          "future-phase config consumption",
+          "duplicate config selection or application",
+          "missing final defined target bytes"
+        ]
+      }
+    },
+    {
+      "id": "P0-PHASE-SEQUENCE-CLIENT",
+      "priority": "P0",
+      "category": "phase_consumption",
+      "side": "client",
+      "execution_state": "unexecuted",
+      "expected_disposition": "pass",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "phase-gated-consumption",
+        "phase-transition-refresh-intermediate",
+        "phase-forward-transition-refresh-final"
+      ],
+      "fixture_spec": {
+        "configs": [
+          "one PREINIT config with a unique client target and marker",
+          "one INIT config with a unique client target and marker",
+          "one DEFAULT config with a unique client target and marker"
+        ],
+        "phase_order": [
+          "PREINIT",
+          "INIT",
+          "DEFAULT"
+        ],
+        "pending_counts_by_boundary": {
+          "before_initial_consumption": 3,
+          "after_PREINIT_consumption": 2,
+          "after_INIT_refresh": 1,
+          "after_DEFAULT_refresh": 0
+        },
+        "bootstrap_binding": "physical client process before any integrated-server interpretation",
+        "physical_side": "client"
+      },
+      "stimulus": [
+        "Register all three configs before advancing the client phase sequence.",
+        "Advance PREINIT to INIT to DEFAULT and force each client target only at its eligible phase."
+      ],
+      "oracle": {
+        "required": [
+          "Prepared config sets and pending counts match every declared boundary exactly.",
+          "Each config is consumed exactly once, at its declared phase and never earlier.",
+          "For INIT and DEFAULT, phase-current set precedes service beginPhase, delegated-transformer refresh, and eligible config preparation.",
+          "Client/common fixture mixins prevent side filtering from satisfying the oracle accidentally.",
+          "Each client target marker appears exactly once in final defined bytes."
+        ],
+        "forbidden": [
+          "future-phase config consumption",
+          "duplicate config selection or application",
+          "server-side substitution for the physical client launch"
+        ]
+      }
+    },
+    {
+      "id": "P0-LATE-DEFAULT-BEFORE-TARGET-SERVER",
+      "priority": "P0",
+      "category": "late_registration",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "pass",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "phase-gated-consumption",
+        "phase-forward-transition-refresh-final"
+      ],
+      "fixture_spec": {
+        "registration_point": "after DEFAULT before target definition",
+        "trigger": "configured target is the first post-registration transformable class",
+        "target_state_at_registration": "not_loaded",
+        "harness_helper_state": "all helper classes preloaded before registration"
+      },
+      "stimulus": [
+        "Reach DEFAULT, register a DEFAULT config, and prove registration alone does not synchronously consume it.",
+        "Positively record IClassTracker.isClassLoaded(target) as false, then force the configured target as the next transformable class."
+      ],
+      "oracle": {
+        "required": [
+          "No consumption event occurs synchronously inside registration.",
+          "Target transform entry precedes config preparation, mixin validation, application completion, and final class definition.",
+          "Config preparation and validation occur exactly once and pending count becomes zero.",
+          "The forced target contains the unique marker in Foundation-retained final bytes and invocation produces the mixed result exactly once."
+        ],
+        "forbidden": [
+          "validation or target ClassInfo resolution before target transform entry",
+          "unmodified final target bytes",
+          "duplicate selection or application"
+        ]
+      }
+    },
+    {
+      "id": "P0-LATE-DEFAULT-AFTER-TARGET-SERVER",
+      "priority": "P0",
+      "category": "late_registration",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "must_reject",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "cleanmix-0.7.0-release-source",
+        "phase-gated-consumption",
+        "phase-forward-transition-refresh-final"
+      ],
+      "fixture_spec": {
+        "registration_point": "after DEFAULT after target definition",
+        "trigger": "next unrelated non-reentrant transform",
+        "target_state_at_registration": "already_defined",
+        "source_prediction": "parseTargetsWithoutCheck can promote the config, while deferred MixinInfo validation cannot run for an already-defined target"
+      },
+      "stimulus": [
+        "Reach DEFAULT and force the unmodified target through final class definition.",
+        "Register its DEFAULT config, trigger an unrelated non-reentrant transform, and invoke the already-defined target."
+      ],
+      "oracle": {
+        "required": [
+          "The definition receipt predates config registration.",
+          "Positive class-tracker state and the baseline final-byte SHA-256 are retained before registration.",
+          "The same loaded class identity and byte SHA-256 remain after registration.",
+          "A structured config, mixin, and target-correlated target_already_loaded failure rejects the case seal."
+        ],
+        "forbidden": [
+          "PASS for this must-reject condition",
+          "silent config preparation or promotion without target_already_loaded rejection",
+          "post-registration application completion or a new final definition for the target",
+          "a transformed-target success claim",
+          "fabricated retroactive final bytes",
+          "silently treating config consumption as target application"
+        ]
+      }
+    },
+    {
+      "id": "P0-XFAIL-LAZY-INHERITANCE-CALLBACKINFO-SERVER",
+      "priority": "P0",
+      "category": "known_gap",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "xfail",
+      "xfail_reason_code": "cleanmix-0.7.0-lazy-inheritance-tracker",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "cleanmix-pr-3-handler-conformance"
+      ],
+      "fixture_spec": {
+        "hierarchy": "cancellable parent injector whose parent body does not load CallbackInfo and child override that does",
+        "target_order": "parent target transforms before child mixin completes lazy onInit",
+        "tracker_state": "CallbackInfo-use inference is evaluated before child initialization completes"
+      },
+      "stimulus": [
+        "Transform the parent under the declared lazy-initialization order and invoke the injected path on a child instance."
+      ],
+      "oracle": {
+        "named_defect": "Lazy inheritance tracking can emit ACONST_NULL for the virtual handler CallbackInfo argument even though the child override uses it.",
+        "required_for_xfail": [
+          "Final bytes contain ACONST_NULL passed to the conformed virtual handler rather than a constructed CallbackInfo.",
+          "Runtime counters are child_handler=1, callback_info_null=1, and original_target_body=1.",
+          "No unrelated launch, service-selection, or fixture failure explains the result."
+        ],
+        "unexpected_pass": "XPASS requiring exact upstream-drift review"
+      }
+    },
+    {
+      "id": "P0-XFAIL-REENTRANT-PENDING-TARGET-SERVER",
+      "priority": "P0",
+      "category": "known_gap",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "xfail",
+      "xfail_reason_code": "cleanmix-0.7.0-reentrant-pending-target",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "phase-gated-consumption"
+      ],
+      "fixture_spec": {
+        "config_state": "preparation active, config removed from pending, and not yet promoted",
+        "reentrant_action": "controlled transformer requests the config target during that interval",
+        "target_state": "not previously defined"
+      },
+      "stimulus": [
+        "Consume the eligible config while its callback reentrantly forces the configured target."
+      ],
+      "oracle": {
+        "named_defect": "The reentrant target can proceed silently without its mixin while the config is no longer visible as pending.",
+        "required_for_xfail": [
+          "The ordered trace is config prepare enter, reentrant target transform enter, final class definition, then config promotion.",
+          "No ReEntrantTransformerError or pending-target rejection occurs.",
+          "Foundation final bytes lack the unique marker and runtime invocation remains baseline."
+        ],
+        "unexpected_pass": "XPASS requiring exact upstream-drift review"
+      }
+    },
+    {
+      "id": "P0-XFAIL-THREE-DEEP-CHILD-FIRST-SERVER",
+      "priority": "P0",
+      "category": "known_gap",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "xfail",
+      "xfail_reason_code": "cleanmix-0.7.0-three-deep-handler-order",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "cleanmix-pr-3-handler-conformance"
+      ],
+      "fixture_spec": {
+        "hierarchy": "three-level base, middle, and leaf targets with plain overriding injector handlers",
+        "target_order": "leaf_then_middle_then_base",
+        "handler_body_markers": "independent counter at every level"
+      },
+      "stimulus": [
+        "Request target transformations from leaf to base, complete class definition, and invoke every level."
+      ],
+      "oracle": {
+        "named_defect": "Three-deep plain handler conformance remains dependent on target processing order.",
+        "required_for_xfail": [
+          "Final root and middle handler names match while the leaf retains a different original name.",
+          "The root injection remains virtual to the conformed root name and a leaf instance dispatches to the middle handler.",
+          "An ordinary three-level virtual-dispatch control still reaches the leaf body."
+        ],
+        "unexpected_pass": "XPASS requiring exact upstream-drift review"
+      }
+    },
+    {
+      "id": "P1-PLUGIN-TARGET-VISIBILITY-SERVER",
+      "priority": "P1",
+      "category": "plugin_phase_visibility",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "pass",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "phase-gated-consumption"
+      ],
+      "fixture_spec": {
+        "configs": {
+          "PREINIT_active": "TargetPre",
+          "INIT_plugin": "TargetPlugin",
+          "INIT_peer": "TargetPeer",
+          "DEFAULT_future": "TargetFuture"
+        },
+        "plugin_probe": "record sorted canonical acceptTargets inputs at INIT"
+      },
+      "stimulus": [
+        "Advance to INIT and retain the plugin acceptTargets invocation and immutable argument sets."
+      ],
+      "oracle": {
+        "required": [
+          "acceptTargets runs exactly once after both INIT configs prepare and before their postInitialise calls.",
+          "myTargets equals TargetPlugin.",
+          "otherTargets equals TargetPre and TargetPeer, excluding self and future TargetFuture.",
+          "Mutation of otherTargets is rejected."
+        ],
+        "forbidden": [
+          "future-phase target leakage into the INIT plugin view",
+          "missing ordered plugin-call evidence"
+        ]
+      }
+    },
+    {
+      "id": "P1-CONFORMANCE-ERROR-HARD-GATE-SERVER",
+      "priority": "P1",
+      "category": "observer_health_gate",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "must_reject",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "cleanmix-pr-3-handler-conformance"
+      ],
+      "fixture_spec": {
+        "fault": "deterministically force handler-name conformance to emit Error conforming injector handler names",
+        "cleanmix_behavior_under_probe": "the affected config may still be promoted after the error is logged"
+      },
+      "stimulus": [
+        "Trigger the conformance error and let the process reach the normal fixture completion boundary if possible."
+      ],
+      "oracle": {
+        "required": [
+          "The independent observer records exactly one conformance error with config, mixin, phase, exception class, and source identity.",
+          "The case receives a rejected seal even if CleanMix returns from postInitialise, promotes the config, and the process exits normally.",
+          "Any later config promotion is retained as evidence, not treated as recovery."
+        ],
+        "forbidden": [
+          "PASS after Error conforming injector handler names",
+          "relying only on cleanmix.log for the gate"
+        ]
+      }
+    },
+    {
+      "id": "P1-PHASE-REPEAT-BACKWARD-NON-DUPLICATION-SERVER",
+      "priority": "P1",
+      "category": "phase_transition_robustness",
+      "side": "dedicated_server",
+      "execution_state": "unexecuted",
+      "expected_disposition": "pass",
+      "isolation": "fresh_jvm",
+      "authority_refs": [
+        "phase-gated-consumption",
+        "phase-transition-refresh-intermediate",
+        "phase-forward-transition-refresh-final"
+      ],
+      "fixture_spec": {
+        "phase_signals": [
+          "PREINIT",
+          "INIT",
+          "INIT",
+          "PREINIT",
+          "DEFAULT",
+          "INIT",
+          "DEFAULT"
+        ],
+        "configs": "one unique target and counter for each real phase"
+      },
+      "stimulus": [
+        "Deliver the declared repeated and backward phase signals before the final forward transition to DEFAULT.",
+        "Force all targets after their first eligible consumption boundary."
+      ],
+      "oracle": {
+        "required": [
+          "Requested phase signals are retained and effective phases are exactly PREINIT, INIT, DEFAULT.",
+          "Each forward transition has exactly one correlated beginPhase and refresh.",
+          "Same-phase and backward requests cause no correlated phase change, beginPhase, refresh, or config preparation.",
+          "Each config is selected and applied exactly once.",
+          "All final target bytes and counters agree with exactly-once application."
+        ],
+        "forbidden": [
+          "duplicate config selection or application",
+          "future-phase consumption caused by a backward signal",
+          "a successful result without final defined bytes"
+        ]
+      }
+    }
+  ]
+}

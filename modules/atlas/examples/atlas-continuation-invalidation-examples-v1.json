@@ -1,0 +1,42 @@
+[
+  {
+    "changed_field": "binding.snapshot_id",
+    "expected_reason": "snapshot-changed",
+    "meaning": "A snapshot replacement starts a new lineage."
+  },
+  {
+    "changed_field": "binding.scopes",
+    "expected_reason": "scope-changed",
+    "meaning": "A continuation cannot cross profile or physical-side scope."
+  },
+  {
+    "changed_field": "binding.algorithm.version",
+    "expected_reason": "algorithm-changed",
+    "meaning": "A different traversal implementation is not the same frontier."
+  },
+  {
+    "changed_field": "binding.structural_limits",
+    "expected_reason": "structural-policy-changed",
+    "meaning": "Raising a traversal limit and rerunning is not continuation."
+  },
+  {
+    "changed_field": "binding.evidence_sha256",
+    "expected_reason": "evidence-changed",
+    "meaning": "Changed authority invalidates the lineage instead of silently drifting."
+  },
+  {
+    "changed_field": "parent.manifest_sha256",
+    "expected_reason": "wrong-parent",
+    "meaning": "A delta composes only over the exact parent bytes it names."
+  },
+  {
+    "changed_field": "cumulative_budget.consumed_work_items",
+    "expected_reason": "budget-drift",
+    "meaning": "Cumulative work must equal parent work plus segment work."
+  },
+  {
+    "changed_field": "state",
+    "expected_reason": "state-digest-mismatch",
+    "meaning": "Client-authored or corrupted frontier state fails closed."
+  }
+]

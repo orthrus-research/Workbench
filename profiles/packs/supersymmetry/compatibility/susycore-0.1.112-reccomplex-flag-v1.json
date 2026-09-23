@@ -1,0 +1,24 @@
+{
+  "format": "workbench-runtime-compatibility-patch-v1",
+  "schema_version": 1,
+  "patch_id": "workbench-pack:supersymmetry:susycore-0.1.112-reccomplex-flag-v1",
+  "description": "Experimental disposable bridge for SusyCore 0.1.112's arg3 selector against Recurrent Complex 1.4.8.6 under CleanMixin.",
+  "applicability": {
+    "pack_version": "0.1.16.12",
+    "susycore": "0.1.112",
+    "recurrent_complex": "1.4.8.6"
+  },
+  "authority": {
+    "path": "../atlas/runtime-graph/cleanroom-compatibility-overlays-v1.json",
+    "overlay_id": "susy-reccomplex-modify-variable-name-v1"
+  },
+  "target": {
+    "path": ".minecraft/mods/supersymmetry-v0.1.112.jar",
+    "sha256": "11101461f859ccae3f9924ea0903c02694e52e7cb93048e7fc89adbda70bf3ec",
+    "entry": "supersymmetry/mixins/reccomplex/StructureSpawnContextMixin.class",
+    "entry_sha256": "77208fc27f343b1b42a24e0073c68d65e1feab2f6bbc9cdc81af01fd86da1f5d",
+    "find_utf8": "arg3",
+    "replace_utf8": "flag",
+    "expected_matches": 1
+  }
+}

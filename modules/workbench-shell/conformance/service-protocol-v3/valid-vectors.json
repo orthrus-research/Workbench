@@ -1,0 +1,3605 @@
+{
+  "format": "workbench-service-protocol-v3-valid-vectors-v1",
+  "registry": {
+    "format": "workbench-component-capability-registry-v3",
+    "schema_version": 3,
+    "canonicalizer": "workbench-canonical-json-v2",
+    "registry_generation": 1,
+    "service_distribution_id": "service-distribution:sha256:bde54db176864e52b591a875c1c2d599c90dd753c25f47998ceefda495b659fd",
+    "providers": [
+      {
+        "provider_format": "workbench-capability-provider-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "provider_id": "provider:sha256:3d4c8b4888c7584294c2fbe4d4472e1a3c30628f9d7a6b7fc2f41551ef7e1162",
+        "provider_key": "workbench.provider.atlas",
+        "distribution_id": "distribution:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+        "source_tree_id": null,
+        "dependency_lock_id": null,
+        "package_name": "workbench-atlas",
+        "package_version": "3.0.0"
+      },
+      {
+        "provider_format": "workbench-capability-provider-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "provider_id": "provider:sha256:bec1659a1cbcfe3935ef43b644b4d01ac6baaa9daccf9f483bd9ee4b29051d74",
+        "provider_key": "workbench.provider.blueprints",
+        "distribution_id": "distribution:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+        "source_tree_id": null,
+        "dependency_lock_id": null,
+        "package_name": "workbench-blueprints",
+        "package_version": "3.0.0"
+      },
+      {
+        "provider_format": "workbench-capability-provider-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "provider_key": "workbench.provider.crucible",
+        "distribution_id": "distribution:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "source_tree_id": null,
+        "dependency_lock_id": null,
+        "package_name": "workbench-crucible",
+        "package_version": "3.0.0"
+      },
+      {
+        "provider_format": "workbench-capability-provider-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "provider_id": "provider:sha256:04b9b94e048598eca5325d8833f3405c73fea7b407105a3e7c41143b5013388e",
+        "provider_key": "workbench.provider.shell",
+        "distribution_id": "distribution:sha256:ce635c4eabff5e4f56dba8fb1e39ca235530aa2b6b18533eef1af3862016c577",
+        "source_tree_id": null,
+        "dependency_lock_id": null,
+        "package_name": "workbench-shell",
+        "package_version": "3.0.0"
+      }
+    ],
+    "components": [
+      {
+        "component_format": "workbench-capability-component-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "component_id": "component:sha256:85a94b92c58b6722a461c3698b813b84da37083610133e264f17c7e3dfc754e0",
+        "component_key": "workbench.component.atlas",
+        "component_kind": "authority",
+        "provider_id": "provider:sha256:3d4c8b4888c7584294c2fbe4d4472e1a3c30628f9d7a6b7fc2f41551ef7e1162",
+        "semantic_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+        "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+        "public_contract_schema_ids": [
+          "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json"
+        ],
+        "depends_on_component_ids": [],
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+        }
+      },
+      {
+        "component_format": "workbench-capability-component-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "component_id": "component:sha256:b6bc905ff5dbedfef23f364bf9f3696b17eccb8f31df9d4a0b3e577f04144cbd",
+        "component_key": "workbench.component.blueprints",
+        "component_kind": "authority",
+        "provider_id": "provider:sha256:bec1659a1cbcfe3935ef43b644b4d01ac6baaa9daccf9f483bd9ee4b29051d74",
+        "semantic_authority_id": "authority:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+        "authority_adapter_id": "authority-adapter:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+        "public_contract_schema_ids": [
+          "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json"
+        ],
+        "depends_on_component_ids": [
+          "component:sha256:85a94b92c58b6722a461c3698b813b84da37083610133e264f17c7e3dfc754e0"
+        ],
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+          "owner_revision_id": "owner-revision:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+          "authority_adapter_id": "authority-adapter:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f"
+        }
+      },
+      {
+        "component_format": "workbench-capability-component-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "component_id": "component:sha256:7ae682c59c4fbd5b70cfc36922a77cec07c53d44c5065a240dc57b920cb33e96",
+        "component_key": "workbench.component.crucible",
+        "component_kind": "application-service",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "semantic_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "public_contract_schema_ids": [
+          "workbench://schemas/crucible/crucible-context-ref-v2.schema.json",
+          "workbench://schemas/crucible/crucible-input-binding-v2.schema.json",
+          "workbench://schemas/workbench-shell/service-protocol-v3.schema.json"
+        ],
+        "depends_on_component_ids": [
+          "component:sha256:85a94b92c58b6722a461c3698b813b84da37083610133e264f17c7e3dfc754e0",
+          "component:sha256:b6bc905ff5dbedfef23f364bf9f3696b17eccb8f31df9d4a0b3e577f04144cbd"
+        ],
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        }
+      },
+      {
+        "component_format": "workbench-capability-component-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "component_id": "component:sha256:dc7495c10416e60e6f39cbaf577d40dd7f295c78ca0bd6f30f0ba001e3d9399a",
+        "component_key": "workbench.component.shell",
+        "component_kind": "host",
+        "provider_id": "provider:sha256:04b9b94e048598eca5325d8833f3405c73fea7b407105a3e7c41143b5013388e",
+        "semantic_authority_id": null,
+        "authority_adapter_id": null,
+        "public_contract_schema_ids": [
+          "workbench://schemas/workbench-shell/service-protocol-v3.schema.json"
+        ],
+        "depends_on_component_ids": [
+          "component:sha256:7ae682c59c4fbd5b70cfc36922a77cec07c53d44c5065a240dc57b920cb33e96"
+        ],
+        "semantic_authority_binding": null
+      }
+    ],
+    "capability_descriptors": [
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "atlas.evidence.get",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:85a94b92c58b6722a461c3698b813b84da37083610133e264f17c7e3dfc754e0",
+        "semantic_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+        "provider_id": "provider:sha256:3d4c8b4888c7584294c2fbe4d4472e1a3c30628f9d7a6b7fc2f41551ef7e1162",
+        "handler_id": "handler:sha256:fc2b2c0264ea76b9a2e7ac5bd5d251f902ef00a9c7bb130b2cf193ca1019f2f4",
+        "public_entrypoint": "workbench_atlas.service_handlers:get",
+        "handler_implementation_id": "implementation:sha256:fc2b2c0264ea76b9a2e7ac5bd5d251f902ef00a9c7bb130b2cf193ca1019f2f4",
+        "method_bindings": [
+          {
+            "protocol_method": "evidence/get",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/evidenceGetArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/evidenceResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [
+            "evidence-record"
+          ],
+          "produced_record_kinds": []
+        },
+        "context_applicability": {
+          "required_context_fields": [
+            "profile_scope",
+            "store_id"
+          ],
+          "input_binding": "required",
+          "scope_compatibility_policy_id": "policy:sha256:06d0c415ffa4763eab0fdb54b448e92d596e7eef1fb844f44e6f7202703d5c53",
+          "context_binding": "required",
+          "scope_compatibility_authority": {
+            "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+            "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+            "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+          }
+        },
+        "operation": {
+          "operation_class": "inspect",
+          "side_effect_classes": [
+            "store-read"
+          ],
+          "preview": "none",
+          "consent": "none",
+          "idempotency": "none",
+          "freshness_checks": [
+            "context",
+            "input-binding"
+          ]
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "none",
+          "cancellation": "unsupported",
+          "continuation": "none",
+          "subscription": "none"
+        },
+        "resources": {
+          "resource_class": "graph-read",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "explicit-revisions",
+          "profile_revision_refs": [
+            {
+              "profile_kind": "pack-profile-revision",
+              "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+            },
+            {
+              "profile_kind": "platform-profile-revision",
+              "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+            }
+          ],
+          "applicability_policy_id": null,
+          "required_support_states": [
+            "experimental",
+            "provisional",
+            "tested-supported"
+          ],
+          "support_predicate_policy_id": "policy:sha256:3f6a34e1a9fc497fbfa4d5bea0a27b00acf64523d966e7320636bb634bef4b22",
+          "unsupported_result": "unavailable",
+          "action_gate_policy_id": null,
+          "applicability_authority": null,
+          "support_predicate_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "action_gate_authority": null,
+          "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy"
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+        },
+        "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "atlas.graph.query",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:85a94b92c58b6722a461c3698b813b84da37083610133e264f17c7e3dfc754e0",
+        "semantic_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+        "provider_id": "provider:sha256:3d4c8b4888c7584294c2fbe4d4472e1a3c30628f9d7a6b7fc2f41551ef7e1162",
+        "handler_id": "handler:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+        "public_entrypoint": "workbench_atlas.service_handlers:query",
+        "handler_implementation_id": "implementation:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+        "method_bindings": [
+          {
+            "protocol_method": "graph/query",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/graphQueryArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/graphQueryResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          },
+          {
+            "protocol_method": "graph/subscribe",
+            "request_value_scope": "params",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionParams",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionHandle",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [
+            "graph-revision"
+          ],
+          "produced_record_kinds": [
+            "query-result"
+          ]
+        },
+        "context_applicability": {
+          "required_context_fields": [
+            "profile_scope",
+            "store_id"
+          ],
+          "input_binding": "required",
+          "scope_compatibility_policy_id": "policy:sha256:0b14b0ac571d57d4445e5820e32885ed2fbf3abc24c91e32a5e9a6a5b1d11c8e",
+          "context_binding": "required",
+          "scope_compatibility_authority": {
+            "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+            "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+            "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+          }
+        },
+        "operation": {
+          "operation_class": "query",
+          "side_effect_classes": [
+            "store-read"
+          ],
+          "preview": "none",
+          "consent": "none",
+          "idempotency": "none",
+          "freshness_checks": [
+            "context",
+            "input-binding",
+            "profile-support"
+          ]
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "none",
+          "cancellation": "unsupported",
+          "continuation": "none",
+          "subscription": "resumable"
+        },
+        "resources": {
+          "resource_class": "graph-query",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "explicit-revisions",
+          "profile_revision_refs": [
+            {
+              "profile_kind": "pack-profile-revision",
+              "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+            },
+            {
+              "profile_kind": "platform-profile-revision",
+              "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+            }
+          ],
+          "applicability_policy_id": null,
+          "required_support_states": [
+            "experimental",
+            "provisional",
+            "tested-supported"
+          ],
+          "support_predicate_policy_id": "policy:sha256:f5deeaa3715c1829deadf44a8cdeca86257656a26965555354ed4e79828e252f",
+          "unsupported_result": "unavailable",
+          "action_gate_policy_id": null,
+          "applicability_authority": null,
+          "support_predicate_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "action_gate_authority": null,
+          "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy"
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+        },
+        "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "blueprints.operation.commit",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:b6bc905ff5dbedfef23f364bf9f3696b17eccb8f31df9d4a0b3e577f04144cbd",
+        "semantic_authority_id": "authority:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+        "provider_id": "provider:sha256:bec1659a1cbcfe3935ef43b644b4d01ac6baaa9daccf9f483bd9ee4b29051d74",
+        "handler_id": "handler:sha256:90f5e513ba4259336f1759c910550d34f0ad93470e708c64ac9f121e074dda06",
+        "public_entrypoint": "workbench_blueprints.service_handlers:commit",
+        "handler_implementation_id": "implementation:sha256:90f5e513ba4259336f1759c910550d34f0ad93470e708c64ac9f121e074dda06",
+        "method_bindings": [
+          {
+            "protocol_method": "operation/commit",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/operationCommitArguments",
+            "plan_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/operationPlanValue",
+            "progress_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/progressParams",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/acceptedJobResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [
+            "construction-spec",
+            "operation-plan"
+          ],
+          "produced_record_kinds": [
+            "job-submission",
+            "reference-event"
+          ]
+        },
+        "context_applicability": {
+          "required_context_fields": [
+            "profile_scope",
+            "store_id"
+          ],
+          "input_binding": "required",
+          "scope_compatibility_policy_id": "policy:sha256:e44e3451c7e35aa912adab76408508c85c4329041ad7df260a93b7bbad07a25e",
+          "context_binding": "required",
+          "scope_compatibility_authority": {
+            "owner_authority_id": "authority:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+            "owner_revision_id": "owner-revision:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+            "authority_adapter_id": "authority-adapter:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f"
+          }
+        },
+        "operation": {
+          "operation_class": "stable-construct",
+          "side_effect_classes": [
+            "reference-update",
+            "store-append"
+          ],
+          "preview": "required",
+          "consent": "explicit-plan",
+          "idempotency": "keyed-replay",
+          "freshness_checks": [
+            "action-gate",
+            "context",
+            "expected-heads",
+            "input-binding",
+            "profile-support",
+            "writer-lease"
+          ]
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "durable-job-events",
+          "cancellation": "safe-boundaries",
+          "continuation": "none",
+          "subscription": "none"
+        },
+        "resources": {
+          "resource_class": "construction",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "explicit-revisions",
+          "profile_revision_refs": [
+            {
+              "profile_kind": "pack-profile-revision",
+              "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+            },
+            {
+              "profile_kind": "platform-profile-revision",
+              "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+            }
+          ],
+          "applicability_policy_id": null,
+          "required_support_states": [
+            "tested-supported"
+          ],
+          "support_predicate_policy_id": "policy:sha256:19521b77194c771de7d2c0773211f81e28824461dea2e3cb4c65689cbf72d10b",
+          "unsupported_result": "blocked",
+          "action_gate_policy_id": "policy:sha256:0f755a52fcb878e22cc147a73b9059b6db12d94c49736ec10146678cfae99fe1",
+          "applicability_authority": null,
+          "support_predicate_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "action_gate_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy"
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+          "owner_revision_id": "owner-revision:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+          "authority_adapter_id": "authority-adapter:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f"
+        },
+        "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "workbench.context.resolve",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:7ae682c59c4fbd5b70cfc36922a77cec07c53d44c5065a240dc57b920cb33e96",
+        "semantic_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "handler_id": "handler:sha256:4b0d71861c4545fc8800b29baf3b8cecd520c87e025bf02ada18c495026eb706",
+        "public_entrypoint": "workbench_crucible.service_handlers:resolve",
+        "handler_implementation_id": "implementation:sha256:4b0d71861c4545fc8800b29baf3b8cecd520c87e025bf02ada18c495026eb706",
+        "method_bindings": [
+          {
+            "protocol_method": "context/get",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/emptyArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/contextGetResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          },
+          {
+            "protocol_method": "context/resolve",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/contextResolveArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/contextResolveResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [],
+          "produced_record_kinds": []
+        },
+        "context_applicability": {
+          "required_context_fields": [],
+          "input_binding": "none",
+          "scope_compatibility_policy_id": null,
+          "context_binding": "optional",
+          "scope_compatibility_authority": null
+        },
+        "operation": {
+          "operation_class": "inspect",
+          "side_effect_classes": [
+            "store-read"
+          ],
+          "preview": "none",
+          "consent": "none",
+          "idempotency": "none",
+          "freshness_checks": []
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "none",
+          "cancellation": "unsupported",
+          "continuation": "none",
+          "subscription": "none"
+        },
+        "resources": {
+          "resource_class": "context-resolution",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "profile-independent",
+          "profile_revision_refs": [],
+          "applicability_policy_id": null,
+          "required_support_states": [],
+          "support_predicate_policy_id": null,
+          "unsupported_result": "unavailable",
+          "action_gate_policy_id": null,
+          "applicability_authority": null,
+          "support_predicate_authority": null,
+          "action_gate_authority": null,
+          "profile_adapter_id": null,
+          "profile_validation_entrypoint": null
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "capability_id": "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "workbench.job.cancel",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:7ae682c59c4fbd5b70cfc36922a77cec07c53d44c5065a240dc57b920cb33e96",
+        "semantic_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "handler_id": "handler:sha256:142d5082e8e72b50d90be1f4b9248c93776345e370e2ebf7d6397191744ef72f",
+        "public_entrypoint": "workbench_crucible.service_handlers:cancel",
+        "handler_implementation_id": "implementation:sha256:142d5082e8e72b50d90be1f4b9248c93776345e370e2ebf7d6397191744ef72f",
+        "method_bindings": [
+          {
+            "protocol_method": "job/cancel",
+            "request_value_scope": "params",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/jobCancelParams",
+            "plan_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/operationPlanValue",
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/acceptedJobResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [
+            "job-event"
+          ],
+          "produced_record_kinds": [
+            "job-event"
+          ]
+        },
+        "context_applicability": {
+          "required_context_fields": [
+            "profile_scope",
+            "store_id"
+          ],
+          "input_binding": "required",
+          "scope_compatibility_policy_id": "policy:sha256:d8c4577f1f6725cd3d653647cce0e7910267a6a52091b165389d11add861425e",
+          "context_binding": "required",
+          "scope_compatibility_authority": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          }
+        },
+        "operation": {
+          "operation_class": "disposable-runtime-execute",
+          "side_effect_classes": [
+            "store-append"
+          ],
+          "preview": "required",
+          "consent": "acknowledge",
+          "idempotency": "keyed-replay",
+          "freshness_checks": [
+            "context",
+            "expected-heads",
+            "input-binding"
+          ]
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "none",
+          "cancellation": "unsupported",
+          "continuation": "none",
+          "subscription": "none"
+        },
+        "resources": {
+          "resource_class": "job-ledger-write",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "profile-independent",
+          "profile_revision_refs": [],
+          "applicability_policy_id": null,
+          "required_support_states": [],
+          "support_predicate_policy_id": null,
+          "unsupported_result": "unavailable",
+          "action_gate_policy_id": null,
+          "applicability_authority": null,
+          "support_predicate_authority": null,
+          "action_gate_authority": null,
+          "profile_adapter_id": null,
+          "profile_validation_entrypoint": null
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "capability_id": "capability:sha256:498799ccfa0585ec1997eb0b553e0cad3f800cd77a6ddbca15661669d64d6db2"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "workbench.job.get",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:7ae682c59c4fbd5b70cfc36922a77cec07c53d44c5065a240dc57b920cb33e96",
+        "semantic_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "handler_id": "handler:sha256:20a63d326ee95904dc0eb9c7e74607ebe01cc03dfe8b2dd45fff3c698970fc41",
+        "public_entrypoint": "workbench_crucible.service_handlers:get",
+        "handler_implementation_id": "implementation:sha256:20a63d326ee95904dc0eb9c7e74607ebe01cc03dfe8b2dd45fff3c698970fc41",
+        "method_bindings": [
+          {
+            "protocol_method": "job/get",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/jobGetArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/jobProjectionResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [
+            "job-event"
+          ],
+          "produced_record_kinds": []
+        },
+        "context_applicability": {
+          "required_context_fields": [
+            "profile_scope",
+            "store_id"
+          ],
+          "input_binding": "required",
+          "scope_compatibility_policy_id": "policy:sha256:6eb5a2ed277e1c7c7f0d1e8e8ba0d70d9a44ac25f8555c718a3f5b46552673c3",
+          "context_binding": "required",
+          "scope_compatibility_authority": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          }
+        },
+        "operation": {
+          "operation_class": "inspect",
+          "side_effect_classes": [
+            "store-read"
+          ],
+          "preview": "none",
+          "consent": "none",
+          "idempotency": "none",
+          "freshness_checks": [
+            "context",
+            "input-binding"
+          ]
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "none",
+          "cancellation": "unsupported",
+          "continuation": "none",
+          "subscription": "none"
+        },
+        "resources": {
+          "resource_class": "job-ledger-read",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "profile-independent",
+          "profile_revision_refs": [],
+          "applicability_policy_id": null,
+          "required_support_states": [],
+          "support_predicate_policy_id": null,
+          "unsupported_result": "unavailable",
+          "action_gate_policy_id": null,
+          "applicability_authority": null,
+          "support_predicate_authority": null,
+          "action_gate_authority": null,
+          "profile_adapter_id": null,
+          "profile_validation_entrypoint": null
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "capability_id": "capability:sha256:a18478124c9b7f845ad6c0a6b8d8b3134316f414f86832570594ff24ff915581"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "workbench.object.read",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:7ae682c59c4fbd5b70cfc36922a77cec07c53d44c5065a240dc57b920cb33e96",
+        "semantic_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "handler_id": "handler:sha256:e139c4f5c88cc2f2dcb3c54dd4bb3f68ff09e139f62bab47a1c8ac2b8d7da9da",
+        "public_entrypoint": "workbench_crucible.service_handlers:read",
+        "handler_implementation_id": "implementation:sha256:e139c4f5c88cc2f2dcb3c54dd4bb3f68ff09e139f62bab47a1c8ac2b8d7da9da",
+        "method_bindings": [
+          {
+            "protocol_method": "object/read",
+            "request_value_scope": "params",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/objectReadParams",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/objectChunk",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [
+            "object-descriptor"
+          ],
+          "produced_record_kinds": []
+        },
+        "context_applicability": {
+          "required_context_fields": [
+            "profile_scope",
+            "store_id"
+          ],
+          "input_binding": "required",
+          "scope_compatibility_policy_id": "policy:sha256:e7360484450fa47a1fa6a6931bb0ce6441ef8b65fb0c4566069ed4d11ba7fa59",
+          "context_binding": "required",
+          "scope_compatibility_authority": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          }
+        },
+        "operation": {
+          "operation_class": "inspect",
+          "side_effect_classes": [
+            "store-read"
+          ],
+          "preview": "none",
+          "consent": "none",
+          "idempotency": "none",
+          "freshness_checks": [
+            "context",
+            "input-binding"
+          ]
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "none",
+          "cancellation": "unsupported",
+          "continuation": "none",
+          "subscription": "none"
+        },
+        "resources": {
+          "resource_class": "object-io",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "profile-independent",
+          "profile_revision_refs": [],
+          "applicability_policy_id": null,
+          "required_support_states": [],
+          "support_predicate_policy_id": null,
+          "unsupported_result": "unavailable",
+          "action_gate_policy_id": null,
+          "applicability_authority": null,
+          "support_predicate_authority": null,
+          "action_gate_authority": null,
+          "profile_adapter_id": null,
+          "profile_validation_entrypoint": null
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "capability_id": "capability:sha256:dffcafaf2663d1fef3a5fe753918296e0717fd6b18eb1b4ef60c4720c7633454"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "workbench.runtime.start",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:7ae682c59c4fbd5b70cfc36922a77cec07c53d44c5065a240dc57b920cb33e96",
+        "semantic_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "handler_id": "handler:sha256:71668e4645a6fb74033847e64c44518fcc5d193b5624cdca9513433e73f3ba00",
+        "public_entrypoint": "workbench_crucible.service_handlers:start",
+        "handler_implementation_id": "implementation:sha256:71668e4645a6fb74033847e64c44518fcc5d193b5624cdca9513433e73f3ba00",
+        "method_bindings": [
+          {
+            "protocol_method": "runtime/start",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/runtimeStartArguments",
+            "plan_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/operationPlanValue",
+            "progress_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/progressParams",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/acceptedJobResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [
+            "runtime-plan"
+          ],
+          "produced_record_kinds": [
+            "job-submission",
+            "runtime-session"
+          ]
+        },
+        "context_applicability": {
+          "required_context_fields": [
+            "profile_scope",
+            "store_id"
+          ],
+          "input_binding": "required",
+          "scope_compatibility_policy_id": "policy:sha256:f00b500131e4df694cc2b30566340ac4c258e99a1dcce8caf03f52d90125a1fa",
+          "context_binding": "required",
+          "scope_compatibility_authority": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          }
+        },
+        "operation": {
+          "operation_class": "disposable-runtime-execute",
+          "side_effect_classes": [
+            "managed-target-create",
+            "runtime-process"
+          ],
+          "preview": "required",
+          "consent": "explicit-plan",
+          "idempotency": "keyed-new-attempt",
+          "freshness_checks": [
+            "action-gate",
+            "context",
+            "input-binding",
+            "physical-binding",
+            "profile-support"
+          ]
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "durable-job-events",
+          "cancellation": "process-supervised",
+          "continuation": "none",
+          "subscription": "none"
+        },
+        "resources": {
+          "resource_class": "runtime-process",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "explicit-revisions",
+          "profile_revision_refs": [
+            {
+              "profile_kind": "pack-profile-revision",
+              "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+            },
+            {
+              "profile_kind": "platform-profile-revision",
+              "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+            }
+          ],
+          "applicability_policy_id": null,
+          "required_support_states": [
+            "provisional",
+            "tested-supported"
+          ],
+          "support_predicate_policy_id": "policy:sha256:d6f3babcaa552d32113b4707d2bf2214f9ed0c90f83841b28b975fd31fac35b1",
+          "unsupported_result": "blocked",
+          "action_gate_policy_id": "policy:sha256:36fcdbe6b18f25306718601dabd63e04542b63a6b0e6267b2b5eea658b1e7b31",
+          "applicability_authority": null,
+          "support_predicate_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "action_gate_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy"
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "workbench.service.capabilities",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:dc7495c10416e60e6f39cbaf577d40dd7f295c78ca0bd6f30f0ba001e3d9399a",
+        "semantic_authority_id": null,
+        "provider_id": "provider:sha256:04b9b94e048598eca5325d8833f3405c73fea7b407105a3e7c41143b5013388e",
+        "handler_id": "handler:sha256:c615dd252b6e70d268d974ad149c6335d57a3674fa160ea035195fc51a6c2817",
+        "public_entrypoint": "workbench_shell.service_handlers:capabilities",
+        "handler_implementation_id": "implementation:sha256:c615dd252b6e70d268d974ad149c6335d57a3674fa160ea035195fc51a6c2817",
+        "method_bindings": [
+          {
+            "protocol_method": "service/capabilities",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/emptyArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/serviceCapabilitiesResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [],
+          "produced_record_kinds": []
+        },
+        "context_applicability": {
+          "required_context_fields": [],
+          "input_binding": "none",
+          "scope_compatibility_policy_id": null,
+          "context_binding": "none",
+          "scope_compatibility_authority": null
+        },
+        "operation": {
+          "operation_class": "inspect",
+          "side_effect_classes": [
+            "none"
+          ],
+          "preview": "none",
+          "consent": "none",
+          "idempotency": "none",
+          "freshness_checks": []
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "none",
+          "cancellation": "unsupported",
+          "continuation": "none",
+          "subscription": "none"
+        },
+        "resources": {
+          "resource_class": "host-control",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "profile-independent",
+          "profile_revision_refs": [],
+          "applicability_policy_id": null,
+          "required_support_states": [],
+          "support_predicate_policy_id": null,
+          "unsupported_result": "unavailable",
+          "action_gate_policy_id": null,
+          "applicability_authority": null,
+          "support_predicate_authority": null,
+          "action_gate_authority": null,
+          "profile_adapter_id": null,
+          "profile_validation_entrypoint": null
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": null,
+        "capability_id": "capability:sha256:0082afb4cec254c7aea0e56dd9e02c25d14b6266960a25f1049d8fd4159c6dc8"
+      },
+      {
+        "descriptor_format": "workbench-capability-descriptor-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "capability_key": "workbench.session.read",
+        "semantic_version": "3.0.0",
+        "owner_component_id": "component:sha256:7ae682c59c4fbd5b70cfc36922a77cec07c53d44c5065a240dc57b920cb33e96",
+        "semantic_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "handler_id": "handler:sha256:29760b26999e60534b4fdb8f562885044c0ed8c590fac4d1633d7c1ad5dc4788",
+        "public_entrypoint": "workbench_crucible.service_handlers:read",
+        "handler_implementation_id": "implementation:sha256:29760b26999e60534b4fdb8f562885044c0ed8c590fac4d1633d7c1ad5dc4788",
+        "method_bindings": [
+          {
+            "protocol_method": "session/get",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/sessionGetArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/sessionResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          },
+          {
+            "protocol_method": "session/subscribe",
+            "request_value_scope": "params",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionParams",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionHandle",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "record_flow": {
+          "required_record_kinds": [
+            "runtime-session"
+          ],
+          "produced_record_kinds": []
+        },
+        "context_applicability": {
+          "required_context_fields": [
+            "profile_scope",
+            "store_id"
+          ],
+          "input_binding": "required",
+          "scope_compatibility_policy_id": "policy:sha256:4613a713056cceb5690c2a4797b35ad92eec277f24c2a7bb57af5e438aa099db",
+          "context_binding": "required",
+          "scope_compatibility_authority": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          }
+        },
+        "operation": {
+          "operation_class": "inspect",
+          "side_effect_classes": [
+            "store-read"
+          ],
+          "preview": "none",
+          "consent": "none",
+          "idempotency": "none",
+          "freshness_checks": [
+            "context",
+            "input-binding"
+          ]
+        },
+        "invocation_modes": [
+          "batch",
+          "cli",
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "async_behavior": {
+          "progress": "none",
+          "cancellation": "unsupported",
+          "continuation": "none",
+          "subscription": "resumable"
+        },
+        "resources": {
+          "resource_class": "session-read",
+          "claims": [],
+          "default_budgets": [
+            {
+              "budget_key": "bytes",
+              "unit": "bytes",
+              "limit": 1048576
+            },
+            {
+              "budget_key": "time",
+              "unit": "milliseconds",
+              "limit": 30000
+            }
+          ],
+          "backpressure": "reject-before-mutation"
+        },
+        "profile": {
+          "applicability_mode": "profile-independent",
+          "profile_revision_refs": [],
+          "applicability_policy_id": null,
+          "required_support_states": [],
+          "support_predicate_policy_id": null,
+          "unsupported_result": "unavailable",
+          "action_gate_policy_id": null,
+          "applicability_authority": null,
+          "support_predicate_authority": null,
+          "action_gate_authority": null,
+          "profile_adapter_id": null,
+          "profile_validation_entrypoint": null
+        },
+        "maturity": "supported",
+        "semantic_authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "capability_id": "capability:sha256:119cc5ee2b07e776278dd5dd8f05baa9b93da7715812cec6054fdbb04020b5f0"
+      }
+    ],
+    "handler_registrations": [
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:19d605a8472b5929a24cc134f55bd7bc03b042ae27db03ae658c02bc1c8af986",
+        "capability_id": "capability:sha256:119cc5ee2b07e776278dd5dd8f05baa9b93da7715812cec6054fdbb04020b5f0",
+        "handler_id": "handler:sha256:29760b26999e60534b4fdb8f562885044c0ed8c590fac4d1633d7c1ad5dc4788",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "public_entrypoint": "workbench_crucible.service_handlers:read",
+        "handler_implementation_id": "implementation:sha256:29760b26999e60534b4fdb8f562885044c0ed8c590fac4d1633d7c1ad5dc4788",
+        "method_bindings": [
+          {
+            "protocol_method": "session/get",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/sessionGetArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/sessionResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          },
+          {
+            "protocol_method": "session/subscribe",
+            "request_value_scope": "params",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionParams",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionHandle",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:29760b26999e60534b4fdb8f562885044c0ed8c590fac4d1633d7c1ad5dc4788"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:29760b26999e60534b4fdb8f562885044c0ed8c590fac4d1633d7c1ad5dc4788"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:2f7fae72f8ad2e0560f848aea829a9bb57f3a075270a24fd2a2c7cdfc6f15483",
+        "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+        "handler_id": "handler:sha256:fc2b2c0264ea76b9a2e7ac5bd5d251f902ef00a9c7bb130b2cf193ca1019f2f4",
+        "provider_id": "provider:sha256:3d4c8b4888c7584294c2fbe4d4472e1a3c30628f9d7a6b7fc2f41551ef7e1162",
+        "public_entrypoint": "workbench_atlas.service_handlers:get",
+        "handler_implementation_id": "implementation:sha256:fc2b2c0264ea76b9a2e7ac5bd5d251f902ef00a9c7bb130b2cf193ca1019f2f4",
+        "method_bindings": [
+          {
+            "protocol_method": "evidence/get",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/evidenceGetArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/evidenceResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:fc2b2c0264ea76b9a2e7ac5bd5d251f902ef00a9c7bb130b2cf193ca1019f2f4"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:fc2b2c0264ea76b9a2e7ac5bd5d251f902ef00a9c7bb130b2cf193ca1019f2f4"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:42a624035ab8f5cbe3ee765fa61dddc1c62e1d3dcfb96d942c89846eaddd52a5",
+        "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+        "handler_id": "handler:sha256:71668e4645a6fb74033847e64c44518fcc5d193b5624cdca9513433e73f3ba00",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "public_entrypoint": "workbench_crucible.service_handlers:start",
+        "handler_implementation_id": "implementation:sha256:71668e4645a6fb74033847e64c44518fcc5d193b5624cdca9513433e73f3ba00",
+        "method_bindings": [
+          {
+            "protocol_method": "runtime/start",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/runtimeStartArguments",
+            "plan_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/operationPlanValue",
+            "progress_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/progressParams",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/acceptedJobResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:71668e4645a6fb74033847e64c44518fcc5d193b5624cdca9513433e73f3ba00"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:71668e4645a6fb74033847e64c44518fcc5d193b5624cdca9513433e73f3ba00"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:5e8c67775bb99bf5ee44fc601944d227c8042ff83f340113353cab3187e7428e",
+        "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+        "handler_id": "handler:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+        "provider_id": "provider:sha256:3d4c8b4888c7584294c2fbe4d4472e1a3c30628f9d7a6b7fc2f41551ef7e1162",
+        "public_entrypoint": "workbench_atlas.service_handlers:query",
+        "handler_implementation_id": "implementation:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+        "method_bindings": [
+          {
+            "protocol_method": "graph/query",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/graphQueryArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/graphQueryResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          },
+          {
+            "protocol_method": "graph/subscribe",
+            "request_value_scope": "params",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionParams",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionHandle",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:87393c746e24302f31a71a44324318947018f7317851ed5a8d4e6e68265079e0",
+        "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+        "handler_id": "handler:sha256:90f5e513ba4259336f1759c910550d34f0ad93470e708c64ac9f121e074dda06",
+        "provider_id": "provider:sha256:bec1659a1cbcfe3935ef43b644b4d01ac6baaa9daccf9f483bd9ee4b29051d74",
+        "public_entrypoint": "workbench_blueprints.service_handlers:commit",
+        "handler_implementation_id": "implementation:sha256:90f5e513ba4259336f1759c910550d34f0ad93470e708c64ac9f121e074dda06",
+        "method_bindings": [
+          {
+            "protocol_method": "operation/commit",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/operationCommitArguments",
+            "plan_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/operationPlanValue",
+            "progress_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/progressParams",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/acceptedJobResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:90f5e513ba4259336f1759c910550d34f0ad93470e708c64ac9f121e074dda06"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:90f5e513ba4259336f1759c910550d34f0ad93470e708c64ac9f121e074dda06"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:a0ccaacaf2da7126548c7ddcf87da24c699ab9df7ba63338c1c4b91df477557e",
+        "capability_id": "capability:sha256:498799ccfa0585ec1997eb0b553e0cad3f800cd77a6ddbca15661669d64d6db2",
+        "handler_id": "handler:sha256:142d5082e8e72b50d90be1f4b9248c93776345e370e2ebf7d6397191744ef72f",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "public_entrypoint": "workbench_crucible.service_handlers:cancel",
+        "handler_implementation_id": "implementation:sha256:142d5082e8e72b50d90be1f4b9248c93776345e370e2ebf7d6397191744ef72f",
+        "method_bindings": [
+          {
+            "protocol_method": "job/cancel",
+            "request_value_scope": "params",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/jobCancelParams",
+            "plan_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/operationPlanValue",
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/acceptedJobResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:142d5082e8e72b50d90be1f4b9248c93776345e370e2ebf7d6397191744ef72f"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:142d5082e8e72b50d90be1f4b9248c93776345e370e2ebf7d6397191744ef72f"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:b59e64f8a51bbada252d3b1b0b9d37c31689cb4c98c4801dd50bb66311889160",
+        "capability_id": "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1",
+        "handler_id": "handler:sha256:4b0d71861c4545fc8800b29baf3b8cecd520c87e025bf02ada18c495026eb706",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "public_entrypoint": "workbench_crucible.service_handlers:resolve",
+        "handler_implementation_id": "implementation:sha256:4b0d71861c4545fc8800b29baf3b8cecd520c87e025bf02ada18c495026eb706",
+        "method_bindings": [
+          {
+            "protocol_method": "context/get",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/emptyArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/contextGetResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          },
+          {
+            "protocol_method": "context/resolve",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/contextResolveArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/contextResolveResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:4b0d71861c4545fc8800b29baf3b8cecd520c87e025bf02ada18c495026eb706"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:4b0d71861c4545fc8800b29baf3b8cecd520c87e025bf02ada18c495026eb706"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:cc2f43b6dfa795357d1f3484166f23f80cd283dddc67c83a00703cc649d06c47",
+        "capability_id": "capability:sha256:dffcafaf2663d1fef3a5fe753918296e0717fd6b18eb1b4ef60c4720c7633454",
+        "handler_id": "handler:sha256:e139c4f5c88cc2f2dcb3c54dd4bb3f68ff09e139f62bab47a1c8ac2b8d7da9da",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "public_entrypoint": "workbench_crucible.service_handlers:read",
+        "handler_implementation_id": "implementation:sha256:e139c4f5c88cc2f2dcb3c54dd4bb3f68ff09e139f62bab47a1c8ac2b8d7da9da",
+        "method_bindings": [
+          {
+            "protocol_method": "object/read",
+            "request_value_scope": "params",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/objectReadParams",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/objectChunk",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:e139c4f5c88cc2f2dcb3c54dd4bb3f68ff09e139f62bab47a1c8ac2b8d7da9da"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:e139c4f5c88cc2f2dcb3c54dd4bb3f68ff09e139f62bab47a1c8ac2b8d7da9da"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:d509fafe89bc188cdfb968ca0fb7e2e65470846624e7955662fc13fa29599ead",
+        "capability_id": "capability:sha256:0082afb4cec254c7aea0e56dd9e02c25d14b6266960a25f1049d8fd4159c6dc8",
+        "handler_id": "handler:sha256:c615dd252b6e70d268d974ad149c6335d57a3674fa160ea035195fc51a6c2817",
+        "provider_id": "provider:sha256:04b9b94e048598eca5325d8833f3405c73fea7b407105a3e7c41143b5013388e",
+        "public_entrypoint": "workbench_shell.service_handlers:capabilities",
+        "handler_implementation_id": "implementation:sha256:c615dd252b6e70d268d974ad149c6335d57a3674fa160ea035195fc51a6c2817",
+        "method_bindings": [
+          {
+            "protocol_method": "service/capabilities",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/emptyArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/serviceCapabilitiesResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:c615dd252b6e70d268d974ad149c6335d57a3674fa160ea035195fc51a6c2817"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:c615dd252b6e70d268d974ad149c6335d57a3674fa160ea035195fc51a6c2817"
+        ]
+      },
+      {
+        "registration_format": "workbench-handler-registration-v3",
+        "canonicalizer": "workbench-canonical-json-v2",
+        "registration_id": "handler-registration:sha256:d53708b91e457531b705965035a07d476ac420c0d60bb64d8ac21c9f7be7b692",
+        "capability_id": "capability:sha256:a18478124c9b7f845ad6c0a6b8d8b3134316f414f86832570594ff24ff915581",
+        "handler_id": "handler:sha256:20a63d326ee95904dc0eb9c7e74607ebe01cc03dfe8b2dd45fff3c698970fc41",
+        "provider_id": "provider:sha256:41f1f81ca6e16894a870ab138c2c1b9ce12a6f34e22913d8ddb31cc177310859",
+        "public_entrypoint": "workbench_crucible.service_handlers:get",
+        "handler_implementation_id": "implementation:sha256:20a63d326ee95904dc0eb9c7e74607ebe01cc03dfe8b2dd45fff3c698970fc41",
+        "method_bindings": [
+          {
+            "protocol_method": "job/get",
+            "request_value_scope": "arguments",
+            "request_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/jobGetArguments",
+            "plan_schema_id": null,
+            "progress_schema_id": null,
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/jobProjectionResult",
+            "failure_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/failure"
+          }
+        ],
+        "invocation_modes": [
+          "embedded",
+          "local-endpoint",
+          "stdio"
+        ],
+        "state": "available",
+        "reasons": [],
+        "conformance_case_ids": [
+          "conformance-case:sha256:20a63d326ee95904dc0eb9c7e74607ebe01cc03dfe8b2dd45fff3c698970fc41"
+        ],
+        "health_receipt_ids": [
+          "health-receipt:sha256:20a63d326ee95904dc0eb9c7e74607ebe01cc03dfe8b2dd45fff3c698970fc41"
+        ]
+      }
+    ],
+    "legacy_v2_gateway": {
+      "enabled": true,
+      "disposition": "partial-historical-compatibility-gateway",
+      "protocol_major": 2,
+      "framing": "content-length-jsonrpc-2.0",
+      "method_mappings": [
+        {
+          "legacy_method": "runtime/plan",
+          "disposition": "retained-legacy-path",
+          "capability_id": null,
+          "compatibility_contract_id": "compatibility-contract:sha256:1d83f32744d7754ce2da85dbff32529d11f867bf02587a08af50b5feb9f900fd",
+          "reason": "Retained only for the bounded historical V2 runtime-plan surface."
+        },
+        {
+          "legacy_method": "workspace/inspect",
+          "disposition": "shared-handler",
+          "capability_id": "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1",
+          "compatibility_contract_id": "compatibility-contract:sha256:96247f6673cb61d62fc82b3f102de59ea603ff7894ddb3b2973a63ab8b704c92",
+          "reason": "Maps through an explicit compatibility contract; it does not expose V3 context identity."
+        }
+      ],
+      "excluded_v3_features": [
+        "contexts",
+        "object-range-reads",
+        "durable-jobs",
+        "progress-and-cancellation",
+        "continuations",
+        "subscriptions"
+      ]
+    },
+    "registry_id": "component-capability-registry:sha256:dbbf27f31760d4fd14cec07d293a06e873e090064936dfbc930d5dabe2d33cf5",
+    "descriptor_authority_admissions": [
+      {
+        "capability_id": "capability:sha256:119cc5ee2b07e776278dd5dd8f05baa9b93da7715812cec6054fdbb04020b5f0",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:5b716d7797bba3db2b2b813b4eb70591139fcfe7e4217d65a54112f93e635ed5",
+          "capability_id": "capability:sha256:119cc5ee2b07e776278dd5dd8f05baa9b93da7715812cec6054fdbb04020b5f0",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          },
+          "admission_policy_id": "policy:sha256:acadabc51b2d4bda9b01697d01a998078394ae55acb21a96aa47d27a2fa95694",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:498799ccfa0585ec1997eb0b553e0cad3f800cd77a6ddbca15661669d64d6db2",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:06696bdb5c4f48b3bcfd544d4a5614dd3e6cd2bf87f6b2c2cec78391ee3d796b",
+          "capability_id": "capability:sha256:498799ccfa0585ec1997eb0b553e0cad3f800cd77a6ddbca15661669d64d6db2",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          },
+          "admission_policy_id": "policy:sha256:acadabc51b2d4bda9b01697d01a998078394ae55acb21a96aa47d27a2fa95694",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+          "owner_revision_id": "owner-revision:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+          "authority_adapter_id": "authority-adapter:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:7abe9fd45e408eb58e32fd14a320100881c5b720d050e5555ac11e6231038d53",
+          "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+            "owner_revision_id": "owner-revision:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f",
+            "authority_adapter_id": "authority-adapter:sha256:28ab7f1620ee84f641bfe56fa08b5b474e4c7b84546e53a33d3030aeb663db1f"
+          },
+          "admission_policy_id": "policy:sha256:bf84e1a021f42759e1575c080158e193553eff7292d6712787fe0403c71b0aba",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:18687dba8f8ee9bf1412afd0a90882c7e43464ac2ede32286f0da736c1241f9c",
+          "capability_id": "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          },
+          "admission_policy_id": "policy:sha256:acadabc51b2d4bda9b01697d01a998078394ae55acb21a96aa47d27a2fa95694",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:d482646e0f68cd4890726fbdb03463d94a40d45547d327baa6c41fab6d10c286",
+          "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+            "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+            "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+          },
+          "admission_policy_id": "policy:sha256:9716bd9311458a7f38c8a87e3dcd41a7202aa9a0dbb5dbc1c46a95d020504aaf",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:a18478124c9b7f845ad6c0a6b8d8b3134316f414f86832570594ff24ff915581",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:01c9195f83a4f37fd769a63d7f51bdc66d6cc577525fcdd7564540421b4d3989",
+          "capability_id": "capability:sha256:a18478124c9b7f845ad6c0a6b8d8b3134316f414f86832570594ff24ff915581",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          },
+          "admission_policy_id": "policy:sha256:acadabc51b2d4bda9b01697d01a998078394ae55acb21a96aa47d27a2fa95694",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:d11cbf9a8a5c9487922d80d833331be6570974f2ad691ff15538a87f84da4461",
+          "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          },
+          "admission_policy_id": "policy:sha256:acadabc51b2d4bda9b01697d01a998078394ae55acb21a96aa47d27a2fa95694",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:dffcafaf2663d1fef3a5fe753918296e0717fd6b18eb1b4ef60c4720c7633454",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+          "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:42b15971c6d2a9abde4c7904e620db9fb970d3ce9c5415a5b4e6e92d04a3564b",
+          "capability_id": "capability:sha256:dffcafaf2663d1fef3a5fe753918296e0717fd6b18eb1b4ef60c4720c7633454",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "owner_revision_id": "owner-revision:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec",
+            "authority_adapter_id": "authority-adapter:sha256:340d6bb972c2bc1eb7e627ff505ae4fa90c8de05ea0c9903da7c161942b13cec"
+          },
+          "admission_policy_id": "policy:sha256:acadabc51b2d4bda9b01697d01a998078394ae55acb21a96aa47d27a2fa95694",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+        "authority_binding": {
+          "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+          "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+        },
+        "authority_validation_entrypoint": "workbench_shell.authority_adapter:validate_capability_descriptor",
+        "attestation": {
+          "format": "workbench-capability-authority-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "capability-authority-attestation:sha256:b506727793f631cb146f8ac7c5abb0793c52127921879ca0a8de7120295162f8",
+          "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+          "authority_binding": {
+            "owner_authority_id": "authority:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+            "owner_revision_id": "owner-revision:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9",
+            "authority_adapter_id": "authority-adapter:sha256:7c82602500857aa6ed0cf38c4c3e4ec645bdcaa82c00b9155eb08be100c778a9"
+          },
+          "admission_policy_id": "policy:sha256:9716bd9311458a7f38c8a87e3dcd41a7202aa9a0dbb5dbc1c46a95d020504aaf",
+          "decision": "approved"
+        }
+      }
+    ],
+    "profile_policy_admissions": [
+      {
+        "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+        "profile_revision_ref": {
+          "profile_kind": "pack-profile-revision",
+          "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+        },
+        "profile_authority": {
+          "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy",
+        "attestation": {
+          "format": "workbench-profile-policy-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "profile-policy-attestation:sha256:f23be94844bb19a00e8ff85973b74f0f4854c0f9bae053cc561e6ee786381280",
+          "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+          "profile_revision_ref": {
+            "profile_kind": "pack-profile-revision",
+            "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+          },
+          "profile_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "support_predicate_policy_id": "policy:sha256:19521b77194c771de7d2c0773211f81e28824461dea2e3cb4c65689cbf72d10b",
+          "action_gate_policy_id": "policy:sha256:0f755a52fcb878e22cc147a73b9059b6db12d94c49736ec10146678cfae99fe1",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+        "profile_revision_ref": {
+          "profile_kind": "platform-profile-revision",
+          "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+        },
+        "profile_authority": {
+          "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy",
+        "attestation": {
+          "format": "workbench-profile-policy-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "profile-policy-attestation:sha256:1df00ae798f853a296114a089391c614b324ee988bbaa33324290c9252fe5c4d",
+          "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+          "profile_revision_ref": {
+            "profile_kind": "platform-profile-revision",
+            "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+          },
+          "profile_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "support_predicate_policy_id": "policy:sha256:19521b77194c771de7d2c0773211f81e28824461dea2e3cb4c65689cbf72d10b",
+          "action_gate_policy_id": "policy:sha256:0f755a52fcb878e22cc147a73b9059b6db12d94c49736ec10146678cfae99fe1",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+        "profile_revision_ref": {
+          "profile_kind": "pack-profile-revision",
+          "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+        },
+        "profile_authority": {
+          "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy",
+        "attestation": {
+          "format": "workbench-profile-policy-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "profile-policy-attestation:sha256:ca5ef5a209bd7bc677ab69e7e1f90b8e3ca3a66969fb8a8c4a874316cdf490b3",
+          "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+          "profile_revision_ref": {
+            "profile_kind": "pack-profile-revision",
+            "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+          },
+          "profile_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "support_predicate_policy_id": "policy:sha256:f5deeaa3715c1829deadf44a8cdeca86257656a26965555354ed4e79828e252f",
+          "action_gate_policy_id": null,
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+        "profile_revision_ref": {
+          "profile_kind": "platform-profile-revision",
+          "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+        },
+        "profile_authority": {
+          "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy",
+        "attestation": {
+          "format": "workbench-profile-policy-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "profile-policy-attestation:sha256:8c66ca37746feadf78e95d9d3a6ccfcf563a119f6d0547b020371057823839b9",
+          "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+          "profile_revision_ref": {
+            "profile_kind": "platform-profile-revision",
+            "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+          },
+          "profile_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "support_predicate_policy_id": "policy:sha256:f5deeaa3715c1829deadf44a8cdeca86257656a26965555354ed4e79828e252f",
+          "action_gate_policy_id": null,
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+        "profile_revision_ref": {
+          "profile_kind": "pack-profile-revision",
+          "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+        },
+        "profile_authority": {
+          "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy",
+        "attestation": {
+          "format": "workbench-profile-policy-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "profile-policy-attestation:sha256:688e48666d6ccd944a0ad149b83d2a11353d3338820279cd40df9e4e58849e77",
+          "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+          "profile_revision_ref": {
+            "profile_kind": "pack-profile-revision",
+            "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+          },
+          "profile_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "support_predicate_policy_id": "policy:sha256:d6f3babcaa552d32113b4707d2bf2214f9ed0c90f83841b28b975fd31fac35b1",
+          "action_gate_policy_id": "policy:sha256:36fcdbe6b18f25306718601dabd63e04542b63a6b0e6267b2b5eea658b1e7b31",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+        "profile_revision_ref": {
+          "profile_kind": "platform-profile-revision",
+          "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+        },
+        "profile_authority": {
+          "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy",
+        "attestation": {
+          "format": "workbench-profile-policy-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "profile-policy-attestation:sha256:95fee7dd13dc44b006bd5e197c0d54a74094d3b2135e65183147129f527b8fd7",
+          "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+          "profile_revision_ref": {
+            "profile_kind": "platform-profile-revision",
+            "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+          },
+          "profile_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "support_predicate_policy_id": "policy:sha256:d6f3babcaa552d32113b4707d2bf2214f9ed0c90f83841b28b975fd31fac35b1",
+          "action_gate_policy_id": "policy:sha256:36fcdbe6b18f25306718601dabd63e04542b63a6b0e6267b2b5eea658b1e7b31",
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+        "profile_revision_ref": {
+          "profile_kind": "pack-profile-revision",
+          "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+        },
+        "profile_authority": {
+          "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy",
+        "attestation": {
+          "format": "workbench-profile-policy-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "profile-policy-attestation:sha256:a452b99db9a17eec893e3b11cff25f58fb5f462a14d6dd45703d778b22293d71",
+          "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+          "profile_revision_ref": {
+            "profile_kind": "pack-profile-revision",
+            "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+          },
+          "profile_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "support_predicate_policy_id": "policy:sha256:3f6a34e1a9fc497fbfa4d5bea0a27b00acf64523d966e7320636bb634bef4b22",
+          "action_gate_policy_id": null,
+          "decision": "approved"
+        }
+      },
+      {
+        "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+        "profile_revision_ref": {
+          "profile_kind": "platform-profile-revision",
+          "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+        },
+        "profile_authority": {
+          "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "profile_adapter_id": "profile-adapter:sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "profile_validation_entrypoint": "workbench_profiles.authority_adapter:validate_capability_profile_policy",
+        "attestation": {
+          "format": "workbench-profile-policy-attestation-v3",
+          "canonicalizer": "workbench-canonical-json-v2",
+          "attestation_id": "profile-policy-attestation:sha256:5e3468b1e0791b10a7ca5ae7407191fc3b34b1b9a0b1f050c09426685beb114d",
+          "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+          "profile_revision_ref": {
+            "profile_kind": "platform-profile-revision",
+            "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+          },
+          "profile_authority": {
+            "owner_authority_id": "authority:sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "owner_revision_id": "owner-revision:sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "authority_adapter_id": "authority-adapter:sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "support_predicate_policy_id": "policy:sha256:3f6a34e1a9fc497fbfa4d5bea0a27b00acf64523d966e7320636bb634bef4b22",
+          "action_gate_policy_id": null,
+          "decision": "approved"
+        }
+      }
+    ]
+  },
+  "messages": [
+    {
+      "case_id": "initialize-v3-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "service/initialize",
+        "params": {
+          "protocol_version": {
+            "major": 3,
+            "minor": 0
+          },
+          "request_id": "request-v3:470ebe82f755275238654540d4cde778",
+          "client": {
+            "client_id": "workbench.test-client",
+            "kind": "test",
+            "version": "3.0.0"
+          },
+          "transport": "stdio",
+          "required_capability_ids": [
+            "capability:sha256:0082afb4cec254c7aea0e56dd9e02c25d14b6266960a25f1049d8fd4159c6dc8"
+          ],
+          "required_features": [
+            "contexts",
+            "object-range-reads",
+            "durable-jobs",
+            "progress-and-cancellation",
+            "continuations",
+            "subscriptions"
+          ],
+          "maximum_frame_bytes": 1048576
+        }
+      }
+    },
+    {
+      "case_id": "initialize-v3-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "format": "workbench-service-initialize-result-v3",
+          "protocol_version": {
+            "major": 3,
+            "minor": 0
+          },
+          "request_id": "request-v3:470ebe82f755275238654540d4cde778",
+          "client_session_id": "client-session-v3:948fe603f61dc036b5c596dc09fe3ce3",
+          "service_instance_id": "service-instance-v2:9df6b026a8c6c26e3c3acd2370a16e93",
+          "service_distribution_id": "service-distribution:sha256:bde54db176864e52b591a875c1c2d599c90dd753c25f47998ceefda495b659fd",
+          "registry_id": "component-capability-registry:sha256:dbbf27f31760d4fd14cec07d293a06e873e090064936dfbc930d5dabe2d33cf5",
+          "negotiated_features": [
+            "contexts",
+            "object-range-reads",
+            "durable-jobs",
+            "progress-and-cancellation",
+            "continuations",
+            "subscriptions"
+          ],
+          "limits": {
+            "maximum_frame_bytes": 1048576,
+            "maximum_object_range_bytes": 1048576,
+            "maximum_subscriptions": 8,
+            "subscription_retention_events": 4096
+          },
+          "legacy_v2_gateway": {
+            "available": true,
+            "protocol_major": 2,
+            "disposition": "partial-historical-compatibility-gateway"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "service-capabilities-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "service/capabilities",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:1312bf617f996ee5ce2344b5fa1ead2c",
+            "capability_id": "capability:sha256:0082afb4cec254c7aea0e56dd9e02c25d14b6266960a25f1049d8fd4159c6dc8",
+            "capability_version": "3.0.0",
+            "context_ref_id": null,
+            "input_binding_id": null,
+            "intent": "service.capabilities",
+            "operation_class": "inspect",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "arguments": {}
+        }
+      }
+    },
+    {
+      "case_id": "context-resolve-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "context/resolve",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:746ba9590a05064b6ad81ce0b6fede44",
+            "capability_id": "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1",
+            "capability_version": "3.0.0",
+            "context_ref_id": null,
+            "input_binding_id": null,
+            "intent": "context.resolve",
+            "operation_class": "inspect",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "arguments": {
+            "selector_kind": "registered-workspace",
+            "selector_value": "supersymmetry-dev"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "context-get-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "context/get",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:2b39a5db43d3746e775a8e2cc0852385",
+            "capability_id": "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": null,
+            "intent": "context.get",
+            "operation_class": "inspect",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "arguments": {}
+        }
+      }
+    },
+    {
+      "case_id": "context-get-transport-error",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "error": {
+          "code": -32004,
+          "message": "Requested capability is unavailable.",
+          "data": {
+            "kind": "internal-transport-failure",
+            "availability": "unavailable",
+            "retryable": true
+          }
+        }
+      }
+    },
+    {
+      "case_id": "object-read-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "object/read",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:e421f91dbf99817081b1ea9358c2c9ef",
+            "capability_id": "capability:sha256:dffcafaf2663d1fef3a5fe753918296e0717fd6b18eb1b4ef60c4720c7633454",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "object.read",
+            "operation_class": "inspect",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "object_id": "workbench-blob-v2:sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+          "range": {
+            "offset": 0,
+            "length": 3
+          }
+        }
+      }
+    },
+    {
+      "case_id": "evidence-get-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 14,
+        "method": "evidence/get",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:c6b828c4abf9f4cf6293de5e4fb5b993",
+            "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "evidence.get",
+            "operation_class": "inspect",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "arguments": {
+            "evidence_record_id": "evidence-record:sha256:5b181a581a374d0510150c19437e4c6dc266a82ee735affc9bb33cec7f656224"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "graph-query-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 15,
+        "method": "graph/query",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:02d257d67b68acebe7760337c9577631",
+            "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "graph.query",
+            "operation_class": "query",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "arguments": {
+            "graph_revision_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6",
+            "query_expression": "category:worldgen node:ore",
+            "category_keys": [
+              "worldgen"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "case_id": "operation-commit-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 16,
+        "method": "operation/commit",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:fa878716f1511db677c478c8979f3819",
+            "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "operation.commit",
+            "operation_class": "stable-construct",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": "idempotency-v3:fa878716f1511db677c478c8979f3819",
+            "commit": {
+              "plan_id": "operation-plan:sha256:fa878716f1511db677c478c8979f38194eb984a3e870be2112629a4ad2d11cc7",
+              "consent_record_id": "consent-decision:sha256:fa878716f1511db677c478c8979f38194eb984a3e870be2112629a4ad2d11cc7",
+              "expected_head_refs": [
+                {
+                  "record_kind": "graph-revision",
+                  "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+                }
+              ],
+              "idempotency_key": "idempotency-v3:fa878716f1511db677c478c8979f3819"
+            }
+          },
+          "arguments": {
+            "construction_spec_id": "construction-spec:sha256:2a97516c354b68848cdbd8f54a226a0a55b21ed138e207ad6c5cbb9c00aa5aea"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "job-get-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 17,
+        "method": "job/get",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:afa5e7566a2b3476509bdb7abbd2be01",
+            "capability_id": "capability:sha256:a18478124c9b7f845ad6c0a6b8d8b3134316f414f86832570594ff24ff915581",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "job.get",
+            "operation_class": "inspect",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "arguments": {
+            "job_id": "job-v2:b6bd664d24747f51faa946702c0748b9"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "job-get-transport-error",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 17,
+        "error": {
+          "code": -32004,
+          "message": "Requested capability is unavailable.",
+          "data": {
+            "kind": "internal-transport-failure",
+            "availability": "unavailable",
+            "retryable": true
+          }
+        }
+      }
+    },
+    {
+      "case_id": "job-cancel-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 18,
+        "method": "job/cancel",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:6872605f644d5c6e1920a4b60117fa2a",
+            "capability_id": "capability:sha256:498799ccfa0585ec1997eb0b553e0cad3f800cd77a6ddbca15661669d64d6db2",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "job.cancel",
+            "operation_class": "disposable-runtime-execute",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": "idempotency-v3:6872605f644d5c6e1920a4b60117fa2a",
+            "commit": {
+              "plan_id": "operation-plan:sha256:6872605f644d5c6e1920a4b60117fa2a3485790be99809a32a34094f1d7d1074",
+              "consent_record_id": "consent-decision:sha256:6872605f644d5c6e1920a4b60117fa2a3485790be99809a32a34094f1d7d1074",
+              "expected_head_refs": [
+                {
+                  "record_kind": "graph-revision",
+                  "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+                }
+              ],
+              "idempotency_key": "idempotency-v3:6872605f644d5c6e1920a4b60117fa2a"
+            }
+          },
+          "job_id": "job-v2:b6bd664d24747f51faa946702c0748b9",
+          "expected_event_id": "job-event:sha256:4b04ae0f2d970b810c879e620dd94b71d17c878241840d092e0a9d2ae89e88a2",
+          "expected_event_ordinal": 4,
+          "requester_id": "actor:sha256:88fa0d759f845b47c044c2cd44e29082cf6fea665c30c146374ec7c8f3d699e3",
+          "reason": "Stop after the next safe boundary."
+        }
+      }
+    },
+    {
+      "case_id": "runtime-start-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 19,
+        "method": "runtime/start",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:51b9a67e209976066949f71e915ff698",
+            "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "runtime.start",
+            "operation_class": "disposable-runtime-execute",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": "idempotency-v3:51b9a67e209976066949f71e915ff698",
+            "commit": {
+              "plan_id": "operation-plan:sha256:51b9a67e209976066949f71e915ff698336d1dab39f8ea22372f13e547487e0a",
+              "consent_record_id": "consent-decision:sha256:51b9a67e209976066949f71e915ff698336d1dab39f8ea22372f13e547487e0a",
+              "expected_head_refs": [
+                {
+                  "record_kind": "graph-revision",
+                  "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+                }
+              ],
+              "idempotency_key": "idempotency-v3:51b9a67e209976066949f71e915ff698"
+            }
+          },
+          "arguments": {
+            "runtime_plan_id": "runtime-plan:sha256:2a97516c354b68848cdbd8f54a226a0a55b21ed138e207ad6c5cbb9c00aa5aea"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "session-get-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 20,
+        "method": "session/get",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:5f934890f1fb65d73d345306b127e2fa",
+            "capability_id": "capability:sha256:119cc5ee2b07e776278dd5dd8f05baa9b93da7715812cec6054fdbb04020b5f0",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "session.get",
+            "operation_class": "inspect",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "arguments": {
+            "runtime_session_id": "runtime-session:sha256:fa57a52dbf08190218529730a3e99db6946c6c29220fb6e0551e21598b0b05db"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "graph-subscribe-start-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 21,
+        "method": "graph/subscribe",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:b6ad4089eb6fdb6f1303a782997faca3",
+            "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "graph.subscribe-start",
+            "operation_class": "query",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "event_families": [
+            "graph"
+          ],
+          "delivery": "lossless",
+          "position": {
+            "kind": "start"
+          },
+          "scope": {
+            "kind": "graph",
+            "graph_revision_ids": [
+              "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+            ],
+            "graph_set_revision_ids": [],
+            "reference_event_ids": []
+          }
+        }
+      }
+    },
+    {
+      "case_id": "graph-subscribe-resume-request",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 22,
+        "method": "graph/subscribe",
+        "params": {
+          "request": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:98cff544c5a99a485319f16d24bd87b2",
+            "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+            "capability_version": "3.0.0",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "intent": "graph.subscribe-resume",
+            "operation_class": "query",
+            "resource_budgets": [],
+            "deadline": null,
+            "idempotency_key": null,
+            "commit": null
+          },
+          "event_families": [
+            "graph"
+          ],
+          "delivery": "lossless",
+          "position": {
+            "kind": "resume",
+            "subscription_id": "subscription-v3:ae5c24754c7394a7bb0cf5fdbf4faee2",
+            "stream_generation": "stream-generation-v3:232993b7b5d0797a707158c051610281",
+            "last_cursor": 1
+          },
+          "scope": {
+            "kind": "graph",
+            "graph_revision_ids": [
+              "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+            ],
+            "graph_set_revision_ids": [],
+            "reference_event_ids": []
+          }
+        }
+      }
+    },
+    {
+      "case_id": "service-capabilities-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:1312bf617f996ee5ce2344b5fa1ead2c",
+            "request_method": "service/capabilities",
+            "capability_id": "capability:sha256:0082afb4cec254c7aea0e56dd9e02c25d14b6266960a25f1049d8fd4159c6dc8",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:c615dd252b6e70d268d974ad149c6335d57a3674fa160ea035195fc51a6c2817",
+            "handler_implementation_id": "implementation:sha256:c615dd252b6e70d268d974ad149c6335d57a3674fa160ea035195fc51a6c2817",
+            "context_ref_id": null,
+            "input_binding_id": null,
+            "input_revision_refs": [],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "available",
+              "profile_support": "not-applicable",
+              "evidence": "not-applicable",
+              "completeness": "complete",
+              "action_gate": "not-required",
+              "action_gate_decision_ids": [],
+              "profile_revision_refs": [],
+              "support_decision_ids": [],
+              "context": "not-applicable",
+              "inputs": "not-applicable",
+              "freshness": "not-applicable",
+              "consent": "not-applicable",
+              "continuity": "not-applicable"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "succeeded",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/serviceCapabilitiesResult",
+            "value": {
+              "registry_id": "component-capability-registry:sha256:dbbf27f31760d4fd14cec07d293a06e873e090064936dfbc930d5dabe2d33cf5",
+              "capability_ids": [
+                "capability:sha256:dffcafaf2663d1fef3a5fe753918296e0717fd6b18eb1b4ef60c4720c7633454",
+                "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+                "capability:sha256:0082afb4cec254c7aea0e56dd9e02c25d14b6266960a25f1049d8fd4159c6dc8",
+                "capability:sha256:119cc5ee2b07e776278dd5dd8f05baa9b93da7715812cec6054fdbb04020b5f0",
+                "capability:sha256:a18478124c9b7f845ad6c0a6b8d8b3134316f414f86832570594ff24ff915581",
+                "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+                "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+                "capability:sha256:498799ccfa0585ec1997eb0b553e0cad3f800cd77a6ddbca15661669d64d6db2",
+                "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1",
+                "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b"
+              ]
+            },
+            "object_references": [],
+            "continuation_id": null
+          }
+        }
+      }
+    },
+    {
+      "case_id": "context-resolve-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:746ba9590a05064b6ad81ce0b6fede44",
+            "request_method": "context/resolve",
+            "capability_id": "capability:sha256:6fbf7f46e16620b4268bdbc329889633bc75f02d99917c5649714d03206a3cf1",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:4b0d71861c4545fc8800b29baf3b8cecd520c87e025bf02ada18c495026eb706",
+            "handler_implementation_id": "implementation:sha256:4b0d71861c4545fc8800b29baf3b8cecd520c87e025bf02ada18c495026eb706",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "available",
+              "profile_support": "not-applicable",
+              "evidence": "not-applicable",
+              "completeness": "complete",
+              "action_gate": "not-required",
+              "action_gate_decision_ids": [],
+              "profile_revision_refs": [],
+              "support_decision_ids": [],
+              "context": "available",
+              "inputs": "not-applicable",
+              "freshness": "not-applicable",
+              "consent": "not-applicable",
+              "continuity": "not-applicable"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "succeeded",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/contextResolveResult",
+            "value": {
+              "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+              "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402"
+            },
+            "object_references": [],
+            "continuation_id": null
+          }
+        }
+      }
+    },
+    {
+      "case_id": "graph-query-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 15,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:02d257d67b68acebe7760337c9577631",
+            "request_method": "graph/query",
+            "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+            "handler_implementation_id": "implementation:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [
+              {
+                "record_kind": "graph-revision",
+                "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+              }
+            ],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "available",
+              "profile_support": "tested-supported",
+              "evidence": "available",
+              "completeness": "complete",
+              "action_gate": "not-required",
+              "action_gate_decision_ids": [],
+              "profile_revision_refs": [
+                {
+                  "profile_kind": "pack-profile-revision",
+                  "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+                },
+                {
+                  "profile_kind": "platform-profile-revision",
+                  "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+                }
+              ],
+              "support_decision_ids": [
+                "support-decision:sha256:d1b9dfeb8de747d73ab63752274cb11013cc430b3f1a09a7cf50f6082f8bd0f5"
+              ],
+              "context": "available",
+              "inputs": "available",
+              "freshness": "fresh",
+              "consent": "not-applicable",
+              "continuity": "not-applicable"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "succeeded",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/graphQueryResult",
+            "value": {
+              "graph_revision_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6",
+              "result_object_id": "workbench-blob-v2:sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            },
+            "object_references": [],
+            "continuation_id": null
+          }
+        }
+      }
+    },
+    {
+      "case_id": "object-read-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:e421f91dbf99817081b1ea9358c2c9ef",
+            "request_method": "object/read",
+            "capability_id": "capability:sha256:dffcafaf2663d1fef3a5fe753918296e0717fd6b18eb1b4ef60c4720c7633454",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:e139c4f5c88cc2f2dcb3c54dd4bb3f68ff09e139f62bab47a1c8ac2b8d7da9da",
+            "handler_implementation_id": "implementation:sha256:e139c4f5c88cc2f2dcb3c54dd4bb3f68ff09e139f62bab47a1c8ac2b8d7da9da",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [
+              {
+                "record_kind": "graph-revision",
+                "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+              }
+            ],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "available",
+              "profile_support": "not-applicable",
+              "evidence": "not-applicable",
+              "completeness": "complete",
+              "action_gate": "not-required",
+              "action_gate_decision_ids": [],
+              "profile_revision_refs": [],
+              "support_decision_ids": [],
+              "context": "available",
+              "inputs": "available",
+              "freshness": "fresh",
+              "consent": "not-applicable",
+              "continuity": "not-applicable"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "succeeded",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/objectChunk",
+            "value": {
+              "object": {
+                "object_id": "workbench-blob-v2:sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                "object_descriptor_id": "object-descriptor:sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                "media_type": "application/octet-stream",
+                "schema_id": null,
+                "byte_length": 3,
+                "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                "privacy_class": "project",
+                "read_capability_id": "capability:sha256:dffcafaf2663d1fef3a5fe753918296e0717fd6b18eb1b4ef60c4720c7633454"
+              },
+              "offset": 0,
+              "length": 3,
+              "data_base64": "YWJj",
+              "eof": true,
+              "next_offset": null
+            },
+            "object_references": [],
+            "continuation_id": null
+          }
+        }
+      }
+    },
+    {
+      "case_id": "runtime-start-accepted-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 19,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:51b9a67e209976066949f71e915ff698",
+            "request_method": "runtime/start",
+            "capability_id": "capability:sha256:c7e1016c27f26f1ec28ddc18a4952a9f23c57fbddd1f18911f7cb776d23cc495",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:71668e4645a6fb74033847e64c44518fcc5d193b5624cdca9513433e73f3ba00",
+            "handler_implementation_id": "implementation:sha256:71668e4645a6fb74033847e64c44518fcc5d193b5624cdca9513433e73f3ba00",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [
+              {
+                "record_kind": "graph-revision",
+                "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+              }
+            ],
+            "output_revision_refs": [
+              {
+                "record_kind": "job-submission",
+                "record_id": "job-submission:sha256:b6bd664d24747f51faa946702c0748b94e615e9bab4ab77755a59cb9ce1c21e0"
+              }
+            ],
+            "states": {
+              "implementation": "available",
+              "profile_support": "tested-supported",
+              "evidence": "available",
+              "completeness": "complete",
+              "action_gate": "allowed",
+              "action_gate_decision_ids": [
+                "action-gate-decision:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              ],
+              "profile_revision_refs": [
+                {
+                  "profile_kind": "pack-profile-revision",
+                  "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+                },
+                {
+                  "profile_kind": "platform-profile-revision",
+                  "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+                }
+              ],
+              "support_decision_ids": [
+                "support-decision:sha256:d1b9dfeb8de747d73ab63752274cb11013cc430b3f1a09a7cf50f6082f8bd0f5"
+              ],
+              "context": "available",
+              "inputs": "available",
+              "freshness": "fresh",
+              "consent": "granted",
+              "continuity": "not-applicable"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "accepted",
+            "job": {
+              "job_id": "job-v2:b6bd664d24747f51faa946702c0748b9",
+              "job_submission_id": "job-submission:sha256:b6bd664d24747f51faa946702c0748b94e615e9bab4ab77755a59cb9ce1c21e0",
+              "latest_event_id": "job-event:sha256:4b04ae0f2d970b810c879e620dd94b71d17c878241840d092e0a9d2ae89e88a2",
+              "latest_event_ordinal": 4,
+              "lifecycle_state": "running",
+              "mutation_state": "temporary-residue",
+              "terminal_seal_id": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "case_id": "evidence-unavailable-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 14,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:c6b828c4abf9f4cf6293de5e4fb5b993",
+            "request_method": "evidence/get",
+            "capability_id": "capability:sha256:e0b002ccfd60d2903872d95478d02689b1b72fdf19ad15f5fb8e8818080685c2",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:fc2b2c0264ea76b9a2e7ac5bd5d251f902ef00a9c7bb130b2cf193ca1019f2f4",
+            "handler_implementation_id": "implementation:sha256:fc2b2c0264ea76b9a2e7ac5bd5d251f902ef00a9c7bb130b2cf193ca1019f2f4",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [
+              {
+                "record_kind": "graph-revision",
+                "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+              }
+            ],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "unavailable",
+              "profile_support": "tested-supported",
+              "evidence": "available",
+              "completeness": "unavailable",
+              "action_gate": "not-required",
+              "action_gate_decision_ids": [],
+              "profile_revision_refs": [
+                {
+                  "profile_kind": "pack-profile-revision",
+                  "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+                },
+                {
+                  "profile_kind": "platform-profile-revision",
+                  "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+                }
+              ],
+              "support_decision_ids": [
+                "support-decision:sha256:d1b9dfeb8de747d73ab63752274cb11013cc430b3f1a09a7cf50f6082f8bd0f5"
+              ],
+              "context": "available",
+              "inputs": "available",
+              "freshness": "fresh",
+              "consent": "not-applicable",
+              "continuity": "not-applicable"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "unavailable",
+            "failure": {
+              "disposition": "unavailable",
+              "kind": "unavailable-capability",
+              "retryability": "after-change",
+              "mutation_possible": false,
+              "diagnostics": [
+                {
+                  "ordinal": 0,
+                  "severity": "error",
+                  "code": "unavailable-capability",
+                  "message": "Conformance unavailable-capability outcome.",
+                  "related_records": []
+                }
+              ],
+              "remediation_actions": [
+                "refresh"
+              ],
+              "job_id": null,
+              "residue_object_ids": [],
+              "minimum_available_cursor": null,
+              "resynchronization_action": null,
+              "mutation_state": null,
+              "job_terminal_seal_id": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "case_id": "operation-consent-blocked-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 16,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:fa878716f1511db677c478c8979f3819",
+            "request_method": "operation/commit",
+            "capability_id": "capability:sha256:69aa1e686914caa87df1a347e1c989265ae813c7b93db9104535ac598c4f913f",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:90f5e513ba4259336f1759c910550d34f0ad93470e708c64ac9f121e074dda06",
+            "handler_implementation_id": "implementation:sha256:90f5e513ba4259336f1759c910550d34f0ad93470e708c64ac9f121e074dda06",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [
+              {
+                "record_kind": "graph-revision",
+                "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+              }
+            ],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "available",
+              "profile_support": "tested-supported",
+              "evidence": "available",
+              "completeness": "partial",
+              "action_gate": "blocked",
+              "action_gate_decision_ids": [
+                "action-gate-decision:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              ],
+              "profile_revision_refs": [
+                {
+                  "profile_kind": "pack-profile-revision",
+                  "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+                },
+                {
+                  "profile_kind": "platform-profile-revision",
+                  "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+                }
+              ],
+              "support_decision_ids": [
+                "support-decision:sha256:d1b9dfeb8de747d73ab63752274cb11013cc430b3f1a09a7cf50f6082f8bd0f5"
+              ],
+              "context": "available",
+              "inputs": "available",
+              "freshness": "fresh",
+              "consent": "required",
+              "continuity": "not-applicable"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "blocked",
+            "failure": {
+              "disposition": "blocked",
+              "kind": "consent-required",
+              "retryability": "with-new-request",
+              "mutation_possible": false,
+              "diagnostics": [
+                {
+                  "ordinal": 0,
+                  "severity": "error",
+                  "code": "consent-required",
+                  "message": "Conformance consent-required outcome.",
+                  "related_records": []
+                }
+              ],
+              "remediation_actions": [
+                "refresh"
+              ],
+              "job_id": null,
+              "residue_object_ids": [],
+              "minimum_available_cursor": null,
+              "resynchronization_action": null,
+              "mutation_state": null,
+              "job_terminal_seal_id": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "case_id": "job-cancel-failed-after-mutation-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 18,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:6872605f644d5c6e1920a4b60117fa2a",
+            "request_method": "job/cancel",
+            "capability_id": "capability:sha256:498799ccfa0585ec1997eb0b553e0cad3f800cd77a6ddbca15661669d64d6db2",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:142d5082e8e72b50d90be1f4b9248c93776345e370e2ebf7d6397191744ef72f",
+            "handler_implementation_id": "implementation:sha256:142d5082e8e72b50d90be1f4b9248c93776345e370e2ebf7d6397191744ef72f",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [
+              {
+                "record_kind": "graph-revision",
+                "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+              }
+            ],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "available",
+              "profile_support": "not-applicable",
+              "evidence": "not-applicable",
+              "completeness": "partial",
+              "action_gate": "not-required",
+              "action_gate_decision_ids": [],
+              "profile_revision_refs": [],
+              "support_decision_ids": [],
+              "context": "available",
+              "inputs": "available",
+              "freshness": "fresh",
+              "consent": "granted",
+              "continuity": "not-applicable"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "failed",
+            "failure": {
+              "disposition": "failed",
+              "kind": "cancelled-after-mutation",
+              "retryability": "never",
+              "mutation_possible": true,
+              "diagnostics": [
+                {
+                  "ordinal": 0,
+                  "severity": "error",
+                  "code": "cancelled-after-mutation",
+                  "message": "Conformance cancelled-after-mutation outcome.",
+                  "related_records": []
+                }
+              ],
+              "remediation_actions": [
+                "refresh"
+              ],
+              "job_id": "job-v2:b6bd664d24747f51faa946702c0748b9",
+              "residue_object_ids": [
+                "workbench-blob-v2:sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+              ],
+              "minimum_available_cursor": null,
+              "resynchronization_action": null,
+              "mutation_state": "protected-mutation-partial",
+              "job_terminal_seal_id": "job-terminal-seal:sha256:58e5137d7b2b8f657ea509c3e8fa5c36c348d98a6bf4fbdb960175a90747004a"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case_id": "graph-subscription-gap-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 22,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:98cff544c5a99a485319f16d24bd87b2",
+            "request_method": "graph/subscribe",
+            "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+            "handler_implementation_id": "implementation:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [
+              {
+                "record_kind": "graph-revision",
+                "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+              }
+            ],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "available",
+              "profile_support": "tested-supported",
+              "evidence": "available",
+              "completeness": "partial",
+              "action_gate": "not-required",
+              "action_gate_decision_ids": [],
+              "profile_revision_refs": [
+                {
+                  "profile_kind": "pack-profile-revision",
+                  "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+                },
+                {
+                  "profile_kind": "platform-profile-revision",
+                  "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+                }
+              ],
+              "support_decision_ids": [
+                "support-decision:sha256:d1b9dfeb8de747d73ab63752274cb11013cc430b3f1a09a7cf50f6082f8bd0f5"
+              ],
+              "context": "available",
+              "inputs": "available",
+              "freshness": "fresh",
+              "consent": "not-applicable",
+              "continuity": "gap"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "blocked",
+            "failure": {
+              "disposition": "blocked",
+              "kind": "subscription-gap",
+              "retryability": "with-new-request",
+              "mutation_possible": false,
+              "diagnostics": [
+                {
+                  "ordinal": 0,
+                  "severity": "error",
+                  "code": "subscription-gap",
+                  "message": "Conformance subscription-gap outcome.",
+                  "related_records": []
+                }
+              ],
+              "remediation_actions": [
+                "refresh"
+              ],
+              "job_id": null,
+              "residue_object_ids": [],
+              "minimum_available_cursor": 20,
+              "resynchronization_action": "fetch-graph-revision",
+              "mutation_state": null,
+              "job_terminal_seal_id": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "case_id": "graph-subscribe-start-response",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 21,
+        "result": {
+          "format": "workbench-service-result-v3",
+          "binding": {
+            "protocol_version": {
+              "major": 3,
+              "minor": 0
+            },
+            "request_id": "request-v3:b6ad4089eb6fdb6f1303a782997faca3",
+            "request_method": "graph/subscribe",
+            "capability_id": "capability:sha256:744f56ca64006c266b5b03ca4fc907ec8ac24ee9e8ae46976ac54044cf5fba5b",
+            "capability_version": "3.0.0",
+            "handler_id": "handler:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+            "handler_implementation_id": "implementation:sha256:8f7bad89157a780966f54adf6a2cb1020bd455f81666fd22882bbe10924daac4",
+            "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_binding_id": "input-binding:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+            "input_revision_refs": [
+              {
+                "record_kind": "graph-revision",
+                "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+              }
+            ],
+            "output_revision_refs": [],
+            "states": {
+              "implementation": "available",
+              "profile_support": "tested-supported",
+              "evidence": "available",
+              "completeness": "complete",
+              "action_gate": "not-required",
+              "action_gate_decision_ids": [],
+              "profile_revision_refs": [
+                {
+                  "profile_kind": "pack-profile-revision",
+                  "profile_revision_id": "pack-profile-revision:sha256:a4dbf57ea498f95e893d1f19bcab931102fb65471c0a3b89a9c80cd8304d45b6"
+                },
+                {
+                  "profile_kind": "platform-profile-revision",
+                  "profile_revision_id": "platform-profile-revision:sha256:483df63499346361cca23e89cf110f59726e47345b4fa0eba13711a3e1f27224"
+                }
+              ],
+              "support_decision_ids": [
+                "support-decision:sha256:d1b9dfeb8de747d73ab63752274cb11013cc430b3f1a09a7cf50f6082f8bd0f5"
+              ],
+              "context": "available",
+              "inputs": "available",
+              "freshness": "fresh",
+              "consent": "not-applicable",
+              "continuity": "available"
+            },
+            "diagnostics": [],
+            "limitations": []
+          },
+          "outcome": {
+            "state": "succeeded",
+            "result_schema_id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/subscriptionHandle",
+            "value": {
+              "subscription_id": "subscription-v3:ae5c24754c7394a7bb0cf5fdbf4faee2",
+              "stream_generation": "stream-generation-v3:232993b7b5d0797a707158c051610281",
+              "next_cursor": 0,
+              "minimum_available_cursor": 0,
+              "retained_until": "2026-08-09T00:00:00Z",
+              "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+              "scope": {
+                "kind": "graph",
+                "graph_revision_ids": [
+                  "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+                ],
+                "graph_set_revision_ids": [],
+                "reference_event_ids": []
+              },
+              "event_families": [
+                "graph"
+              ],
+              "delivery": "lossless"
+            },
+            "object_references": [],
+            "continuation_id": null
+          }
+        }
+      }
+    },
+    {
+      "case_id": "job-progress-notification",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "job/progress",
+        "params": {
+          "job_id": "job-v2:b6bd664d24747f51faa946702c0748b9",
+          "job_event_id": "job-event:sha256:4b04ae0f2d970b810c879e620dd94b71d17c878241840d092e0a9d2ae89e88a2",
+          "event_ordinal": 4,
+          "phase_id": "materialize.graph",
+          "completed": 5,
+          "total": 10,
+          "unit": "partitions",
+          "mutation_state": "temporary-residue",
+          "mutation_started": false
+        }
+      }
+    },
+    {
+      "case_id": "job-progress-notification-complete",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "job/progress",
+        "params": {
+          "job_id": "job-v2:b6bd664d24747f51faa946702c0748b9",
+          "job_event_id": "job-event:sha256:bf432e70352bf08fb305369352c038ddcdbd61d9ea5bd23a6a6d23077bcb735d",
+          "event_ordinal": 5,
+          "phase_id": "materialize.graph",
+          "completed": 10,
+          "total": 10,
+          "unit": "partitions",
+          "mutation_state": "immutable-output-published",
+          "mutation_started": true
+        }
+      }
+    },
+    {
+      "case_id": "graph-subscription-event",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "subscription/event",
+        "params": {
+          "subscription_id": "subscription-v3:ae5c24754c7394a7bb0cf5fdbf4faee2",
+          "stream_generation": "stream-generation-v3:232993b7b5d0797a707158c051610281",
+          "cursor": 0,
+          "event_family": "graph",
+          "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+          "revision_refs": [
+            {
+              "record_kind": "graph-revision",
+              "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+            }
+          ],
+          "reference_event_ids": [],
+          "job_event_ids": [],
+          "terminal_seal_ids": [],
+          "runtime_session_ids": [],
+          "object_references": [],
+          "dropped_cursor_ranges": [],
+          "scope": {
+            "kind": "graph",
+            "graph_revision_ids": [
+              "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+            ],
+            "graph_set_revision_ids": [],
+            "reference_event_ids": []
+          }
+        }
+      }
+    },
+    {
+      "case_id": "graph-subscription-event-next",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "subscription/event",
+        "params": {
+          "subscription_id": "subscription-v3:ae5c24754c7394a7bb0cf5fdbf4faee2",
+          "stream_generation": "stream-generation-v3:232993b7b5d0797a707158c051610281",
+          "cursor": 1,
+          "event_family": "graph",
+          "context_ref_id": "context-ref:sha256:4a42094abcea11d8adc6be9b008b03b788f6c12e0997acb33631761edcda1402",
+          "revision_refs": [
+            {
+              "record_kind": "graph-revision",
+              "record_id": "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+            }
+          ],
+          "reference_event_ids": [],
+          "job_event_ids": [],
+          "terminal_seal_ids": [],
+          "runtime_session_ids": [],
+          "object_references": [],
+          "dropped_cursor_ranges": [],
+          "scope": {
+            "kind": "graph",
+            "graph_revision_ids": [
+              "graph-revision:sha256:d8213feb6870bd577f1ec01869a6969d45206182e329729cda835c61fe292ee6"
+            ],
+            "graph_set_revision_ids": [],
+            "reference_event_ids": []
+          }
+        }
+      }
+    },
+    {
+      "case_id": "transport-error-unavailable",
+      "value": {
+        "jsonrpc": "2.0",
+        "id": 20,
+        "error": {
+          "code": -32004,
+          "message": "Requested capability is unavailable.",
+          "data": {
+            "kind": "internal-transport-failure",
+            "availability": "unavailable",
+            "retryable": true
+          }
+        }
+      }
+    }
+  ],
+  "stdio_frames": [
+    {
+      "case_id": "initialize-v3-content-length-frame",
+      "content_length": 536,
+      "frame": "Content-Length: 536\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"service/initialize\",\"params\":{\"protocol_version\":{\"major\":3,\"minor\":0},\"request_id\":\"request-v3:470ebe82f755275238654540d4cde778\",\"client\":{\"client_id\":\"workbench.test-client\",\"kind\":\"test\",\"version\":\"3.0.0\"},\"transport\":\"stdio\",\"required_capability_ids\":[\"capability:sha256:0082afb4cec254c7aea0e56dd9e02c25d14b6266960a25f1049d8fd4159c6dc8\"],\"required_features\":[\"contexts\",\"object-range-reads\",\"durable-jobs\",\"progress-and-cancellation\",\"continuations\",\"subscriptions\"],\"maximum_frame_bytes\":1048576}}",
+      "payload_case_id": "initialize-v3-request"
+    }
+  ]
+}

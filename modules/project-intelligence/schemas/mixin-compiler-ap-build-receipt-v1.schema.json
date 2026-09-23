@@ -1,0 +1,455 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/mixin-compiler-ap-build-receipt-v1.schema.json",
+  "title": "Workbench Mixin compiler/AP invocation-custody receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "boundaries",
+    "canonicalization_id",
+    "diagnostics",
+    "format",
+    "inputs",
+    "invocation",
+    "issues",
+    "limitations",
+    "outputs",
+    "policy",
+    "processors",
+    "receipt_id",
+    "schema_version",
+    "sources",
+    "summary"
+  ],
+  "properties": {
+    "boundaries": {"$ref": "#/$defs/boundaries"},
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "diagnostics": {"$ref": "#/$defs/file"},
+    "format": {
+      "const": "workbench-project-intelligence-mixin-compiler-ap-build-receipt-v1"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/input"}
+    },
+    "invocation": {"$ref": "#/$defs/invocation"},
+    "issues": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/issue"}
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "outputs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/output"}
+    },
+    "policy": {"$ref": "#/$defs/policy"},
+    "processors": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/processor"}
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^workbench-mixin-compiler-ap-build-receipt:sha256:[0-9a-f]{64}$"
+    },
+    "schema_version": {"const": 1},
+    "sources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/file"}
+    },
+    "summary": {"$ref": "#/$defs/summary"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file_id",
+        "label",
+        "logical_name",
+        "present",
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compiler-ap-file:sha256:[0-9a-f]{64}$"
+        },
+        "label": {"type": "string", "minLength": 1},
+        "logical_name": {"type": "string", "minLength": 1},
+        "present": {"type": "boolean"},
+        "sha256": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/sha256"}
+          ]
+        },
+        "size_bytes": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 536870912
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotation_processor_options",
+        "compiler_options",
+        "options_id"
+      ],
+      "properties": {
+        "annotation_processor_options": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 16384}
+        },
+        "compiler_options": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 16384}
+        },
+        "options_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compiler-ap-options:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compiler_executable",
+        "compiler_identity_capture",
+        "invocation_id",
+        "invocation_label",
+        "options",
+        "runtime_artifacts",
+        "runtime_identity_capture"
+      ],
+      "properties": {
+        "compiler_executable": {"$ref": "#/$defs/file"},
+        "compiler_identity_capture": {"$ref": "#/$defs/file"},
+        "invocation_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compiler-ap-invocation:sha256:[0-9a-f]{64}$"
+        },
+        "invocation_label": {"type": "string", "minLength": 1},
+        "options": {"$ref": "#/$defs/options"},
+        "runtime_artifacts": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/file"}
+        },
+        "runtime_identity_capture": {"$ref": "#/$defs/file"}
+      }
+    },
+    "serviceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error",
+        "parse_state",
+        "path",
+        "present",
+        "providers",
+        "service_entry_id",
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "error": {"type": ["string", "null"]},
+        "parse_state": {"enum": ["exact", "invalid", "missing"]},
+        "path": {"type": "string", "minLength": 1},
+        "present": {"type": "boolean"},
+        "providers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*$"
+          }
+        },
+        "service_entry_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compiler-ap-service-entry:sha256:[0-9a-f]{64}$"
+        },
+        "sha256": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/sha256"}
+          ]
+        },
+        "size_bytes": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "processor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact", "processor_id", "service_entry"],
+      "properties": {
+        "artifact": {"$ref": "#/$defs/file"},
+        "processor_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compiler-ap-processor:sha256:[0-9a-f]{64}$"
+        },
+        "service_entry": {"$ref": "#/$defs/serviceEntry"}
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "input_id", "input_kind"],
+      "properties": {
+        "file": {"$ref": "#/$defs/file"},
+        "input_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compiler-ap-input:sha256:[0-9a-f]{64}$"
+        },
+        "input_kind": {"$ref": "#/$defs/kind"}
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "output_id", "output_kind"],
+      "properties": {
+        "file": {"$ref": "#/$defs/file"},
+        "output_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compiler-ap-output:sha256:[0-9a-f]{64}$"
+        },
+        "output_kind": {"$ref": "#/$defs/kind"}
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distribution", "distribution_version", "source_revision"],
+      "properties": {
+        "distribution": {"type": "string", "minLength": 1},
+        "distribution_version": {"type": "string", "minLength": 1},
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cleanmix_compatibility_output_name",
+        "component",
+        "format",
+        "minimum_processor_artifact_count",
+        "minimum_runtime_artifact_count",
+        "minimum_source_count",
+        "policy_id",
+        "processor_service_path",
+        "required_output_kinds",
+        "required_processor_artifact_sha256s",
+        "required_processor_providers",
+        "schema_version",
+        "sha256"
+      ],
+      "properties": {
+        "cleanmix_compatibility_output_name": {"type": "string", "minLength": 1},
+        "component": {"$ref": "#/$defs/component"},
+        "format": {"const": "workbench-mixin-compiler-ap-build-policy-v1"},
+        "minimum_processor_artifact_count": {"type": "integer", "minimum": 1},
+        "minimum_runtime_artifact_count": {"type": "integer", "minimum": 1},
+        "minimum_source_count": {"type": "integer", "minimum": 1},
+        "policy_id": {"type": "string", "minLength": 1},
+        "processor_service_path": {"type": "string", "minLength": 1},
+        "required_output_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "contains": {"const": "cleanmix-compatibility"},
+          "items": {"$ref": "#/$defs/kind"}
+        },
+        "required_processor_artifact_sha256s": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/sha256"}
+        },
+        "required_processor_providers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*$"
+          }
+        },
+        "schema_version": {"const": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caller_declared_single_invocation",
+        "compiler_process_execution_attested",
+        "exact_declared_bytes_bound",
+        "reproducible_build_proved",
+        "runtime_behavior_proved",
+        "source_to_output_causality_proved"
+      ],
+      "properties": {
+        "caller_declared_single_invocation": {"const": true},
+        "compiler_process_execution_attested": {"const": false},
+        "exact_declared_bytes_bound": {"const": true},
+        "reproducible_build_proved": {"const": false},
+        "runtime_behavior_proved": {"const": false},
+        "source_to_output_causality_proved": {"const": false}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected", "issue_id", "issue_kind", "locator", "observed"],
+      "properties": {
+        "expected": {},
+        "issue_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-compiler-ap-issue:sha256:[0-9a-f]{64}$"
+        },
+        "issue_kind": {
+          "enum": [
+            "cleanmix-compatibility-output-name-mismatch",
+            "compiler-executable-empty",
+            "compiler-executable-missing",
+            "compiler-identity-capture-empty",
+            "compiler-identity-capture-missing",
+            "diagnostics-capture-missing",
+            "input-missing",
+            "output-missing",
+            "processor-artifact-count-below-policy",
+            "processor-artifact-missing",
+            "processor-service-entry-invalid",
+            "processor-service-entry-missing",
+            "required-output-kind-missing",
+            "required-processor-artifact-missing",
+            "required-processor-provider-missing",
+            "runtime-artifact-count-below-policy",
+            "runtime-artifact-empty",
+            "runtime-artifact-missing",
+            "runtime-identity-capture-empty",
+            "runtime-identity-capture-missing",
+            "source-count-below-policy",
+            "source-missing"
+          ]
+        },
+        "locator": {"type": "string", "minLength": 1},
+        "observed": {}
+      }
+    },
+    "issueCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cleanmix-compatibility-output-name-mismatch",
+        "compiler-executable-empty",
+        "compiler-executable-missing",
+        "compiler-identity-capture-empty",
+        "compiler-identity-capture-missing",
+        "diagnostics-capture-missing",
+        "input-missing",
+        "output-missing",
+        "processor-artifact-count-below-policy",
+        "processor-artifact-missing",
+        "processor-service-entry-invalid",
+        "processor-service-entry-missing",
+        "required-output-kind-missing",
+        "required-processor-artifact-missing",
+        "required-processor-provider-missing",
+        "runtime-artifact-count-below-policy",
+        "runtime-artifact-empty",
+        "runtime-artifact-missing",
+        "runtime-identity-capture-empty",
+        "runtime-identity-capture-missing",
+        "source-count-below-policy",
+        "source-missing"
+      ],
+      "properties": {
+        "cleanmix-compatibility-output-name-mismatch": {"type": "integer", "minimum": 0},
+        "compiler-executable-empty": {"type": "integer", "minimum": 0},
+        "compiler-executable-missing": {"type": "integer", "minimum": 0},
+        "compiler-identity-capture-empty": {"type": "integer", "minimum": 0},
+        "compiler-identity-capture-missing": {"type": "integer", "minimum": 0},
+        "diagnostics-capture-missing": {"type": "integer", "minimum": 0},
+        "input-missing": {"type": "integer", "minimum": 0},
+        "output-missing": {"type": "integer", "minimum": 0},
+        "processor-artifact-count-below-policy": {"type": "integer", "minimum": 0},
+        "processor-artifact-missing": {"type": "integer", "minimum": 0},
+        "processor-service-entry-invalid": {"type": "integer", "minimum": 0},
+        "processor-service-entry-missing": {"type": "integer", "minimum": 0},
+        "required-output-kind-missing": {"type": "integer", "minimum": 0},
+        "required-processor-artifact-missing": {"type": "integer", "minimum": 0},
+        "required-processor-provider-missing": {"type": "integer", "minimum": 0},
+        "runtime-artifact-count-below-policy": {"type": "integer", "minimum": 0},
+        "runtime-artifact-empty": {"type": "integer", "minimum": 0},
+        "runtime-artifact-missing": {"type": "integer", "minimum": 0},
+        "runtime-identity-capture-empty": {"type": "integer", "minimum": 0},
+        "runtime-identity-capture-missing": {"type": "integer", "minimum": 0},
+        "source-count-below-policy": {"type": "integer", "minimum": 0},
+        "source-missing": {"type": "integer", "minimum": 0}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotation_processor_option_count",
+        "compiler_option_count",
+        "custody_state",
+        "declared_file_count",
+        "input_count",
+        "issue_count",
+        "issue_counts",
+        "missing_file_count",
+        "output_counts",
+        "present_file_count",
+        "processor_artifact_count",
+        "processor_provider_count",
+        "runtime_artifact_count",
+        "source_count"
+      ],
+      "properties": {
+        "annotation_processor_option_count": {"type": "integer", "minimum": 0},
+        "compiler_option_count": {"type": "integer", "minimum": 0},
+        "custody_state": {"enum": ["complete", "partial"]},
+        "declared_file_count": {"type": "integer", "minimum": 0},
+        "input_count": {"type": "integer", "minimum": 0},
+        "issue_count": {"type": "integer", "minimum": 0},
+        "issue_counts": {"$ref": "#/$defs/issueCounts"},
+        "missing_file_count": {"type": "integer", "minimum": 0},
+        "output_counts": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/kind"},
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "present_file_count": {"type": "integer", "minimum": 0},
+        "processor_artifact_count": {"type": "integer", "minimum": 0},
+        "processor_provider_count": {"type": "integer", "minimum": 0},
+        "runtime_artifact_count": {"type": "integer", "minimum": 0},
+        "source_count": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

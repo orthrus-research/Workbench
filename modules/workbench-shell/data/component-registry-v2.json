@@ -1,0 +1,86 @@
+{
+  "format": "workbench-component-registry-v2",
+  "schema_version": 2,
+  "registry_id": "workbench-components",
+  "lifecycle_states": [
+    "incomplete",
+    "ready",
+    "active",
+    "review",
+    "complete",
+    "blocked"
+  ],
+  "constraints": {
+    "shell_component": "workbench-shell",
+    "project_context_component": "project-intelligence",
+    "authority_components": [
+      "atlas",
+      "blueprints",
+      "manuals"
+    ],
+    "profile_roots": [
+      "profiles/platforms",
+      "profiles/packs"
+    ]
+  },
+  "components": [
+    {
+      "id": "atlas",
+      "kind": "authority",
+      "path": "modules/atlas",
+      "state": "active",
+      "depends_on": []
+    },
+    {
+      "id": "blueprints",
+      "kind": "authority",
+      "path": "modules/blueprints",
+      "state": "active",
+      "depends_on": ["project-intelligence"]
+    },
+    {
+      "id": "manuals",
+      "kind": "authority",
+      "path": "modules/manuals",
+      "state": "active",
+      "depends_on": []
+    },
+    {
+      "id": "project-intelligence",
+      "kind": "foundation",
+      "path": "modules/project-intelligence",
+      "state": "active",
+      "depends_on": []
+    },
+    {
+      "id": "workbench-shell",
+      "kind": "foundation",
+      "path": "modules/workbench-shell",
+      "state": "active",
+      "depends_on": [
+        "project-intelligence",
+        "atlas",
+        "blueprints",
+        "manuals"
+      ]
+    },
+    {
+      "id": "client-vscode",
+      "kind": "client",
+      "path": "clients/vscode",
+      "state": "review",
+      "depends_on": [
+        "workbench-shell"
+      ]
+    },
+    {
+      "id": "client-intellij-community",
+      "kind": "client",
+      "path": "clients/intellij-community",
+      "state": "review",
+      "depends_on": [
+        "workbench-shell"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_8",
+  "package": "dev.workbench.crucible.runtimegraph.mixin",
+  "mixins": [
+    "MixinBedrockFluidDepositDefinition",
+    "MixinGroovyScriptSandbox",
+    "MixinGroovyEventListener",
+    "MixinEarlyCaveHook",
+    "MixinFeatureCaveHook",
+    "MixinMaterial",
+    "MixinMaterialRegistryImpl",
+    "MixinOreDepositDefinition",
+    "MixinReloadableRegistryManager",
+    "MixinVirtualizedRegistry",
+    "MixinWorldGenRegistry"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

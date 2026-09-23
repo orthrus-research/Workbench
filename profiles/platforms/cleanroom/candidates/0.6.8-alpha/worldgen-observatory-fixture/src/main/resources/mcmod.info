@@ -1,0 +1,26 @@
+[
+  {
+    "modid": "workbench_worldgen_observatory",
+    "name": "Workbench Worldgen Observatory Fixture",
+    "version": "0.1.0",
+    "mcversion": "1.12.2",
+    "description": "Source-only candidate fixture for deterministic world-generation observations.",
+    "authorList": ["Workbench"],
+    "credits": "Cleanroom 0.6.8-alpha candidate evidence only",
+    "url": "",
+    "updateJSON": "",
+    "logoFile": ""
+  },
+  {
+    "modid": "workbench_synthetic_worldgen",
+    "name": "Workbench Independent Synthetic Worldgen",
+    "version": "0.1.0",
+    "mcversion": "1.12.2",
+    "description": "An independent Forge IWorldGenerator used as an external decoration fixture.",
+    "authorList": ["Workbench"],
+    "credits": "No observatory dependency or integration",
+    "url": "",
+    "updateJSON": "",
+    "logoFile": ""
+  }
+]

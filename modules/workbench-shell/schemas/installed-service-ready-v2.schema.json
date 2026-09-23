@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/installed-service-ready-v2.schema.json",
+  "title": "Native environment Service V3 readiness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "ready_id", "owner_environment_id", "package_fingerprint", "process_nonce", "pid", "service_instance_id", "service_distribution_id", "registry_id", "endpoint_path", "credential_path", "store_path", "host_adapter_receipt_id", "claims"],
+  "properties": {
+    "format": {"const": "workbench-installed-service-ready-v2"},
+    "schema_version": {"const": 2},
+    "ready_id": {"type": "string", "pattern": "^installed-service-ready:sha256:[0-9a-f]{64}$"},
+    "owner_environment_id": {"$ref": "#/$defs/digest"},
+    "package_fingerprint": {"$ref": "#/$defs/digest"},
+    "process_nonce": {"type": "string", "pattern": "^service-process-nonce:[0-9a-f]{32}$"},
+    "pid": {"type": "integer", "minimum": 1},
+    "service_instance_id": {"type": "string", "minLength": 1},
+    "service_distribution_id": {"type": "string", "minLength": 1},
+    "registry_id": {"type": "string", "minLength": 1},
+    "endpoint_path": {"$ref": "#/$defs/path"},
+    "credential_path": {"$ref": "#/$defs/path"},
+    "store_path": {"$ref": "#/$defs/path"},
+    "host_adapter_receipt_id": {"type": "string", "minLength": 1},
+    "claims": {
+      "type": "object", "additionalProperties": false,
+      "required": ["feature_handlers_registered", "profile_support_claimed", "release_qualified"],
+      "properties": {
+        "feature_handlers_registered": {"const": true},
+        "profile_support_claimed": {"const": false},
+        "release_qualified": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "path": {"type": "string", "minLength": 1, "maxLength": 8192}
+  }
+}

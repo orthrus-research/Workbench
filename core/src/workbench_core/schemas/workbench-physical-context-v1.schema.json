@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-physical-context-v1.schema.json",
+  "title": "Workbench Physical Context V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "configuration_home",
+    "workspace",
+    "state_root",
+    "profile_configuration_reference"
+  ],
+  "properties": {
+    "format": {"const": "workbench-physical-context-v1"},
+    "schema_version": {"const": 1},
+    "configuration_home": {"$ref": "#/$defs/absolutePath"},
+    "workspace": {"$ref": "#/$defs/absolutePath"},
+    "state_root": {"$ref": "#/$defs/absolutePath"},
+    "profile_configuration_reference": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/absolutePath"}
+      ]
+    }
+  },
+  "$defs": {
+    "absolutePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\/]+[\\\\/][^\\\\/]+(?:[\\\\/]|$))"
+    }
+  }
+}

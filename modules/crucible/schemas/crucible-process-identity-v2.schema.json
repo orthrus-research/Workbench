@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-process-identity-v2.schema.json",
+  "title": "Workbench Crucible exact process identity V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind", "format", "schema_version", "schema_id", "canonicalizer", "id",
+    "process_instance_id", "job_id", "job_submission_id", "attempt_record_id", "attempt_id",
+    "session_record_id", "session_id", "context_ref_id", "input_binding_id", "platform",
+    "host_instance_id", "boot_id", "pid", "process_start_token", "executable_object_descriptor_id",
+    "argv_object_descriptor_id", "environment_object_descriptor_id", "working_directory_object_descriptor_id",
+    "process_group_id", "supervisor_process_identity_id", "launch_observation_id",
+    "adoption_reconciliation_id", "binding_method",
+    "bound_at", "evidence_eligible"
+  ],
+  "properties": {
+    "kind": {"const": "process-identity"},
+    "format": {"const": "workbench-crucible-process-identity-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-process-identity-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/processIdentityRecordId"},
+    "process_instance_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/processInstanceId"},
+    "job_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobId"},
+    "job_submission_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobSubmissionId"},
+    "attempt_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobAttemptRecordId"},
+    "attempt_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/attemptId"},
+    "session_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/runtimeSessionRecordId"},
+    "session_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/sessionId"},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/contextRefId"},
+    "input_binding_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/inputBindingId"},
+    "platform": {"enum": ["linux", "windows", "macos", "jvm", "container", "other"]},
+    "host_instance_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "boot_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "pid": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/positiveInteger"},
+    "process_start_token": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "executable_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "argv_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "environment_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "working_directory_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "process_group_id": {
+      "oneOf": [
+        {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"},
+        {"type": "null"}
+      ]
+    },
+    "supervisor_process_identity_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableProcessIdentityRecordId"},
+    "launch_observation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableProcessLaunchObservationId"},
+    "adoption_reconciliation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableProcessAdoptionReconciliationId"},
+    "binding_method": {"enum": ["launched", "adopted-after-exact-reconciliation"]},
+    "bound_at": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/timestamp"},
+    "evidence_eligible": {"const": false}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"binding_method": {"const": "launched"}}, "required": ["binding_method"]},
+      "then": {
+        "properties": {
+          "launch_observation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/processLaunchObservationId"},
+          "adoption_reconciliation_id": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"binding_method": {"const": "adopted-after-exact-reconciliation"}}, "required": ["binding_method"]},
+      "then": {
+        "properties": {
+          "launch_observation_id": {"type": "null"},
+          "adoption_reconciliation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/processAdoptionReconciliationId"}
+        }
+      }
+    }
+  ]
+}

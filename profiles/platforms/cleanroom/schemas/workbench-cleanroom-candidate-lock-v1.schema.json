@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/profiles/cleanroom/workbench-cleanroom-candidate-lock-v1.schema.json",
+  "$defs": {
+    "hex_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {
+      "const": "workbench-platform:cleanroom:0.6.8-alpha+mc-1.12.2+forge-14.23.5.2864+mcp-9.42-stable_39"
+    },
+    "cleanroom": {
+      "additionalProperties": false,
+      "properties": {
+        "release": {
+          "additionalProperties": false,
+          "properties": {
+            "sha256": {"$ref": "#/$defs/hex_sha256"},
+            "size": {"minimum": 1, "type": "integer"},
+            "url": {
+              "format": "uri",
+              "pattern": "^https://github\\.com/CleanroomMC/Cleanroom/releases/download/0\\.6\\.8-alpha/",
+              "type": "string"
+            }
+          },
+          "required": ["sha256", "size", "url"],
+          "type": "object"
+        },
+        "source_repository": {
+          "const": "https://github.com/CleanroomMC/Cleanroom.git"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "version": {"const": "0.6.8-alpha"}
+      },
+      "required": ["release", "source_repository", "source_revision", "version"],
+      "type": "object"
+    },
+    "forge": {
+      "additionalProperties": false,
+      "properties": {"version": {"const": "14.23.5.2864"}},
+      "required": ["version"],
+      "type": "object"
+    },
+    "format": {"const": "workbench-cleanroom-candidate-lock-v1"},
+    "mappings": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {"const": "stable"},
+        "coordinate": {"const": "stable_39"},
+        "mcp_version": {"const": "9.42"},
+        "version": {"const": "39"}
+      },
+      "required": ["channel", "coordinate", "mcp_version", "version"],
+      "type": "object"
+    },
+    "minecraft": {
+      "additionalProperties": false,
+      "properties": {"version": {"const": "1.12.2"}},
+      "required": ["version"],
+      "type": "object"
+    },
+    "maturity": {"const": "experimental"},
+    "schema_version": {"const": 1}
+  },
+  "required": [
+    "candidate_id",
+    "cleanroom",
+    "forge",
+    "format",
+    "mappings",
+    "minecraft",
+    "maturity",
+    "schema_version"
+  ],
+  "title": "Exact Cleanroom 0.6.8-alpha candidate lock V1",
+  "type": "object"
+}

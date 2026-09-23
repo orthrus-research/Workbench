@@ -1,0 +1,99 @@
+{
+  "schema": "axiom.native-identity-source-lock.v1",
+  "references": [
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/patcher/ClassPatchManager.java",
+      "gitBlob": "593ac2746a4d51771575f20d2f4757c7bd6caf0e",
+      "sha256": "0f42217fccbcb77b0211bcc9fec8e7e80de9df2709689d0d441d90938b25c261"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/patcher/ClassPatch.java",
+      "gitBlob": "7b1b19d730bca9c7a1c48b45152091e2111b9563",
+      "sha256": "6bd4626f9f887f49d436976938183eac2ab36059b0cd7f6587105623206b1c1e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/deobf/FMLDeobfuscatingRemapper.java",
+      "gitBlob": "7a5661c6cd382837400de02d6d17b650e2064534",
+      "sha256": "bc052606fb8ca9256b4857711dca950b72fbbbce7f21c081430e86c2e849379a"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/deobf/FMLRemappingAdapter.java",
+      "gitBlob": "6b18fd50c98b944a42256f3796b21eb731cecdb0",
+      "sha256": "9d889f3ffc78599286fd7a5ca6f42e0ccfd031362de35ac6f7bcb1f53489607d"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/AccessTransformer.java",
+      "gitBlob": "7ae454ab5c4974e27cae3929c676d2f4265fe951",
+      "sha256": "750c47d46e6fbca4de047d1f70ba051bca892dd0eeddc842d25ef03f9d30d1df"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/EventSubscriptionTransformer.java",
+      "gitBlob": "ed1fbdb0921b1618a2ac28361348cfd238e05144",
+      "sha256": "dfb23b3b0e67124e218d297df35beba6362c19db0b84fa26fac04f0fe3479490"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/GameData.java",
+      "gitBlob": "07d241bf8ec556a88bbc765b3ce7c10032978fd8",
+      "sha256": "ed47f38eb4a14896413804f3c9564b7282e960885d6da43dab5667f1d54a1eb7"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fluids/FluidRegistry.java",
+      "gitBlob": "12a560423cb01a020c2da667893697adf974aebb",
+      "sha256": "d0e7b102938d4cc740a893c8f3aa71fb39ab39cb5240916923d911e1cac5a44a"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/init/Bootstrap.java.patch",
+      "gitBlob": "3ca25181b17d2453719cb37bcce15032377b89d0",
+      "sha256": "e60ad1c007b6a1016f358076a186c94ca3ce55b885c12242d8dd6d52fd2dc720"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/block/Block.java.patch",
+      "gitBlob": "4d314b312eba0c7c10ddb723f165e8cc171c3243",
+      "sha256": "04cbe4bff7412eb32737dd2c7da58c331f802bf955cf00fe692433760bbf1e7e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/block/BlockLiquid.java.patch",
+      "gitBlob": "a4e91b9dba3c3c9d264caa1a9848d920cf1bf285",
+      "sha256": "199eb39e915f9f0524e8e7636da5cfe25cbb4f5ab6748cc0f1e198dabf77cb3c"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/enchantment/Enchantment.java.patch",
+      "gitBlob": "03a35ab9dacc38f9564016d0adbc91c27ab6524b",
+      "sha256": "10466db1cc60563f7614c15af3e2bb058edaa0bace33d5ee7063ba5d239addb9"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/resources/forge_at.cfg",
+      "gitBlob": "d92caf98c961c8587eadd049f346fafb6e70dfff",
+      "sha256": "3fe044f1cc0f9a479c9b3eadba64e2f7e26ed2fa70599bb7d73411afd052935e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/materials/FirstDegreeMaterials.java",
+      "gitBlob": "9f6c190d6f3feab0ea86b8c6c84517dc8868d5a8",
+      "sha256": "5a0cf3112434988131dc0d28811440047719bc5c937ac050744da49be6f9fb3c"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/materials/SecondDegreeMaterials.java",
+      "gitBlob": "aff4da9ac1f767a12cc23386e4fb5944d68f8626",
+      "sha256": "e6c2604bc8d6d6827fe336b7dc88da736f2b2ed37918bdddca7e154d66755eed"
+    }
+  ],
+  "revisions": {
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b"
+  }
+}

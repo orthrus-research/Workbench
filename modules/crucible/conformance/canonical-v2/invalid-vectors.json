@@ -1,0 +1,162 @@
+{
+  "format": "workbench-canonical-json-v2-invalid-vectors-v1",
+  "canonicalizer": "workbench-canonical-json-v2",
+  "max_nesting_depth": 256,
+  "vectors": [
+    {
+      "name": "duplicate-top-level-key",
+      "description": "A raw JSON record with a repeated kind key must not be collapsed by a host JSON parser.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"kind\":\"shadow-kind\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\"}",
+      "expected_error": "duplicate-key"
+    },
+    {
+      "name": "duplicate-nested-key",
+      "description": "Duplicate-key rejection applies recursively, including prototype-looking keys.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"payload\":{\"__proto__\":1,\"__proto__\":2}}",
+      "expected_error": "duplicate-key"
+    },
+    {
+      "name": "duplicate-key-after-escape-decoding",
+      "description": "Lexically different key spellings that decode to the same Unicode string are duplicates.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"payload\":{\"a\":1,\"\\u0061\":2}}",
+      "expected_error": "duplicate-key"
+    },
+    {
+      "name": "decimal-number",
+      "description": "JSON decimal notation is forbidden even when its mathematical value is integral.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":1.0}",
+      "expected_error": "floating-point-forbidden"
+    },
+    {
+      "name": "exponent-number",
+      "description": "JSON exponent notation is forbidden even when its mathematical value is integral.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":1e0}",
+      "expected_error": "floating-point-forbidden"
+    },
+    {
+      "name": "positive-integer-out-of-range",
+      "description": "The first value above signed 64-bit maximum is rejected before identity.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":9223372036854775808}",
+      "expected_error": "integer-out-of-range"
+    },
+    {
+      "name": "negative-integer-out-of-range",
+      "description": "The first value below signed 64-bit minimum is rejected before identity.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":-9223372036854775809}",
+      "expected_error": "integer-out-of-range"
+    },
+    {
+      "name": "escaped-lone-high-surrogate",
+      "description": "An escaped high surrogate without a low pair is not a Unicode scalar value.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":\"\\ud800\"}",
+      "expected_error": "unpaired-surrogate"
+    },
+    {
+      "name": "escaped-lone-low-surrogate",
+      "description": "An escaped low surrogate without a high pair is not a Unicode scalar value.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":\"\\udc00\"}",
+      "expected_error": "unpaired-surrogate"
+    },
+    {
+      "name": "escaped-reversed-surrogate-pair",
+      "description": "A low surrogate followed by a high surrogate is malformed Unicode.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":\"\\udc00\\ud800\"}",
+      "expected_error": "unpaired-surrogate"
+    },
+    {
+      "name": "utf8-encoded-surrogate",
+      "description": "UTF-8 bytes that encode surrogate U+D800 are rejected by fatal UTF-8 decoding.",
+      "input_utf8_hex": "7b226964223a2263616e6f6e6963616c2d766563746f723a7368613235363a30303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030222c226b696e64223a2263616e6f6e6963616c2d766563746f72222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c2276616c7565223a22eda080227d",
+      "expected_error": "invalid-utf8"
+    },
+    {
+      "name": "malformed-utf8-sequence",
+      "description": "A malformed two-byte sequence is rejected before parsing.",
+      "input_utf8_hex": "7b2276616c7565223a22c328227d",
+      "expected_error": "invalid-utf8"
+    },
+    {
+      "name": "unescaped-control-character",
+      "description": "A raw U+000A byte inside a JSON string is invalid even though escaped controls are accepted.",
+      "input_utf8_hex": "7b226964223a2263616e6f6e6963616c2d766563746f723a7368613235363a30303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030222c226b696e64223a2263616e6f6e6963616c2d766563746f72222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c2276616c7565223a22610a62227d",
+      "expected_error": "unescaped-control"
+    },
+    {
+      "name": "leading-zero-integer",
+      "description": "Non-minimal leading-zero integer notation is rejected.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":01}",
+      "expected_error": "invalid-number"
+    },
+    {
+      "name": "non-finite-token",
+      "description": "NaN is neither JSON nor a permitted identity-bearing value.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"value\":NaN}",
+      "expected_error": "unexpected-token"
+    },
+    {
+      "name": "invalid-record-kind",
+      "description": "Record kinds outside the lowercase domain pattern cannot enter the identity preimage.",
+      "input_json": "{\"id\":\"Bad_Kind:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"Bad_Kind\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\"}",
+      "expected_error": "record-kind-invalid"
+    },
+    {
+      "name": "wrong-canonicalizer-domain",
+      "description": "A record cannot silently select a V1 or host-default encoder.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v1\"}",
+      "expected_error": "record-canonicalizer-invalid"
+    },
+    {
+      "name": "uppercase-content-digest",
+      "description": "The textual content ID requires exactly 64 lowercase hexadecimal characters.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\"}",
+      "expected_error": "record-id-invalid"
+    },
+    {
+      "name": "content-digest-mismatch",
+      "description": "The well-formed SHA-256 of the canonical body cannot substitute for the domain-separated content digest.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:25543b8a000b43be04ba86556393dbf80e78d47b75c898ba9911728c9309a914\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\"}",
+      "expected_error": "content-id-mismatch"
+    },
+    {
+      "name": "trailing-json-value",
+      "description": "A valid record followed by another value is not one canonical record.",
+      "input_json": "{\"id\":\"canonical-vector:sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\"}{}",
+      "expected_error": "trailing-data"
+    },
+    {
+      "name": "noncanonical-object-key-order",
+      "description": "A decoder may normalize this object, but an already-canonical byte validator rejects its descending key order.",
+      "operation": "validate-canonical-bytes",
+      "input_json": "{\"z\":0,\"a\":0}",
+      "expected_error": "noncanonical-bytes"
+    },
+    {
+      "name": "noncanonical-short-control-escape",
+      "description": "The legal JSON short newline escape is not the required canonical lowercase \\u00xx spelling.",
+      "operation": "validate-canonical-bytes",
+      "input_json": "{\"value\":\"\\n\"}",
+      "expected_error": "noncanonical-bytes"
+    },
+    {
+      "name": "noncanonical-escaped-nonascii",
+      "description": "A valid scalar other than U+0000 through U+001F must be emitted directly as UTF-8.",
+      "operation": "validate-canonical-bytes",
+      "input_json": "{\"value\":\"\\u00e9\"}",
+      "expected_error": "noncanonical-bytes"
+    },
+    {
+      "name": "noncanonical-whitespace",
+      "description": "Insignificant whitespace is accepted for normalization but forbidden in canonical bytes.",
+      "operation": "validate-canonical-bytes",
+      "input_json": "{ \"a\" : 0 }\n",
+      "expected_error": "noncanonical-bytes"
+    },
+    {
+      "name": "noncanonical-negative-zero",
+      "description": "Negative zero normalizes to the minimal integer spelling zero and is not canonical input bytes.",
+      "operation": "validate-canonical-bytes",
+      "input_json": "{\"value\":-0}",
+      "expected_error": "noncanonical-bytes"
+    }
+  ]
+}

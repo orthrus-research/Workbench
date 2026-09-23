@@ -1,0 +1,1152 @@
+{
+  "format": "workbench-service-protocol-v3-invalid-vectors-v1",
+  "cases": [
+    {
+      "case_id": "legacy-v2-initialize-is-not-v3",
+      "target": "message",
+      "base": "initialize-v3-request",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/method",
+          "value": "initialize"
+        },
+        {
+          "op": "replace",
+          "path": "/params/protocol_version/major",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "case_id": "selector-cannot-occupy-context-id",
+      "target": "message",
+      "base": "graph-query-request",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/request/context_ref_id",
+          "value": {
+            "selector": "supersymmetry"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "job-id-cannot-occupy-request-id",
+      "target": "message",
+      "base": "graph-query-request",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/request/request_id",
+          "value": "job-v2:11111111111111111111111111111111"
+        }
+      ]
+    },
+    {
+      "case_id": "object-range-is-bounded",
+      "target": "message",
+      "base": "object-read-request",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/range/length",
+          "value": 1048577
+        }
+      ]
+    },
+    {
+      "case_id": "context-get-has-no-input-binding",
+      "target": "message",
+      "base": "context-get-request",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/request/input_binding_id",
+          "value": "input-binding:sha256:e4223cb60f763eb6595e75e1f0dd3dae108e73342f153bbdc9335e1ac06acdc9"
+        }
+      ]
+    },
+    {
+      "case_id": "resume-requires-generation",
+      "target": "message",
+      "base": "graph-subscribe-resume-request",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "remove",
+          "path": "/params/position/stream_generation"
+        }
+      ]
+    },
+    {
+      "case_id": "terminal-job-requires-seal",
+      "target": "message",
+      "base": "runtime-start-accepted-response",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/job/lifecycle_state",
+          "value": "terminal"
+        }
+      ]
+    },
+    {
+      "case_id": "progress-mutation-partition-is-exact",
+      "target": "message",
+      "base": "job-progress-notification",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/mutation_state",
+          "value": "immutable-output-published"
+        }
+      ]
+    },
+    {
+      "case_id": "subscription-method-families-do-not-cross",
+      "target": "message",
+      "base": "graph-subscribe-resume-request",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/method",
+          "value": "job/subscribe"
+        }
+      ]
+    },
+    {
+      "case_id": "gap-requires-minimum-cursor",
+      "target": "message",
+      "base": "graph-subscription-gap-response",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "remove",
+          "path": "/result/outcome/failure/minimum_available_cursor"
+        }
+      ]
+    },
+    {
+      "case_id": "cancel-after-mutation-is-conservative",
+      "target": "message",
+      "base": "job-cancel-failed-after-mutation-response",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/mutation_possible",
+          "value": false
+        }
+      ]
+    },
+    {
+      "case_id": "transport-errors-cannot-be-policy-blocked",
+      "target": "message",
+      "base": "transport-error-unavailable",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/error/data/availability",
+          "value": "blocked"
+        }
+      ]
+    },
+    {
+      "case_id": "unknown-wire-field-is-closed",
+      "target": "message",
+      "base": "graph-query-request",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "add",
+          "path": "/params/undeclared",
+          "value": true
+        }
+      ]
+    },
+    {
+      "case_id": "generic-profile-revision-is-invalid",
+      "target": "registry",
+      "base": "registry",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/1/profile/profile_revision_refs/0/profile_revision_id",
+          "value": "profile-revision:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    {
+      "case_id": "support-unavailable-is-not-a-support-state",
+      "target": "registry",
+      "base": "registry",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/1/profile/required_support_states/0",
+          "value": "unavailable"
+        }
+      ]
+    },
+    {
+      "case_id": "v2-gateway-feature-list-is-fixed",
+      "target": "registry",
+      "base": "registry",
+      "phase": "schema",
+      "expected_code": "schema.reject",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/legacy_v2_gateway/excluded_v3_features/1",
+          "value": "objects"
+        }
+      ]
+    },
+    {
+      "case_id": "registry-id-is-recomputed",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.identity",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/registry_id",
+          "value": "component-capability-registry:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "case_id": "capability-key-is-unique",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.capability-key-duplicate",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/1/capability_key",
+          "value": "atlas.evidence.get"
+        }
+      ]
+    },
+    {
+      "case_id": "component-self-edge-is-rejected",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.topology-self-edge",
+      "mutations": [
+        {
+          "op": "add",
+          "path": "/components/0/depends_on_component_ids/-",
+          "value": "component:sha256:85a94b92c58b6722a461c3698b813b84da37083610133e264f17c7e3dfc754e0"
+        }
+      ]
+    },
+    {
+      "case_id": "component-cycle-is-rejected",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.topology-cycle",
+      "mutations": [
+        {
+          "op": "add",
+          "path": "/components/0/depends_on_component_ids/-",
+          "value": "component:sha256:dc7495c10416e60e6f39cbaf577d40dd7f295c78ca0bd6f30f0ba001e3d9399a"
+        }
+      ]
+    },
+    {
+      "case_id": "none-cannot-mix-with-side-effects",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.side-effects-none-mixed",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/6/operation/side_effect_classes",
+          "value": [
+            "none",
+            "store-read"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "mutating-capability-requires-preview",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.mutation-preview",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/2/operation/preview",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "case_id": "handler-method-schema-drift-is-rejected",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.handler-method-drift",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/handler_registrations/5/method_bindings/0/result_schema_id",
+          "value": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/evidenceResult"
+        }
+      ]
+    },
+    {
+      "case_id": "handler-invocation-cannot-broaden",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.handler-mode",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/1/invocation_modes",
+          "value": [
+            "embedded",
+            "local-endpoint"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "authority-bearing-capability-matches-component",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.authority",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/1/semantic_authority_id",
+          "value": "authority:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "case_id": "record-ref-kind-matches-prefix",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "message.record-ref-kind",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/binding/input_revision_refs/0/record_kind",
+          "value": "evidence-record"
+        }
+      ]
+    },
+    {
+      "case_id": "closed-owner-arguments-run-before-dispatch",
+      "target": "message",
+      "base": "context-resolve-request",
+      "phase": "semantic",
+      "expected_code": "request.value-schema",
+      "mutations": [
+        {
+          "op": "add",
+          "path": "/params/arguments/undeclared",
+          "value": true
+        }
+      ]
+    },
+    {
+      "case_id": "method-must-be-bound-by-capability",
+      "target": "message",
+      "base": "graph-query-request",
+      "phase": "semantic",
+      "expected_code": "request.method-binding",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/request/capability_id",
+          "value": "capability:sha256:e4223cb60f763eb6595e75e1f0dd3dae108e73342f153bbdc9335e1ac06acdc9"
+        }
+      ]
+    },
+    {
+      "case_id": "operation-class-matches-capability",
+      "target": "message",
+      "base": "graph-query-request",
+      "phase": "semantic",
+      "expected_code": "request.operation-class",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/request/operation_class",
+          "value": "inspect"
+        }
+      ]
+    },
+    {
+      "case_id": "mutating-request-requires-commit",
+      "target": "message",
+      "base": "operation-commit-request",
+      "phase": "semantic",
+      "expected_code": "request.commit-required",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/request/commit",
+          "value": null
+        },
+        {
+          "op": "replace",
+          "path": "/params/request/idempotency_key",
+          "value": null
+        }
+      ]
+    },
+    {
+      "case_id": "commit-and-request-idempotency-match",
+      "target": "message",
+      "base": "operation-commit-request",
+      "phase": "semantic",
+      "expected_code": "request.idempotency-mismatch",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/request/commit/idempotency_key",
+          "value": "idempotency-v3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "case_id": "direct-result-schema-id-is-exact",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "response.result-schema",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/result_schema_id",
+          "value": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json#/$defs/evidenceResult"
+        }
+      ]
+    },
+    {
+      "case_id": "direct-result-value-is-validated",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "response.value-schema",
+      "mutations": [
+        {
+          "op": "remove",
+          "path": "/result/outcome/value/result_object_id"
+        }
+      ]
+    },
+    {
+      "case_id": "response-repeats-request-capability",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "response.capability",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/binding/capability_id",
+          "value": "capability:sha256:e4223cb60f763eb6595e75e1f0dd3dae108e73342f153bbdc9335e1ac06acdc9"
+        }
+      ]
+    },
+    {
+      "case_id": "stale-plan-requires-new-request",
+      "target": "message",
+      "base": "operation-consent-blocked-response",
+      "phase": "schema",
+      "expected_code": "message.schema",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/kind",
+          "value": "stale-plan"
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/retryability",
+          "value": "immediate"
+        }
+      ]
+    },
+    {
+      "case_id": "progress-does-not-exceed-total",
+      "target": "message",
+      "base": "job-progress-notification",
+      "phase": "semantic",
+      "expected_code": "progress.total",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/completed",
+          "value": 11
+        }
+      ]
+    },
+    {
+      "case_id": "object-chunk-length-matches-decoded-bytes",
+      "target": "message",
+      "base": "object-read-response",
+      "phase": "semantic",
+      "expected_code": "object.decoded-length",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/length",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "case_id": "object-next-offset-is-contiguous",
+      "target": "message",
+      "base": "object-read-response",
+      "phase": "semantic",
+      "expected_code": "object.next-offset",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/eof",
+          "value": false
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/next_offset",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "case_id": "object-digest-matches-full-object",
+      "target": "message",
+      "base": "object-read-response",
+      "phase": "semantic",
+      "expected_code": "object.digest",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/object/sha256",
+          "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "case_id": "resume-gap-advances-past-last-cursor",
+      "target": "message",
+      "base": "graph-subscription-gap-response",
+      "phase": "semantic",
+      "expected_code": "subscription.gap-cursor",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/minimum_available_cursor",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "case_id": "cursor-ranges-are-ordered",
+      "target": "message",
+      "base": "graph-subscription-event",
+      "phase": "semantic",
+      "expected_code": "subscription.cursor-range",
+      "mutations": [
+        {
+          "op": "add",
+          "path": "/params/dropped_cursor_ranges/-",
+          "value": {
+            "first": 5,
+            "last": 4
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "subscription-event-is-contiguous",
+      "target": "message",
+      "base": "graph-subscription-event",
+      "phase": "semantic",
+      "expected_code": "subscription.cursor-continuity",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/cursor",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "case_id": "registry-context-fields-are-canonical",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.context-field-order",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/0/context_applicability/required_context_fields",
+          "value": [
+            "store_id",
+            "profile_scope"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "dynamic-schema-must-be-recursively-closed",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.schema-open",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/0/method_bindings/0/request_schema_id",
+          "value": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/genericArguments"
+        }
+      ]
+    },
+    {
+      "case_id": "side-effects-impose-operation-lower-bound",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.side-effect-operation",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/0/operation/side_effect_classes",
+          "value": [
+            "world-mutation"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "authority-bearing-descriptor-requires-admission",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.authority-attestation-missing",
+      "mutations": [
+        {
+          "op": "remove",
+          "path": "/descriptor_authority_admissions/3"
+        }
+      ]
+    },
+    {
+      "case_id": "descriptor-authority-binding-is-exact",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.authority-binding",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/0/semantic_authority_binding/owner_revision_id",
+          "value": "owner-revision:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "case_id": "scope-policy-authority-is-exact",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.scope-policy-authority",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/0/context_applicability/scope_compatibility_authority/owner_revision_id",
+          "value": "owner-revision:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "case_id": "mechanical-owner-cannot-assert-scope-policy",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.mechanical-scope-policy",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/8/context_applicability/context_binding",
+          "value": "optional"
+        },
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/8/context_applicability/scope_compatibility_policy_id",
+          "value": "policy:sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        {
+          "op": "replace",
+          "path": "/capability_descriptors/8/context_applicability/scope_compatibility_authority",
+          "value": {
+            "owner_authority_id": "authority:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "owner_revision_id": "owner-revision:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "authority_adapter_id": "authority-adapter:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "duplicate-workbench-request-id-is-rejected",
+      "target": "message",
+      "base": "evidence-get-request",
+      "phase": "semantic",
+      "expected_code": "request.id-duplicate",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/request/request_id",
+          "value": "request-v3:02d257d67b68acebe7760337c9577631"
+        }
+      ]
+    },
+    {
+      "case_id": "jsonrpc-response-id-correlates",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "response.jsonrpc-id",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/id",
+          "value": 999
+        }
+      ]
+    },
+    {
+      "case_id": "response-capability-version-correlates",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "response.capability-version",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/binding/capability_version",
+          "value": "3.0.1"
+        }
+      ]
+    },
+    {
+      "case_id": "response-context-correlates",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "response.context",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/binding/context_ref_id",
+          "value": "context-ref:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "case_id": "response-input-binding-correlates",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "response.input-binding",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/binding/input_binding_id",
+          "value": "input-binding:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ]
+    },
+    {
+      "case_id": "resolved-input-binding-correlates",
+      "target": "message",
+      "base": "context-resolve-response",
+      "phase": "semantic",
+      "expected_code": "response.input-binding",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/binding/input_binding_id",
+          "value": "input-binding:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ]
+    },
+    {
+      "case_id": "object-id-correlates-with-request",
+      "target": "message",
+      "base": "object-read-response",
+      "phase": "semantic",
+      "expected_code": "object.identity",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/object/object_id",
+          "value": "workbench-blob-v2:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/object/sha256",
+          "value": "1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    {
+      "case_id": "object-range-does-not-cross-byte-length",
+      "target": "message",
+      "base": "object-read-response",
+      "phase": "semantic",
+      "expected_code": "object.range",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/object/byte_length",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "case_id": "object-eof-is-exact",
+      "target": "message",
+      "base": "object-read-response",
+      "phase": "semantic",
+      "expected_code": "object.eof",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/eof",
+          "value": false
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/next_offset",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "case_id": "subscription-generation-replay-is-rejected",
+      "target": "message",
+      "base": "graph-subscription-event",
+      "phase": "semantic",
+      "expected_code": "subscription.generation",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/stream_generation",
+          "value": "stream-generation-v3:cccccccccccccccccccccccccccccccc"
+        }
+      ]
+    },
+    {
+      "case_id": "subscription-scope-replay-is-rejected",
+      "target": "message",
+      "base": "graph-subscription-event",
+      "phase": "semantic",
+      "expected_code": "subscription.scope",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/scope/graph_revision_ids/0",
+          "value": "graph-revision:sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ]
+    },
+    {
+      "case_id": "progress-event-ordinal-is-monotonic",
+      "target": "message",
+      "base": "job-progress-notification-complete",
+      "phase": "semantic",
+      "expected_code": "progress.event-ordinal",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/event_ordinal",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "case_id": "progress-completed-is-monotonic",
+      "target": "message",
+      "base": "job-progress-notification-complete",
+      "phase": "semantic",
+      "expected_code": "progress.monotonic",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/completed",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "case_id": "cancelled-after-mutation-requires-terminal-seal",
+      "target": "message",
+      "base": "job-cancel-failed-after-mutation-response",
+      "phase": "schema",
+      "expected_code": "message.schema",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/job_terminal_seal_id",
+          "value": null
+        }
+      ]
+    },
+    {
+      "case_id": "failure-mutation-state-controls-possibility",
+      "target": "message",
+      "base": "job-cancel-failed-after-mutation-response",
+      "phase": "schema",
+      "expected_code": "message.schema",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/mutation_state",
+          "value": "temporary-residue"
+        }
+      ]
+    },
+    {
+      "case_id": "profile-policy-requires-profile-owner-admission",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.profile-admission-missing",
+      "mutations": [
+        {
+          "op": "remove",
+          "path": "/profile_policy_admissions/0"
+        }
+      ]
+    },
+    {
+      "case_id": "profile-policy-attestation-is-exact",
+      "target": "registry",
+      "base": "registry",
+      "phase": "semantic",
+      "expected_code": "registry.profile-attestation-binding",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/profile_policy_admissions/0/profile_authority",
+          "value": {
+            "owner_authority_id": "authority:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "owner_revision_id": "owner-revision:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "authority_adapter_id": "authority-adapter:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "profile-support-response-requires-owner-decision",
+      "target": "message",
+      "base": "graph-query-response",
+      "phase": "semantic",
+      "expected_code": "response.support-decision",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/binding/states/support_decision_ids",
+          "value": []
+        }
+      ]
+    },
+    {
+      "case_id": "implicit-action-gate-approval-is-rejected",
+      "target": "message",
+      "base": "runtime-start-accepted-response",
+      "phase": "semantic",
+      "expected_code": "response.action-gate-decision",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/binding/states/action_gate_decision_ids",
+          "value": []
+        }
+      ]
+    },
+    {
+      "case_id": "accepted-job-submission-replay-is-rejected",
+      "target": "message",
+      "base": "runtime-start-accepted-response",
+      "phase": "semantic",
+      "expected_code": "response.job-output-revision",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/job/job_submission_id",
+          "value": "job-submission:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "case_id": "completed-internal-failure-requires-terminal-seal",
+      "target": "message",
+      "base": "job-cancel-failed-after-mutation-response",
+      "phase": "schema",
+      "expected_code": "message.schema",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/kind",
+          "value": "internal-failure"
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/retryability",
+          "value": "after-change"
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/failure/job_terminal_seal_id",
+          "value": null
+        }
+      ]
+    },
+    {
+      "case_id": "initialize-registry-is-correlated",
+      "target": "message",
+      "base": "initialize-v3-response",
+      "phase": "semantic",
+      "expected_code": "initialize.registry",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/registry_id",
+          "value": "component-capability-registry:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "case_id": "initialize-protocol-version-is-correlated",
+      "target": "message",
+      "base": "initialize-v3-response",
+      "phase": "semantic",
+      "expected_code": "initialize.protocol-version",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/protocol_version/minor",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "case_id": "initialize-features-are-correlated",
+      "target": "message",
+      "base": "initialize-v3-response",
+      "phase": "semantic",
+      "expected_code": "initialize.features",
+      "mutations": [
+        {
+          "op": "remove",
+          "path": "/result/negotiated_features/5"
+        }
+      ]
+    },
+    {
+      "case_id": "transport-error-id-is-correlated",
+      "target": "message",
+      "base": "transport-error-unavailable",
+      "phase": "semantic",
+      "expected_code": "error.request-correlation",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/id",
+          "value": 999
+        }
+      ]
+    },
+    {
+      "case_id": "resume-request-cannot-change-original-scope",
+      "target": "message",
+      "base": "graph-subscribe-resume-request",
+      "phase": "semantic",
+      "expected_code": "subscription.scope",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/params/scope/graph_revision_ids/0",
+          "value": "graph-revision:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "case_id": "non-eof-object-read-must-advance",
+      "target": "message",
+      "base": "object-read-response",
+      "phase": "schema",
+      "expected_code": "message.schema",
+      "mutations": [
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/length",
+          "value": 0
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/data_base64",
+          "value": ""
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/eof",
+          "value": false
+        },
+        {
+          "op": "replace",
+          "path": "/result/outcome/value/next_offset",
+          "value": 0
+        }
+      ]
+    }
+  ]
+}

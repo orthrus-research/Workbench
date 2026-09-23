@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/stage-bound-registry-effect-snapshot-v1.schema.json",
+  "title": "Workbench Crucible Stage Snapshot V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "snapshot_id", "authority", "binding", "registry", "effects", "summary", "limitations"],
+  "properties": {
+    "format": {"const": "workbench-crucible-stage-snapshot-v1"},
+    "schema_version": {"const": 1},
+    "snapshot_id": {"type": "string", "pattern": "^workbench-crucible-stage-snapshot:sha256:[0-9a-f]{64}$"},
+    "authority": {"type": "object"},
+    "binding": {"type": "object", "required": ["pack_profile_id", "platform_profile_id", "stage", "capture"]},
+    "registry": {"type": "array", "items": {"$ref": "#/$defs/registry"}},
+    "effects": {"type": "array", "items": {"$ref": "#/$defs/effect"}},
+    "summary": {"type": "object"},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "kind", "key"],
+      "properties": {
+        "domain": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "key": {"type": "object", "minProperties": 1}
+      }
+    },
+    "registry": {
+      "type": "object",
+      "required": ["runtime_record_id", "record_kind", "semantic_descriptor", "evidence_state", "stage", "registry_state", "provenance"],
+      "properties": {
+        "record_kind": {"const": "registry-observation"},
+        "semantic_descriptor": {"$ref": "#/$defs/descriptor"},
+        "evidence_state": {"const": "runtime-observed"}
+      }
+    },
+    "effect": {
+      "type": "object",
+      "required": ["runtime_record_id", "record_kind", "semantic_descriptor", "evidence_state", "stage", "operation", "effect_state", "provenance"],
+      "properties": {
+        "record_kind": {"const": "effect-observation"},
+        "semantic_descriptor": {"$ref": "#/$defs/descriptor"},
+        "evidence_state": {"const": "runtime-observed"}
+      }
+    }
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "format": "workbench-runtime-worldgen-audit-profile-v1",
+  "schema_version": 1,
+  "profile_id": "workbench-pack:supersymmetry:rtg-worldgen-audit-v1",
+  "discovery": {
+    "script_globs": [
+      "config/BiomeTweaker/scripts/*.cfg"
+    ],
+    "biome_report_globs": [
+      "config/BiomeTweaker/output/biome/*.json"
+    ],
+    "log_globs": [
+      "logs/latest.log"
+    ],
+    "source_alignment_paths": [
+      "config/BiomeTweaker/scripts/RTG.cfg"
+    ],
+    "artifact_inventory": [
+      {
+        "artifact_id": "biometweaker-3.2.369",
+        "artifact_glob": "mods/BiomeTweaker-1.12.2-3.2.369.jar",
+        "expected_sha256": "a988d397a755680598925aed319ca3206d5a9babb13f6f6a6d4c1bda52585f31",
+        "required": true
+      },
+      {
+        "artifact_id": "rtgu-1.1.0",
+        "artifact_glob": "mods/RTGU-1.12.2-1.1.0.jar",
+        "expected_sha256": "1d8a927ed0b6973acf2c39462cda07006549eb597b7697fb8aa5db750d8c34d4",
+        "required": true
+      },
+      {
+        "artifact_id": "vertically-stacked-dimensions-0.1.9",
+        "artifact_glob": "mods/VerticallyStackedDimensions-1.12.2-0.1.9.jar",
+        "expected_sha256": "008a57fc10c2a5089929aff8511248529ebacfcd395d61d191f3749c2aaae4c2",
+        "required": true
+      },
+      {
+        "artifact_id": "historical-successor-runtime-compat-1.0.1",
+        "artifact_glob": "mods/*successor-runtime-compat-1.0.1-compat.jar",
+        "expected_sha256": "484fb23839b36ff516789437a5966f831d4e97b473bee47fe948cea3f1782ea3",
+        "required": false
+      }
+    ],
+    "configuration_literal_audits": [
+      {
+        "config_path": "config/RTG/rtg.cfg",
+        "artifact_glob": "mods/RTGU-*.jar",
+        "keys": [
+          "oreGenEventCancellation",
+          "patchBiome",
+          "rtgWorldTypeByDefault"
+        ]
+      }
+    ]
+  },
+  "selector_expectations": [
+    {
+      "variable": "vanillaWarmOverworldBiomes",
+      "climate": "WARM",
+      "selector": "forBiomes"
+    }
+  ],
+  "known_non_overworld_biomes": [
+    "appliedenergistics2:storage_biome",
+    "beneath:the_beneath",
+    "minecraft:hell",
+    "minecraft:sky",
+    "susy:maria",
+    "susy:moon",
+    "tardis:farmlands",
+    "tardis:moon",
+    "tardis:mountains",
+    "tardis:redlands",
+    "tardis:telos",
+    "tardis:telos_orange"
+  ],
+  "expected_event_reports": [
+    {
+      "reporter": "dimstack",
+      "generator": "rtg.world.gen.ChunkGeneratorRTG",
+      "event": "net.minecraftforge.event.terraingen.InitNoiseGensEvent"
+    }
+  ],
+  "guidance": {
+    "generation-selector-mismatch": {
+      "requires_artifacts": [
+        "biometweaker-3.2.369"
+      ],
+      "interpretation": "The declared vanilla WARM list is a complement of the named warm biomes. BiomeTweaker therefore adds every other registered biome, including dimension-only biomes, to BiomeManager.WARM.",
+      "developer_actions": [
+        "Stage an experimental one-token change from forAllBiomesExcept to forBiomes in a disposable projection.",
+        "Start a fresh JVM and generate a new fixed-seed world; BiomeManager is process-global and existing chunks retain the old biome selection.",
+        "Compare the effective BiomeManager entries and canonical chunk fingerprints before proposing a pack change."
+      ]
+    },
+    "duplicate-biome-manager-membership": {
+      "requires_artifacts": [
+        "biometweaker-3.2.369"
+      ],
+      "interpretation": "Repeated positive-weight entries change effective selection weight and are observable registry state, even when the individual weights match.",
+      "developer_actions": [
+        "Compare duplicate entries and normalized probabilities before and after the selector candidate; the one-token change is not by itself a complete pool repair."
+      ]
+    },
+    "cross-climate-biome-manager-membership": {
+      "requires_artifacts": [
+        "biometweaker-3.2.369"
+      ],
+      "interpretation": "Cross-climate membership can be intentional, so treat this as an inventory until a profile expectation or A/B world proves harm.",
+      "developer_actions": [
+        "Review only positive-weight entries that remain cross-climate after the selector candidate."
+      ]
+    },
+    "non-overworld-biome-climate-membership": {
+      "requires_artifacts": [
+        "biometweaker-3.2.369"
+      ],
+      "interpretation": "Dimension-only biomes are eligible for ordinary Overworld climate selection in this runtime registry.",
+      "developer_actions": [
+        "Treat this as a required negative invariant for the corrected runtime."
+      ]
+    },
+    "rtg-unsupported-biome-climate-overlap": {
+      "requires_artifacts": [
+        "biometweaker-3.2.369",
+        "rtgu-1.1.0"
+      ],
+      "interpretation": "The selected root contains positive-weight Forge climate candidates that its retained log also lists as lacking RTG realistic implementations. If one is selected, RTGU falls back to the configured patch biome; the audit does not prove that selection occurred in a chunk.",
+      "developer_actions": [
+        "Record the configured patchBiome and compare affected fixed-seed chunks after correcting the biome pool."
+      ]
+    },
+    "reported-missing-worldgen-event": {
+      "requires_artifacts": [
+        "rtgu-1.1.0",
+        "vertically-stacked-dimensions-0.1.9"
+      ],
+      "interpretation": "DimStack reported that RTG missed its expected InitNoiseGensEvent boundary. The associated retained warning can identify unavailable native noise fields, but terrain corruption remains a candidate mechanism until the preset, artifact tuple, and generated chunks are bound and compared.",
+      "developer_actions": [
+        "Locate and identity-bind the separately retained historical Forge-profile bridge candidate before adapting or rebuilding it for Cleanroom.",
+        "Install a candidate only in a disposable projection and require both the DimStack warning to disappear and the expected event state to be observed.",
+        "Run an A/A determinism check before comparing patched and unpatched terrain."
+      ]
+    },
+    "configuration-key-class-literal-not-observed": {
+      "requires_artifacts": [
+        "rtgu-1.1.0"
+      ],
+      "interpretation": "The configured RTG keys are not present as exact literals in any class entry of the installed RTGU artifact. They are likely stale, but this observation alone cannot exclude indirect binding.",
+      "developer_actions": [
+        "Do not use these keys as A/B variables until an executable binding is identified.",
+        "Retain them as configuration-drift findings rather than causal findings."
+      ]
+    }
+  }
+}

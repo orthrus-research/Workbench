@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/mixin-service-provider-enumeration-evidence-v1.schema.json",
+  "title": "Workbench Crucible Mixin service-provider enumeration evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "evidence_id",
+    "canonicalization_id",
+    "session",
+    "probe",
+    "state",
+    "providers",
+    "failure",
+    "summary",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-crucible-mixin-service-provider-enumeration-evidence-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "evidence_id": {
+      "type": "string",
+      "pattern": "^crucible-mixin-service-provider-enumeration:sha256:[0-9a-f]{64}$"
+    },
+    "canonicalization_id": {
+      "const": "workbench-canonical-json-v1"
+    },
+    "session": {
+      "$ref": "#/$defs/session"
+    },
+    "probe": {
+      "$ref": "#/$defs/probe"
+    },
+    "state": {
+      "enum": ["enumerated", "failed"]
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/provider"
+      }
+    },
+    "failure": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/failure"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "boundaries": {
+      "$ref": "#/$defs/boundaries"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "enumerated"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "failed"
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "providers": {
+            "maxItems": 0
+          },
+          "failure": {
+            "$ref": "#/$defs/failure"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "launch_id",
+        "profile_id",
+        "side",
+        "candidate_toolchain_lock_sha256",
+        "component_topology_receipt_id",
+        "component_topology_receipt_sha256"
+      ],
+      "properties": {
+        "session_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "launch_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "side": {
+          "enum": ["client", "dedicated_server", "integrated_server"]
+        },
+        "candidate_toolchain_lock_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "component_topology_receipt_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-topology-receipt:sha256:[0-9a-f]{64}$"
+        },
+        "component_topology_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe_id",
+        "mechanism",
+        "service_interface",
+        "class_loader_kind",
+        "class_loader_class"
+      ],
+      "properties": {
+        "probe_id": {
+          "const": "workbench-mixin-service-provider-enumerator-v1"
+        },
+        "mechanism": {
+          "const": "java.util.ServiceLoader.iterator"
+        },
+        "service_interface": {
+          "const": "org.spongepowered.asm.service.IMixinService"
+        },
+        "class_loader_kind": {
+          "const": "thread_context"
+        },
+        "class_loader_class": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_class",
+        "service_name",
+        "source_uri",
+        "provider_artifact_sha256",
+        "provider_artifact_size_bytes"
+      ],
+      "properties": {
+        "service_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "service_name": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "source_uri": {
+          "type": "string",
+          "pattern": "^file:.+"
+        },
+        "provider_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "provider_artifact_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "exception_class", "message"],
+      "properties": {
+        "stage": {
+          "enum": [
+            "service_interface_load",
+            "service_loader_create",
+            "service_loader_iteration",
+            "provider_name",
+            "provider_code_source",
+            "artifact_measurement"
+          ]
+        },
+        "exception_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "message": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_count",
+        "distinct_service_name_count",
+        "duplicate_service_names"
+      ],
+      "properties": {
+        "provider_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "distinct_service_name_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_service_names": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime_selection_proved",
+        "provider_source_from_implementation_protection_domain",
+        "mixin_code_source_used_for_provider_attribution",
+        "partial_provider_set_published"
+      ],
+      "properties": {
+        "runtime_selection_proved": {
+          "const": false
+        },
+        "provider_source_from_implementation_protection_domain": {
+          "const": true
+        },
+        "mixin_code_source_used_for_provider_attribution": {
+          "const": false
+        },
+        "partial_provider_set_published": {
+          "const": false
+        }
+      }
+    }
+  }
+}

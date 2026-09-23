@@ -1,0 +1,105 @@
+{
+  "schema": "axiom.material-context-selection.v1",
+  "profile": "supersymmetry",
+  "contexts": [
+    {
+      "id": "supersymmetry:material-authoring-gt-base",
+      "label": "Saved workspace \u2014 GT-base material phase (incomplete pack context)",
+      "qualification": "pending-native-groovy-execution",
+      "admissionPolicy": "axiom-material-admission.json",
+      "platformProfile": "cleanroom",
+      "sourceRevisions": {
+        "supersymmetry": "3e83cd7bad57bd4c424de4e6cc707ab02fe32f54",
+        "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+        "groovyscript": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4"
+      },
+      "scriptRoot": "groovy/",
+      "runConfig": "groovy/runConfig.json",
+      "loader": "preInit",
+      "loaders": {
+        "preInit": [
+          "classes/",
+          "globals/",
+          "material/",
+          "preInit/"
+        ],
+        "postInit": [
+          "prePostInit/",
+          "postInit/"
+        ]
+      },
+      "side": "server",
+      "scriptOwner": "supersymmetry",
+      "materialRegistryOwners": [
+        "gregtech"
+      ],
+      "baseMaterialProducers": [
+        "gregtech.api.unification.material.materials.ElementMaterials",
+        "gregtech.api.unification.material.materials.FirstDegreeMaterials",
+        "gregtech.api.unification.material.materials.OrganicChemistryMaterials",
+        "gregtech.api.unification.material.materials.UnknownCompositionMaterials",
+        "gregtech.api.unification.material.materials.SecondDegreeMaterials",
+        "gregtech.api.unification.material.materials.HigherDegreeMaterials",
+        "gregtech.api.unification.material.materials.MaterialFlagAddition"
+      ],
+      "programBoundary": "complete-declared-source-program",
+      "gameLaunchRequired": false,
+      "wholePackParity": false,
+      "excludedComposition": [
+        "Susy-Core material and post-material listeners",
+        "Supersymmetry SuSyMaterials.init and ChangeFlags.init",
+        "complete Supersymmetry RegisterMetaItems and addon component producers (bounded GT StandardMetaItem coexistence is supported)",
+        "unqualified addon properties, fluid storage keys and prefix families",
+        "material recipe processing handlers",
+        "world-dependent machine, block and harvesting behavior"
+      ]
+    },
+    {
+      "id": "supersymmetry:material-authoring-pack",
+      "label": "Saved workspace \u2014 native pack initialization and recipe registries",
+      "qualification": "pending-native-initialization-evidence",
+      "admissionPolicy": "axiom-material-admission.json",
+      "platformProfile": "cleanroom",
+      "sourceRevisions": {
+        "supersymmetry": "3e83cd7bad57bd4c424de4e6cc707ab02fe32f54",
+        "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+        "groovyscript": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4",
+        "susy-core": "2042c2e4f8b2e5fc9691b1b1e74f0ee11632513a"
+      },
+      "scriptRoot": "groovy/",
+      "runConfig": "groovy/runConfig.json",
+      "loader": "preInit",
+      "loaders": {
+        "preInit": [
+          "classes/",
+          "globals/",
+          "material/",
+          "preInit/"
+        ],
+        "postInit": [
+          "prePostInit/",
+          "postInit/"
+        ]
+      },
+      "side": "server",
+      "scriptOwner": "supersymmetry",
+      "materialRegistryOwners": [
+        "gregtech"
+      ],
+      "programBoundary": "complete-declared-source-program",
+      "gameLaunchRequired": false,
+      "wholePackParity": false,
+      "requiredNativeMixins": [
+        "supercritical.mixins.gregtech.MixinElement",
+        "supersymmetry.mixins.gregtech.RecipeMapsMixin"
+      ],
+      "pendingComposition": [],
+      "excludedComposition": [
+        "deferred crafting and machine execution, including world-dependent callbacks",
+        "world generation and gameplay behavior",
+        "CLIENT rendering and optional unselected integrations"
+      ],
+      "initializationStage": "recipes"
+    }
+  ]
+}

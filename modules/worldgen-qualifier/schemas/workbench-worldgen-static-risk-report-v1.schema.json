@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/schemas/workbench-worldgen-static-risk-report-v1.schema.json",
+  "title": "Workbench Worldgen Static Risk Report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "report_id", "created_at", "coverage", "method", "jars", "findings", "summary", "limitations"],
+  "properties": {
+    "format": {"const": "workbench-worldgen-static-risk-report-v1"},
+    "schema_version": {"const": 1},
+    "report_id": {"type": "string", "pattern": "^workbench-worldgen-static-risk:sha256:[0-9a-f]{64}$"},
+    "created_at": {"type": "string", "minLength": 1},
+    "coverage": {"enum": ["complete", "partial"]},
+    "method": {"const": "bounded-java-class-constant-pool-cooccurrence-v1"},
+    "jars": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["path", "sha256", "size_bytes", "class_count", "malformed_class_count", "nested_archive_count", "uncompressed_bytes", "coverage", "finding_count"]}},
+    "findings": {"type": "array", "items": {"type": "object", "required": ["finding_id", "jar_sha256", "jar_name", "class_name", "rule_id", "severity", "title", "why", "disposition", "rationale", "evidence_state"]}},
+    "summary": {"type": "object", "required": ["jar_count", "class_count", "finding_count", "severity", "dispositions"]},
+    "limitations": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+  }
+}

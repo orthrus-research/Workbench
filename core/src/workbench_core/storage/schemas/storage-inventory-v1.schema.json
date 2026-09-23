@@ -1,0 +1,826 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/storage-inventory-v1.schema.json",
+  "title": "Workbench storage inventory V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalization_id",
+    "inventory_id",
+    "read_only",
+    "generated_at",
+    "workspace_root",
+    "storage_root",
+    "scan",
+    "totals",
+    "items",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-storage-inventory-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "canonicalization_id": {
+      "const": "workbench-canonical-json-v1"
+    },
+    "inventory_id": {
+      "type": "string",
+      "pattern": "^workbench-storage-inventory:sha256:[0-9a-f]{64}$"
+    },
+    "read_only": {
+      "const": true
+    },
+    "generated_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "workspace_root": {
+      "$ref": "#/$defs/absolutePath"
+    },
+    "storage_root": {
+      "$ref": "#/$defs/absolutePath"
+    },
+    "scan": {
+      "$ref": "#/$defs/scan"
+    },
+    "totals": {
+      "$ref": "#/$defs/totals"
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "limitations": {
+      "$ref": "#/$defs/limitations"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/+@=-]*$"
+    },
+    "singleLine": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "absolutePath": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/singleLine"
+        },
+        {
+          "not": {
+            "pattern": "(^|[\\\\/])\\.\\.([\\\\/]|$)"
+          }
+        }
+      ]
+    },
+    "workbenchRelativePath": {
+      "allOf": [
+        {
+          "type": "string",
+          "minLength": 11,
+          "maxLength": 8192,
+          "pattern": "^\\.workbench/[^\\r\\n\\u0000]+$"
+        },
+        {
+          "not": {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        }
+      ]
+    },
+    "nullableWorkbenchRelativePath": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/workbenchRelativePath"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableIdentifier": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/timestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/singleLine"
+      }
+    },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "completed_at",
+        "followed_symlinks",
+        "content_hashes_computed",
+        "root_device",
+        "problem_count"
+      ],
+      "properties": {
+        "started_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "completed_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "followed_symlinks": {
+          "const": false
+        },
+        "content_hashes_computed": {
+          "const": false
+        },
+        "root_device": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "problem_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_count",
+        "logical_bytes",
+        "unique_allocated_bytes",
+        "exclusive_allocated_bytes",
+        "eligible_bytes",
+        "review_bytes",
+        "protected_bytes",
+        "active_bytes",
+        "problem_count"
+      ],
+      "properties": {
+        "item_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "logical_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_allocated_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exclusive_allocated_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "eligible_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "review_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "protected_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "active_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "problem_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "logical_bytes",
+        "unique_allocated_bytes",
+        "exclusive_allocated_bytes",
+        "file_count",
+        "directory_count",
+        "symlink_count"
+      ],
+      "properties": {
+        "logical_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_allocated_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exclusive_allocated_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "directory_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "symlink_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "custodian",
+        "producer",
+        "profile_id",
+        "platform_profile_id",
+        "evidence_paths"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "managed",
+            "recognized-legacy",
+            "external",
+            "unknown"
+          ]
+        },
+        "custodian": {
+          "$ref": "#/$defs/nullableIdentifier"
+        },
+        "producer": {
+          "$ref": "#/$defs/nullableIdentifier"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/nullableIdentifier"
+        },
+        "platform_profile_id": {
+          "$ref": "#/$defs/nullableIdentifier"
+        },
+        "evidence_paths": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/workbenchRelativePath"
+          }
+        }
+      }
+    },
+    "filesystemOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uid",
+        "gid",
+        "user",
+        "group",
+        "mixed"
+      ],
+      "properties": {
+        "uid": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gid": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "user": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/singleLine"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/singleLine"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mixed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "lastUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "at",
+        "basis",
+        "evidence_paths"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "observed",
+            "inferred",
+            "unknown"
+          ]
+        },
+        "at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "basis": {
+          "enum": [
+            "receipt",
+            "manager-ledger",
+            "filesystem-mtime",
+            "unknown"
+          ]
+        },
+        "evidence_paths": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/workbenchRelativePath"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "at": {
+                "type": "null"
+              },
+              "basis": {
+                "const": "unknown"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "at": {
+                "$ref": "#/$defs/timestamp"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reproducibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason",
+        "evidence_paths"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "verified",
+            "regenerable",
+            "recipe-available",
+            "retained-only",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "evidence_paths": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/workbenchRelativePath"
+          }
+        }
+      }
+    },
+    "deletion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "recoverability",
+        "reason_codes",
+        "referenced_by"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "eligible",
+            "review",
+            "protected",
+            "active"
+          ]
+        },
+        "recoverability": {
+          "enum": [
+            "trash",
+            "snapshot-first",
+            "none"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "referenced_by": {
+          "type": "array",
+          "maxItems": 10000,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^workbench-storage-item:sha256:[0-9a-f]{64}$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "eligible"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "recoverability": {
+                "const": "trash"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "protected",
+                  "active"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "recoverability": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "kind",
+        "relative_path",
+        "logical_bytes",
+        "unique_allocated_bytes",
+        "exclusive_allocated_bytes"
+      ],
+      "properties": {
+        "component_id": {
+          "type": "string",
+          "pattern": "^workbench-storage-component:sha256:[0-9a-f]{64}$"
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "relative_path": {
+          "$ref": "#/$defs/workbenchRelativePath"
+        },
+        "logical_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_allocated_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exclusive_allocated_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "target_item_id",
+        "target_path",
+        "required",
+        "evidence_path"
+      ],
+      "properties": {
+        "relation": {
+          "enum": [
+            "contains",
+            "depends-on",
+            "produced-by",
+            "references",
+            "snapshot-of",
+            "trash-of"
+          ]
+        },
+        "target_item_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^workbench-storage-item:sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_path": {
+          "$ref": "#/$defs/nullableWorkbenchRelativePath"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "evidence_path": {
+          "$ref": "#/$defs/nullableWorkbenchRelativePath"
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "target_item_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "target_item_id"
+          ]
+        },
+        {
+          "properties": {
+            "target_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "target_path"
+          ]
+        }
+      ]
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "detail",
+        "path"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/identifier"
+        },
+        "detail": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "path": {
+          "$ref": "#/$defs/nullableWorkbenchRelativePath"
+        }
+      }
+    },
+    "kind": {
+      "enum": [
+        "artifact",
+        "build-output",
+        "cache",
+        "capture",
+        "configuration",
+        "evidence",
+        "experiment",
+        "fixture",
+        "gradle-cache",
+        "iteration",
+        "jdk",
+        "log",
+        "overlay",
+        "research",
+        "runtime",
+        "runtime-template",
+        "screenshot",
+        "session",
+        "snapshot",
+        "staging",
+        "target",
+        "temporary",
+        "trash",
+        "world",
+        "unknown"
+      ]
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "parent_item_id",
+        "resource_id",
+        "kind",
+        "path",
+        "relative_path",
+        "custody",
+        "filesystem_owner",
+        "size",
+        "last_use",
+        "reproducibility",
+        "deletion",
+        "components",
+        "references",
+        "observation_sha256",
+        "problems",
+        "limitations"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "pattern": "^workbench-storage-item:sha256:[0-9a-f]{64}$"
+        },
+        "parent_item_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^workbench-storage-item:sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resource_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "relative_path": {
+          "$ref": "#/$defs/workbenchRelativePath"
+        },
+        "custody": {
+          "$ref": "#/$defs/custody"
+        },
+        "filesystem_owner": {
+          "$ref": "#/$defs/filesystemOwner"
+        },
+        "size": {
+          "$ref": "#/$defs/size"
+        },
+        "last_use": {
+          "$ref": "#/$defs/lastUse"
+        },
+        "reproducibility": {
+          "$ref": "#/$defs/reproducibility"
+        },
+        "deletion": {
+          "$ref": "#/$defs/deletion"
+        },
+        "components": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "$ref": "#/$defs/component"
+          }
+        },
+        "references": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "$ref": "#/$defs/reference"
+          }
+        },
+        "observation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "problems": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "$ref": "#/$defs/problem"
+          }
+        },
+        "limitations": {
+          "$ref": "#/$defs/limitations"
+        }
+      }
+    }
+  }
+}

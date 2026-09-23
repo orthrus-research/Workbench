@@ -1,0 +1,167 @@
+{
+  "schema": "axiom.native-fluid-source-lock.v1",
+  "revisions": {
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "susy-core": "2042c2e4f8b2e5fc9691b1b1e74f0ee11632513a"
+  },
+  "references": [
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/FluidConstants.java",
+      "gitBlob": "9acc1a6cebd13f563ce93039e52d30372b6251bd",
+      "sha256": "ca9b55cc64fa36c27f191d6d97508f62bb19c7ace04c7b36c237596eb18f68cc"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/FluidState.java",
+      "gitBlob": "02cad14303c20c24e86d60a96b231f125d4dda83",
+      "sha256": "f7159f40ac8db315659332194525a7c62682569b72dfb364bf7b576d3594cae4"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/attribute/FluidAttribute.java",
+      "gitBlob": "ad99e07821b3270d8cf2f7b15cf3a27c72b3db01",
+      "sha256": "75cb3ca9ae53b52c786931ca736cec1c82289c9e39ca8a395526c9fb597d4531"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/attribute/AttributedFluid.java",
+      "gitBlob": "d35a99be991c78c34a562f8a2b6f1e5c857e93c0",
+      "sha256": "cacbc0f72016561bb8e2609dc3ab4e93bd76becfdd714c1c09232e26dab08bb5"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/GTFluid.java",
+      "gitBlob": "5b808f034f8156c2eab4f08624459312d157c2c4",
+      "sha256": "1b1b98764994829e6bcd469fca7511e00d6df44a556300575e6b5d7d60fbc3c7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/store/FluidStorageKey.java",
+      "gitBlob": "4000c1d5ef98ef3d8d5b231a8965d54648c89542",
+      "sha256": "b638dcb4969157e8b7918edc80ce4fc80784ec9690a25dcf3ce28c86319d4c94"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/store/FluidStorageKeys.java",
+      "gitBlob": "515fb605270d10d017f29ef7d6f2fbf216d5f7dd",
+      "sha256": "21634fef3c1e65f8830275e9475c836de90dbc49fa02c6ad3739dc5efda87389"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/FluidProperty.java",
+      "gitBlob": "d8662ec6bed77431594b53362091cbd36cb0dbe4",
+      "sha256": "4db65208d271cc5d2742d1691c8455cde706e69ed61608b1ee4b457622c49c93"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/FluidBuilder.java",
+      "gitBlob": "31c9caad896f8fd17133f6f95cf30f4e06a6378d",
+      "sha256": "c39af1c6301ad60c9e2de27aa65c35c1f411485bb5e931d3297de4b6835e728b"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/FluidUnifier.java",
+      "gitBlob": "ffc916c4237f155a7ddb63328fb488d1d7c68efe",
+      "sha256": "6c833cecfd439911887168de5ec1da37691dfcc184971999e96e9e8797843077"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/info/MaterialFlag.java",
+      "gitBlob": "dffbd6d29b9de645dbcc06571a930901ee0b0064",
+      "sha256": "ccfd1c528551755610bf8a6b68a15f823a5a4771c02ab0264412c6ce5c14a780"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/info/MaterialFlags.java",
+      "gitBlob": "2bed36b06a439b1a38d49a6b3c04ee7add77cadc",
+      "sha256": "bc61f3d88dd284288e1a95c8847146409fbc08d6db9027e2c5173e483cdaa660"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/info/MaterialIconSet.java",
+      "gitBlob": "005bf8769e778109d3cce9684baf32cefce3fe9f",
+      "sha256": "00edad0a34e852f49acf9b0fb3cbe95e693600ae63262001d7a2e8196e6c6728"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/BlastProperty.java",
+      "gitBlob": "61670ea18f9b6771e9e6a550b6e388fe1eb4ebf7",
+      "sha256": "a4589693cfec3ca60b14f2532cb60acf416e26f9aef203ee853174fdd5b00a6e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/Material.java",
+      "gitBlob": "18770e5325cd561ba2121ab21e26394452b88195",
+      "sha256": "46b7cf9c92c06fb3c6db97b06e71f3b826d30d2889f417909418bd406245425e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/GTUtility.java",
+      "gitBlob": "b4e3c75aeb8fef2c531f716bff84875224c46f62",
+      "sha256": "c79e1d4d62dc2246ab456c931aa7a44340c146951e1b14585fa3f471fe6beaed"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/GTFluidRegistration.java",
+      "gitBlob": "8f690c15c4c545f4e2c0f232fdc7267cea39ab99",
+      "sha256": "729a24b6b302a220f3d69060e8b16f6ab8fd6ca4348be8c5dab6b0e8579a4069"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fluids/Fluid.java",
+      "gitBlob": "d211bdc450fecedb369de1948dd997a217a2fdd9",
+      "sha256": "ef2bae716c3ce83143f04587c773be313143effce799d06c67218569c3709917"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fluids/FluidRegistry.java",
+      "gitBlob": "12a560423cb01a020c2da667893697adf974aebb",
+      "sha256": "d0e7b102938d4cc740a893c8f3aa71fb39ab39cb5240916923d911e1cac5a44a"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/info/MaterialIconType.java",
+      "gitBlob": "23d4589d3b5c41cf08ba6ac919ef9eef1dd5be11",
+      "sha256": "5cc6cd0677d0ecc6de3b3a7b352ec2d527fe315f25d561e245a3275de85440a6"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/FluidTooltipUtil.java",
+      "gitBlob": "5f2ccad8ed98f1d914ba161b4e84b2f156b8e06b",
+      "sha256": "ebb4923561178cd9e1845cd8783c30cb5a1e337f48df426a7daaa12223ff34c9"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSyUnknownCompositionMaterials.java",
+      "gitBlob": "9ef65750072e2b1bf9c96774163ff2aff3fabf89",
+      "sha256": "3730a2e18e786e30f369fc9877d864888492570cbdfd26a8e3a589ad8302a574"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/util/SuSyUtility.java",
+      "gitBlob": "ffb00c7572f71ebc5a7ac5ce5d1c4056cf880359",
+      "sha256": "8d0e0f5a544ba1f0c8267007a6056cda20cdb3ae07c41b43707cdcccb75f23e3"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/Supersymmetry.java",
+      "gitBlob": "8dc99471d35550472a9c7604ecf5a5765d6545e3",
+      "sha256": "c51e3e16cb14a16e379902e8255c673bfcbe45a8b3571d5846d1e208fe32b8a8"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "LICENSE",
+      "gitBlob": "8000a6faacf471c537530805ab29523c7732e11a",
+      "sha256": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331"
+    },
+    {
+      "repository": "susy-core",
+      "path": "gradle.properties",
+      "gitBlob": "06821d5c10918aef84f68ab858fd3cde8c0881a2",
+      "sha256": "c6b4d155fb2a43b589c4f915e5a087e9f3b51cd15187244d3735cdc73ed9c546"
+    }
+  ],
+  "qualification": "isolated native producer domain; not vanilla bootstrap, pack events or world behavior"
+}

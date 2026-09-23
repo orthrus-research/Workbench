@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/literal-diagnostic-policy-v1.schema.json",
+  "title": "Workbench Crucible literal diagnostic policy v1",
+  "$ref": "#/$defs/policy",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+    },
+    "singleLine": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "disposition",
+        "logger",
+        "level",
+        "message_prefix"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "disposition": {
+          "enum": ["fail", "review"]
+        },
+        "logger": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "level": {
+          "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"]
+        },
+        "message_prefix": {
+          "$ref": "#/$defs/singleLine"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "policy_id",
+        "owner_profile_id",
+        "subject_artifact_sha256",
+        "log_format",
+        "match_semantics",
+        "zero_match_state",
+        "rules"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-crucible-literal-diagnostic-policy-v1"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "policy_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "owner_profile_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "subject_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "log_format": {
+          "const": "forge-log4j2-bracketed-v1"
+        },
+        "match_semantics": {
+          "const": "literal-logger-level-message-prefix-v1"
+        },
+        "zero_match_state": {
+          "const": "inconclusive"
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      }
+    }
+  }
+}

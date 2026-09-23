@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/schema/blueprints-standard-registry-v1.schema.json",
+  "title": "Blueprints implementation standard registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "registry_id",
+    "standards"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-standard-registry-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-IMPLEMENTATION-STANDARD-V1"
+    },
+    "registry_id": {
+      "type": "string",
+      "pattern": "^blueprints-standard-registry:sha256:[0-9a-f]{64}$"
+    },
+    "standards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "standard_key",
+          "version",
+          "lifecycle",
+          "kind",
+          "feature_family",
+          "source_path",
+          "source_sha256",
+          "standard_id",
+          "standard_sha256"
+        ],
+        "properties": {
+          "standard_key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+          },
+          "lifecycle": {
+            "enum": [
+              "active",
+              "retired"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "primary",
+              "component"
+            ]
+          },
+          "feature_family": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+          },
+          "source_path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\).+\\.yaml$"
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "standard_id": {
+            "type": "string",
+            "pattern": "^blueprints-standard:sha256:[0-9a-f]{64}$"
+          },
+          "standard_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

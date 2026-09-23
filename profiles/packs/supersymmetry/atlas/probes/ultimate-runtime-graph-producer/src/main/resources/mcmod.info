@@ -1,0 +1,16 @@
+[
+  {
+    "modid": "workbench_runtime_graph",
+    "name": "Workbench Ultimate Runtime Graph Producer",
+    "description": "Armed-only categorical occurrence capture for Workbench Crucible and Atlas.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "updateUrl": "",
+    "authorList": ["Workbench"],
+    "credits": "",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": ["required-after:appliedenergistics2", "required-after:betterquesting", "required-after:gregtech", "required-after:industrialrenewal", "required-after:opencomputers", "required-after:pyrotech", "required-after:rftools", "required-after:rsgauges", "required-after:techguns"]
+  }
+]

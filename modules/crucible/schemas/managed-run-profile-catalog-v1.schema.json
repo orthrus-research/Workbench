@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/managed-run-profile-catalog-v1.schema.json",
+  "title": "Workbench managed run profile catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "catalog_id",
+    "pack_profile",
+    "target",
+    "recipes"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-managed-run-profile-catalog-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "catalog_id": {
+      "type": "string",
+      "pattern": "^workbench-pack:[a-z0-9][a-z0-9_-]*:managed-run-profiles-v1$"
+    },
+    "pack_profile": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "recipes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/recipe"
+      }
+    }
+  },
+  "$defs": {
+    "singleLine": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "side",
+        "worldgen_profile"
+      ],
+      "properties": {
+        "capability": {
+          "const": "worldgen-dev"
+        },
+        "side": {
+          "const": "dedicated-server"
+        },
+        "worldgen_profile": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+        }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "available",
+            "unavailable"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/singleLine"
+        }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "purpose",
+        "availability",
+        "mode",
+        "region_default",
+        "diagnostic_sample_modulo",
+        "open_viewer",
+        "record_jfr"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+        },
+        "purpose": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
+        "mode": {
+          "enum": [
+            "fast",
+            "debug",
+            "performance",
+            null
+          ]
+        },
+        "region_default": {
+          "enum": [
+            "fast_region",
+            "debug_region",
+            null
+          ]
+        },
+        "diagnostic_sample_modulo": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "open_viewer": {
+          "type": "boolean"
+        },
+        "record_jfr": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "properties": {
+                  "state": {
+                    "const": "available"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            },
+            "required": [
+              "availability"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "fast",
+                  "debug",
+                  "performance"
+                ]
+              },
+              "region_default": {
+                "enum": [
+                  "fast_region",
+                  "debug_region"
+                ]
+              },
+              "diagnostic_sample_modulo": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "mode": {
+                "type": "null"
+              },
+              "region_default": {
+                "type": "null"
+              },
+              "diagnostic_sample_modulo": {
+                "type": "null"
+              },
+              "open_viewer": {
+                "const": false
+              },
+              "record_jfr": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

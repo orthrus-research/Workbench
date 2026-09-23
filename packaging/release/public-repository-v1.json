@@ -1,0 +1,61 @@
+{
+  "format": "workbench-public-repository-v1",
+  "schema_version": 1,
+  "project": {
+    "id": "workbench",
+    "display_name": "Workbench",
+    "organization_display_name": "Orthrus Research"
+  },
+  "destination": {
+    "provider": "github",
+    "organization_login": "orthrus-research",
+    "repository_name": "workbench",
+    "full_name": "orthrus-research/workbench",
+    "html_url": "https://github.com/orthrus-research/workbench",
+    "clone_url": "https://github.com/orthrus-research/workbench.git",
+    "issues_url": "https://github.com/orthrus-research/workbench/issues",
+    "security_advisory_url": "https://github.com/orthrus-research/workbench/security/advisories/new"
+  },
+  "hosting_state": "public",
+  "history_policy": {
+    "kind": "clean-root-export",
+    "public_default_branch": "master",
+    "existing_branches_published": false,
+    "existing_tags_published": false,
+    "source_history_retained_outside_public_repository": true,
+    "requires_clean_reviewed_revision": true,
+    "export_tool": "tools/prepare_public_export.py",
+    "tag_namespaces": [
+      "workbench-api/v",
+      "workbench-core/v",
+      "workbench-atlas/v",
+      "workbench-axiom/v",
+      "workbench-axiom-engine/v",
+      "workbench-blueprints/v",
+      "workbench-crucible/v",
+      "workbench-material-semantics/v",
+      "workbench-pack-program-studio/v",
+      "workbench-process-studio/v",
+      "workbench-project-intelligence/v",
+      "workbench-relay/v",
+      "workbench-runtime-explorer/v",
+      "workbench-sentinel/v",
+      "workbench-subsurface-studio/v",
+      "workbench-shell/v",
+      "workbench-worldgen-cockpit/v",
+      "workbench-worldgen-qualifier/v",
+      "workbench-profile-supersymmetry/v",
+      "workbench-profile-cleanroom/v",
+      "workbench-vscode/v",
+      "workbench-intellij-community/v"
+    ],
+    "workspace_copy_allowed": false,
+    "mirror_push_allowed": false
+  },
+  "claims": {
+    "history_pushed": false,
+    "public_visibility_verified": true,
+    "repository_created": true,
+    "repository_settings_applied": false
+  }
+}

@@ -1,0 +1,423 @@
+{
+  "expected_run_config": {
+    "pack_id": "supersymmetry",
+    "pack_name": "Supersymmetry"
+  },
+  "format": "workbench-groovy-pack-profile-v1",
+  "identity_policies": [
+    {
+      "disposition": "review",
+      "field": "numeric_id",
+      "identity_kind": "gtceu-material-id",
+      "policy_id": "supersymmetry-gtceu-material-id-unique-v1",
+      "rule_id": "gtceu-material-definition",
+      "save_risk": "fresh-world-review-required"
+    },
+    {
+      "disposition": "review",
+      "field": "registry_name",
+      "identity_kind": "gtceu-material-registry-name",
+      "policy_id": "supersymmetry-gtceu-material-name-unique-v1",
+      "rule_id": "gtceu-material-definition",
+      "save_risk": "fresh-world-review-required"
+    },
+    {
+      "disposition": "review",
+      "field": "numeric_id",
+      "identity_kind": "gtceu-metaitem-id",
+      "policy_id": "supersymmetry-metaitem-id-unique-v1",
+      "rule_id": "supersymmetry-metaitem-definition",
+      "save_risk": "save-compatibility-review-required"
+    },
+    {
+      "disposition": "review",
+      "field": "registry_name",
+      "identity_kind": "gtceu-metaitem-name",
+      "policy_id": "supersymmetry-metaitem-name-unique-v1",
+      "rule_id": "supersymmetry-metaitem-definition",
+      "save_risk": "save-compatibility-review-required"
+    },
+    {
+      "disposition": "review",
+      "field": "recipe_id",
+      "identity_kind": "crafting-recipe-id",
+      "policy_id": "supersymmetry-crafting-recipe-id-review-v1",
+      "rule_id": "groovyscript-crafting-registration",
+      "save_risk": "none"
+    }
+  ],
+  "limitations": [
+    "The Supersymmetry V1 adapter recognizes high-value conventions observed in master-ceu; it is not a complete catalog of every installed mod API.",
+    "Material, metaitem, and crafting identities are comment-aware static candidates until exact registration is observed.",
+    "Machine recipe chains retain literal resolvers and builder properties but do not expand loops, closures, helper methods, or dynamically selected recipe maps."
+  ],
+  "pack_profile_id": "workbench-pack:supersymmetry",
+  "platform_profile": "../../../platforms/cleanroom/groovyscript/groovyscript-1.4.3-v1.json",
+  "profile_id": "workbench-pack:supersymmetry:groovy-program:master-ceu-v1",
+  "rules": [
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "numeric_id",
+          "mode": "integer"
+        },
+        {
+          "argument": 1,
+          "field": "registry_name",
+          "mode": "wrapped-string"
+        }
+      ],
+      "category": "definition",
+      "description": "GTCEu material builder declaration",
+      "identity_fields": [
+        "numeric_id",
+        "registry_name"
+      ],
+      "kind": "material",
+      "match": {
+        "callee": "Material.Builder",
+        "constructor": true
+      },
+      "operation": "add",
+      "reload": "restart-required",
+      "rule_id": "gtceu-material-definition"
+    },
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "numeric_id",
+          "mode": "integer"
+        },
+        {
+          "argument": 1,
+          "field": "registry_name",
+          "mode": "string"
+        }
+      ],
+      "category": "definition",
+      "description": "Supersymmetry StandardMetaItem entry",
+      "identity_fields": [
+        "numeric_id",
+        "registry_name"
+      ],
+      "kind": "metaitem",
+      "match": {
+        "path_regex": "(^|/)preInit/RegisterMetaItems\\.groovy$",
+        "terminal": "addItem"
+      },
+      "operation": "add",
+      "reload": "restart-required",
+      "rule_id": "supersymmetry-metaitem-definition"
+    },
+    {
+      "captures": [
+        {
+          "argument": null,
+          "field": "recipe_map",
+          "mode": "qualifier"
+        }
+      ],
+      "category": "recipe",
+      "description": "GTCEu fluent machine-recipe builder chain",
+      "identity_fields": [],
+      "kind": "machine-recipe",
+      "match": {
+        "terminal": "recipeBuilder"
+      },
+      "operation": "add",
+      "reload": "stage",
+      "rule_id": "gtceu-machine-recipe-builder"
+    },
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "recipe_id",
+          "mode": "wrapped-string"
+        },
+        {
+          "argument": null,
+          "field": "method",
+          "mode": "terminal"
+        }
+      ],
+      "category": "recipe",
+      "description": "GroovyScript crafting add or replacement operation",
+      "identity_fields": [
+        "recipe_id"
+      ],
+      "kind": "crafting-recipe",
+      "match": {
+        "callee_prefix": "crafting.",
+        "terminal_regex": "^(add|replace).*$"
+      },
+      "operation": "add-or-replace",
+      "reload": "stage",
+      "rule_id": "groovyscript-crafting-registration"
+    },
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "recipe_id",
+          "mode": "wrapped-string"
+        },
+        {
+          "argument": null,
+          "field": "method",
+          "mode": "terminal"
+        }
+      ],
+      "category": "mutation",
+      "description": "GroovyScript crafting removal operation",
+      "identity_fields": [
+        "recipe_id"
+      ],
+      "kind": "crafting-recipe",
+      "match": {
+        "callee_prefix": "crafting.",
+        "terminal_regex": "^(remove|clear).*$"
+      },
+      "operation": "remove",
+      "reload": "stage",
+      "rule_id": "groovyscript-crafting-removal"
+    },
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "registry_name",
+          "mode": "wrapped-string"
+        }
+      ],
+      "category": "reference",
+      "description": "Item stack resolver",
+      "identity_fields": [
+        "registry_name"
+      ],
+      "kind": "item",
+      "match": {
+        "callee": "item"
+      },
+      "operation": "resolve",
+      "reload": "stage",
+      "rule_id": "groovyscript-item-reference"
+    },
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "registry_name",
+          "mode": "wrapped-string"
+        }
+      ],
+      "category": "reference",
+      "description": "GTCEu metaitem resolver",
+      "identity_fields": [
+        "registry_name"
+      ],
+      "kind": "metaitem",
+      "match": {
+        "callee": "metaitem"
+      },
+      "operation": "resolve",
+      "reload": "stage",
+      "rule_id": "groovyscript-metaitem-reference"
+    },
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "registry_name",
+          "mode": "wrapped-string"
+        }
+      ],
+      "category": "reference",
+      "description": "Fluid stack resolver",
+      "identity_fields": [
+        "registry_name"
+      ],
+      "kind": "fluid",
+      "match": {
+        "callee": "fluid"
+      },
+      "operation": "resolve",
+      "reload": "stage",
+      "rule_id": "groovyscript-fluid-reference"
+    },
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "ore_name",
+          "mode": "wrapped-string"
+        }
+      ],
+      "category": "reference",
+      "description": "OreDictionary stack resolver",
+      "identity_fields": [
+        "ore_name"
+      ],
+      "kind": "ore-dictionary",
+      "match": {
+        "callee": "ore"
+      },
+      "operation": "resolve",
+      "reload": "stage",
+      "rule_id": "groovyscript-ore-reference"
+    },
+    {
+      "captures": [
+        {
+          "argument": 0,
+          "field": "registry_name",
+          "mode": "wrapped-string"
+        }
+      ],
+      "category": "reference",
+      "description": "Recipe-map resolver",
+      "identity_fields": [
+        "registry_name"
+      ],
+      "kind": "recipe-map",
+      "match": {
+        "callee": "recipemap"
+      },
+      "operation": "resolve",
+      "reload": "stage",
+      "rule_id": "groovyscript-recipemap-reference"
+    },
+    {
+      "captures": [
+        {
+          "argument": null,
+          "field": "adapter_path",
+          "mode": "qualifier"
+        },
+        {
+          "argument": null,
+          "field": "method",
+          "mode": "terminal"
+        }
+      ],
+      "category": "integration",
+      "description": "GroovyScript installed-mod adapter call",
+      "identity_fields": [],
+      "kind": "mod-integration",
+      "match": {
+        "callee_prefix": "mods."
+      },
+      "operation": "invoke",
+      "reload": "stage",
+      "rule_id": "groovyscript-mod-integration-call"
+    },
+    {
+      "captures": [
+        {
+          "argument": null,
+          "field": "adapter_path",
+          "mode": "qualifier"
+        },
+        {
+          "argument": null,
+          "field": "method",
+          "mode": "terminal"
+        }
+      ],
+      "category": "mutation",
+      "description": "Mod-adapter removal with unqualified transactional behavior",
+      "identity_fields": [],
+      "kind": "mod-registry",
+      "match": {
+        "callee_prefix": "mods.",
+        "terminal_regex": "^(remove|clear).*$"
+      },
+      "operation": "remove",
+      "reload": "unknown",
+      "rule_id": "groovyscript-mod-removal"
+    },
+    {
+      "captures": [
+        {
+          "argument": null,
+          "field": "owner_path",
+          "mode": "qualifier"
+        },
+        {
+          "argument": null,
+          "field": "method",
+          "mode": "terminal"
+        }
+      ],
+      "category": "dynamic",
+      "description": "Direct Java or registry removal escape hatch",
+      "identity_fields": [],
+      "kind": "direct-java-mutation",
+      "match": {
+        "exclude_callee_prefix": [
+          "crafting.",
+          "mods."
+        ],
+        "terminal_regex": "^(remove|removeAll|removeAllRecipes|removeRecipe|clear).*$"
+      },
+      "operation": "remove",
+      "reload": "unknown",
+      "rule_id": "groovy-direct-removal-escape-hatch"
+    },
+    {
+      "captures": [
+        {
+          "argument": null,
+          "field": "method",
+          "mode": "terminal"
+        }
+      ],
+      "category": "data",
+      "description": "NBT-bearing stack or recipe operation",
+      "identity_fields": [],
+      "kind": "nbt",
+      "match": {
+        "terminal_regex": "^.*(NBT|Nbt|nbt).*$"
+      },
+      "operation": "read-or-mutate",
+      "reload": "stage",
+      "rule_id": "groovy-nbt-operation"
+    },
+    {
+      "captures": [],
+      "category": "runtime",
+      "description": "Forge/GroovyScript event listener registration",
+      "identity_fields": [],
+      "kind": "event-listener",
+      "match": {
+        "callee": "eventManager.listen"
+      },
+      "operation": "register-handler",
+      "reload": "unknown",
+      "rule_id": "groovy-event-listener"
+    },
+    {
+      "captures": [],
+      "category": "dynamic",
+      "description": "Groovy metaclass mutation or access",
+      "identity_fields": [],
+      "kind": "metaclass",
+      "match": {
+        "token": "metaClass"
+      },
+      "operation": "dynamic-mutation",
+      "reload": "unknown",
+      "rule_id": "groovy-metaclass-escape-hatch"
+    }
+  ],
+  "schema_version": 1,
+  "source_layout": {
+    "groovy_root": "groovy",
+    "max_file_bytes": 4194304,
+    "max_files": 5000,
+    "max_total_bytes": 268435456,
+    "run_config": "runConfig.json"
+  }
+}

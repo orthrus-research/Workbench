@@ -1,0 +1,333 @@
+{
+  "format": "workbench-crucible-v2-malicious-cases-v1",
+  "cases": [
+    {
+      "case_id": "object-descriptor-unknown-field",
+      "target": "object-descriptor",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "evidence-record-unknown-field",
+      "target": "evidence-record",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "admission-record-unknown-field",
+      "target": "admission-record",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "ledger-entry-unknown-field",
+      "target": "ledger-entry",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "evidence-set-revision-unknown-field",
+      "target": "evidence-set-revision",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "graph-record-unknown-field",
+      "target": "graph-record",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "graph-revision-unknown-field",
+      "target": "graph-revision",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "graph-set-revision-unknown-field",
+      "target": "graph-set-revision",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "materialization-recipe-unknown-field",
+      "target": "materialization-recipe",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "dependency-manifest-unknown-field",
+      "target": "dependency-manifest",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "reference-event-unknown-field",
+      "target": "reference-event",
+      "operation": "add",
+      "pointer": "/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.additionalProperties"
+    },
+    {
+      "case_id": "node-body-unknown-field",
+      "target": "graph-record:node",
+      "operation": "add",
+      "pointer": "/body/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.oneOf"
+    },
+    {
+      "case_id": "edge-body-unknown-field",
+      "target": "graph-record:edge",
+      "operation": "add",
+      "pointer": "/body/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.oneOf"
+    },
+    {
+      "case_id": "property-body-unknown-field",
+      "target": "graph-record:property",
+      "operation": "add",
+      "pointer": "/body/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.oneOf"
+    },
+    {
+      "case_id": "evidence-link-body-unknown-field",
+      "target": "graph-record:evidence-link",
+      "operation": "add",
+      "pointer": "/body/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.oneOf"
+    },
+    {
+      "case_id": "refinement-mapping-body-unknown-field",
+      "target": "graph-record:refinement-mapping",
+      "operation": "add",
+      "pointer": "/body/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.oneOf"
+    },
+    {
+      "case_id": "frontier-body-unknown-field",
+      "target": "graph-record:frontier",
+      "operation": "add",
+      "pointer": "/body/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.oneOf"
+    },
+    {
+      "case_id": "conflict-body-unknown-field",
+      "target": "graph-record:conflict",
+      "operation": "add",
+      "pointer": "/body/unexpected",
+      "value": true,
+      "expected_stage": "record",
+      "expected_phase": "schema",
+      "expected_code": "schema.oneOf"
+    },
+    {
+      "case_id": "evidence-source-binding-order",
+      "target": "evidence-record",
+      "operation": "reverse-array",
+      "pointer": "/source_bindings",
+      "expected_stage": "record",
+      "expected_phase": "semantic",
+      "expected_code": "semantic.source-binding-order"
+    },
+    {
+      "case_id": "graph-partition-order",
+      "target": "graph-revision",
+      "operation": "reverse-array-and-reseal",
+      "pointer": "/partitions",
+      "expected_stage": "publication",
+      "expected_phase": "semantic",
+      "expected_code": "semantic.partition-order"
+    },
+    {
+      "case_id": "record-content-id-mismatch",
+      "target": "graph-record:node",
+      "operation": "replace",
+      "pointer": "/id",
+      "value": "graph-record:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "record",
+      "expected_phase": "identity",
+      "expected_code": "identity.mismatch"
+    },
+    {
+      "case_id": "object-digest-mismatch",
+      "target": "object-descriptor",
+      "operation": "replace-and-reseal",
+      "pointer": "/sha256",
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "semantic",
+      "expected_code": "semantic.object-digest-agreement"
+    },
+    {
+      "case_id": "wrong-kind-reference",
+      "target": "admission-record",
+      "operation": "replace-from-and-reseal",
+      "pointer": "/candidate_record_id",
+      "value_from": "graph-record:node",
+      "expected_stage": "publication",
+      "expected_phase": "schema",
+      "expected_code": "schema.pattern"
+    },
+    {
+      "case_id": "missing-reference",
+      "target": "evidence-record",
+      "operation": "replace-and-reseal",
+      "pointer": "/payload_object_descriptor_id",
+      "value": "object-descriptor:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "relation",
+      "expected_code": "relation.unavailable"
+    },
+    {
+      "case_id": "rejected-effective-admission",
+      "target": "publication",
+      "operation": "reject-admission-and-reseal-descendants",
+      "pointer": "/admission-record/outcome",
+      "value": "rejected",
+      "expected_stage": "publication",
+      "expected_phase": "relation",
+      "expected_code": "relation.effective-admission-outcome"
+    },
+    {
+      "case_id": "evidence-set-root-mismatch",
+      "target": "evidence-set-revision",
+      "operation": "replace-and-reseal",
+      "pointer": "/semantic_root",
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "semantic",
+      "expected_code": "semantic.root-mismatch"
+    },
+    {
+      "case_id": "dependency-footprint-root-mismatch",
+      "target": "dependency-manifest",
+      "operation": "replace-and-reseal",
+      "pointer": "/footprints/0/footprint_root",
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "semantic",
+      "expected_code": "semantic.root-mismatch"
+    },
+    {
+      "case_id": "dependency-aggregate-root-mismatch",
+      "target": "dependency-manifest",
+      "operation": "replace-and-reseal",
+      "pointer": "/semantic_root",
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "semantic",
+      "expected_code": "semantic.root-mismatch"
+    },
+    {
+      "case_id": "graph-partition-root-mismatch",
+      "target": "graph-revision",
+      "operation": "replace-and-reseal",
+      "pointer": "/partitions/0/semantic_root",
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "relation",
+      "expected_code": "relation.partition-root"
+    },
+    {
+      "case_id": "graph-record-root-mismatch",
+      "target": "graph-revision",
+      "operation": "replace-and-reseal",
+      "pointer": "/record_roots/nodes",
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "relation",
+      "expected_code": "relation.record-root"
+    },
+    {
+      "case_id": "graph-aggregate-root-mismatch",
+      "target": "graph-revision",
+      "operation": "replace-and-reseal",
+      "pointer": "/aggregate_semantic_root",
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "semantic",
+      "expected_code": "semantic.root-mismatch"
+    },
+    {
+      "case_id": "graph-set-aggregate-root-mismatch",
+      "target": "graph-set-revision",
+      "operation": "replace-and-reseal",
+      "pointer": "/aggregate_semantic_root",
+      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "semantic",
+      "expected_code": "semantic.root-mismatch"
+    },
+    {
+      "case_id": "cross-context-graph-revision",
+      "target": "graph-revision",
+      "operation": "replace-and-reseal",
+      "pointer": "/context_ref_id",
+      "value": "context-ref:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expected_stage": "publication",
+      "expected_phase": "relation",
+      "expected_code": "relation.dependency-agreement"
+    }
+  ]
+}

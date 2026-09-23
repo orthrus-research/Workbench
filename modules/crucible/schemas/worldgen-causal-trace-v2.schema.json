@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/worldgen-causal-trace-v2.schema.json",
+  "title": "Workbench World Studio Causal Trace V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "execution_envelope_id",
+    "occurrence_ordinal", "record_type", "stage_id", "rule_id",
+    "seed", "dimension", "chunk_x", "chunk_z"
+  ],
+  "properties": {
+    "format": {"const": "workbench-world-studio-causal-trace-v2"},
+    "schema_version": {"const": 2},
+    "execution_envelope_id": {
+      "type": "string",
+      "pattern": "^worldgen-execution-envelope:sha256:[0-9a-f]{64}$"
+    },
+    "occurrence_ordinal": {"type": "integer", "minimum": 0},
+    "record_type": {"enum": ["gate-decision", "feature-decision"]},
+    "stage_id": {"const": "populate.custom"},
+    "rule_id": {"enum": ["forge.populate.custom", "world-studio.boulder.v1"]},
+    "seed": {"type": "integer"},
+    "dimension": {"type": "integer"},
+    "chunk_x": {"type": "integer"},
+    "chunk_z": {"type": "integer"},
+    "decision": {"enum": ["allowed", "rejected"]},
+    "rng_algorithm": {"const": "java.util.Random.v1"},
+    "seed_derivation_id": {"const": "world-studio.stage-random.v1"},
+    "stage_seed": {"type": "integer"},
+    "eligibility_bound": {"const": 10},
+    "eligibility_draw": {"type": "integer", "minimum": 0, "maximum": 9},
+    "eligibility_accepted": {"type": "boolean"},
+    "x_draw": {"type": ["integer", "null"], "minimum": 0, "maximum": 7},
+    "z_draw": {"type": ["integer", "null"], "minimum": 0, "maximum": 7},
+    "optional_top_draw": {"type": ["boolean", "null"]},
+    "base_position": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/position"}
+      ]
+    },
+    "writes": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {"$ref": "#/$defs/write"}
+    },
+    "outcome": {"enum": ["placed", "rejected-by-eligibility-draw"]}
+  },
+  "$defs": {
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": {"type": "integer"},
+        "y": {"type": "integer"},
+        "z": {"type": "integer"}
+      }
+    },
+    "state": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["registry_name", "metadata"],
+          "properties": {
+            "registry_name": {"type": "string", "minLength": 1},
+            "metadata": {"type": "integer"}
+          }
+        }
+      ]
+    },
+    "write": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role", "position", "before_state", "requested_state", "after_state",
+        "invoked", "result", "outcome"
+      ],
+      "properties": {
+        "role": {"enum": ["mandatory-base", "mandatory-east", "optional-top"]},
+        "position": {"$ref": "#/$defs/position"},
+        "before_state": {"$ref": "#/$defs/state"},
+        "requested_state": {"$ref": "#/$defs/state"},
+        "after_state": {"$ref": "#/$defs/state"},
+        "invoked": {"type": "boolean"},
+        "result": {"type": "boolean"},
+        "outcome": {
+          "enum": ["written", "write-returned-false", "rejected-by-optional-draw"]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"record_type": {"const": "gate-decision"}}},
+      "then": {
+        "required": ["decision"],
+        "properties": {"rule_id": {"const": "forge.populate.custom"}}
+      }
+    },
+    {
+      "if": {"properties": {"record_type": {"const": "feature-decision"}}},
+      "then": {
+        "required": [
+          "rng_algorithm", "seed_derivation_id", "stage_seed",
+          "eligibility_bound", "eligibility_draw", "eligibility_accepted",
+          "x_draw", "z_draw", "optional_top_draw", "base_position", "writes", "outcome"
+        ],
+        "properties": {"rule_id": {"const": "world-studio.boulder.v1"}}
+      }
+    }
+  ]
+}

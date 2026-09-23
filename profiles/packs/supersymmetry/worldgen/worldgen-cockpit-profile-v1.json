@@ -1,0 +1,59 @@
+{
+  "boundaries": {
+    "atlas_remains_causal_authority": true,
+    "crucible_remains_experiment_authority": true,
+    "profile_is_pack_specific": true,
+    "strata_remains_final_state_authority": true
+  },
+  "dimension_id": 0,
+  "format": "workbench-worldgen-cockpit-pack-profile-v1",
+  "iteration_profile": "profiles/packs/supersymmetry/worldgen/worldgen-iteration-profile-v2.json",
+  "limits": {
+    "max_chunks": 1024,
+    "max_exact_block_comparisons": 33554432,
+    "max_outliers": 24,
+    "max_samples_per_chunk": 4,
+    "max_topology_blocks": 4000000
+  },
+  "modes": {
+    "debug": {
+      "region_default": "debug_region",
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical",
+        "causal"
+      ]
+    },
+    "fast": {
+      "region_default": "fast_region",
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical"
+      ]
+    },
+    "performance": {
+      "region_default": "debug_region",
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical",
+        "performance",
+        "observer_overhead"
+      ]
+    }
+  },
+  "pack_profile": "supersymmetry",
+  "profile_id": "workbench-pack:supersymmetry:worldgen-cockpit-v1",
+  "schema_version": 1,
+  "subsurface_profile": "profiles/packs/supersymmetry/subsurface/gtceu-2.8.10-v1.json",
+  "thresholds": {
+    "cave_volume_relative": 0.05,
+    "chunk_outlier_mad": 3.5,
+    "height_mean_abs_blocks": 1.0,
+    "ore_mass_relative": 0.05,
+    "performance_regression_min_us": 100,
+    "performance_regression_ratio": 1.15
+  }
+}

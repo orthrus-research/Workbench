@@ -1,0 +1,1181 @@
+{
+  "schema": "axiom.material-program-source-lock.v1",
+  "revisions": {
+    "supersymmetry": "3e83cd7bad57bd4c424de4e6cc707ab02fe32f54",
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+    "susy-core": "2042c2e4f8b2e5fc9691b1b1e74f0ee11632513a",
+    "groovyscript": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4",
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73"
+  },
+  "references": [
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/relauncher/FMLLaunchHandler.java",
+      "size": 6676,
+      "sha256": "cb7c060002cab8ce0d01dd58f85c868100594e89476d3f8ff87c57795402d14c",
+      "gitBlob": "5eccf7530417ab5030f302703be3f7d74c7398b0"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/launcher/FMLTweaker.java",
+      "size": 6279,
+      "sha256": "bc7bcc71610166c37194a5b6d2e1d45df3c9341dbfd2c00bdb510263d88f4f29",
+      "gitBlob": "faf27b0313b7b39e69cb0fe87d30a3ec0b9ec156"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/launcher/FMLServerTweaker.java",
+      "size": 2111,
+      "sha256": "7628628bb1fa791cd196bf74b62bb747a78567520aa53e1f80f1429beae8c907",
+      "gitBlob": "ad4af714c83116729135348dc2eb11c523a6c499"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/PatchingTransformer.java",
+      "size": 1184,
+      "sha256": "a13956c74bb04cb9f885fe4026522ecb353cbf7696351e083a27743fec2b4349",
+      "gitBlob": "7dc573d925775445b393a5bafbfe4592195b9ce8"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/patcher/ClassPatchManager.java",
+      "size": 10893,
+      "sha256": "0f42217fccbcb77b0211bcc9fec8e7e80de9df2709689d0d441d90938b25c261",
+      "gitBlob": "593ac2746a4d51771575f20d2f4757c7bd6caf0e"
+    },
+  {
+    "repository": "cleanroom",
+    "path": "src/main/java/net/minecraftforge/fml/relauncher/FMLInjectionData.java",
+    "size": 2230,
+    "sha256": "447436aa667b3bc46378c1cf912e3abd5c92365bc0cc2b524fbd5bac7790d3dd",
+    "gitBlob": "3eaea30c7b27eb7b9a87dd0346905f144c393f85"
+  },
+  {
+    "repository": "cleanroom",
+    "path": "src/main/java/net/minecraftforge/fml/relauncher/CoreModManager.java",
+    "size": 20406,
+    "sha256": "73b664dcf2ec1ed55bf973cc198a6c1aabedfdcd6a37b04241641a432566fe68",
+    "gitBlob": "04b9a3a477b8cbde44d632b143922b8f578c6d6c"
+  },
+  {
+    "repository": "cleanroom",
+    "path": "src/main/java/net/minecraftforge/common/ForgeEarlyConfig.java",
+    "size": 6348,
+    "sha256": "9489172b9a972bf5c7ba90b4369b12c8ae610bf2d7a7eccc5752575e2164bb63",
+    "gitBlob": "00cd0e7f661d7e40056fc67b2833bc5661277a19"
+  },
+  {
+    "repository": "cleanroom",
+    "path": "src/main/java/com/cleanroommc/client/modlist/ModListConfig.java",
+    "size": 1835,
+    "sha256": "af38a6a4c3b8d38dc283da0ce735a1ae24961977fca5b332d0eaa07a32652170",
+    "gitBlob": "f68d9b50f2388b43c86219f71ea7db6e5bd6017a"
+  },
+  {
+    "repository": "cleanroom",
+    "path": "src/main/java/com/cleanroommc/common/CleanroomContainer.java",
+    "size": 2044,
+    "sha256": "7a3765d70b3e3904e72f28f0c8b976353c2b110d9072b10c6d5b706eddd5c729",
+    "gitBlob": "5d424de1ddd1dc992fe1f59deb77b7f7ce7234eb"
+  },
+  {
+    "repository": "cleanroom",
+    "path": "src/main/java/com/cleanroommc/common/ConfigAnytimeContainer.java",
+    "size": 1257,
+    "sha256": "1889db2fe9ca506e7bb303b989a899a867ddc6ac8368431664d55c31a672bfce",
+    "gitBlob": "7e9b8feac52a66f6f99c540e9cf678145a3ed008"
+  },
+  {
+    "repository": "cleanroom",
+    "path": "src/main/java/zone/rong/mixinbooter/MixinBooterModContainer.java",
+    "size": 1672,
+    "sha256": "78348fd8ce83990b1430b2a6498185fb11d91a662f6a7b9e6676db4cc2d551c4",
+    "gitBlob": "eb87cde264ba5c051f1106af2c172a316e291152"
+  },
+  {
+    "repository": "cleanroom",
+    "path": "src/main/java/net/minecraftforge/fml/common/InjectedModContainer.java",
+    "size": 5534,
+    "sha256": "6bfd87e4ad5fb5b4a4a76d4a1655be874dd7036aa8ca22beec68b5717256ee6e",
+    "gitBlob": "7056e87f84fbca77f46c6de3a68947728330e4ef"
+  },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/relauncher/libraries/LibraryManager.java",
+      "size": 25179,
+      "sha256": "e96aa7b4e7046dbd5d153e51ac80cc738c4155948817a9ef0470773d436fc67c",
+      "gitBlob": "aa5e0e44e06f289307d5f4ece34b0c16bb669f91"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/relauncher/libraries/ModList.java",
+      "size": 8208,
+      "sha256": "6117f64817a1e747f0a355d570f89fcd3680fe54b7af6e8faa472b1f3c39bdf2",
+      "gitBlob": "21070925e404c2b232f089492212731b60393553"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/ModClassLoader.java",
+      "size": 5720,
+      "sha256": "1b75dbd00bb7c954c5213f58374b0364ba5ad07f97a38ed312e92ee53351cf14",
+      "gitBlob": "4ced73ed527874c80d021d39c689e8f5d3bcd84d"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/API.java",
+      "size": 1113,
+      "sha256": "0d084c872ab11e8e0582341b7d5f1803f0c2280eb1659803884d74632dc3e5ef",
+      "gitBlob": "d1adfd984e0299ad06dc721f23d5f63e6f2f5c07"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/discovery/ASMDataTable.java",
+      "size": 6338,
+      "sha256": "fafe86c4a05b10e4e3595c46b3e33d5cb864fed2aa77346d5847e21833aa346c",
+      "gitBlob": "9b3f0c6182acea479805083c1c96244a81a65123"
+    },
+    {
+      "repository": "susy-core",
+      "path": "gradle.properties",
+      "size": 9102,
+      "sha256": "c6b4d155fb2a43b589c4f915e5a087e9f3b51cd15187244d3735cdc73ed9c546",
+      "gitBlob": "06821d5c10918aef84f68ab858fd3cde8c0881a2"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/util/SuSyUtility.java",
+      "size": 5293,
+      "sha256": "8d0e0f5a544ba1f0c8267007a6056cda20cdb3ae07c41b43707cdcccb75f23e3",
+      "gitBlob": "ffb00c7572f71ebc5a7ac5ce5d1c4056cf880359"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/material/FirstDegreeMaterialsB.groovy",
+      "size": 38363,
+      "sha256": "e39602e2e484e19b32e2af4c0b0ae9e271902e001148efa4a68bcc44fc7439ca",
+      "gitBlob": "bd935c4ed486248c0229764bf85f4486fb2b5603"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSyFirstDegreeMaterials.java",
+      "size": 8328,
+      "sha256": "a6fc8d43e19be0057145d522e4c50b98b1250dc603672c1ab90143d13da54be5",
+      "gitBlob": "04a5989e6acfd87f7b9bbae0524ffcab65928625"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/GTValues.java",
+      "size": 7608,
+      "sha256": "f2861c31315f5e556705927a63e7649ef0c6ca1c0a420170af38a99146b15675",
+      "gitBlob": "006f9444117742e6caa5eb17237b3f109084ee7c"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/attribute/FluidAttribute.java",
+      "size": 1697,
+      "sha256": "75cb3ca9ae53b52c786931ca736cec1c82289c9e39ca8a395526c9fb597d4531",
+      "gitBlob": "ad99e07821b3270d8cf2f7b15cf3a27c72b3db01"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/FluidPipeProperties.java",
+      "size": 5471,
+      "sha256": "dd3b78b80bf208a2e9eb39c23203497968d181799768e48c0fac4c44868c08a6",
+      "gitBlob": "5bd1ce7e1ecec70de003c8f5fafd995386b7cf1b"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/integration/groovyscript/SuSyExpansions.java",
+      "size": 4870,
+      "sha256": "f9b771bee7c0791e9ce652624a2753a0471e117defebea2808fca35ee2d98072",
+      "gitBlob": "68b16a821b32a8e18b6f11f8b0fa334d186c8b0f"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/integration/groovyscript/GrSModule.java",
+      "size": 1452,
+      "sha256": "49e57ee8caef4ef6af4c19db6a1fe9c0800103a17bc8ac8e91c31f2e159a01a9",
+      "gitBlob": "1088a3fb75b1f6788dce509eed43806ca4785562"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/fluids/SuSyFluidAttributes.java",
+      "size": 460,
+      "sha256": "16bef89bd820be62fd85c9a5b370c1ab071787bf8437a14d541a5df5361326ad",
+      "gitBlob": "4616723ccf4d74a7743785e96cacb63eb75a5568"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/integration/groovy/MaterialPropertyExpansion.java",
+      "size": 16169,
+      "sha256": "f293a77fe43b6b96367ff9690566b6f3a43d4a3b718ca2ac756401b0dc721e52",
+      "gitBlob": "79cc7c810aa37e29dabba259885afe283e088a81"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/FluidBuilder.java",
+      "size": 16479,
+      "sha256": "c39af1c6301ad60c9e2de27aa65c35c1f411485bb5e931d3297de4b6835e728b",
+      "gitBlob": "31c9caad896f8fd17133f6f95cf30f4e06a6378d"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/store/FluidStorageImpl.java",
+      "size": 3509,
+      "sha256": "19464f7cb915d60bd6e68ec84ac5239668d463ab4a78937d24de677df5535c73",
+      "gitBlob": "06911df8deb326464d70caa8d67be957ffe47124"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/FluidProperty.java",
+      "size": 4094,
+      "sha256": "4db65208d271cc5d2742d1691c8455cde706e69ed61608b1ee4b457622c49c93",
+      "gitBlob": "d8662ec6bed77431594b53362091cbd36cb0dbe4"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/BlastProperty.java",
+      "size": 6574,
+      "sha256": "a4589693cfec3ca60b14f2532cb60acf416e26f9aef203ee853174fdd5b00a6e",
+      "gitBlob": "61670ea18f9b6771e9e6a550b6e388fe1eb4ebf7"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/material/FirstDegreeMaterialsA.groovy",
+      "size": 166667,
+      "sha256": "d3231ef5e005205a160ffbd15a565e9d71216f7e922f15700d33d87c5e4dc68e",
+      "gitBlob": "be779867abcaa2d574fb2fe4d5a3207b04369242"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/globals/Globals.groovy",
+      "size": 3705,
+      "sha256": "a22e8fc3296369dce93eeba15dd2baabef14c2a29a0bd0dfa010098dc8291913",
+      "gitBlob": "00f8bb1c37f5afd3aa669042ef7d96bf9337e5fa"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/Material.java",
+      "size": 45150,
+      "sha256": "46b7cf9c92c06fb3c6db97b06e71f3b826d30d2889f417909418bd406245425e",
+      "gitBlob": "18770e5325cd561ba2121ab21e26394452b88195"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/Materials.java",
+      "size": 28444,
+      "sha256": "aa8d1403441faef12ded7cc6127e322107f9c6cfef52ba27e1c9f3480ca7e6a0",
+      "gitBlob": "d2d65e81f72776b7fd1806b05d088fac1f1d4e6c"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/MaterialStack.java",
+      "size": 2174,
+      "sha256": "5aa97516063c7fe0ed561ad691802e51d09e64e9535c9273273e9a39e9fbf942",
+      "gitBlob": "35584781e22b25779a25a5e5b125096df0b15abe"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/MaterialProperties.java",
+      "size": 3113,
+      "sha256": "3ad2fff16eea35ad7da8463c6aa743695e7c366dd9a169857033a648b2f46a24",
+      "gitBlob": "b3ea19b4c8b5cc527df6eaba6b200b906ecbf249"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/event/MaterialEvent.java",
+      "size": 349,
+      "sha256": "69588d46ad8b34bf6a4d2ed905251a26a1e5b10a9e395cf62387f6fd9563ab35",
+      "gitBlob": "71476090916f1533b5f2b22a256956bbad3380bd"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/event/PostMaterialEvent.java",
+      "size": 372,
+      "sha256": "56d9c247c24fb89032f8a6b3653ca9333b13385991d006599467fd5d56b71232",
+      "gitBlob": "23a501a69ab1f4b2b9f2a8a90ea8ce8c1f761ad4"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/CoreModule.java",
+      "size": 14589,
+      "sha256": "419bcda8f1e04e17aeae9cf167a45aa8c31aee3413c1c57ce58aad5756d8700b",
+      "gitBlob": "d103159380f9bcf7b944ca2e25e69b9aa08e5676"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/unification/material/internal/MaterialRegistryImpl.java",
+      "size": 2083,
+      "sha256": "a13df098c1b3cf58283317e9afb27a39c7919fbb792d73f1936a7edd0fca0fb8",
+      "gitBlob": "5311166dd2c0de322746e1173f39dc5a61e1e797"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/unification/material/internal/MaterialRegistryManager.java",
+      "size": 5078,
+      "sha256": "d3fb2aba0675e4b2dee5edd23037504d6cfd0504d1cee556670a6091bbd8c76b",
+      "gitBlob": "ff26e95cdd2b4a33b8d2cd051a0fa9d71fc44340"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/integration/groovy/GroovyMaterialBuilderExpansion.java",
+      "size": 6108,
+      "sha256": "60fcb2d81116e70aa897fe9af3b73ad610d04331899deb13b2e04799f1d71e20",
+      "gitBlob": "f132c8ea48188fb9427b23a60beb849c46504b48"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/integration/groovy/GroovyScriptModule.java",
+      "size": 14288,
+      "sha256": "bff46ad1b522cdc65c7ed472daab1f8e8a132440060eaf1c25827aeb5503e200",
+      "gitBlob": "cca6dc79babf916d77b85740e1c8c0fb2b51d6c7"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "gradle.properties",
+      "size": 3132,
+      "sha256": "04383730811acc0dbe566885657298ab33bd1f7cd374c4512e5921989c60c240",
+      "gitBlob": "5936cf83665d26398f9d5e36fdf20c4752db1287"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/GroovyScript.java",
+      "size": 13409,
+      "sha256": "26d2bf722a8ccc3e6220e71db19eb21caf01604af7bbecfd491186f9969a3101",
+      "gitBlob": "436f80ccd9ff6ceea89a35f7500e93f70144133c"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/GroovyScriptSandbox.java",
+      "size": 15879,
+      "sha256": "085bb22c91b4cc2cda63fb41d1a40f5c268c913945d52965214b3d0b4f89cae9",
+      "gitBlob": "772518129c9f677edd863881fa69041b3db743f3"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/SandboxData.java",
+      "size": 6745,
+      "sha256": "d6f009e97cf5724fb26b6958767a8837d60efa4a8a09bd8a11456d2933a80739",
+      "gitBlob": "0616f687be1e4a38a45a4c7158267d8ca893df6b"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/Preprocessor.java",
+      "size": 6494,
+      "sha256": "5cfc584499e2af33bc87585a15d8e9b1aaecf70e967f20c718df1a556d8bd305",
+      "gitBlob": "04bcc1f3430f4b9bdc69c11ff228e934b6cd1eec"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/ClosureHelper.java",
+      "size": 4066,
+      "sha256": "1066c93b0115dea2eadbfcb98c3f8ebbb67b8d3912aa29ba1b02fdb6c2417421",
+      "gitBlob": "22e6af5d7f251f819c871247631729843296eda0"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/GroovyLogImpl.java",
+      "size": 14252,
+      "sha256": "9c62a9981e30b6510352612058c96878204160838a53b153c1e2f846ba666a17",
+      "gitBlob": "020e1d4d735cc21ff573e5f32bf219506b0a3a2d"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/meta/ClassScriptMetaClass.java",
+      "size": 709,
+      "sha256": "de9c9a8f14c49571b099d5af9c69dfcc5180be77ff24f57c56ad47398968dc2b",
+      "gitBlob": "106a14bbd7cf2cb5b2eba90b8c2fa96a4419a1be"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/meta/ClassMetaClass.java",
+      "size": 1055,
+      "sha256": "34925848501e1cf2f3e03a942477607c0cedccc7daafb9ca04194938c17f5704",
+      "gitBlob": "f604ff26d30de66f58c90c58f6bad3a5de101d52"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/transformer/GroovyScriptEarlyCompiler.java",
+      "size": 3068,
+      "sha256": "3c498637e503ba3df734ceae69406dae7b9538323afabebb699eb91f5c003c43",
+      "gitBlob": "8c6c797d3c27015c49bf4bf1b5a1c64794459636"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/transformer/GroovyScriptCompiler.java",
+      "size": 537,
+      "sha256": "8444076bbcf0587b4cd036c116749a19168eb434363af837fda16f413a67462b",
+      "gitBlob": "cc268e7680773c678da884eb208dbdef517d888c"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/transformer/GroovyScriptTransformer.java",
+      "size": 3797,
+      "sha256": "8a620802f02c59788dbd81b02f92d4543a8d7d0cdc6708766a226e23568f60cc",
+      "gitBlob": "c133a95ff663e51204985fadf5ca584572343f11"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/transformer/AbstractCompileCustomizer.java",
+      "size": 3041,
+      "sha256": "de00597cdb582f64794b33f849ae957d9a2b39372da3775fea07766171d5487e",
+      "gitBlob": "4b7be9b19f034e64e9b08265db4be4f7e3f8d5ce"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/transformer/AbstractTransformer.java",
+      "size": 1682,
+      "sha256": "64496bdfbd3f542c6c4a0df683283fa81877081c4be9ef0da5be27b5baa1c293",
+      "gitBlob": "6519832fb841c084f0d04aa93f7f14e1cec55202"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/event/GroovyEventManager.java",
+      "size": 5674,
+      "sha256": "cd0a07ce14a9297690dd1dc9e5201631e105bb14ddcbdcabf7eecc1ce182ecf1",
+      "gitBlob": "13fe3ed3019b12831540f16a0c9386a2c9d52833"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/event/EventBusExtended.java",
+      "size": 305,
+      "sha256": "b4811379b7e41d4d851c0dd410abd1d5cd62c9c527c38cac9d7140ee67a669fa",
+      "gitBlob": "f0746e89adc2364669bab1434ec7caa04ea63b38"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/EventBusMixin.java",
+      "size": 1382,
+      "sha256": "d450f71263204f11ec546e0f32b9319f92bcf97b018c8768b7e7693905f07fa1",
+      "gitBlob": "9b724fc21bca28097ca84ed53df9ebb817b01b72"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/ModuleNodeAccessor.java",
+      "size": 418,
+      "sha256": "8e3da79e62ae965be3c2311fabede7c0b1246f029560d21049b49f3f6bac4cc3",
+      "gitBlob": "0edf62b45cad65111563885a33b4c0c35edf99af"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/ClosureMixin.java",
+      "size": 881,
+      "sha256": "78b7d13cb7e2b78b994ea6762755bf63afdd80032b6f6e88a6ed095ea85cd55f",
+      "gitBlob": "ef419ae6e926c2dba021f789af0f9b0f987afd50"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/MetaClassImplMixin.java",
+      "size": 6728,
+      "sha256": "d7fdc6401212f19d2e76dff037efda2da6175db3af79c7f9ead398ed7ffaed04",
+      "gitBlob": "90c228cedcc5ef88ea6a58bb5e507b2d1c116bb6"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/resources/mixin.groovyscript.json",
+      "size": 1150,
+      "sha256": "6e9c89ea0a6e157bab92c6044b27af35fd4c73baf9ae7c1bd42edaee4834d8bf",
+      "gitBlob": "bb7e6b2224d9c42829f4faa4986d63d0522c3def"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/runConfig.json",
+      "size": 282,
+      "sha256": "067ff8d32a3817fe38604759eca35d69f56bb149466a6ba55f32a82e81f0546f",
+      "gitBlob": "89b7834feae6c3ca6f23a761a61e34c9b0935354"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/material/OreMaterials.groovy",
+      "size": 28471,
+      "sha256": "09a7ed7b0b08a3886932ceb6029348409230e4fb665d1e76d9c91b5129ab595d",
+      "gitBlob": "c03203eed5ac746bc1de135b192408e98e96041b"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/material/SuSyMaterials.groovy",
+      "size": 125403,
+      "sha256": "287d2d7608a8b7fcfed41ef634f6d3380212b4e6878802b8beda5ab94de0e88e",
+      "gitBlob": "94c5c95e8e6b57f9085a30639bebafc7519973ae"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/material/IsotopeMaterials.groovy",
+      "size": 4234,
+      "sha256": "ae4c7c87f916e8419f01ff97a2639646cb257db4254142c747b9913008f74d5a",
+      "gitBlob": "5f63a72daf0f1aaefcf67c830c0a229c6fa894ac"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/classes/ChangeFlags.groovy",
+      "size": 32840,
+      "sha256": "8f6873ca445d4b811d460e5ce4676056efa7f89fdc4894230323b1ea7481036f",
+      "gitBlob": "11b2872d4d06090197fbf64828d6a8b6531eb1ab"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/preInit/MaterialChanges.groovy",
+      "size": 957,
+      "sha256": "0fdc926962b12dcf55dfb6c0780a64254a85814e13b1960443ad98ba5434199f",
+      "gitBlob": "6ce18023c606ae8112194032444282c847136014"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/preInit/RegisterMetaItems.groovy",
+      "size": 20846,
+      "sha256": "3e3c887e3c8d2691a3ff6f5726f4a31c7e001630bb980f00049e4818a557c674",
+      "gitBlob": "f48591d4e0239803b494942b0f217578f05e37b4"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/CommonProxy.java",
+      "size": 14655,
+      "sha256": "62b8052634a123109b7efe1f474f574839559b6ab8fe5d1e804f19cc3486c6f6",
+      "gitBlob": "bf18cba6178baf47f1def67153427d72c7f57ae6"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SusyMaterials.java",
+      "size": 13679,
+      "sha256": "4aa34ecc666ef19560e0b182eceb087e892743487e9fb5e279c2d5e7cac3ac8c",
+      "gitBlob": "c54914b0f67a64b740e27a7a4fec8096d58b64fe"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/EventSubscriptionTransformer.java",
+      "size": 11077,
+      "sha256": "dfb23b3b0e67124e218d297df35beba6362c19db0b84fa26fac04f0fe3479490",
+      "gitBlob": "ed1fbdb0921b1618a2ac28361348cfd238e05144"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/eventhandler/EventBus.java",
+      "size": 9387,
+      "sha256": "bdeb5ae37f450918ed17251d77b77285b3123b812687bd7ae9cbc95480f35eec",
+      "gitBlob": "0fa262bcde9eb62161ee84e095e5ad2ee1fd3b31"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/eventhandler/ListenerList.java",
+      "size": 8448,
+      "sha256": "c572e4763c8d90d877ab4cc67f65d1686ad8a7cfee892e19590c2a9aaff62cea",
+      "gitBlob": "32cc6de12a3bc4b2eb69d95e892bd446cd8f73a6"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/RunConfig.java",
+      "size": 15739,
+      "sha256": "438038fc21e0b4be4db169a4a4050a1524abbad833ee42f86c7b3757d9d4ce12",
+      "gitBlob": "d0e14a4037261de3ba884394caa360f1607f7bbc"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/CustomGroovyScriptEngine.java",
+      "size": 24320,
+      "sha256": "d4cb583365a284831770806f72571b8901f72d1e8836354a3d0a3354ca7124eb",
+      "gitBlob": "9c7a6e5ecd460d31957be5b9d28ee931dc9d2258"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/transformer/AsmDecompileHelper.java",
+      "size": 7371,
+      "sha256": "a49b616e6059e4175e44907f0fd2ac9b06ffa4bde0a528acf04294f4dd2edbc3",
+      "gitBlob": "4cac6300e2ba71d79411aba72a95b0cf78d5e869"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/transformer/GroovyCodeFactory.java",
+      "size": 6720,
+      "sha256": "1a8e524d2684880896e691a564d6344fa9fffea00e70aaea0aa7d8613b1f00fc",
+      "gitBlob": "d6c07dbe56151efa5d5612d601b14f3aafe22dc1"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/mapper/GroovyDeobfMapper.java",
+      "size": 12686,
+      "sha256": "7313526e0fe9bf170fdccc6edbd543b65fdf00ee23dbec91ee47ac802d4f02b0",
+      "gitBlob": "c461c1ab8c79cbd0a52bee9df39d1c5fd48b4cfa"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/sandbox/security/GroovySecurityManager.java",
+      "size": 8253,
+      "sha256": "b63ccc62a1a6b8ac59df347124be935a3af595a4550fd96ea2472bfeb463ee56",
+      "gitBlob": "9c5bb722ca6bcc91f7e4901aa664af6fda3a1831"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/AsmDecompilerMixin.java",
+      "size": 743,
+      "sha256": "8e78df35aa73eec06fb813514d11bd8363ee7850c4dd3ec31f83da5e86accd51",
+      "gitBlob": "818b7a8befdc853cc6b49eab654f283b5a0e9a7d"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/ClassNodeResolverMixin.java",
+      "size": 2329,
+      "sha256": "b56014feabdb50f004fd681b4abd01380023b2338fd731df026084f79a88c3b2",
+      "gitBlob": "2875922e3eea53502d7a50e1e11b052bd49388d8"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/CompUnitClassGenMixin.java",
+      "size": 1290,
+      "sha256": "cd566260f66e29e36da70b6494b6e1eada283e3ca6059056e2571ccc8bf597b9",
+      "gitBlob": "96629a7c21ba2ecdf89fefa89d923ac6e9c08188"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/Java8Mixin.java",
+      "size": 5695,
+      "sha256": "fe255e09afb058bd90c604051d0fe802c909e7fe8af36368c72b679445b58105",
+      "gitBlob": "3c0dc76ad6d3753309c71a504534f580f51f214d"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/ModuleNodeMixin.java",
+      "size": 3033,
+      "sha256": "a6a6411a3cb2e905008993490f8949c40c4705b55a2569a2be98b5d34567c6e2",
+      "gitBlob": "3bd445c9136d5d0f086eb5013af4a0f3aab4f9d4"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/core/mixin/groovy/ResolveVisitorMixin.java",
+      "size": 7090,
+      "sha256": "0498e3f667678807e8e3b855515f2af67f4dd38c14dffb655f50d0e238d97028",
+      "gitBlob": "8cb9d53768249ece9309b8f9d66b4117bde57a14"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/unification/material/properties/FiberProperty.java",
+      "size": 1712,
+      "sha256": "a0b7861b88c2d546c74514f4b7d6ffc74e3ce78a5e10a012293d3f72e4f60b08",
+      "gitBlob": "b6e738396a94dab6e8b412326cf2b7cea1698ac6"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/unification/material/properties/DummyABSProperty.java",
+      "size": 822,
+      "sha256": "3ec7129f57490b13e73c8d2a40d8550a992f4ff7914fac739068f0adece731c6",
+      "gitBlob": "1b065b101a2faf01851e6f9b7e1c06954bed0c1e"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/unification/material/properties/MillBallProperty.java",
+      "size": 482,
+      "sha256": "1602469aefe5bc574aa4316a0d1f37ec485c0f12380b9f0f705a648142966207",
+      "gitBlob": "e732cd9490ad82f575508b86dbcb8cde231ee57e"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/unification/material/properties/SuSyPropertyKey.java",
+      "size": 579,
+      "sha256": "b4cc15f03dbb6299a2b9741d5f4c3beb831add45b48c0e16e9de1d76dbc708d8",
+      "gitBlob": "3c8ff20613288e9e6fd85449b4aea74273e5f08c"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/unification/material/info/SuSyMaterialFlags.java",
+      "size": 3602,
+      "sha256": "adb04219b890d8b960b520dcff0abdf07b3f4fc294b994132189e638094266bc",
+      "gitBlob": "7024a2ad5c16f25cb50d8e282ab741828989fbb9"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/GTControlledRegistry.java",
+      "size": 2236,
+      "sha256": "2d4409ec994ca7eeb7e6747e1f771f484a4a4acba42c7524f0017c6c50d250fd",
+      "gitBlob": "8ae00d93cbf6352fdd8188faace986344ebaafbd"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/material/SecondDegreeMaterials.groovy",
+      "size": 52694,
+      "sha256": "8a8c90d0aaaccdf55a0d907aff533df22d4c5a21aaacb2ee61ab6a8da3ea4531",
+      "gitBlob": "28d4372147f7e993a723704edd3c8c95a283119d"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSyElementMaterials.java",
+      "size": 113,
+      "sha256": "b99231839745de1e484038ce1392da6ee7910e54e598292390e1eeebd3ac822f",
+      "gitBlob": "87b4935a3a8ba8ddcc7315575ad112b7d08fa54c"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSySecondDegreeMaterials.java",
+      "size": 3043,
+      "sha256": "f361bb5908defb4e49fd26977c325c53cb7c20452b0c78c1e41fbeecdffccacc",
+      "gitBlob": "f4a9664f8eab98f4711eea276b2a7cd365fffab1"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSyOrganicChemistryMaterials.java",
+      "size": 122,
+      "sha256": "c68956f38f6425da3242ee9883b1da7bec378b2912b635c2025efb223494727c",
+      "gitBlob": "bdcaba0aa6ee505399a8493886170eae61ab2bc4"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSyHighDegreeMaterials.java",
+      "size": 770,
+      "sha256": "06d470ed0b15f2ff3817c11392d7a5a3f6bfcb351068c998debb6c2f9ab0e050",
+      "gitBlob": "f627c10034a25a58c3ffbd4c9662ab41531fe96e"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSyUnknownCompositionMaterials.java",
+      "size": 1896,
+      "sha256": "3730a2e18e786e30f369fc9877d864888492570cbdfd26a8e3a589ad8302a574",
+      "gitBlob": "9ef65750072e2b1bf9c96774163ff2aff3fabf89"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/fluids/SusyGeneratedFluidHandler.java",
+      "size": 1353,
+      "sha256": "4cf3b35f8af0d32fc7452fb09b245ba7af4be74aae35cb105d684df9047acc04",
+      "gitBlob": "4609649422fd2f91829268b79a985a1b9f6b0a54"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/eventhandler/ASMEventHandler.java",
+      "size": 3093,
+      "sha256": "22ca66105b6b04b0729e5f5009b5eb2719f8763a9d99382a7be7f8fb35a67957",
+      "gitBlob": "a0088666e9f4af58cd24e011c93358e5be916286"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/eventhandler/EventListenerFactory.java",
+      "size": 2785,
+      "sha256": "543ec827e018fdfeb920eb016fa64384c8e81956d2dc69073cd32888c8a148f1",
+      "gitBlob": "a7bfd2a43bfa5eb1cfc79ac1669c7de0670bf461"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/mapper/ObjectMapperManager.java",
+      "size": 15711,
+      "sha256": "afa57afcc89715f49f05e423bf18fc155127de8a2e5e24da0fa333fb30170d4a",
+      "gitBlob": "1f31730f9326bfb55e2a7206c3a3ebdb2b9b3a69"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/mapper/ObjectMapper.java",
+      "size": 14097,
+      "sha256": "d75dd3db9db2eb442ba36483195261036db0ca032cde4b96b6ceb3d1401f930b",
+      "gitBlob": "efd79eb81ce1bf3054c729f59f71f4e2e1a9176a"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/mapper/AbstractObjectMapper.java",
+      "size": 6653,
+      "sha256": "899b908825d00c488ffe62539721f92f825473811835228db9295fcdd2525903",
+      "gitBlob": "8ac462556728a2038f1e8d94f33f3175eda3ad3e"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/mapper/ObjectMapperMetaMethod.java",
+      "size": 1406,
+      "sha256": "ac95f779cc5ce614ec5ff46e70e040329dee072ade2f60db964a3c493ccd64d7",
+      "gitBlob": "4c5663a17eb00065bd3d1a5a3a453a782af7dcf6"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/java/com/cleanroommc/groovyscript/api/IObjectParser.java",
+      "size": 3250,
+      "sha256": "a56f8d10d8db13aaa7520742e89161ff11c4f88bb6f498a4a0d9cc7403d0356f",
+      "gitBlob": "6f1878a8662f147ee736f6bf37cc4de410c47935"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/material/ThirdDegreeMaterials.groovy",
+      "size": 45456,
+      "sha256": "f7c71447cbeebfd411c01eae29c99a5980428be2cdebd015ee0d366af1dbddf7",
+      "gitBlob": "256f9490cb62e258c56b39f0b6677d7ef02d06fb"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/RecipeMaps.java",
+      "size": 62704,
+      "sha256": "aee1205cb04776b31554285de2d37d61a1d85a1f611277b2d8261a027a4e18ff",
+      "gitBlob": "cd222d4105b1a76c8715decb86e892e533540e8c"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/RecipeMap.java",
+      "size": 67883,
+      "sha256": "13704f9e261dc1c2b37340de321bd3580f70d058fe2a0cb0bebea614270a8de5",
+      "gitBlob": "4c48707b5f3a4742a0b00e69557c7eb79afa8696"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/gui/resources/TextureArea.java",
+      "size": 5859,
+      "sha256": "14380070ea1e0672dd88392f329cdefa31112cd5820099cefc33a0e50a78c054",
+      "gitBlob": "1466759d6464cf7f0d1fd878574d7a026f6b9715"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/ConfigHolder.java",
+      "size": 34305,
+      "sha256": "79ed084b93af93c4e1c11519b8c2c3ae563067b511c5946d1082dc635536938b",
+      "gitBlob": "caf04defc4835f8f45161482d03b7c66f73dee61"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/WireProperties.java",
+      "size": 4760,
+      "sha256": "707ba6cef1c0f3d12182305737a5b6f6861c0a373b718fd84621e15c4b6abcb7",
+      "gitBlob": "7335be2e0c7d3651cca12ea2e3ff1fefcf7c1e2e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/OreProperty.java",
+      "size": 5862,
+      "sha256": "dca46e424de14251ba49e3d38a0ffc38beaa2246b56f5c7170c7b1863c976059",
+      "gitBlob": "acac622967baaf11aa841c5b606f7e443d2cf40c"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "config/gregtech/gregtech.cfg",
+      "size": 30948,
+      "sha256": "d7438a11cdd496a377deab07d0a6c20ef7f5113e0abeb5584472e48b275458c1",
+      "gitBlob": "f60ee0aae10cd54fa4b34e3335f70b601914bb42"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/recipes/SuSyRecipeMaps.java",
+      "size": 43175,
+      "sha256": "28ebc73d46cf808c51a37c9eabec49c5d316232703f5ed3bde95c854914eeadc",
+      "gitBlob": "3c4cfe09ff8e218241c01057a1d0549ff2602cca"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/mixins/gregtech/RecipeMapsMixin.java",
+      "size": 1174,
+      "sha256": "d17c4501e80291e965bc312a8d7adc830bfa41b82ce96dc1d17d09b7e67ddf70",
+      "gitBlob": "d0d5c6a6e6785cc01479ea6ef798dc11ba31e346"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/resources/mixins.susy.gregtech.json",
+      "size": 1051,
+      "sha256": "bb2b446d664554e082a624cc094672d8340fbdfc6b97cf6509ade147f953bb7d",
+      "gitBlob": "673c8d7d51b4b25c9fa97a43d536abfd54eb9d69"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/config/ConfigManager.java",
+      "size": 20759,
+      "sha256": "50fdbc5149cbccafeef52c1275cd12a37585555cf3a3d4cb2a1404ffae9a093b",
+      "gitBlob": "c4dcda5fd39a0634022c25f3bd4ba6667ece4a0c"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/Loader.java",
+      "size": 38739,
+      "sha256": "37b45c0a3b0dd0374f2b8688f28cfba5dd9458fd7c48fbd3659257e93a34c3ec",
+      "gitBlob": "ef4482d0f8145dc5b8159d2eb2280af99ead105d"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/discovery/asm/ASMModParser.java",
+      "size": 5344,
+      "sha256": "106e375883e7be5ac8e73253e176c85c91bdfdcc8cc36e326d607e8cb2694ee0",
+      "gitBlob": "4857400d213e6ae343a7ba2d45ad1bb7f9e4b20e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/metaitem/MetaItem.java",
+      "size": 43820,
+      "sha256": "13b7269131c14536c139d588194d8ecf4166456c238e7deb4c69d4096d13fddb",
+      "gitBlob": "595e3e0a9fccc29fafb4d0fdd78df25474c0a133"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/metaitem/StandardMetaItem.java",
+      "size": 448,
+      "sha256": "6631fc0cf158bd0b5600c0bad6734fe93afd9588c3ef3dd8e1541b48a25d90e2",
+      "gitBlob": "39aadc1351db3cc82a68f3f34ed657ce7b07f49f"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/metaitem/ElectricStats.java",
+      "size": 10054,
+      "sha256": "724072457795c84c4b84ec82295b5364936c2fc447bacdf38fc9f2ff3de41ee1",
+      "gitBlob": "bf336ec4676d24133b54267a21597855d5430a79"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/integration/baubles/BaubleBehavior.java",
+      "size": 1750,
+      "sha256": "f60721fcb48a1caeeadc075944a43815b17490322817268595dd5665add00572",
+      "gitBlob": "9eb8b186bdbc1973ecf9125e2297cdc2cd7a16e3"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/impl/ElectricItem.java",
+      "size": 5341,
+      "sha256": "fe6bbd2fac8047e4848241ca1e93879633e2e04d2eb7b8c100f7c90bcbcef5c8",
+      "gitBlob": "076813ff469baf25d74effdafb45dc5c739f7fbf"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/impl/CombinedCapabilityProvider.java",
+      "size": 1384,
+      "sha256": "c92b8e397a4c205ba4eb87cce12a42c459c5db763d7a49bf6771de5e24afb0fb",
+      "gitBlob": "3f5f7dbf2e955a163e173c18daa5b7cf729bca2e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/SimpleCapabilityManager.java",
+      "size": 2690,
+      "sha256": "499f2c98919c6f48f65b3648dad878cf2f79079a694eb005370dff7cd2fefbb2",
+      "gitBlob": "8aad39dc29ca4d60b2384050a2f6728e30d167f9"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/classes/Battery.groovy",
+      "size": 1971,
+      "sha256": "94427f951b46eda59335edf7e7d3d4976245941a37b235ae7eba24317ab31d0b",
+      "gitBlob": "23a8e71f747d87c24b26c70056d3a539c9c1c9ca"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "groovy/globals/Batteries.groovy",
+      "size": 995,
+      "sha256": "023430d2c90574c479d61d59c8a39502ad5329c26acf3216ae277a3838b0d03d",
+      "gitBlob": "16ee111f3055650d7721f1a65ad8bed288fe7f90"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/IForgeRegistryEntry.java",
+      "size": 3789,
+      "sha256": "0a0a885d02d269793974dde935ca1eb3a045d0baadb5d93a24289c417589f3c8",
+      "gitBlob": "ec5fb6eec31153e7f87f16612f7f6b0022514c17"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/GameData.java",
+      "size": 45358,
+      "sha256": "ed47f38eb4a14896413804f3c9564b7282e960885d6da43dab5667f1d54a1eb7",
+      "gitBlob": "07d241bf8ec556a88bbc765b3ce7c10032978fd8"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/oredict/OreDictionary.java",
+      "size": 34680,
+      "sha256": "b87c73368cbbf57260098db7a259aa13eef651ff15bf82afc8f51c84985fa68d",
+      "gitBlob": "89a2ae48366ded8feceb3a2fd8d8db8e40c2d09a"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/ModAPITransformer.java",
+      "size": 8470,
+      "sha256": "51a956f22aea8df6181ecf411e0c84080fb5052d01666487b488b34cb6d8bf98",
+      "gitBlob": "d5703a986df6e48e0d1328baab18f9f0484d84b9"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/Supersymmetry.java",
+      "size": 5206,
+      "sha256": "c51e3e16cb14a16e379902e8255c673bfcbe45a8b3571d5846d1e208fe32b8a8",
+      "gitBlob": "8dc99471d35550472a9c7604ecf5a5765d6545e3"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/mixins/SuSyLateMixinLoader.java",
+      "size": 1284,
+      "sha256": "15b5359adbc06d8ca8231bc4701481c23d04e5d0ab0d1e71d724420ada36b637",
+      "gitBlob": "dc2624f9b761475a4fe5bab88729827c3f6848d9"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/mixins/gcym/GCYMEventHandlersMixin.java",
+      "size": 2060,
+      "sha256": "6979fde4fb03cbb42936d621b36552b87de5f9e9833c529effc968c44b7fbe9a",
+      "gitBlob": "848f60013a385697102c05cc70189fa0a24815f7"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/resources/mixins.susy.gcym.json",
+      "size": 250,
+      "sha256": "9d7e79a800147527fcc7320de09f64427d50e9ca0a8a8c821b261c4e279155cc",
+      "gitBlob": "c1613a6244682cb74a058f1100ddf611aac4808c"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "config/supercritical.cfg",
+      "size": 2990,
+      "sha256": "cf283a3487da6e72d33c2be817ea61c52391f739e7634242982bd920ade67368",
+      "gitBlob": "5ac9525fbd67b1dfddd6a587d409fcacddaa1a2e"
+    },
+    {
+      "repository": "supersymmetry",
+      "path": "config/gregtechfoodoption.cfg",
+      "size": 8859,
+      "sha256": "fa138a4c7389121e021c8cf1d2f7441ac5ce4c0e5138fb1f4df9c706c8a85b46",
+      "gitBlob": "9d9f077cfdbd9a312335be6de5c50eb3e533119f"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/com/cleanroommc/discovery/CleanroomModDiscoverer.java",
+      "size": 29571,
+      "sha256": "4d6459cc6b5f6b248b7c0546829d95686477366405ff8441eab5150a2a5fd574",
+      "gitBlob": "29891a326a21f1b824785f68e41c215f3e293446"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/discovery/JarDiscoverer.java",
+      "size": 7197,
+      "sha256": "f2c60fb4c95a45fd34609e4f945d1c39248ff4b8db6d3f11bfd7705cb948afe2",
+      "gitBlob": "4d3acac812b569ba7edbbf19eb4ea1cfe46eee6a"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/discovery/ModCandidate.java",
+      "size": 3736,
+      "sha256": "dfac8d360361e2bbd67f775690bf573f2905b7fdd4d282693e4093073b7c09b5",
+      "gitBlob": "eb471cd20b8ab898f805b155d594291fb2a3b571"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/ModContainerFactory.java",
+      "size": 3283,
+      "sha256": "9059ca6f5432a5476604f971bea9813312ff9096e5e9437f6d9f6c2a4488dd35",
+      "gitBlob": "afdeefceeef5681748b260668b08fe3427840445"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/FMLModContainer.java",
+      "size": 29308,
+      "sha256": "91098cbdc8ad8986390483f35436bbce184b59712756ca746a1f34bd1f4cb45f",
+      "gitBlob": "c36633a65b1545cd9260705b9ef3a6e34107ae48"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/LoadController.java",
+      "size": 14106,
+      "sha256": "39d04149d04b2ae58ca7134b12ebcabbdc44933fa96d0c0b20c501169c9ce236",
+      "gitBlob": "4bcba6f8846aa136fd1146e38012896648d3f098"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/FMLCommonHandler.java",
+      "size": 26052,
+      "sha256": "3029e1a203ef3345b74161b886f0017974cefed223a8723f55bc449d3b6a6ea1",
+      "gitBlob": "1701ac9cfd8bc43374cd32fcc945ce33614f4983"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/server/FMLServerHandler.java",
+      "size": 11374,
+      "sha256": "be17990bb8d8404e454dee4cb51669bb68b58638edf97d4f38c1f97d1472988a",
+      "gitBlob": "cb5ec5b813b509448151d6ddb8cab6c5eed95469"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/MinecraftForge.java",
+      "size": 4578,
+      "sha256": "f164f74b8a13f687082c538721f2d1193c1e3c3cdf7743564dde1ecf429ab823",
+      "gitBlob": "65f730dfa27188cc97a394e4144ec4a27249eccf"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/UsernameCache.java",
+      "size": 6131,
+      "sha256": "02c15869169c6107bb25ed9c6b52c85ecbdfdf0eb159eba53f2cabffbb4df688",
+      "gitBlob": "c7fab9ffeb6d3646eee4f2f61b0188ea29a7e90e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/ForgeHooks.java",
+      "size": 59768,
+      "sha256": "0b639d4c891f75d1168a1b79841572dcb0ab14a4b4d934b7f1da3c79c617067c",
+      "gitBlob": "e02524896d4e8709ba391e5bdadb48b2bbef3a13"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fluids/FluidRegistry.java",
+      "size": 16347,
+      "sha256": "d0e7b102938d4cc740a893c8f3aa71fb39ab39cb5240916923d911e1cac5a44a",
+      "gitBlob": "12a560423cb01a020c2da667893697adf974aebb"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/discovery/ITypeDiscoverer.java",
+      "size": 1215,
+      "sha256": "fc75a995f0d0866f18d2d18aad64b1919b00f5c4a5697fd5da629aafc10c2389",
+      "gitBlob": "761e62953b577020c3d935728646e293e536e824"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/discovery/ContainerType.java",
+      "size": 1472,
+      "sha256": "77ae711ea771b8dd3f178644ab0e3693f05cb5ca6f3ad77c9d439f6fbb0858c7",
+      "gitBlob": "e427637f9bbc8a6985dc0b57ecd2eebb313db7e0"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/MetadataCollection.java",
+      "size": 4306,
+      "sha256": "417a2fe897319de9fa0a467fa97a4f6752f2300eef5dd7c03605a65115babeb4",
+      "gitBlob": "333901a663da4207e3b2186da949180859134a0e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/versioning/DependencyParser.java",
+      "size": 8303,
+      "sha256": "705b72cf262977a37012c52102da20faae482469cd042c6b1507b218fc335caa",
+      "gitBlob": "89ffeff79ac225c571978a0eba4a6623afcc0bf5"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/versioning/DefaultArtifactVersion.java",
+      "size": 3022,
+      "sha256": "f3d22b170f7919f59a09ebf1281f26de2d36daef6df67de12f7c045815bcd100",
+      "gitBlob": "62ca395791d0169b3a116ca53d78af403fc929cb"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/versioning/VersionParser.java",
+      "size": 2691,
+      "sha256": "2725c4118867f790cee3c06cc4f0a8bcffed9038e97e6a00bc08054071945930",
+      "gitBlob": "01f57d7102a341848b9f29df8bfce70d369988bc"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/LoaderState.java",
+      "size": 4531,
+      "sha256": "4f34067d2eb381fe77a7786b813cccc63772865745b5b05dd13b3a8613f6aad2",
+      "gitBlob": "f62f5de5c3011aad69068a2961bdb96cacb635c4"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/event/FMLLoadEvent.java",
+      "size": 924,
+      "sha256": "9a1d012c72323238532506cce23781d139ce723881cb3cbbe08965898bc3c4bc",
+      "gitBlob": "1bba31d0b9e9e5c07c6973793ce3dd68829ed93e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/ModAPIManager.java",
+      "size": 9620,
+      "sha256": "238769d0d72020c14b3d3831dfcdf13b501b79e64a19540988a2d605713cfa02",
+      "gitBlob": "0a53648afe82a56fc0cd0887f5258d9b5b96cc2f"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/toposort/ModSorter.java",
+      "size": 4803,
+      "sha256": "d414647c6c6aea5899558092af0ce96eabba1ca9147398f604a204dc3336b1e4",
+      "gitBlob": "7938358a2420767dd9fb48992797f669faee96fd"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/util/text/translation/LanguageMap.java.patch",
+      "size": 1960,
+      "sha256": "472c478112bf775e8eabbc419d8ee4f11cbe9e1beca1a7247bce632af1f0b546",
+      "gitBlob": "6ece41d91d641f5dc3b22222576f1b245f4f24ce"
+    }
+  ]
+}

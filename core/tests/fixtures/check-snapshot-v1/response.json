@@ -1,0 +1,24 @@
+{
+  "format": "workbench-check-snapshot-response-v1",
+  "snapshot_id": "check-snapshot:sha256:4589642af67eca467b9106778c6bb5ae3ef8620715fa49a6bc824188b6181ab1",
+  "view_id": "view-generation-1",
+  "query_id": "check-snapshot-query:sha256:bc7a7c3af7df0de5b7182de980b94f649a2a8b8a15b620b0b09547a813091e5e",
+  "state": "ready",
+  "payload": {
+    "records": [
+      {
+        "key": "example:recipe",
+        "value": {
+          "nativeValueRef": "0"
+        },
+        "content_reference": null
+      }
+    ],
+    "total": 1,
+    "offset": 0
+  },
+  "complete": true,
+  "next_cursor": null,
+  "reason": null,
+  "request_id": "check-snapshot-read:sha256:168eefe15ccc3c54eb88d942d577f2ba483d55fff894139047da36fcc6ec03a9"
+}

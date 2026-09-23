@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/schemas/workbench-worldgen-qualification-report-v1.schema.json",
+  "title": "Workbench Worldgen Qualification Report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "report_id", "created_at", "status", "assurance", "profile", "qualification", "matrix", "gates", "risk_scan", "decision", "sources", "navigation", "limitations", "reproduction_command"],
+  "properties": {
+    "format": {"const": "workbench-worldgen-qualification-report-v1"},
+    "schema_version": {"const": 1},
+    "report_id": {"type": "string", "pattern": "^workbench-worldgen-qualification:sha256:[0-9a-f]{64}$"},
+    "created_at": {"type": "string", "minLength": 1},
+    "status": {"enum": ["accepted-exact", "accepted-empirical", "accepted-bounded", "accepted-patched", "inconclusive", "rejected-unstable-critical", "failed"]},
+    "assurance": {"enum": ["exact-in-declared-matrix", "empirical-in-declared-matrix", "bounded-equivalence", "patched-exact-artifact", "none"]},
+    "profile": {"type": "object", "required": ["profile_id", "pack_profile", "path", "sha256"]},
+    "qualification": {"type": "object", "required": ["suite", "intent", "comparison_model", "acceptance_scope"]},
+    "matrix": {"type": "object", "required": ["comparison_count", "independent_run_count", "seed_count", "seeds", "controls", "cross_perturbation_groups", "observed_capabilities"]},
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stages", "domains", "evidence", "capabilities", "risk"],
+      "properties": {
+        "stages": {"type": "array", "items": {"type": "object", "required": ["gate_id", "label", "required", "state", "checkpoint_observed", "final_proxy_domains", "limitation"]}},
+        "domains": {"type": "array", "items": {"type": "object", "required": ["gate_id", "domain", "label", "required", "state", "signals", "observed_deltas", "unknown_signals"]}},
+        "evidence": {"type": "array", "items": {"type": "object"}},
+        "capabilities": {"type": "array", "items": {"type": "object"}},
+        "risk": {"type": "object"}
+      }
+    },
+    "risk_scan": {"type": ["object", "null"]},
+    "decision": {"type": "object", "required": ["headline", "blockers", "unstable_reasons", "required_domain_states", "next_actions"]},
+    "sources": {"type": "array", "items": {"type": "object"}},
+    "navigation": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "reproduction_command": {"type": "string"}
+  }
+}

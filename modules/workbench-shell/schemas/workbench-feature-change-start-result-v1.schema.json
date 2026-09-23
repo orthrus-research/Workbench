@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-feature-change-start-result-v1.schema.json",
+  "title": "Workbench feature change start result V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "change_id", "plan_id", "lifecycle",
+    "record_uri", "reused"
+  ],
+  "properties": {
+    "format": {"const": "workbench-feature-change-start-result-v1"},
+    "schema_version": {"const": 1},
+    "change_id": {
+      "type": "string",
+      "pattern": "^workbench-feature-change:sha256:[0-9a-f]{64}$"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "lifecycle": {"$ref": "#/$defs/lifecycle"},
+    "record_uri": {"type": "string", "pattern": "^file:/", "maxLength": 8192},
+    "reused": {"type": "boolean"}
+  },
+  "$defs": {
+    "lifecycle": {
+      "enum": [
+        "planned", "tested", "test-no-go", "applied", "apply-rejected",
+        "verified", "verification-failed", "rolled-back", "rollback-blocked"
+      ]
+    }
+  }
+}

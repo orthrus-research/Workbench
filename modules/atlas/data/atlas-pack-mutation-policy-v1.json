@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "policy_id": "ATLAS-PACK-MUTATION-EXTRACTION-V1",
+  "source_language": "groovy",
+  "execution_claim": "none-static-occurrence-only",
+  "stage_order": [
+    {
+      "stage_id": "groovy-pre-init",
+      "lifecycle_stage_id": "groovy-pre-init",
+      "loader": "preInit"
+    },
+    {
+      "stage_id": "groovy-post-init",
+      "lifecycle_stage_id": "groovy-post-init",
+      "loader": "postInit"
+    }
+  ],
+  "target_states": [
+    "exact",
+    "symbolic",
+    "unresolved"
+  ],
+  "rules": [
+    {
+      "rule_id": "PACK-OP-REPLACE-NAMED-V1",
+      "operation_kind": "replacement",
+      "match": "leaf-in",
+      "values": [
+        "replace",
+        "replaceShaped",
+        "replaceShapeless"
+      ],
+      "target_argument_index": 0
+    },
+    {
+      "rule_id": "PACK-OP-REMOVE-NAMED-V1",
+      "operation_kind": "removal",
+      "match": "leaf-in",
+      "values": [
+        "remove",
+        "removeAllRecipes",
+        "removeAndHide",
+        "removeByInput",
+        "removeByOutput",
+        "removeRecyclingRecipes",
+        "unregister"
+      ],
+      "target_argument_index": 0
+    },
+    {
+      "rule_id": "PACK-OP-ADD-REGISTER-V1",
+      "operation_kind": "addition",
+      "match": "leaf-in",
+      "values": [
+        "add",
+        "addGroup",
+        "addItem",
+        "addRecyclingGroovy",
+        "addShaped",
+        "addShapeless",
+        "addVariation",
+        "buildAndRegister",
+        "register",
+        "registerGreenhouseRecipeBySeed",
+        "registerGreenhouseRecipeNoSeed",
+        "registerOre"
+      ],
+      "target_argument_index": 0
+    },
+    {
+      "rule_id": "PACK-OP-COPY-V1",
+      "operation_kind": "copy",
+      "match": "leaf-in",
+      "values": [
+        "copy",
+        "copyAmount",
+        "copyStack",
+        "copyWithAmount"
+      ],
+      "target_argument_index": 0
+    },
+    {
+      "rule_id": "PACK-OP-SETTER-V1",
+      "operation_kind": "property-change",
+      "match": "leaf-prefix",
+      "values": [
+        "set"
+      ],
+      "target_argument_index": null
+    },
+    {
+      "rule_id": "PACK-OP-BUILDER-PROPERTY-V1",
+      "operation_kind": "property-change",
+      "match": "leaf-in",
+      "values": [
+        "blastTemp",
+        "color",
+        "components",
+        "flags",
+        "fluidTemp",
+        "formula",
+        "iconSet"
+      ],
+      "target_argument_index": null
+    }
+  ],
+  "fidelity": {
+    "configured_root_order": "array order in locked groovy/runConfig.json",
+    "file_order": "unsigned UTF-8 lexicographic repository path within each configured root",
+    "operation_order": "inclusive source byte_start within each selected script",
+    "dynamic_boundary": "identifier, interpolated, concatenated, complex, or missing target expressions remain unresolved",
+    "runtime_boundary": "configured selection and lexical occurrence do not prove compilation, execution, transition, or final survival"
+  }
+}

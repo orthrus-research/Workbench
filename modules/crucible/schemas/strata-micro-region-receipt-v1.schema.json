@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/strata-micro-region-receipt-v1.schema.json",
+  "title": "Workbench Crucible Strata micro-region receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "receipt_id",
+    "canonicalization_id",
+    "adapter",
+    "runtime",
+    "toolchains",
+    "capture",
+    "artifacts",
+    "checks",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {"const": "workbench-crucible-strata-micro-region-receipt-v1"},
+    "schema_version": {"const": 1},
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^crucible-strata-micro-region:sha256:[0-9a-f]{64}$"
+    },
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "adapter": {"type": "object", "required": ["adapter_id", "strata"]},
+    "runtime": {"type": "object", "required": ["relative_path", "server_jar", "observer_jar", "installed_mods"]},
+    "toolchains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "build_host", "observer_compiler", "observer_artifact"],
+      "properties": {
+        "runtime": {"$ref": "#/$defs/jdk"},
+        "build_host": {"$ref": "#/$defs/jdk"},
+        "observer_compiler": {"$ref": "#/$defs/jdk"},
+        "observer_artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["classfile_majors", "compiler_java", "classfile_target"],
+          "properties": {
+            "classfile_majors": {"const": [52]},
+            "compiler_java": {"type": "string"},
+            "classfile_target": {"const": "8"}
+          }
+        }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "required": ["sample_profile", "sample_chunks", "sample_blocks_x", "sample_blocks_z", "chunk_window"],
+      "properties": {
+        "sample_profile": {"const": "micro-region-16x16-v1"},
+        "sample_chunks": {"const": 256},
+        "sample_blocks_x": {"const": 256},
+        "sample_blocks_z": {"const": 256},
+        "chunk_window": {
+          "type": "object",
+          "required": ["chunkSizeX", "chunkSizeZ"],
+          "properties": {
+            "chunkSizeX": {"const": 16},
+            "chunkSizeZ": {"const": 16}
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["scan", "package", "shards", "overview_screenshot", "exact_tile_screenshot"]
+    },
+    "checks": {
+      "type": "object",
+      "required": ["lossless_shard_validation", "derived_preview_validation", "renderer_smoke", "observer_java8_classfiles"],
+      "properties": {
+        "lossless_shard_validation": {"const": "pass"},
+        "derived_preview_validation": {"const": "pass"},
+        "renderer_smoke": {"const": "pass"},
+        "observer_java8_classfiles": {"const": "pass"}
+      }
+    },
+    "boundaries": {
+      "const": {
+        "atlas_admission_proved": false,
+        "causal_attribution_proved": false,
+        "exact_chunk_state_is_source": true,
+        "landform_preview_is_display_only": true,
+        "recurrent_complex_integration_added": false,
+        "request_scope_is_bounded": true,
+        "visual_quality_approved": false,
+        "world_may_generate_or_populate_requested_chunks": true
+      }
+    }
+  },
+  "$defs": {
+    "jdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "java_version", "implementor", "release_sha256", "release_size_bytes"],
+      "properties": {
+        "role": {"type": "string"},
+        "java_version": {"type": "string"},
+        "implementor": {"type": "string"},
+        "release_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "release_size_bytes": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

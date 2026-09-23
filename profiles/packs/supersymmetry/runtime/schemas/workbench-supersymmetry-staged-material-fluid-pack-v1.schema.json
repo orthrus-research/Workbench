@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.org/workbench/schemas/workbench-supersymmetry-staged-material-fluid-pack-v1.schema.json",
+  "title": "Supersymmetry staged material-fluid Packwiz role V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority",
+    "format",
+    "generic_stage",
+    "limitations",
+    "outputs",
+    "plan_id",
+    "revision",
+    "role",
+    "schema_version",
+    "selected_operation_state",
+    "source_operation_state",
+    "source_workspace_uri",
+    "stage_id",
+    "tracked_tree_id",
+    "workspace_uri"
+  ],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-staged-material-fluid-pack-v1"},
+    "schema_version": {"const": 1},
+    "stage_id": {"pattern": "^workbench-supersymmetry-staged-material-fluid-pack:sha256:[0-9a-f]{64}$"},
+    "plan_id": {"pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"},
+    "role": {"enum": ["baseline", "candidate"]},
+    "source_operation_state": {"enum": ["before", "after"]},
+    "selected_operation_state": {"enum": ["before", "after"]},
+    "source_workspace_uri": {"type": "string", "pattern": "^file:"},
+    "workspace_uri": {"type": "string", "pattern": "^file:"},
+    "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "tracked_tree_id": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "outputs": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/output"}
+    },
+    "generic_stage": {
+      "type": "object",
+      "required": ["format", "schema_version", "state", "plan_id", "source_workspace_uri", "workspace_uri", "source_tree", "untracked_excluded", "baseline_revision", "revision", "tracked_tree_id", "outputs"],
+      "properties": {
+        "format": {"const": "workbench-supersymmetry-generic-material-fluid-stage-v1"},
+        "schema_version": {"const": 1},
+        "state": {"const": "staged"},
+        "plan_id": {"type": "string"},
+        "source_workspace_uri": {"type": "string", "pattern": "^file:"},
+        "workspace_uri": {"type": "string", "pattern": "^file:"},
+        "source_tree": {"type": "object"},
+        "untracked_excluded": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["file_count", "paths_sha256"],
+          "properties": {
+            "file_count": {"type": "integer", "minimum": 0},
+            "paths_sha256": {"pattern": "^sha256:[0-9a-f]{64}$"}
+          }
+        },
+        "baseline_revision": {"pattern": "^[0-9a-f]{40}$"},
+        "revision": {"pattern": "^[0-9a-f]{40}$"},
+        "tracked_tree_id": {"pattern": "^[0-9a-f]{40}$"},
+        "outputs": {"type": "array", "items": {"$ref": "#/$defs/output"}}
+      },
+      "additionalProperties": false
+    },
+    "authority": {
+      "type": "object",
+      "required": ["owner", "claim", "construction_authority"],
+      "properties": {
+        "owner": {"const": "Supersymmetry profile runtime owner"},
+        "claim": {"const": "exact role-specific staged Packwiz source"},
+        "construction_authority": {"const": "reviewed material-fluid feature plan"}
+      },
+      "additionalProperties": false
+    },
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "path", "role", "sha256", "size"],
+      "properties": {
+        "ordinal": {"type": "integer", "minimum": 0},
+        "path": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1},
+        "sha256": {"pattern": "^[0-9a-f]{64}$"},
+        "size": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

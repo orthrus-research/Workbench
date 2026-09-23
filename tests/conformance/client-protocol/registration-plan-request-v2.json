@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": "registration-plan-1",
+  "method": "registration/plan",
+  "params": {
+    "pattern": "ore-dictionary-entry",
+    "answers": {
+      "ore_name": "dustWorkbenchProbe",
+      "ingredient": {
+        "kind": "metaitem",
+        "name": "dustSodiumHydroxide"
+      }
+    }
+  }
+}

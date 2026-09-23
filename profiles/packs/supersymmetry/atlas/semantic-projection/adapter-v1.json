@@ -1,0 +1,28 @@
+{
+  "adapter_id": "workbench-atlas-adapter:supersymmetry:semantic-v1",
+  "checks": {
+    "duplicate_effect_operations": [
+      "register-fluid-state"
+    ]
+  },
+  "format": "workbench-atlas-profile-adapter-v1",
+  "limitations": [
+    "Historical fixtures are bound to the named legacy Forge evidence profile and do not qualify Cleanroom stable release.",
+    "The progression order is Supersymmetry policy, not a universal Minecraft tier model."
+  ],
+  "pack_profile_id": "workbench-pack:supersymmetry",
+  "progression_order": [
+    "World",
+    "Steam",
+    "ULV",
+    "LV",
+    "MV",
+    "HV",
+    "EV",
+    "IV",
+    "LuV",
+    "ZPM",
+    "UV"
+  ],
+  "schema_version": 1
+}

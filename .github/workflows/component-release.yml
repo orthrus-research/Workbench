@@ -1,0 +1,167 @@
+name: Native component candidate
+
+on:
+  push:
+    tags:
+      - "workbench-*/v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: component-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  identify:
+    runs-on: ubuntu-24.04
+    outputs:
+      component: ${{ steps.tag.outputs.component }}
+      kind: ${{ steps.tag.outputs.kind }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+          environments: release
+      - name: Validate native component and annotated tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/}"
+          test "$(git cat-file -t "$tag")" = tag
+          component="${tag%/v*}"
+          candidate_args=()
+          if [[ "$tag" =~ -rc\.([1-9][0-9]*)$ ]]; then
+            candidate_args=(--candidate "${BASH_REMATCH[1]}")
+          fi
+          expected="$(pixi run --locked --no-config -e release python tools/release.py tag "$component" "${candidate_args[@]}")"
+          test "$tag" = "$expected"
+          pixi run --locked --no-config -e release python tools/release.py validate
+          pixi run --locked --no-config -e release python tools/release.py github-output "$component" "${candidate_args[@]}" >> "$GITHUB_OUTPUT"
+
+  canonical:
+    needs: identify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+      - name: Prepare the required second canonical implementation
+        run: pixi run --locked --no-config python validation/provision_ide_toolchains.py --node-only --path-file "$GITHUB_PATH"
+      - name: Validate the exact candidate source before building artifacts
+        run: pixi run --environment release --locked --no-config python validation/validate.py --tier canonical --policy --result .workbench/validation/candidate-source-result.json
+      - name: Require the real pip isolation probe
+        run: pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/candidate-source-result.json --group pip
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: candidate-source-validation
+          path: .workbench/validation/
+          include-hidden-files: true
+          retention-days: 14
+
+  python:
+    if: needs.identify.outputs.kind == 'python'
+    needs: [identify, canonical]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+          environments: release
+      - name: Build selected native dependency closure
+        env:
+          COMPONENT: ${{ needs.identify.outputs.component }}
+        run: pixi run --locked --no-config -e release python tools/build_native_distribution.py --component "$COMPONENT" --output .workbench/candidate-wheelhouse --diagnostics .workbench/validation/ci/candidate-build
+      - name: Install the exact hash-locked closure outside the checkout
+        run: pixi run --locked --no-config -e release python tools/install_workbench.py .workbench/candidate-wheelhouse --destination "$RUNNER_TEMP/workbench-candidate" --diagnostics .workbench/validation/ci/candidate-install
+      - name: Verify wheel contents and retain only selected package
+        env:
+          COMPONENT: ${{ needs.identify.outputs.component }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pixi run --locked --no-config -e release python tools/validate_native_artifacts.py .workbench/candidate-wheelhouse/wheels
+          filename="$(pixi run --locked --no-config -e release python tools/release.py artifact "$COMPONENT.wheel")"
+          mkdir .workbench/candidate
+          install -m 0644 ".workbench/candidate-wheelhouse/wheels/$filename" ".workbench/candidate/$filename"
+          python3 tools/verify_component_artifacts.py --component "$COMPONENT" --directory .workbench/candidate
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ needs.identify.outputs.component }}
+          path: .workbench/candidate/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: candidate-native-diagnostics
+          path: .workbench/validation/ci/
+          include-hidden-files: true
+          retention-days: 14
+
+  client:
+    if: needs.identify.outputs.kind == 'client'
+    needs: [identify, canonical]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          pixi-version: v0.75.0
+          locked: true
+          environments: release
+      - name: Build and verify the selected independently versioned client
+        env:
+          COMPONENT: ${{ needs.identify.outputs.component }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a pixi run --locked --no-config -e release python tools/build_release_clients.py --component "$COMPONENT" --lane public-v1 --output-dir .workbench/client-raw
+          case "$COMPONENT" in
+            workbench-vscode) artifact="$COMPONENT.vsix" ;;
+            workbench-intellij-community) artifact="$COMPONENT.plugin-zip" ;;
+            *) exit 1 ;;
+          esac
+          filename="$(pixi run --locked --no-config -e release python tools/release.py artifact "$artifact")"
+          mkdir .workbench/candidate
+          install -m 0644 ".workbench/client-raw/$filename" ".workbench/candidate/$filename"
+          python3 tools/verify_component_artifacts.py --component "$COMPONENT" --directory .workbench/candidate
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ needs.identify.outputs.component }}
+          path: .workbench/candidate/
+          if-no-files-found: error
+          retention-days: 14
+
+  jvm:
+    if: needs.identify.outputs.kind == 'jvm'
+    needs: [identify, canonical]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prepare the Linux evaluation boundary
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - name: Build the source-locked Axiom candidate
+        run: python3 tools/build_axiom.py --provision --output .workbench/candidate
+      - name: Verify the exact native artifact family
+        run: python3 tools/verify_component_artifacts.py --component workbench-axiom-engine --directory .workbench/candidate
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: workbench-axiom-engine
+          path: .workbench/candidate/
+          if-no-files-found: error
+          retention-days: 14
+
+# This workflow creates reviewable candidates only. It never creates a GitHub
+# release or uploads to PyPI/IDE marketplaces; publication requires review.

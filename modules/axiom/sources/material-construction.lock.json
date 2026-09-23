@@ -1,0 +1,147 @@
+{
+  "schema": "axiom.material-construction-source-lock.v1",
+  "revisions": {
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b"
+  },
+  "references": [
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/Element.java",
+      "gitBlob": "2826212ecc01beab21a7e5e45b3ffc9fdce431a8",
+      "sha256": "b8096647ae0c5deb6a11368de5c3afc92f50a31028c4940ad0a991bf4692d3b1"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/Elements.java",
+      "gitBlob": "d49203d32f66ccc1399e8b6867eb53bbcd0229ae",
+      "sha256": "1aba1df867e58191cdef871edd237dbbd2c3a8fcf80913a77e4d9c4b8063c95c"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/MaterialStack.java",
+      "gitBlob": "35584781e22b25779a25a5e5b125096df0b15abe",
+      "sha256": "5aa97516063c7fe0ed561ad691802e51d09e64e9535c9273273e9a39e9fbf942"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/SmallDigits.java",
+      "gitBlob": "6ced3b9337551874c00767fbd4195cd96590c1cb",
+      "sha256": "257014c6b5f4a24d35e257993a746f5bda1f6784bb5ebe6ede58604030f7ad02"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/toolitem/EnchantmentLevel.java",
+      "gitBlob": "afeedf3dfb9b21a93c3f7c0993e90f882ef38210",
+      "sha256": "f34a28f6ed182dc2864c9037be9c7a6fd6458c472f49cc04ba220773bb53c2fd"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/WoodProperty.java",
+      "gitBlob": "7f38703d67bd26232eee4b3e4114433b9027fa11",
+      "sha256": "ab41b2da11358c51c69f5c12daf467c0ed2b1c2b008cdbab9db5420c9254933d"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/PolymerProperty.java",
+      "gitBlob": "c2878b6e3f9efe361af3b0becc0faaf91546a64d",
+      "sha256": "fc9131ed64d1370949ab6ce1e6586eb76c7f607c7527dbe987d37b4b91eadf9d"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/OreProperty.java",
+      "gitBlob": "acac622967baaf11aa841c5b606f7e443d2cf40c",
+      "sha256": "dca46e424de14251ba49e3d38a0ffc38beaa2246b56f5c7170c7b1863c976059"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/ToolProperty.java",
+      "gitBlob": "99264c592e474f971424bed3e07ae902be3a21da",
+      "sha256": "f3636fbbb51ff7fcad6f72d62d3109d3ecad29e1b98a2cdb42a203ec7e234e97"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/RotorProperty.java",
+      "gitBlob": "6864c810ca537a35f2b792ee5405baa926f6348c",
+      "sha256": "08e69c140dd4641ebb1287b9f665e9bda0a94eb63cf8d5158436f2b5211f00ff"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/WireProperties.java",
+      "gitBlob": "7335be2e0c7d3651cca12ea2e3ff1fefcf7c1e2e",
+      "sha256": "707ba6cef1c0f3d12182305737a5b6f6861c0a373b718fd84621e15c4b6abcb7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/ItemPipeProperties.java",
+      "gitBlob": "8314d4a7c07fe7308455649cd29c7ba8abb8eede",
+      "sha256": "32f409f2d76c9ad1cc758090c5685b5becf89b15577badea4f0a2b6d71c90a45"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/FluidPipeProperties.java",
+      "gitBlob": "5bd1ce7e1ecec70de003c8f5fafd995386b7cf1b",
+      "sha256": "dd3b78b80bf208a2e9eb39c23203497968d181799768e48c0fac4c44868c08a6"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/fluids/attribute/FluidAttributes.java",
+      "gitBlob": "b683d21c4fc372a14dc6ebfb13db8aab9162a7c6",
+      "sha256": "4e682505204e8a9b39d620df7ed694bf9722eb6e7f39d3b8192a6ef4880e6b69"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/GTValues.java",
+      "gitBlob": "006f9444117742e6caa5eb17237b3f109084ee7c",
+      "sha256": "f2861c31315f5e556705927a63e7649ef0c6ca1c0a420170af38a99146b15675"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/Material.java",
+      "gitBlob": "18770e5325cd561ba2121ab21e26394452b88195",
+      "sha256": "46b7cf9c92c06fb3c6db97b06e71f3b826d30d2889f417909418bd406245425e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/info/MaterialFlags.java",
+      "gitBlob": "2bed36b06a439b1a38d49a6b3c04ee7add77cadc",
+      "sha256": "bc61f3d88dd284288e1a95c8847146409fbc08d6db9027e2c5173e483cdaa660"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/PropertyKey.java",
+      "gitBlob": "5dc2234a40e4d267e3eae16cfa31340fc1549a1a",
+      "sha256": "42cb4526c60aff50eb2ac1544c4345f5cacf6b009ecde11161efe19e8bbe40f0"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/MarkerMaterial.java",
+      "gitBlob": "13762ec5f27c760e3a09c6bb97a5cdf1c93b8ded",
+      "sha256": "3b28642a8969db929862fe4f0a39b24c2c75288413637cfe2e9deccaaa52c207"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/registry/MarkerMaterialRegistry.java",
+      "gitBlob": "25b58fe74b5756b9b0c24c4867067b6fab33fbfc",
+      "sha256": "1598e97144bef2c59665cf5222edebfa09e39750d52d1ab58d3a75ba0aee94e7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/Materials.java",
+      "gitBlob": "d2d65e81f72776b7fd1806b05d088fac1f1d4e6c",
+      "sha256": "aa8d1403441faef12ded7cc6127e322107f9c6cfef52ba27e1c9f3480ca7e6a0"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/materials/ElementMaterials.java",
+      "gitBlob": "8d4af1f4fa7c3c61fa2cb047371db1b844c42de6",
+      "sha256": "be3b532e40e87d05af4324b320367c89fd128c7bdd0f286c6d2e36db23594ac9"
+    }
+  ],
+  "scope": "Native material construction and properties; not producer or generated-registry qualification",
+  "unresolved": [
+    "ore-prefix catalog and ignore effects",
+    "actual enchantment identity registry",
+    "full producer lifecycle and applied transforms",
+    "generated item and ore membership"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "axiom.material-lifecycle-source-lock.v1",
+  "repository": "https://github.com/GregTechCEu/GregTech",
+  "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+  "references": [
+    {
+      "path": "src/main/java/gregtech/core/CoreModule.java",
+      "sha256": "419bcda8f1e04e17aeae9cf167a45aa8c31aee3413c1c57ce58aad5756d8700b"
+    },
+    {
+      "path": "src/main/java/gregtech/api/unification/material/event/MaterialRegistryEvent.java",
+      "sha256": "a2c0907ad7021771eb143e12cd30e354ff0c39e0f5f8d15507a185cf0dcdc57b"
+    },
+    {
+      "path": "src/main/java/gregtech/api/unification/material/event/MaterialEvent.java",
+      "sha256": "69588d46ad8b34bf6a4d2ed905251a26a1e5b10a9e395cf62387f6fd9563ab35"
+    },
+    {
+      "path": "src/main/java/gregtech/api/unification/material/event/PostMaterialEvent.java",
+      "sha256": "56d9c247c24fb89032f8a6b3653ca9333b13385991d006599467fd5d56b71232"
+    }
+  ]
+}

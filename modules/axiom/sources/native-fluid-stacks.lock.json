@@ -1,0 +1,51 @@
+{
+  "schema": "axiom.native-fluid-stack-source-lock.v1",
+  "revisions": {
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b"
+  },
+  "references": [
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fluids/Fluid.java",
+      "gitBlob": "d211bdc450fecedb369de1948dd997a217a2fdd9",
+      "sha256": "ef2bae716c3ce83143f04587c773be313143effce799d06c67218569c3709917"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fluids/FluidRegistry.java",
+      "gitBlob": "12a560423cb01a020c2da667893697adf974aebb",
+      "sha256": "d0e7b102938d4cc740a893c8f3aa71fb39ab39cb5240916923d911e1cac5a44a"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fluids/FluidStack.java",
+      "gitBlob": "44dc8afb2e0d3c2b07c7c6f97611cba30068f4a2",
+      "sha256": "684de1ffa1637aff2e758aed26e957f55677a514ef1b2431dbb10fe95d1cd838"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/util/Constants.java",
+      "gitBlob": "e1c30ea357889cc2d2ce6a5ce9c1506a1666846f",
+      "sha256": "dd337d8b234b55b8cff0dc1f6a0bf8d3227b55ff3b4d83972e8e1fc1db3abb6d"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/properties/FluidProperty.java",
+      "gitBlob": "d8662ec6bed77431594b53362091cbd36cb0dbe4",
+      "sha256": "4db65208d271cc5d2742d1691c8455cde706e69ed61608b1ee4b457622c49c93"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/material/Material.java",
+      "gitBlob": "18770e5325cd561ba2121ab21e26394452b88195",
+      "sha256": "46b7cf9c92c06fb3c6db97b06e71f3b826d30d2889f417909418bd406245425e"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/nbt/NBTTagCompound.java.patch",
+      "gitBlob": "8299097f5c3ca8336768947a2386505156f05dce",
+      "sha256": "cade9be509ef9f308c3640a78c4b5be2776400fc5bfb0109394ab50c8d03a76d"
+    }
+  ]
+}

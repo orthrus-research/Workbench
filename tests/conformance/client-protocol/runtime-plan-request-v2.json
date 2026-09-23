@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": "runtime-plan-1",
+  "method": "runtime/plan",
+  "params": {
+    "side": "client",
+    "launcher": "prism"
+  }
+}

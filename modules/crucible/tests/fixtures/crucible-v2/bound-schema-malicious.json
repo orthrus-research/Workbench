@@ -1,0 +1,83 @@
+{
+  "format": "workbench-crucible-v2-bound-schema-malicious-v1",
+  "cases": [
+    {
+      "case_id": "implicit-object-properties-required",
+      "expected_phase": "relation",
+      "expected_code": "relation.open-bound-schema",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "workbench://schemas/crucible/fixtures/implicit-object-properties-required.schema.json",
+        "properties": {
+          "value_kind": {"type": "string"}
+        },
+        "required": ["value_kind"]
+      }
+    },
+    {
+      "case_id": "union-object-type-open",
+      "expected_phase": "relation",
+      "expected_code": "relation.open-bound-schema",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "workbench://schemas/crucible/fixtures/union-object-type-open.schema.json",
+        "type": ["object", "null"],
+        "properties": {
+          "value_kind": {"type": "string"}
+        },
+        "required": ["value_kind"]
+      }
+    },
+    {
+      "case_id": "combinator-open-implicit-object-branch",
+      "expected_phase": "relation",
+      "expected_code": "relation.open-bound-schema",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "workbench://schemas/crucible/fixtures/combinator-open-implicit-object-branch.schema.json",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value_kind", "value"],
+            "properties": {
+              "value_kind": {"const": "property-value"},
+              "value": {"type": "string"}
+            }
+          },
+          {
+            "properties": {
+              "value_kind": {"type": "string"}
+            },
+            "required": ["value_kind"]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "implicit-array-with-open-item-projection",
+      "expected_phase": "relation",
+      "expected_code": "relation.open-bound-schema",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "workbench://schemas/crucible/fixtures/implicit-array-with-open-item-projection.schema.json",
+        "items": {
+          "properties": {
+            "value_kind": {"type": "string"}
+          },
+          "required": ["value_kind"]
+        }
+      }
+    },
+    {
+      "case_id": "untyped-root-admits-unconstrained-arrays",
+      "expected_phase": "relation",
+      "expected_code": "relation.open-bound-schema",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "workbench://schemas/crucible/fixtures/untyped-root-admits-unconstrained-arrays.schema.json",
+        "additionalProperties": false
+      }
+    }
+  ]
+}

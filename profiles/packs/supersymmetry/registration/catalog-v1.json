@@ -1,0 +1,1126 @@
+{
+  "schema_version": 1,
+  "format": "workbench-registration-catalog-v1",
+  "profile_family_id": "workbench-pack:supersymmetry",
+  "authority_order": [
+    {
+      "id": "groovy",
+      "rank": 1,
+      "description": "Pack Groovy is the first construction authority whenever it performs the registration itself."
+    },
+    {
+      "id": "susycore",
+      "rank": 2,
+      "description": "SuSyCore Java is used when Groovy only binds an existing object or has no constructor surface."
+    },
+    {
+      "id": "pack-data",
+      "rank": 3,
+      "description": "Pack configuration, resources, and external-mod data are used only when neither Groovy nor SuSyCore owns the construction."
+    }
+  ],
+  "observations": [
+    {
+      "authority": "groovy",
+      "repository": "https://github.com/SymmetricDevs/Supersymmetry",
+      "revision": "97a44866fe2079f30b4a89721a2625d2dd02f411",
+      "branch": "master-ceu",
+      "observed_date": "2026-08-01",
+      "census": {
+        "groovy_files": 301,
+        "material_builder_text_occurrences": 2565,
+        "parsed_numeric_material_registrations": 2479,
+        "active_dynamic_material_builder_sites": 21,
+        "recipe_builders": 4679,
+        "build_and_register_calls": 4664,
+        "recipe_map_aliases": 124,
+        "meta_item_add_calls": 396,
+        "ore_dictionary_add_calls": 129,
+        "ore_dictionary_remove_calls": 6,
+        "crafting_add_calls": 308,
+        "crafting_replace_calls": 522,
+        "crafting_remove_calls": 74,
+        "event_listeners": 6
+      }
+    },
+    {
+      "authority": "susycore",
+      "repository": "https://github.com/SymmetricDevs/Susy-Core",
+      "revision": "587132a6b1b9b095142f802d3393a786a01868a5",
+      "branch": "main",
+      "observed_date": "2026-08-01",
+      "census": {
+        "java_files": 611,
+        "material_builders": 41,
+        "recipe_map_constructors": 100,
+        "meta_tile_entity_registrations": 172,
+        "forge_entity_registrations": 5,
+        "tile_entity_registrations": 5,
+        "cover_behavior_registrations": 4,
+        "capability_registrations": 3,
+        "biome_registrations": 2,
+        "sound_registrations": 8,
+        "particle_registrations": 34,
+        "packet_registrations": 8,
+        "gt_module_registrations": 9,
+        "server_command_registrations": 4
+      }
+    }
+  ],
+  "families": [
+    {
+      "id": "materials",
+      "label": "Materials and generated fluids",
+      "description": "GT materials, including liquid and gas forms, are declared centrally and built in category register methods.",
+      "lifecycle": "MaterialEvent at LOWEST after SuSyCore's HIGH listener",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/preInit/MaterialChanges.groovy", "groovy/material/SuSyMaterials.groovy", "groovy/material/*Materials*.groovy"],
+          "note": "SuSyMaterials.init() calls category register() methods; each category assigns a new Material.Builder to the central field."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/java/supersymmetry/common/materials/SusyMaterials.java", "src/main/java/supersymmetry/common/materials/SuSy*Materials.java"],
+          "note": "SuSyCore registers its baseline materials first; pack-owned additions prefer Groovy."
+        }
+      ],
+      "companion_surfaces": ["central static field", "category Material.Builder", "English localization", "generated GT material forms"],
+      "active_instance_support": "ready",
+      "pattern_keys": ["material-backed-fluid"]
+    },
+    {
+      "id": "elements-isotopes",
+      "label": "Elements and isotopes",
+      "description": "Element identities and isotope-backed materials are constructed during the material lifecycle.",
+      "lifecycle": "preInit MaterialEvent",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/preInit/RegisterIsotopes.groovy", "groovy/material/ElementMaterials.groovy", "groovy/material/IsotopeMaterials.groovy"],
+          "note": "Groovy constructs Element objects and their Material.Builder registrations."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/java/supersymmetry/common/materials/SuSyElementMaterials.java"],
+          "note": "Core owns only the Java baseline not already supplied by the pack scripts."
+        }
+      ],
+      "companion_surfaces": ["element identity", "material ID", "formula", "localization"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "material-flags-properties",
+      "label": "Material flags and custom properties",
+      "description": "Existing materials are modified and SuSy-specific fiber/fluid property types are attached.",
+      "lifecycle": "MaterialEvent and PostMaterialEvent",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/classes/ChangeFlags.groovy", "groovy/preInit/MaterialChanges.groovy"],
+          "note": "Groovy registers the base property type and applies pack flag/property changes."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/java/supersymmetry/api/unification/material/properties", "src/main/java/supersymmetry/api/unification/material/info"],
+          "note": "Core defines the custom Java property and icon types consumed by Groovy."
+        }
+      ],
+      "companion_surfaces": ["property Java type", "Groovy base-type registration", "material flag mutation"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "meta-items",
+      "label": "Simple meta-items",
+      "description": "Pack-only simple items use a StandardMetaItem created from Groovy and numeric addItem registrations.",
+      "lifecycle": "preInit PostMaterialEvent listener",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/preInit/RegisterMetaItems.groovy"],
+          "note": "Simple pack components are registered with new StandardMetaItem(2) and addItem(id, name)."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/java/supersymmetry/common/item/SuSyMetaItems.java"],
+          "note": "Behavior-bearing items and Core-owned components remain Java registrations."
+        }
+      ],
+      "companion_surfaces": ["numeric meta ID", "metaitem localization", "item model JSON", "item texture", "optional components/behavior"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "machine-recipes",
+      "label": "GregTech machine recipes",
+      "description": "Machine recipes are built in domain-organized postInit scripts against named recipe-map aliases.",
+      "lifecycle": "postInit Groovy scripts",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/postInit/**/*.groovy", "groovy/prePostInit/Recipemaps.groovy"],
+          "note": "Scripts call MAP.recipeBuilder(), add typed inputs/outputs, duration and EUt, then buildAndRegister()."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/java/supersymmetry/loaders/recipes/SuSyRecipeLoader.java"],
+          "note": "Java recipes are reserved for Core mechanics that cannot be expressed as ordinary pack recipes."
+        }
+      ],
+      "companion_surfaces": ["existing recipe-map alias", "resolvable item/fluid identities", "domain postInit script"],
+      "active_instance_support": "ready",
+      "pattern_keys": ["machine-recipe"]
+    },
+    {
+      "id": "crafting-smelting-recipes",
+      "label": "Crafting and smelting recipes",
+      "description": "Shaped, shapeless, replacement, and smelting recipes are authored through GroovyScript managers.",
+      "lifecycle": "postInit Groovy scripts",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/postInit/**/*.groovy"],
+          "note": "The pack uses crafting.add/replace methods and smelting managers alongside domain recipes."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/java/supersymmetry/loaders/recipes/SuSyRecipeLoader.java"],
+          "note": "Core supplies only mechanics-coupled recipe registrations."
+        }
+      ],
+      "companion_surfaces": ["stable recipe name", "output identity", "ingredient grid", "recycling policy when applicable"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "recipe-removals-jei",
+      "label": "Recipe removal, replacement, and JEI policy",
+      "description": "Pack overhauls remove recipes by name/input and hide displaced categories or ingredients.",
+      "lifecycle": "prePostInit and postInit Groovy scripts",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/prePostInit/ModifyRecipeMaps.groovy", "groovy/postInit/**/*.groovy"],
+          "note": "Groovy owns removeAllRecipes, removeByInput, crafting.remove, replacement, and JEI yeet/hide calls."
+        }
+      ],
+      "companion_surfaces": ["removal selector", "replacement recipe", "JEI visibility", "recycling consistency"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "recipe-maps-builders-properties",
+      "label": "Recipe maps, builders, and properties",
+      "description": "Groovy resolves recipe-map names, but SuSyCore constructs the maps and any custom builders/properties.",
+      "lifecycle": "SuSyCore static initialization; Groovy prePostInit binding",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "binding-only",
+          "paths": ["groovy/prePostInit/Recipemaps.groovy"],
+          "note": "recipemap(name) is an alias lookup and does not create a RecipeMap."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/api/recipes/SuSyRecipeMaps.java", "src/main/java/supersymmetry/api/recipes/builders", "src/main/java/supersymmetry/api/recipes/properties"],
+          "note": "Core constructs RecipeMap objects, slot limits, UI, sound, builders, and typed properties."
+        }
+      ],
+      "companion_surfaces": ["RecipeMap field", "builder class", "property class", "Groovy alias", "machine consumer", "localization"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "ore-dictionary-unification",
+      "label": "Ore dictionary and unification entries",
+      "description": "Pack entries, removals, and aliases are centralized in Groovy; generated Core forms use Java loaders.",
+      "lifecycle": "prePostInit Groovy; Forge recipe registry event in Core",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/prePostInit/oreDict.groovy"],
+          "note": "Ordinary add/remove relationships use ore(name).add/remove in the pack's central script."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/java/supersymmetry/loaders/SusyOreDictionaryLoader.java", "src/main/java/supersymmetry/common/blocks/SuSyMetaBlocks.java"],
+          "note": "Core registers generated material blocks and mechanics-bound entries."
+        }
+      ],
+      "companion_surfaces": ["ore key", "resolvable item/meta-item/ore identity", "optional JEI removal"],
+      "active_instance_support": "ready",
+      "pattern_keys": ["ore-dictionary-entry"]
+    },
+    {
+      "id": "thermodynamic-process-families",
+      "label": "Thermodynamic process families",
+      "description": "Coolants, cryogenic gases, refrigerants, fuels, and working-fluid families expand into recipes from Groovy data objects.",
+      "lifecycle": "prePostInit Groovy",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/classes/*.groovy", "groovy/prePostInit/Thermodynamics.groovy", "groovy/globals/*.groovy"],
+          "note": "Reusable Groovy classes hold parameters and register related recipe sets."
+        }
+      ],
+      "companion_surfaces": ["material identities", "process parameters", "generated recipe family"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "gameplay-horde-events",
+      "label": "Gameplay and horde events",
+      "description": "Pack gameplay events use Groovy to instantiate SuSyCore event APIs and attach triggers/modifiers.",
+      "lifecycle": "postInit Groovy",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/postInit/gameplay/Invasions.groovy", "groovy/postInit/gameplay/*.groovy"],
+          "note": "Groovy constructs MobHordeEvent and other pack policy against Core APIs."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/java/supersymmetry/api/event/MobHordeEvent.java"],
+          "note": "Core defines reusable mechanics rather than individual pack events."
+        }
+      ],
+      "companion_surfaces": ["event identity", "trigger", "spawn factory", "NBT/equipment modifier", "localization"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "loot-tweaks",
+      "label": "Loot-table tweaks",
+      "description": "Loot additions and removals are registered in the pack's gameplay Groovy scripts.",
+      "lifecycle": "postInit Groovy",
+      "selected_authority": "groovy",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "constructor",
+          "paths": ["groovy/postInit/gameplay/LootTweaks.groovy"],
+          "note": "The script targets named loot tables and pools through GroovyScript integrations."
+        }
+      ],
+      "companion_surfaces": ["loot table", "pool/entry", "conditions", "item identity"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "blocks",
+      "label": "Blocks and ItemBlocks",
+      "description": "SuSy blocks are Java VariantBlock classes discovered by SuSyBlocks and registered in Forge block/item events.",
+      "lifecycle": "SuSyCore initialization and Forge RegistryEvent",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "The observed pack has no Groovy block registry constructor."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/blocks/SuSyBlocks.java", "src/main/java/supersymmetry/common/CommonProxy.java"],
+          "note": "VariantBlock fields are instantiated, registry-named, block-registered, ItemBlock-registered, and model-registered."
+        }
+      ],
+      "companion_surfaces": ["VariantBlock class/enum", "SuSyBlocks field", "Forge ItemBlock", "blockstate", "models", "textures", "localization", "ore dictionary"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "stone-types-ore-prefixes",
+      "label": "Stone types and ore prefixes",
+      "description": "New generated GT form families and SuSy stone types are Java API registrations.",
+      "lifecycle": "SuSyCore preLoad and PostMaterialEvent",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "Groovy consumes these identities but does not construct the registered prefix/type objects."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/api/unification/ore/SusyOrePrefix.java", "src/main/java/supersymmetry/api/unification/ore/SusyStoneTypes.java", "src/main/java/supersymmetry/common/CommonProxy.java"],
+          "note": "Core defines prefixes/types and adds generated meta-item prefixes after materials."
+        }
+      ],
+      "companion_surfaces": ["prefix/type field", "generation predicate", "material flag", "model/icon", "recipe handler", "localization"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "fluid-storage-attributes",
+      "label": "Custom fluid storage keys and attributes",
+      "description": "Nonstandard fluid states and behavior attributes are defined and registered in SuSyCore.",
+      "lifecycle": "SuSyCore material/fluid initialization",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "binding-only",
+          "paths": ["groovy/material/*.groovy", "groovy/prePostInit/ModifyRecipeMaps.groovy"],
+          "note": "Groovy attaches and queries Core-defined storage keys."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/api/fluids/SusyFluidStorageKeys.java", "src/main/java/supersymmetry/api/fluids/SuSyFluidAttributes.java", "src/main/java/supersymmetry/api/fluids/SusyGeneratedFluidHandler.java"],
+          "note": "Core owns storage-key identity, generated variants, attributes, and tooltip behavior."
+        }
+      ],
+      "companion_surfaces": ["storage key", "fluid attribute", "generated fluid handler", "texture/color", "tooltip"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "armor-behavior-items",
+      "label": "Behavior-bearing items and armor",
+      "description": "Items with capabilities, armor logic, renderers, or Core behavior are Java meta-items.",
+      "lifecycle": "SuSyCore item initialization and Forge item registry",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "fallback",
+          "paths": ["groovy/preInit/RegisterMetaItems.groovy"],
+          "note": "Groovy remains suitable only when the item is a simple StandardMetaItem entry."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/item/SuSyMetaItems.java", "src/main/java/supersymmetry/common/item/armor"],
+          "note": "Core attaches behavior, armor logic, capability components, and client rendering."
+        }
+      ],
+      "companion_surfaces": ["Java field", "numeric meta ID", "behavior/armor logic", "renderer/model", "texture", "localization", "recipe"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "tile-entities",
+      "label": "Forge tile entities",
+      "description": "Non-GT block entities are registered by SuSyCore with stable resource locations and optional renderers.",
+      "lifecycle": "SuSyBlocks initialization",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "No Groovy tile-entity registry surface was observed."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/tileentities/SuSyTileEntities.java"],
+          "note": "Core calls GameRegistry.registerTileEntity and binds client renderers."
+        }
+      ],
+      "companion_surfaces": ["TileEntity class", "stable resource ID", "owning block", "optional renderer", "serialization/data migration"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "single-block-machines",
+      "label": "GT single-block machines",
+      "description": "Single-block machine MTEs are Java classes and numeric registrations in SuSyMetaTileEntities.",
+      "lifecycle": "SuSyMetaTileEntityLoader during Core load",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "Groovy scripts add recipes to machines but do not register MTEs."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/metatileentities/SuSyMetaTileEntities.java", "src/main/java/supersymmetry/common/metatileentities/single"],
+          "note": "Core defines the class/recipe behavior and calls registerMetaTileEntity with an allocated ID."
+        }
+      ],
+      "companion_surfaces": ["MTE class", "numeric MTE ID", "resource ID", "recipe map", "tier array", "overlay/texture", "sound", "localization", "crafting recipes"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "multiblock-machines",
+      "label": "GT multiblock machines",
+      "description": "Multiblocks require Java controllers, block-pattern predicates, abilities, recipe maps, and MTE registration.",
+      "lifecycle": "SuSyMetaTileEntityLoader during Core load",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "Recipes are Groovy-authored, but controller/pattern registration is not."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/metatileentities/multi", "src/main/java/supersymmetry/common/metatileentities/SuSyMetaTileEntities.java", "src/main/java/supersymmetry/api/metatileentity/multiblock"],
+          "note": "Core owns structure patterns, controller logic, registration IDs, abilities, and render behavior."
+        }
+      ],
+      "companion_surfaces": ["controller class", "multiblock pattern", "MTE ID", "recipe map", "casing blocks", "abilities/parts", "textures", "localization", "recipes"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "multiblock-parts-capabilities",
+      "label": "Multiblock parts, abilities, and capabilities",
+      "description": "Custom buses, hatches, ability registries, and capabilities are SuSyCore Java surfaces.",
+      "lifecycle": "Core static initialization and capability setup",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "No Groovy ability/capability constructor surface was observed."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/metatileentities/multiblockpart", "src/main/java/supersymmetry/api/metatileentity/multiblock/SuSyMultiblockAbilities.java", "src/main/java/supersymmetry/api/capability/SuSyCapabilities.java"],
+          "note": "Core registers capability interfaces and MTE parts that expose multiblock abilities."
+        }
+      ],
+      "companion_surfaces": ["capability/ability identity", "part MTE class", "MTE ID", "registration list", "textures", "localization", "controller predicates"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "covers",
+      "label": "GT cover behaviors",
+      "description": "Covers bind a stable resource ID and meta-item to a Java behavior factory.",
+      "lifecycle": "SuSyCore cover initialization",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "The observed pack does not register cover behaviors in Groovy."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/covers/SuSyCoverBehaviors.java", "src/main/java/supersymmetry/common/covers"],
+          "note": "Core calls registerBehavior with item and factory identities."
+        }
+      ],
+      "companion_surfaces": ["cover item", "behavior class", "resource ID", "factory", "texture/UI", "localization", "recipe"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "entities",
+      "label": "Forge and Immersive Railroading entities",
+      "description": "Gameplay entities and their renderers are registered from SuSyCore Java.",
+      "lifecycle": "SuSyCore preInit and integration load",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "binding-only",
+          "paths": ["groovy/postInit/gameplay/Invasions.groovy"],
+          "note": "Groovy spawns existing entity classes but does not register new entity types."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/SusyMetaEntities.java", "src/main/java/supersymmetry/loaders/SuSyIRLoader.java"],
+          "note": "Core registers entity resource IDs, numeric tracking IDs, factories, and client renderers."
+        }
+      ],
+      "companion_surfaces": ["entity class", "resource and tracking ID", "factory", "renderer/model/texture", "network behavior", "localization"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "biomes",
+      "label": "Biomes",
+      "description": "SuSyCore constructs biome classes/properties and registers them through Forge.",
+      "lifecycle": "Forge biome RegistryEvent",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "No Groovy biome constructor surface was observed."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/CommonProxy.java", "src/main/java/supersymmetry/common/world/biome", "src/main/java/supersymmetry/common/world/SuSyBiomes.java"],
+          "note": "Core creates BiomeProperties, assigns registry names, registers biomes, and adds dictionary types."
+        }
+      ],
+      "companion_surfaces": ["biome class", "properties", "registry ID", "BiomeDictionary types", "world provider use", "localization/assets"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "dimensions-planets-celestial",
+      "label": "Dimensions, planets, and celestial objects",
+      "description": "Core registers dimension types and planet layout, while celestial object graphs provide dimension identities.",
+      "lifecycle": "after biome registration",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "The observed Groovy globals only reference existing dimension IDs."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/common/world/SuSyDimensions.java", "src/main/java/supersymmetry/common/world/Planet.java", "src/main/java/supersymmetry/api/space/CelestialObjects.java"],
+          "note": "Core constructs DimensionType, Planet, celestial identities, biome layout, sky, gravity, and registration."
+        },
+        {
+          "authority": "pack-data",
+          "role": "fallback",
+          "paths": ["config/gregtech/dimensions.json"],
+          "note": "GregTech configuration admits dimension IDs but does not replace Core planet registration."
+        }
+      ],
+      "companion_surfaces": ["celestial object", "dimension ID/type", "Planet registration", "biomes", "world provider", "sky renderer", "gravity", "worldgen", "localization/assets"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "sounds",
+      "label": "Sound events",
+      "description": "SuSyCore constructs and registers SoundEvent identities used by machines, blocks, entities, and items.",
+      "lifecycle": "SuSyCore preInit",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "Groovy consumes sound-bearing maps but does not register sound events."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/api/sound/SusySounds.java", "src/main/resources/assets/susy/sounds.json"],
+          "note": "Core creates SoundEvent, sets registry names, registers with Forge, and supplies sound assets metadata."
+        }
+      ],
+      "companion_surfaces": ["SoundEvent field", "resource ID", "sounds.json", "audio asset", "consumer"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "particles",
+      "label": "Physics particles and client effects",
+      "description": "Physics particle identities and rendered client particle effects are SuSyCore Java types.",
+      "lifecycle": "SuSyCore preLoad and client rendering",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "No Groovy particle registry constructor was observed."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/api/particle/Particles.java", "src/main/java/supersymmetry/client/renderer/particles"],
+          "note": "Core constructs particle-domain objects, registers them, and implements visual effects."
+        }
+      ],
+      "companion_surfaces": ["particle identity/properties", "registry collection", "beam capability", "client renderer/texture", "recipe property when applicable"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "network-modules",
+      "label": "Network packets and GT modules",
+      "description": "SuSyCore owns module-container and packet registrations required by mechanics.",
+      "lifecycle": "GT module initialization",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "No Groovy packet or module registration surface was observed."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/modules/SuSyCoreModule.java", "src/main/java/supersymmetry/modules/SuSyModules.java", "src/main/java/supersymmetry/common/CommonProxy.java"],
+          "note": "Core registers the GT module container and packet classes."
+        }
+      ],
+      "companion_surfaces": ["module descriptor", "packet class", "numeric/discriminator registration", "sender/handler", "consumer mechanics"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "server-commands",
+      "label": "Server commands and subcommands",
+      "description": "SuSyCore constructs and registers horde, faction, recipe-map dump, and untranslated-key server commands.",
+      "lifecycle": "FMLServerStartingEvent",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "No pack Groovy server-command constructor was observed."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/Supersymmetry.java", "src/main/java/supersymmetry/common/command"],
+          "note": "Core instantiates ICommand implementations during serverStarting, registers roots, and attaches horde subcommands."
+        }
+      ],
+      "companion_surfaces": ["command root/name", "permission and sender policy", "arguments/tab completion", "subcommand graph", "localization/output", "serverStarting registration"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "optional-mod-integrations",
+      "label": "Optional-mod integration registrations",
+      "description": "SuSyCore modules register integration-owned items, tile entities, IR entities and GUI types, JEI categories, OpenComputers drivers/floppies, and probe providers.",
+      "lifecycle": "SuSyCore construction through postInit and optional-mod module events",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "binding-only",
+          "paths": ["groovy/postInit/mod/*.groovy"],
+          "note": "Pack Groovy adds recipes and policy for existing integrations but does not construct their Java registry types."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/integration", "src/main/java/supersymmetry/Supersymmetry.java"],
+          "note": "Core owns optional-mod module classes, registry callbacks, drivers, plugins, GUI/container bindings, and providers."
+        }
+      ],
+      "companion_surfaces": ["mod-presence/module gate", "registered integration type", "foreign API contract", "recipe/policy bindings", "client GUI/renderer", "assets/localization"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "rocketry-components-blueprints",
+      "label": "Rocket components and blueprints",
+      "description": "Rocket component, fuel, stage, and blueprint domain types are Core mechanics backed by registered blocks/items/entities.",
+      "lifecycle": "SuSyCore load",
+      "selected_authority": "susycore",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "binding-only",
+          "paths": ["groovy/postInit/components/SpaceComponents.groovy"],
+          "note": "Groovy adds progression recipes for existing rocket components."
+        },
+        {
+          "authority": "susycore",
+          "role": "constructor",
+          "paths": ["src/main/java/supersymmetry/api/rocketry", "src/main/java/supersymmetry/common/rocketry", "src/main/java/supersymmetry/common/blocks/rocketry", "src/main/java/supersymmetry/common/entities/EntityRocket.java"],
+          "note": "Core defines the runtime component/blueprint model and registered content."
+        }
+      ],
+      "companion_surfaces": ["domain object", "registered blocks/items/entities", "recipes", "models/textures", "localization", "networking"],
+      "active_instance_support": "source-build-required",
+      "pattern_keys": []
+    },
+    {
+      "id": "gregtech-worldgen",
+      "label": "GregTech ore veins and fluid deposits",
+      "description": "Pack worldgen deposits are JSON definitions consumed directly by GregTech.",
+      "lifecycle": "GregTech worldgen configuration load",
+      "selected_authority": "pack-data",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "No Groovy deposit constructor is used by the observed pack."
+        },
+        {
+          "authority": "susycore",
+          "role": "absent",
+          "paths": [],
+          "note": "Core supplies related materials/blocks but does not own these deposit definitions."
+        },
+        {
+          "authority": "pack-data",
+          "role": "data-definition",
+          "paths": ["config/gregtech/worldgen/vein/**/*.json", "config/gregtech/worldgen/fluid/**/*.json"],
+          "note": "Each JSON file is the formal vein or bedrock-fluid registration consumed by GregTech."
+        }
+      ],
+      "companion_surfaces": ["unique deposit name/file", "dimension predicate", "weight/y-level", "shape/filler", "material/fluid identities", "localization/JEI where needed"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "gaspunk-gases-agents",
+      "label": "Gaspunk gases and agents",
+      "description": "Custom atmospheric gases and health agents are external-mod JSON data owned by the pack.",
+      "lifecycle": "Gaspunk configuration load",
+      "selected_authority": "pack-data",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "binding-only",
+          "paths": ["groovy/postInit/mod/GasPunk.groovy"],
+          "note": "Groovy integrates recipes and existing gas identities but does not define the gas registry records."
+        },
+        {
+          "authority": "susycore",
+          "role": "absent",
+          "paths": [],
+          "note": "SuSyCore does not construct Gaspunk custom gas records."
+        },
+        {
+          "authority": "pack-data",
+          "role": "data-definition",
+          "paths": ["config/gaspunk/custom_gases/*.json", "config/gaspunk/custom_agents/*.json", "config/gaspunk/custom_recipes/*.json"],
+          "note": "Gaspunk loads these JSON records directly."
+        }
+      ],
+      "companion_surfaces": ["gas JSON", "agent JSON", "optional Gaspunk recipe", "localization", "Groovy integration recipes"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "external-spawn-rules",
+      "label": "External spawn and loot rules",
+      "description": "InControl JSON owns pack rules for potential spawns, spawn admission, experience, and external loot.",
+      "lifecycle": "InControl configuration load",
+      "selected_authority": "pack-data",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "These global external-mod rule tables are not registered by Groovy."
+        },
+        {
+          "authority": "susycore",
+          "role": "absent",
+          "paths": [],
+          "note": "Core's MobHordeEvent is a separate scripted-event path."
+        },
+        {
+          "authority": "pack-data",
+          "role": "data-definition",
+          "paths": ["config/incontrol/spawn.json", "config/incontrol/potentialspawn.json", "config/incontrol/loot.json", "config/incontrol/experience.json", "config/incontrol/summonaid.json"],
+          "note": "InControl reads the ordered JSON rules directly."
+        }
+      ],
+      "companion_surfaces": ["ordered rule", "entity/dimension predicates", "result/action", "item identities"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "quests-progression",
+      "label": "Quests and progression",
+      "description": "BetterQuesting quest lines, quest records, rewards, and tasks are pack JSON data.",
+      "lifecycle": "BetterQuesting default quest database load",
+      "selected_authority": "pack-data",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "Groovy recipes support progression but do not construct the quest database."
+        },
+        {
+          "authority": "susycore",
+          "role": "absent",
+          "paths": [],
+          "note": "SuSyCore does not own BetterQuesting records."
+        },
+        {
+          "authority": "pack-data",
+          "role": "data-definition",
+          "paths": ["config/betterquesting/DefaultQuests/QuestLines/*.json", "config/betterquesting/DefaultQuests/Quests/**/*.json", "config/betterquesting/DefaultQuests/QuestSettings.json"],
+          "note": "BetterQuesting consumes the ID-linked JSON database."
+        }
+      ],
+      "companion_surfaces": ["quest ID/file", "quest line", "tasks", "rewards", "prerequisites", "localization", "item/fluid identities"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "recurrent-complex-structures",
+      "label": "Structures and generation rules",
+      "description": "Recurrent Complex structure, inventory-generator, transformer, and placement records are binary/data assets in the pack.",
+      "lifecycle": "Recurrent Complex structure load",
+      "selected_authority": "pack-data",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "absent",
+          "paths": [],
+          "note": "No Groovy structure registry constructor is used."
+        },
+        {
+          "authority": "susycore",
+          "role": "absent",
+          "paths": [],
+          "note": "Core may consume structures but does not define these Recurrent Complex records."
+        },
+        {
+          "authority": "pack-data",
+          "role": "data-definition",
+          "paths": ["structures/active/**/*.rcst", "structures/active/**/*.rcig", "structures/active/**/*.rcbp", "structures/active/**/*.rcgp", "structures/active/**/*.rcnc"],
+          "note": "Recurrent Complex loads the pack's structure and generator records directly."
+        }
+      ],
+      "companion_surfaces": ["structure record", "generation/placement record", "inventory generators", "transformers", "block/entity dependencies"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    },
+    {
+      "id": "resources-localization-assets",
+      "label": "Localization, models, textures, and resource overrides",
+      "description": "Resource Loader supplies pack-owned translations and visual assets, including companions for Groovy meta-items.",
+      "lifecycle": "client resource reload",
+      "selected_authority": "pack-data",
+      "authority_chain": [
+        {
+          "authority": "groovy",
+          "role": "binding-only",
+          "paths": ["groovy/preInit/RegisterMetaItems.groovy", "groovy/material/*.groovy"],
+          "note": "Groovy creates identities whose client representation is supplied by resource data."
+        },
+        {
+          "authority": "susycore",
+          "role": "fallback",
+          "paths": ["src/main/resources/assets/susy"],
+          "note": "Core ships assets for Java-owned content inside its JAR."
+        },
+        {
+          "authority": "pack-data",
+          "role": "data-definition",
+          "paths": ["resources/langfiles/lang/*.lang", "resources/*/models/**/*.json", "resources/*/blockstates/*.json", "resources/*/textures/**/*", "resources/pack.mcmeta"],
+          "note": "Resource Loader applies these files directly from the installed instance."
+        }
+      ],
+      "companion_surfaces": ["translation key", "model/blockstate JSON", "texture", "sound metadata/audio", "pack metadata"],
+      "active_instance_support": "planned",
+      "pattern_keys": []
+    }
+  ],
+  "patterns": [
+    {
+      "key": "material-backed-fluid",
+      "label": "Material-backed fluid",
+      "family_id": "materials",
+      "lifecycle": "experimental",
+      "renderer": "gregtech-material-backed-fluid-v1",
+      "summary": "Allocate a petrochemistry material ID and update SuSyMaterials, PetrochemistryMaterials, and central English localization.",
+      "authority_spec": {
+        "kind": "convention-patch",
+        "pattern_path": "blueprints/experimental/patterns/material-backed-fluid-v1.json"
+      },
+      "questions": [
+        {
+          "id": "name",
+          "label": "Developer name",
+          "type": "string",
+          "required": true,
+          "description": "Human-readable name used to derive registry and Groovy symbol identities."
+        },
+        {
+          "id": "color",
+          "label": "Fluid color",
+          "type": "color",
+          "required": true,
+          "description": "Six-digit RGB color in 0xrrggbb form."
+        },
+        {
+          "id": "translation",
+          "label": "English translation",
+          "type": "string",
+          "required": false,
+          "description": "Display name; defaults to the developer name."
+        },
+        {
+          "id": "symbol",
+          "label": "Groovy symbol",
+          "type": "string",
+          "required": false,
+          "description": "Central static-field symbol; defaults to PascalCase name and can preserve acronym casing."
+        }
+      ],
+      "limitations": [
+        "This first material pattern intentionally matches the observed petrochemistry liquid convention and adds FLAMMABLE.",
+        "The updated scripts still require a Cleanroom launch to prove runtime registration."
+      ]
+    },
+    {
+      "key": "machine-recipe",
+      "label": "GregTech machine recipe",
+      "family_id": "machine-recipes",
+      "lifecycle": "experimental",
+      "renderer": "gregtech-machine-recipe-v1",
+      "summary": "Append one structured recipeBuilder chain to an existing domain-organized postInit script using an observed Recipemaps alias.",
+      "authority_spec": {
+        "kind": "gregtech-postinit-recipe",
+        "owner_root": "groovy/postInit",
+        "recipe_maps_path": "groovy/prePostInit/Recipemaps.groovy",
+        "required_imports": ["import static prePostInit.Recipemaps.*", "import static gregtech.api.GTValues.*"],
+        "indentation": "    "
+      },
+      "questions": [
+        {
+          "id": "script",
+          "label": "Owning postInit script",
+          "type": "path",
+          "required": true,
+          "runtime_source": "groovy-postinit-scripts",
+          "description": "Existing script whose domain owns this recipe."
+        },
+        {
+          "id": "recipe_map",
+          "label": "Recipe map alias",
+          "type": "choice",
+          "required": true,
+          "runtime_source": "recipe-map-aliases",
+          "description": "Uppercase alias formally resolved in prePostInit/Recipemaps.groovy."
+        },
+        {
+          "id": "item_inputs",
+          "label": "Item inputs",
+          "type": "ingredient-list",
+          "required": false,
+          "default": [],
+          "description": "Ore, meta-item, or item stacks consumed by the recipe."
+        },
+        {
+          "id": "fluid_inputs",
+          "label": "Fluid inputs",
+          "type": "fluid-list",
+          "required": false,
+          "default": [],
+          "description": "Fluid stacks consumed in millibuckets."
+        },
+        {
+          "id": "item_outputs",
+          "label": "Item outputs",
+          "type": "ingredient-list",
+          "required": false,
+          "default": [],
+          "description": "Ore, meta-item, or item stacks produced by the recipe."
+        },
+        {
+          "id": "fluid_outputs",
+          "label": "Fluid outputs",
+          "type": "fluid-list",
+          "required": false,
+          "default": [],
+          "description": "Fluid stacks produced in millibuckets."
+        },
+        {
+          "id": "duration",
+          "label": "Duration",
+          "type": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 2147483647,
+          "description": "Recipe duration in ticks."
+        },
+        {
+          "id": "voltage_tier",
+          "label": "Voltage tier",
+          "type": "choice",
+          "required": true,
+          "choices": ["ULV", "LV", "MV", "HV", "EV", "IV", "LuV", "ZPM", "UV", "UHV", "UEV", "UIV"],
+          "description": "GTValues tier used as VA[tier]."
+        }
+      ],
+      "limitations": [
+        "The V1 renderer covers ordinary item/fluid inputs and outputs, duration, and EUt; specialized builder properties remain future patterns.",
+        "Recipe-map slot arity is not yet proven before launch, so the wizard reports that runtime check as outstanding."
+      ]
+    },
+    {
+      "key": "ore-dictionary-entry",
+      "label": "Ore dictionary entry",
+      "family_id": "ore-dictionary-unification",
+      "lifecycle": "experimental",
+      "renderer": "forge-ore-dictionary-entry-v1",
+      "summary": "Append an ore(name).add(...) relationship to Supersymmetry's central prePostInit oreDict script.",
+      "authority_spec": {
+        "kind": "groovyscript-ore-dictionary",
+        "owner_path": "groovy/prePostInit/oreDict.groovy",
+        "required_markers": ["package prePostInit", "ore("]
+      },
+      "questions": [
+        {
+          "id": "ore_name",
+          "label": "Ore dictionary name",
+          "type": "string",
+          "required": true,
+          "description": "Forge ore dictionary key to receive the entry."
+        },
+        {
+          "id": "ingredient",
+          "label": "Registered ingredient",
+          "type": "ingredient",
+          "required": true,
+          "description": "One existing ore, meta-item, or item identity."
+        }
+      ],
+      "limitations": [
+        "This pattern adds one relationship and does not hide or remove displaced JEI ingredients."
+      ]
+    }
+  ]
+}

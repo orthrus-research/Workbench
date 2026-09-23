@@ -1,0 +1,19 @@
+// Profile-owned cleanup for Unimined's project-local cache.
+// Build outputs and reusable dependency caches remain under ignored .workbench.
+// The build-finished hook is deliberate: a failed check must not strand the
+// project-local cache that the exact runner promises to remove.
+gradle.projectsEvaluated {
+    def ownerRoot = gradle.rootProject
+    ownerRoot.tasks.register('workbenchCleanFixtureLocalCache') {
+        group = 'verification'
+        description = 'Remove Unimined project-local cache after the frozen fixture check.'
+        doLast {
+            ownerRoot.delete(ownerRoot.layout.projectDirectory.dir('.gradle'))
+        }
+    }
+}
+
+gradle.buildFinished {
+    def ownerRoot = gradle.rootProject
+    ownerRoot.delete(ownerRoot.layout.projectDirectory.dir('.gradle'))
+}

@@ -1,0 +1,1078 @@
+{
+  "schema_version": 1,
+  "registry_id": "SUSY-INFRASTRUCTURE-SOURCE-AUTHORITIES-0001",
+  "snapshot_id": "SNAPSHOT-SUSY-0-1-16-11-9D3AA7AE0",
+  "source_lock_id": "supersymmetry-legacy-forge",
+  "pack_commit": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972",
+  "citations": [
+    {
+      "id": "CIT-FORGE-CAPABILITY-MANAGER-REGISTER",
+      "source_id": "SRC-FORGE",
+      "revision": "d3f01843f7e7a4f613b5e8113d381fd8747b4343",
+      "path": "src/main/java/net/minecraftforge/common/capabilities/CapabilityManager.java",
+      "symbol": "net.minecraftforge.common.capabilities.CapabilityManager.register",
+      "line_start": 40,
+      "line_end": 98,
+      "file_sha256": "822dec8994e86dfa8d7264f0274f971d7f04ec1442fb4318ce217a23100a7df2",
+      "anchor": "public <T> void register(Class<T> type, Capability.IStorage<T> storage, Callable<? extends T> factory)",
+      "authority_roles": [
+        "substrate"
+      ],
+      "semantic_domains": [
+        "capability"
+      ]
+    },
+    {
+      "id": "CIT-FORGE-CONFIGURATION-LOAD",
+      "source_id": "SRC-FORGE",
+      "revision": "d3f01843f7e7a4f613b5e8113d381fd8747b4343",
+      "path": "src/main/java/net/minecraftforge/common/config/Configuration.java",
+      "symbol": "net.minecraftforge.common.config.Configuration.load",
+      "line_start": 828,
+      "line_end": 895,
+      "file_sha256": "8504efc9e0878f1217bb63b97aeb19a284a85ed87294cd95911df8a3585b4491",
+      "anchor": "input = new UnicodeInputStreamReader(new FileInputStream(file), defaultEncoding);",
+      "authority_roles": [
+        "substrate"
+      ],
+      "semantic_domains": [
+        "configuration"
+      ]
+    },
+    {
+      "id": "CIT-FORGE-DIMENSION-MANAGER-REGISTER",
+      "source_id": "SRC-FORGE",
+      "revision": "d3f01843f7e7a4f613b5e8113d381fd8747b4343",
+      "path": "src/main/java/net/minecraftforge/common/DimensionManager.java",
+      "symbol": "net.minecraftforge.common.DimensionManager.init/registerDimension",
+      "line_start": 115,
+      "line_end": 141,
+      "file_sha256": "a2ea192d9108c65aadf88fa9c1243c8ff0057710e8a414fa463c1c348879b53e",
+      "anchor": "public static void registerDimension(int id, DimensionType type)",
+      "authority_roles": [
+        "substrate"
+      ],
+      "semantic_domains": [
+        "dimension"
+      ]
+    },
+    {
+      "id": "CIT-FORGE-GAMEDATA-REGISTRY-EVENTS",
+      "source_id": "SRC-FORGE",
+      "revision": "d3f01843f7e7a4f613b5e8113d381fd8747b4343",
+      "path": "src/main/java/net/minecraftforge/registries/GameData.java",
+      "symbol": "net.minecraftforge.registries.GameData.fireCreateRegistryEvents/fireRegistryEvents",
+      "line_start": 823,
+      "line_end": 860,
+      "file_sha256": "504b3dafc9790f0d2313fd63048d3196b114d8cc5d3384e7fee690c9970b0dd0",
+      "anchor": "MinecraftForge.EVENT_BUS.post(new RegistryEvent.NewRegistry());",
+      "authority_roles": [
+        "lifecycle",
+        "substrate"
+      ],
+      "semantic_domains": [
+        "registry-lifecycle"
+      ]
+    },
+    {
+      "id": "CIT-FORGE-LOADER-PREINITIALIZE",
+      "source_id": "SRC-FORGE",
+      "revision": "d3f01843f7e7a4f613b5e8113d381fd8747b4343",
+      "path": "src/main/java/net/minecraftforge/fml/common/Loader.java",
+      "symbol": "net.minecraftforge.fml.common.Loader.preinitializeMods",
+      "line_start": 618,
+      "line_end": 635,
+      "file_sha256": "2d08ef8a7f8f5a1db0ff67651a9792a5312d9f32c17b95d324210f200e52734e",
+      "anchor": "GameData.fireRegistryEvents(rl -> !rl.equals(GameData.RECIPES));",
+      "authority_roles": [
+        "lifecycle",
+        "substrate"
+      ],
+      "semantic_domains": [
+        "capability",
+        "configuration",
+        "registry-lifecycle"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-ASSEMBLER-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeAssembler.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeAssembler.createStructurePattern",
+      "line_start": 48,
+      "line_end": 66,
+      "file_sha256": "a56777f979b7d1683af2f7db083d3333479bfac1eebc927c4244288c2be8b377",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-AUTOCLAVE-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeAutoclave.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeAutoclave.createStructurePattern",
+      "line_start": 36,
+      "line_end": 50,
+      "file_sha256": "f33cf4e8507445351e3f3c6ae57c4a7ab8096619e53935ab404f44a81223339a",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-BENDER-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeBender.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeBender.createStructurePattern",
+      "line_start": 39,
+      "line_end": 50,
+      "file_sha256": "20e490b3d6b896bc28511f9f394eaf39f1177d0dfac81cb0dd896532a6f3d829",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-CENTRIFUGE-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeCentrifuge.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeCentrifuge.createStructurePattern",
+      "line_start": 40,
+      "line_end": 52,
+      "file_sha256": "adb4c81e5f08932b97bd85a66e13121007194f423f9c35f84995906e723fd09f",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-CIRCUIT-ASSEMBLER-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeCircuitAssembler.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeCircuitAssembler.createStructurePattern",
+      "line_start": 47,
+      "line_end": 64,
+      "file_sha256": "072bd617ef26991d8924dd927d2e078b2a22dd569e6d9bd2dc6a85862e2f990b",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-CUTTER-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeCutter.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeCutter.createStructurePattern",
+      "line_start": 42,
+      "line_end": 57,
+      "file_sha256": "91f4c927d40b05c4de533e55192980d470a71f37a6254037c34baf92995422f2",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-DISTILLERY-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeDistillery.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeDistillery.createStructurePattern",
+      "line_start": 127,
+      "line_end": 158,
+      "file_sha256": "c2b8a7575438d2277875a5e3b38999fc31aaea60b5dba75127ea905da8df5237",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-EXTRACTOR-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeExtractor.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeExtractor.createStructurePattern",
+      "line_start": 39,
+      "line_end": 49,
+      "file_sha256": "231def56ec82e6fb9f080a7d477cc085acd95daa78c223263e2593c2292ca683",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-EXTRUDER-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeExtruder.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeExtruder.createStructurePattern",
+      "line_start": 37,
+      "line_end": 51,
+      "file_sha256": "704a9b1474a388807833887638627dc64bd4263326063d4d6a948e28ae993625",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-MIXER-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeMixer.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeMixer.createStructurePattern",
+      "line_start": 39,
+      "line_end": 55,
+      "file_sha256": "f9c1282abfd7b513e17ad0c1cbca63d54e5f389564d37d97b7dcdf55f227fe9d",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-POLARIZER-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargePolarizer.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargePolarizer.createStructurePattern",
+      "line_start": 37,
+      "line_end": 49,
+      "file_sha256": "f4e2324aa86faa43df3eb0cdda7a7ad835a4e2011be5555649bdbabd03db33dd",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GCYM-LARGE-SOLIDIFIER-STRUCTURE",
+      "source_id": "SRC-GREGICALITY-MULTIBLOCKS",
+      "revision": "54168e0dc6d55089469be43eb4ab7517776972b2",
+      "path": "src/main/java/gregicality/multiblocks/common/metatileentities/multiblock/standard/MetaTileEntityLargeSolidifier.java",
+      "symbol": "gregicality.multiblocks.common.metatileentities.multiblock.standard.MetaTileEntityLargeSolidifier.createStructurePattern",
+      "line_start": 38,
+      "line_end": 51,
+      "file_sha256": "a4bc66aca589aa9da060ba6d2ba2083e4d87fc3f301acbe992444ec4d8215449",
+      "anchor": "protected @NotNull BlockPattern createStructurePattern() {",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-ABSTRACT-RECIPE-CLEANROOM",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/capability/impl/AbstractRecipeLogic.java",
+      "symbol": "gregtech.api.capability.impl.AbstractRecipeLogic.checkCleanroomRequirement",
+      "line_start": 414,
+      "line_end": 437,
+      "file_sha256": "4c5aebed2da95b3b136bd1c19a975c5631de173675aded010b36bce46d41bd9c",
+      "anchor": "if (ConfigHolder.machines.cleanMultiblocks && mte instanceof IMultiblockController) return true;",
+      "authority_roles": [
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "cleanroom",
+        "configuration",
+        "recipe-execution"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-ABSTRACT-RECIPE-OVERCLOCK",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/capability/impl/AbstractRecipeLogic.java",
+      "symbol": "gregtech.api.capability.impl.AbstractRecipeLogic.calculateOverclock/performOverclocking/runOverclockingLogic",
+      "line_start": 743,
+      "line_end": 817,
+      "file_sha256": "4c5aebed2da95b3b136bd1c19a975c5631de173675aded010b36bce46d41bd9c",
+      "anchor": "int recipeTier = GTUtility.getTierByVoltage(recipeEUt);",
+      "authority_roles": [
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "recipe-execution",
+        "voltage-tier"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-BLOCK-PATTERN-CHECK",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/pattern/BlockPattern.java",
+      "symbol": "gregtech.api.pattern.BlockPattern.checkPatternFastAt/checkPatternAt",
+      "line_start": 108,
+      "line_end": 234,
+      "file_sha256": "a9a7744504f2e91baf0ee1eba4ffb4a288517f7575b826780b2957310869a993",
+      "anchor": "if (r < aisleRepetitions[c][0]) {",
+      "authority_roles": [
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-CONFIG-CLEAN-MULTIBLOCKS",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/common/ConfigHolder.java",
+      "symbol": "gregtech.common.ConfigHolder.Machines.cleanMultiblocks",
+      "line_start": 122,
+      "line_end": 128,
+      "file_sha256": "79ed084b93af93c4e1c11519b8c2c3ae563067b511c5946d1082dc635536938b",
+      "anchor": "public boolean cleanMultiblocks = false;",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "cleanroom",
+        "configuration"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-DISTILLATION-TOWER-STRUCTURE",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/common/metatileentities/multi/electric/MetaTileEntityDistillationTower.java",
+      "symbol": "gregtech.common.metatileentities.multi.electric.MetaTileEntityDistillationTower.createStructurePattern",
+      "line_start": 121,
+      "line_end": 136,
+      "file_sha256": "f17916dbeedd5d9424c6c6e6674439b83ad7ec335eea0ad500acbf64ffdf74f5",
+      "anchor": ".aisle(\"XXX\", \"X#X\", \"XXX\").setRepeatable(1, 11)",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-FACTORY-BLOCK-PATTERN",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/pattern/FactoryBlockPattern.java",
+      "symbol": "gregtech.api.pattern.FactoryBlockPattern.aisleRepeatable/where/build",
+      "line_start": 53,
+      "line_end": 148,
+      "file_sha256": "ed01381c4adf3ae7ae641152ed4d8c6a7cb84b70161d55ffadbecddf0f776d45",
+      "anchor": "public FactoryBlockPattern aisleRepeatable(int minRepeat, int maxRepeat, String... aisle) {",
+      "authority_roles": [
+        "declaration",
+        "substrate"
+      ],
+      "semantic_domains": [
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-MULTIBLOCK-ABILITY",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/metatileentity/multiblock/MultiblockAbility.java",
+      "symbol": "gregtech.api.metatileentity.multiblock.MultiblockAbility",
+      "line_start": 18,
+      "line_end": 88,
+      "file_sha256": "9736707bfb66e511ae2ce22284130578a733af57c5aa129b5e72cc6fd46fdbc2",
+      "anchor": "public static final MultiblockAbility<IEnergyContainer> INPUT_ENERGY = new MultiblockAbility<>(\"input_energy\");",
+      "authority_roles": [
+        "declaration",
+        "substrate"
+      ],
+      "semantic_domains": [
+        "capability",
+        "multiblock-ability"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-MULTIBLOCK-CONTROLLER-FORMATION",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/metatileentity/multiblock/MultiblockControllerBase.java",
+      "symbol": "gregtech.api.metatileentity.multiblock.MultiblockControllerBase.checkStructurePattern/formStructure",
+      "line_start": 320,
+      "line_end": 370,
+      "file_sha256": "ea6f976fb7345d5861f036d0def94b0c7f31bedccfb05b205852b28ce9188ae4",
+      "anchor": "this.multiblockAbilities.putAll(abilities);",
+      "authority_roles": [
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-MULTIBLOCK-PREDICATE-HELPERS",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/metatileentity/multiblock/MultiblockControllerBase.java",
+      "symbol": "gregtech.api.metatileentity.multiblock.MultiblockControllerBase.tilePredicate/metaTileEntities/abilities/states/frames/blocks/air/any/heatingCoils/selfPredicate",
+      "line_start": 172,
+      "line_end": 271,
+      "file_sha256": "ea6f976fb7345d5861f036d0def94b0c7f31bedccfb05b205852b28ce9188ae4",
+      "anchor": "public static TraceabilityPredicate abilities(MultiblockAbility<?>... allowedAbilities) {",
+      "authority_roles": [
+        "declaration",
+        "substrate"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-PRIMITIVE-RECIPE-LOGIC",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/capability/impl/PrimitiveRecipeLogic.java",
+      "symbol": "gregtech.api.capability.impl.PrimitiveRecipeLogic.drawEnergy/hasEnoughPower",
+      "line_start": 12,
+      "line_end": 48,
+      "file_sha256": "69dada4cf6e2076b18004f50d7bec3dc97f29e26817c58414e36d91dea15b83b",
+      "anchor": "return true; // spoof energy being drawn",
+      "authority_roles": [
+        "declaration",
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "recipe-execution"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-PRIMITIVE-WATER-PUMP",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/common/metatileentities/multi/MetaTileEntityPrimitiveWaterPump.java",
+      "symbol": "gregtech.common.metatileentities.multi.MetaTileEntityPrimitiveWaterPump.update/getAmount/initializeAbilities/createStructurePattern",
+      "line_start": 59,
+      "line_end": 154,
+      "file_sha256": "4299ab109ed629c064801c54f9656fbe93d81f645c11e2a99878a0c54e831736",
+      "anchor": "if (provider.isNether() || provider.doesWaterVaporize()) {",
+      "authority_roles": [
+        "declaration",
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "dimension",
+        "environment",
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-RECIPE-LOGIC-STEAM",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/capability/impl/RecipeLogicSteam.java",
+      "symbol": "gregtech.api.capability.impl.RecipeLogicSteam.drawEnergy/hasEnoughPower",
+      "line_start": 203,
+      "line_end": 245,
+      "file_sha256": "dc72c615fb4ba4f7e8015135fdf32b2a9270b679b4db59e328d21a31adccd132",
+      "anchor": "int resultDraw = (int) Math.ceil(recipeEUt / conversionRate);",
+      "authority_roles": [
+        "declaration",
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "recipe-execution",
+        "steam-energy"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-RESERVOIR-HATCH-INFINITE-WATER",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/common/metatileentities/multi/multiblockpart/MetaTileEntityReservoirHatch.java",
+      "symbol": "gregtech.common.metatileentities.multi.multiblockpart.MetaTileEntityReservoirHatch.update/InfiniteWaterTank",
+      "line_start": 44,
+      "line_end": 68,
+      "file_sha256": "1417bfe9a369090019e079406092c8dea85ccbcf8324e571a2570dcc1d9b0074",
+      "anchor": "fluidTank.refillWater();",
+      "authority_roles": [
+        "declaration",
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "environment",
+        "infinite-water"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-STEAM-MULTIBLOCK-RECIPE-LOGIC",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/capability/impl/SteamMultiblockRecipeLogic.java",
+      "symbol": "gregtech.api.capability.impl.SteamMultiblockRecipeLogic.drawEnergy/hasEnoughPower",
+      "line_start": 90,
+      "line_end": 185,
+      "file_sha256": "6d29b1cc7e3f940c87e07b80b04384f38ccf978863b5d02670fc58e6199c7027",
+      "anchor": "int resultDraw = (int) Math.ceil(recipeEUt / conversionRate);",
+      "authority_roles": [
+        "declaration",
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "recipe-execution",
+        "steam-energy"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-TIER-BY-VOLTAGE",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/util/GTUtility.java",
+      "symbol": "gregtech.api.util.GTUtility.nearestLesser/getTierByVoltage",
+      "line_start": 203,
+      "line_end": 250,
+      "file_sha256": "c79e1d4d62dc2246ab456c931aa7a44340c146951e1b14585fa3f471fe6beaed",
+      "anchor": "return (byte) Math.min(GTValues.MAX, nearestLesser(V, voltage) + 1);",
+      "authority_roles": [
+        "derivation",
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "recipe-execution",
+        "voltage-tier"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-TRACEABILITY-BASE-PREDICATES",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/pattern/TraceabilityPredicate.java",
+      "symbol": "gregtech.api.pattern.TraceabilityPredicate.ANY/AIR/HEATING_COILS",
+      "line_start": 25,
+      "line_end": 47,
+      "file_sha256": "cc185a533e78b2d011c50ffd59e80046a19e5ddaecf242e18c6a3d52ddae9dfb",
+      "anchor": "public static TraceabilityPredicate ANY = new TraceabilityPredicate((state) -> true);",
+      "authority_roles": [
+        "declaration",
+        "substrate"
+      ],
+      "semantic_domains": [
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-TRACEABILITY-CARDINALITY",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/pattern/TraceabilityPredicate.java",
+      "symbol": "gregtech.api.pattern.TraceabilityPredicate.setMinGlobalLimited/setMaxGlobalLimited/setMinLayerLimited/setMaxLayerLimited/setExactLimit",
+      "line_start": 135,
+      "line_end": 205,
+      "file_sha256": "cc185a533e78b2d011c50ffd59e80046a19e5ddaecf242e18c6a3d52ddae9dfb",
+      "anchor": "public TraceabilityPredicate setExactLimit(int limit) {",
+      "authority_roles": [
+        "declaration",
+        "substrate"
+      ],
+      "semantic_domains": [
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-GTCEU-VOLTAGE-TABLE",
+      "source_id": "SRC-GTCEU",
+      "revision": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+      "path": "src/main/java/gregtech/api/GTValues.java",
+      "symbol": "gregtech.api.GTValues.V/VA/VN/VOLTAGE_NAMES",
+      "line_start": 53,
+      "line_end": 122,
+      "file_sha256": "f2861c31315f5e556705927a63e7649ef0c6ca1c0a420170af38a99146b15675",
+      "anchor": "public static final long[] V = { 8, 32, 128, 512, 2048, 8192, 32768, 131072, 524288, 2097152, 8388608, 33554432,",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "recipe-execution",
+        "voltage-tier"
+      ]
+    },
+    {
+      "id": "CIT-PACK-CLEAN-MULTIBLOCKS-VALUE",
+      "source_id": "SRC-PACK",
+      "revision": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972",
+      "path": "config/gregtech/gregtech.cfg",
+      "symbol": "machines.cleanMultiblocks",
+      "line_start": 411,
+      "line_end": 414,
+      "file_sha256": "d7438a11cdd496a377deab07d0a6c20ef7f5113e0abeb5584472e48b275458c1",
+      "anchor": "B:cleanMultiblocks=false",
+      "authority_roles": [
+        "configuration",
+        "instantiation"
+      ],
+      "semantic_domains": [
+        "cleanroom",
+        "configuration"
+      ]
+    },
+    {
+      "id": "CIT-PACK-DILUTED-OIL-MATERIAL",
+      "source_id": "SRC-PACK",
+      "revision": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972",
+      "path": "groovy/material/PetrochemistryMaterials.groovy",
+      "symbol": "material.PetrochemistryMaterials.register.DilutedOilLight",
+      "line_start": 17,
+      "line_end": 38,
+      "file_sha256": "29c2813429442300e62c20e66c3988117d5ce9e3b4124d387de4db3f4002661b",
+      "anchor": "DilutedOilLight = new Material.Builder(20000, SuSyUtility.susyId('diluted_oil_light'))",
+      "authority_roles": [
+        "declaration",
+        "instantiation"
+      ],
+      "semantic_domains": [
+        "material-registration",
+        "pack-recipe"
+      ]
+    },
+    {
+      "id": "CIT-PACK-DILUTED-OIL-RECIPE",
+      "source_id": "SRC-PACK",
+      "revision": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972",
+      "path": "groovy/postInit/chemistry/organic_chemistry/petrochemistry/oil_refining/Preprocessing.groovy",
+      "symbol": "postInit.chemistry.organic_chemistry.petrochemistry.oil_refining.Preprocessing.oil_dilution",
+      "line_start": 5,
+      "line_end": 13,
+      "file_sha256": "45c881bd6fb4a921c7a0bfea5f6d73af597cc620fc012e998fd21512572af4e5",
+      "anchor": ".EUt(VA[LV])",
+      "authority_roles": [
+        "declaration",
+        "instantiation"
+      ],
+      "semantic_domains": [
+        "pack-recipe",
+        "recipe-execution",
+        "voltage-tier"
+      ]
+    },
+    {
+      "id": "CIT-PACK-PETROCHEMISTRY-DILUTION-NAMING",
+      "source_id": "SRC-PACK",
+      "revision": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972",
+      "path": "groovy/globals/Petrochemistry.groovy",
+      "symbol": "globals.Petrochemistry.Oil.getDiluted",
+      "line_start": 5,
+      "line_end": 29,
+      "file_sha256": "d3529576b3cdd75a2ae9b4998768d9b5783a3b20bb8dac1e8a2c6e9b948c7c3b",
+      "anchor": "return fluid('diluted_' + this.name) * amount",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "material-registration",
+        "pack-recipe"
+      ]
+    },
+    {
+      "id": "CIT-PACK-PETROCHEMISTRY-OIL-INSTANCES",
+      "source_id": "SRC-PACK",
+      "revision": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972",
+      "path": "groovy/globals/Petrochemistry.groovy",
+      "symbol": "globals.Petrochemistry.oils",
+      "line_start": 180,
+      "line_end": 184,
+      "file_sha256": "d3529576b3cdd75a2ae9b4998768d9b5783a3b20bb8dac1e8a2c6e9b948c7c3b",
+      "anchor": "oil_light: new Oil('oil_light', 'light_oily_brine'),",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "material-registration",
+        "pack-recipe"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-BLENDER-STRUCTURE",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/common/metatileentities/multi/electric/MetaTileEntityBlender.java",
+      "symbol": "supersymmetry.common.metatileentities.multi.electric.MetaTileEntityBlender.createStructurePattern",
+      "line_start": 40,
+      "line_end": 71,
+      "file_sha256": "94385c405b7781ee7674f2c6e169916b6440df40fb2eb4bc87f8616b815abf98",
+      "anchor": "TraceabilityPredicate casing = states(getCasingState()).setMinGlobalLimited(34);",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-CLARIFIER-STRUCTURE",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/common/metatileentities/multi/electric/MetaTileEntityClarifier.java",
+      "symbol": "supersymmetry.common.metatileentities.multi.electric.MetaTileEntityClarifier.createStructurePattern",
+      "line_start": 46,
+      "line_end": 78,
+      "file_sha256": "f25b1c1d1a7a40783db04358d47133cfc348c3c6ca5948e8b3cd9f514ecc9d53",
+      "anchor": ".getState(StoneVariantBlock.StoneType.CONCRETE_LIGHT)).setMinGlobalLimited(250)",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-CONDENSER-STRUCTURE",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/common/metatileentities/multi/electric/MetaTileEntityCondenser.java",
+      "symbol": "supersymmetry.common.metatileentities.multi.electric.MetaTileEntityCondenser.createStructurePattern",
+      "line_start": 34,
+      "line_end": 46,
+      "file_sha256": "31d2d7947795c464fd2e7da55ed3380241e22825c783cdf2615677e875404f37",
+      "anchor": ".setMinGlobalLimited(27)",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-DIMENSION-TYPE",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/common/world/SuSyDimensions.java",
+      "symbol": "supersymmetry.common.world.SuSyDimensions.init",
+      "line_start": 19,
+      "line_end": 53,
+      "file_sha256": "265cf9d40edee48b1d43a30bd4cbb854ef753fad66f85be7bf2a564f7004bdf3",
+      "anchor": "planetType = DimensionType.register(\"susy_planet\", \"_susy\", id, WorldProviderPlanet.class, false);",
+      "authority_roles": [
+        "declaration",
+        "instantiation"
+      ],
+      "semantic_domains": [
+        "dimension"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-INJECTION-MOLDER-STRUCTURE",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/common/metatileentities/multi/electric/MetaTileEntityInjectionMolder.java",
+      "symbol": "supersymmetry.common.metatileentities.multi.electric.MetaTileEntityInjectionMolder.createStructurePattern",
+      "line_start": 49,
+      "line_end": 72,
+      "file_sha256": "cb5a8c17b6902577b3a0e7ae84e6b947aeff0942bbf8763e47d49ade6a9582c1",
+      "anchor": "TraceabilityPredicate casingPredicate = states(getCasingState()).setMinGlobalLimited(35);",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-LARGE-STEAM-HAMMER-STRUCTURE",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/common/metatileentities/multi/steam/MetaTileEntitySuSyLargeHammer.java",
+      "symbol": "supersymmetry.common.metatileentities.multi.steam.MetaTileEntitySuSyLargeHammer.createStructurePattern",
+      "line_start": 50,
+      "line_end": 64,
+      "file_sha256": "c2a392670b3e9b9e43f9615efee692da998557c453e1f2b525e174e3a0e9b3a9",
+      "anchor": ".where('X', states(getCasingState()).setMinGlobalLimited(19).or(autoAbilities()))",
+      "authority_roles": [
+        "declaration"
+      ],
+      "semantic_domains": [
+        "multiblock-ability",
+        "multiblock-pattern"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-NO-ENERGY-MULTIBLOCK-RECIPE-LOGIC",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/api/capability/impl/NoEnergyMultiblockRecipeLogic.java",
+      "symbol": "supersymmetry.api.capability.impl.NoEnergyMultiblockRecipeLogic.drawEnergy/getMaxVoltage/runOverclockingLogic",
+      "line_start": 12,
+      "line_end": 60,
+      "file_sha256": "bd99089b4628ac1aff7c1004c645e142bbd6a16b37535cd34807d31b7ca75ef3",
+      "anchor": "return true; // spoof energy being drawn",
+      "authority_roles": [
+        "declaration",
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "recipe-execution"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-PLANET-DIMENSION",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/common/world/Planet.java",
+      "symbol": "supersymmetry.common.world.Planet.load",
+      "line_start": 52,
+      "line_end": 70,
+      "file_sha256": "92743c9ac9ca7f962b23e560eb8a02aba52626c642a1fbf2c29426121e785890",
+      "anchor": "DimensionManager.registerDimension(this.dimID, SuSyDimensions.planetType);",
+      "authority_roles": [
+        "instantiation"
+      ],
+      "semantic_domains": [
+        "dimension"
+      ]
+    },
+    {
+      "id": "CIT-SUSYCORE-STEAM-LIMIT",
+      "source_id": "SRC-SUSYCORE",
+      "revision": "b5ee1120df93c95b66e6a4dfff35582928f2d348",
+      "path": "src/main/java/supersymmetry/api/capability/impl/RecipeLogicSteamLimited.java",
+      "symbol": "supersymmetry.api.capability.impl.RecipeLogicSteamLimited.getMaxVoltage",
+      "line_start": 10,
+      "line_end": 20,
+      "file_sha256": "37e5af814c5f4d46e566257f2b45ac030d13c04e1a0d1fa871f1ce45e70a3fc9",
+      "anchor": "return GTValues.V[GTValues.ULV];",
+      "authority_roles": [
+        "enforcement"
+      ],
+      "semantic_domains": [
+        "recipe-execution",
+        "voltage-tier"
+      ]
+    }
+  ],
+  "authority_sets": [
+    {
+      "id": "AUTH-CAPABILITY-SUBSTRATE",
+      "semantic_kind": "capability-substrate",
+      "citation_ids": [
+        "CIT-FORGE-CAPABILITY-MANAGER-REGISTER",
+        "CIT-FORGE-LOADER-PREINITIALIZE",
+        "CIT-GTCEU-MULTIBLOCK-ABILITY"
+      ],
+      "required_source_ids": [
+        "SRC-FORGE",
+        "SRC-GTCEU"
+      ]
+    },
+    {
+      "id": "AUTH-CLEANROOM-CONFIGURATION",
+      "semantic_kind": "cleanroom-configuration",
+      "citation_ids": [
+        "CIT-FORGE-CONFIGURATION-LOAD",
+        "CIT-GTCEU-ABSTRACT-RECIPE-CLEANROOM",
+        "CIT-GTCEU-CONFIG-CLEAN-MULTIBLOCKS",
+        "CIT-PACK-CLEAN-MULTIBLOCKS-VALUE"
+      ],
+      "required_source_ids": [
+        "SRC-FORGE",
+        "SRC-GTCEU",
+        "SRC-PACK"
+      ]
+    },
+    {
+      "id": "AUTH-DIMENSION-REGISTRATION",
+      "semantic_kind": "dimension-registration",
+      "citation_ids": [
+        "CIT-FORGE-DIMENSION-MANAGER-REGISTER",
+        "CIT-SUSYCORE-DIMENSION-TYPE",
+        "CIT-SUSYCORE-PLANET-DIMENSION"
+      ],
+      "required_source_ids": [
+        "SRC-FORGE",
+        "SRC-SUSYCORE"
+      ]
+    },
+    {
+      "id": "AUTH-INFINITE-WATER-SUPPLY",
+      "semantic_kind": "infinite-water-supply",
+      "citation_ids": [
+        "CIT-GTCEU-RESERVOIR-HATCH-INFINITE-WATER"
+      ],
+      "required_source_ids": [
+        "SRC-GTCEU"
+      ]
+    },
+    {
+      "id": "AUTH-MULTIBLOCK-STRUCTURE",
+      "semantic_kind": "multiblock-structure",
+      "citation_ids": [
+        "CIT-GCYM-LARGE-ASSEMBLER-STRUCTURE",
+        "CIT-GCYM-LARGE-AUTOCLAVE-STRUCTURE",
+        "CIT-GCYM-LARGE-BENDER-STRUCTURE",
+        "CIT-GCYM-LARGE-CENTRIFUGE-STRUCTURE",
+        "CIT-GCYM-LARGE-CIRCUIT-ASSEMBLER-STRUCTURE",
+        "CIT-GCYM-LARGE-CUTTER-STRUCTURE",
+        "CIT-GCYM-LARGE-DISTILLERY-STRUCTURE",
+        "CIT-GCYM-LARGE-EXTRACTOR-STRUCTURE",
+        "CIT-GCYM-LARGE-EXTRUDER-STRUCTURE",
+        "CIT-GCYM-LARGE-MIXER-STRUCTURE",
+        "CIT-GCYM-LARGE-POLARIZER-STRUCTURE",
+        "CIT-GCYM-LARGE-SOLIDIFIER-STRUCTURE",
+        "CIT-GTCEU-BLOCK-PATTERN-CHECK",
+        "CIT-GTCEU-DISTILLATION-TOWER-STRUCTURE",
+        "CIT-GTCEU-FACTORY-BLOCK-PATTERN",
+        "CIT-GTCEU-MULTIBLOCK-ABILITY",
+        "CIT-GTCEU-MULTIBLOCK-CONTROLLER-FORMATION",
+        "CIT-GTCEU-MULTIBLOCK-PREDICATE-HELPERS",
+        "CIT-GTCEU-PRIMITIVE-WATER-PUMP",
+        "CIT-GTCEU-TRACEABILITY-BASE-PREDICATES",
+        "CIT-GTCEU-TRACEABILITY-CARDINALITY",
+        "CIT-SUSYCORE-BLENDER-STRUCTURE",
+        "CIT-SUSYCORE-CLARIFIER-STRUCTURE",
+        "CIT-SUSYCORE-CONDENSER-STRUCTURE",
+        "CIT-SUSYCORE-INJECTION-MOLDER-STRUCTURE",
+        "CIT-SUSYCORE-LARGE-STEAM-HAMMER-STRUCTURE"
+      ],
+      "required_source_ids": [
+        "SRC-GREGICALITY-MULTIBLOCKS",
+        "SRC-GTCEU",
+        "SRC-SUSYCORE"
+      ]
+    },
+    {
+      "id": "AUTH-NO-ENERGY-LOGIC",
+      "semantic_kind": "no-energy-logic",
+      "citation_ids": [
+        "CIT-GTCEU-PRIMITIVE-RECIPE-LOGIC"
+      ],
+      "required_source_ids": [
+        "SRC-GTCEU"
+      ]
+    },
+    {
+      "id": "AUTH-PACK-DILUTED-OIL-ROUTE",
+      "semantic_kind": "pack-diluted-oil-route",
+      "citation_ids": [
+        "CIT-GTCEU-VOLTAGE-TABLE",
+        "CIT-PACK-DILUTED-OIL-MATERIAL",
+        "CIT-PACK-DILUTED-OIL-RECIPE",
+        "CIT-PACK-PETROCHEMISTRY-DILUTION-NAMING",
+        "CIT-PACK-PETROCHEMISTRY-OIL-INSTANCES"
+      ],
+      "required_source_ids": [
+        "SRC-GTCEU",
+        "SRC-PACK"
+      ]
+    },
+    {
+      "id": "AUTH-PRIMITIVE-WATER-ENVIRONMENT",
+      "semantic_kind": "primitive-water-environment",
+      "citation_ids": [
+        "CIT-GTCEU-PRIMITIVE-WATER-PUMP"
+      ],
+      "required_source_ids": [
+        "SRC-GTCEU"
+      ]
+    },
+    {
+      "id": "AUTH-REGISTRY-LIFECYCLE",
+      "semantic_kind": "registry-lifecycle",
+      "citation_ids": [
+        "CIT-FORGE-GAMEDATA-REGISTRY-EVENTS",
+        "CIT-FORGE-LOADER-PREINITIALIZE",
+        "CIT-PACK-DILUTED-OIL-MATERIAL",
+        "CIT-PACK-DILUTED-OIL-RECIPE"
+      ],
+      "required_source_ids": [
+        "SRC-FORGE",
+        "SRC-PACK"
+      ]
+    },
+    {
+      "id": "AUTH-STEAM-ENERGY",
+      "semantic_kind": "steam-energy",
+      "citation_ids": [
+        "CIT-GTCEU-RECIPE-LOGIC-STEAM",
+        "CIT-GTCEU-STEAM-MULTIBLOCK-RECIPE-LOGIC",
+        "CIT-GTCEU-VOLTAGE-TABLE",
+        "CIT-SUSYCORE-STEAM-LIMIT"
+      ],
+      "required_source_ids": [
+        "SRC-GTCEU",
+        "SRC-SUSYCORE"
+      ]
+    },
+    {
+      "id": "AUTH-SUSY-NO-ENERGY-LOGIC",
+      "semantic_kind": "susy-no-energy-logic",
+      "citation_ids": [
+        "CIT-SUSYCORE-NO-ENERGY-MULTIBLOCK-RECIPE-LOGIC"
+      ],
+      "required_source_ids": [
+        "SRC-SUSYCORE"
+      ]
+    },
+    {
+      "id": "AUTH-VOLTAGE-TIER",
+      "semantic_kind": "voltage-tier",
+      "citation_ids": [
+        "CIT-GTCEU-ABSTRACT-RECIPE-OVERCLOCK",
+        "CIT-GTCEU-TIER-BY-VOLTAGE",
+        "CIT-GTCEU-VOLTAGE-TABLE"
+      ],
+      "required_source_ids": [
+        "SRC-GTCEU"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "workbench-client-extension-host-harness",
+  "displayName": "Workbench client Extension Host harness",
+  "description": "Isolated test harness for the installed Workbench client VSIX.",
+  "version": "0.0.0",
+  "publisher": "cleanroom-workbench-tests",
+  "private": true,
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "*"
+  ],
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "workbench.test.atlasImpact",
+          "name": "Atlas installed acceptance",
+          "visibility": "collapsed"
+        }
+      ]
+    }
+  }
+}

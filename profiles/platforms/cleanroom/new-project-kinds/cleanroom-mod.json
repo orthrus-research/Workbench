@@ -1,0 +1,62 @@
+{
+  "declaration_id": "cleanroom-new-project-kind-mod-v4",
+  "declared_values": {
+    "identity": {
+      "admission_state": "owner-admitted",
+      "construction_slot": {
+        "construction_contract_id": "BLUEPRINTS-FRESH-PROJECT-CONSTRUCTION-V2",
+        "construction_owner_id": "workbench-cleanroom-mod-construction-owner:sha256:befe2af77e834818a6e2746ef9ddad70f740267330ddde2cbbf5f1730a1661ce",
+        "construction_owner_ref": {
+          "path": "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2.json",
+          "schema_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json",
+          "schema_sha256": "sha256:d7bf003ea570c221045c30d7b4f508fbbdb98e12b206287a0a44c5ae7335325a",
+          "sha256": "sha256:a373d634f5daf5870d4f75a7ca90101fd9e7670406bcbdec349bea42590d0b1e"
+        },
+        "constructor_component_id": "blueprints",
+        "plan_schema_ref": {
+          "path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-plan-v2.schema.json",
+          "sha256": "sha256:2c6fe49d1e047eec56fb11ca0fa24e5ca37f35d855b2c17e5c2f758d90bfa332"
+        },
+        "request_schema_ref": {
+          "path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-request-v2.schema.json",
+          "sha256": "sha256:d2cd233a6b9d602bd248cd1b814487734d26d790949d1d60e4b346e6a0ca6005"
+        },
+        "result_schema_ref": {
+          "path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-result-v2.schema.json",
+          "sha256": "sha256:8dbf657bde3d794c21249cb42e01c421da7e100c96776c3a0b68c1b21993bbea"
+        },
+        "slot_id": "new-kind.cleanroom-mod.construction",
+        "state": "bound"
+      },
+      "kind_id": "workbench-new-project-kind:cleanroom-mod",
+      "platform_profile_identity_id": "profile.cleanroom",
+      "project_kind": "mod",
+      "template_fixture_identity_id": "fixture.cleanroom-mod",
+      "template_lock_ref": {
+        "path": "profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop/fixture-lock-v1.json",
+        "schema_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-generic-mod-fixture-lock-v1.schema.json",
+        "schema_sha256": "sha256:362e5eb800cf6803ecc15b29192b7c627c47f57f48cb3eecb0d283c3168b66ba",
+        "sha256": "sha256:fc0845123d2a9b833a63b2d49a29a38b39388e8ac24a810dcc07e87a6fbad8d2"
+      },
+      "type": "new-project-kind"
+    },
+    "candidate_lock_ref": {
+      "path": "profiles/platforms/cleanroom/candidates/0.6.8-alpha/candidate-lock-v1.json",
+      "schema_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-candidate-lock-v1.schema.json",
+      "schema_sha256": "sha256:847e6b0c0b3178e775bc9d537a41a8a5cddb0b35984743c1a7bb4c7f410fe6d7",
+      "sha256": "sha256:d6f34886222a4d9e376ef6b1144a3f00e70ce14e8c779363997e8aa206aaf541"
+    }
+  },
+  "format": "workbench-cleanroom-new-project-kind-v4",
+  "identity_ids": [
+    "new-kind.cleanroom-mod"
+  ],
+  "limitations": [
+    "This admission is limited to the exact locked generic Cleanroom mod tree and does not admit arbitrary mod or pack templates.",
+    "The construction slot is bound to the current Cleanroom fresh-project implementation and its exact owner record.",
+    "Construction covers preview, exact consented fresh-target application, retained receipts, and recovery; Gradle build, client, and dedicated-server compatibility remain separate checks."
+  ],
+  "owner_id": "cleanroom-platform-profile",
+  "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+  "schema_version": 4
+}

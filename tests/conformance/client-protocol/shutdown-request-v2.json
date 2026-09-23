@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "shutdown-1",
+  "method": "shutdown",
+  "params": {}
+}

@@ -1,0 +1,485 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/feature-studio-service-v1.schema.json",
+  "title": "Workbench Feature Studio Service V3 records V1",
+  "$defs": {
+    "contentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "recordRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_kind", "record_id"],
+      "properties": {
+        "record_kind": {
+          "enum": ["context-ref", "input-binding"]
+        },
+        "record_id": {"$ref": "#/$defs/contentId"}
+      }
+    },
+    "expectedHeadRefs": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/recordRef"}
+    },
+    "exactExpectedHeadRefs": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/recordRef"}
+    },
+    "contextRegistrationPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "format",
+        "schema_version",
+        "canonicalizer",
+        "kind",
+        "operation_class",
+        "context_ref_id",
+        "input_binding_id",
+        "consent_record_id",
+        "expected_head_refs",
+        "limitations"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"
+        },
+        "format": {
+          "const": "workbench-feature-studio-context-registration-plan-v1"
+        },
+        "schema_version": {"const": 1},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "kind": {"const": "operation-plan"},
+        "operation_class": {"const": "stable-construct"},
+        "context_ref_id": {
+          "type": "string",
+          "pattern": "^context-ref:sha256:[0-9a-f]{64}$"
+        },
+        "input_binding_id": {
+          "type": "string",
+          "pattern": "^input-binding:sha256:[0-9a-f]{64}$"
+        },
+        "consent_record_id": {
+          "type": "string",
+          "pattern": "^consent-decision:sha256:[0-9a-f]{64}$"
+        },
+        "expected_head_refs": {"$ref": "#/$defs/exactExpectedHeadRefs"},
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 1024}
+        }
+      }
+    },
+    "contextRegistrationArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "canonicalizer",
+        "plan_id",
+        "plan",
+        "consent_record_id",
+        "expected_head_refs",
+        "context_ref",
+        "input_binding"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-feature-studio-context-registration-v1"
+        },
+        "schema_version": {"const": 1},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "plan_id": {
+          "type": "string",
+          "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"
+        },
+        "plan": {"$ref": "#/$defs/contextRegistrationPlan"},
+        "consent_record_id": {
+          "type": "string",
+          "pattern": "^consent-decision:sha256:[0-9a-f]{64}$"
+        },
+        "expected_head_refs": {"$ref": "#/$defs/exactExpectedHeadRefs"},
+        "context_ref": {
+          "$ref": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json"
+        },
+        "input_binding": {
+          "$ref": "workbench://schemas/crucible/crucible-input-binding-v2.schema.json"
+        }
+      }
+    },
+    "contextRegistrationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "canonicalizer",
+        "plan_id",
+        "context_ref_id",
+        "input_binding_id",
+        "registered"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-feature-studio-context-registration-result-v1"
+        },
+        "schema_version": {"const": 1},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "plan_id": {
+          "type": "string",
+          "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"
+        },
+        "context_ref_id": {
+          "type": "string",
+          "pattern": "^context-ref:sha256:[0-9a-f]{64}$"
+        },
+        "input_binding_id": {
+          "type": "string",
+          "pattern": "^input-binding:sha256:[0-9a-f]{64}$"
+        },
+        "registered": {"const": true}
+      }
+    },
+    "featureOperationPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "format",
+        "schema_version",
+        "canonicalizer",
+        "kind",
+        "operation",
+        "operation_class",
+        "context_ref_id",
+        "input_binding_id",
+        "owner_request_id",
+        "reviewed_owner_plan_id",
+        "consent_record_id",
+        "expected_head_refs",
+        "side_effect_classes",
+        "limitations"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"
+        },
+        "format": {
+          "const": "workbench-feature-studio-service-operation-plan-v1"
+        },
+        "schema_version": {"const": 1},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "kind": {"const": "operation-plan"},
+        "operation": {"enum": ["verify", "export"]},
+        "operation_class": {"const": "stable-construct"},
+        "context_ref_id": {
+          "type": "string",
+          "pattern": "^context-ref:sha256:[0-9a-f]{64}$"
+        },
+        "input_binding_id": {
+          "type": "string",
+          "pattern": "^input-binding:sha256:[0-9a-f]{64}$"
+        },
+        "owner_request_id": {
+          "type": "string",
+          "pattern": "^feature-studio-owner-request:sha256:[0-9a-f]{64}$"
+        },
+        "reviewed_owner_plan_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "consent_record_id": {
+          "type": "string",
+          "pattern": "^consent-decision:sha256:[0-9a-f]{64}$"
+        },
+        "expected_head_refs": {"$ref": "#/$defs/exactExpectedHeadRefs"},
+        "side_effect_classes": {
+          "oneOf": [
+            {
+              "type": "array",
+              "prefixItems": [
+                {"const": "reference-update"},
+                {"const": "runtime-process"},
+                {"const": "store-append"}
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            {
+              "type": "array",
+              "prefixItems": [
+                {"const": "external-export"},
+                {"const": "reference-update"},
+                {"const": "store-append"}
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            }
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 1024}
+        }
+      }
+    },
+    "featureArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "canonicalizer",
+        "operation",
+        "owner_request_id",
+        "owner_request_canonical_json",
+        "owner_request_canonical_sha256",
+        "owner_request_canonical_size",
+        "plan_id",
+        "operation_plan",
+        "consent_record_id",
+        "expected_head_refs"
+      ],
+      "properties": {
+        "format": {"const": "workbench-feature-studio-service-request-v1"},
+        "schema_version": {"const": 1},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "operation": {
+          "enum": ["inspect", "plan", "verify", "explain", "export"]
+        },
+        "owner_request_id": {
+          "type": "string",
+          "pattern": "^feature-studio-owner-request:sha256:[0-9a-f]{64}$"
+        },
+        "owner_request_canonical_json": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 4194304
+        },
+        "owner_request_canonical_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "owner_request_canonical_size": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 4194304
+        },
+        "plan_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"
+            },
+            {"type": "null"}
+          ]
+        },
+        "operation_plan": {
+          "oneOf": [
+            {"$ref": "#/$defs/featureOperationPlan"},
+            {"type": "null"}
+          ]
+        },
+        "consent_record_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^consent-decision:sha256:[0-9a-f]{64}$"
+            },
+            {"type": "null"}
+          ]
+        },
+        "expected_head_refs": {"$ref": "#/$defs/expectedHeadRefs"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation": {"enum": ["inspect", "plan", "explain"]}
+            }
+          },
+          "then": {
+            "properties": {
+              "plan_id": {"type": "null"},
+              "operation_plan": {"type": "null"},
+              "consent_record_id": {"type": "null"},
+              "expected_head_refs": {"maxItems": 0, "minItems": 0}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"operation": {"enum": ["verify", "export"]}}
+          },
+          "then": {
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"
+              },
+              "operation_plan": {"$ref": "#/$defs/featureOperationPlan"},
+              "consent_record_id": {
+                "type": "string",
+                "pattern": "^consent-decision:sha256:[0-9a-f]{64}$"
+              },
+              "expected_head_refs": {
+                "$ref": "#/$defs/exactExpectedHeadRefs"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "featureProgress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "completed", "total", "unit", "message"],
+      "properties": {
+        "phase": {
+          "enum": [
+            "validating-owner-request",
+            "executing-owner-operation",
+            "validating-owner-result"
+          ]
+        },
+        "completed": {"type": "integer", "minimum": 0, "maximum": 3},
+        "total": {"const": 3},
+        "unit": {"const": "owner-boundaries"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 1024}
+      }
+    },
+    "authorityBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atlas_semantics_created",
+        "blueprint_admission_created",
+        "crucible_custody_replaced",
+        "profile_support_promoted",
+        "source_application_authorized"
+      ],
+      "properties": {
+        "atlas_semantics_created": {"const": false},
+        "blueprint_admission_created": {"const": false},
+        "crucible_custody_replaced": {"const": false},
+        "profile_support_promoted": {"const": false},
+        "source_application_authorized": {"const": false}
+      }
+    },
+    "featureResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_id",
+        "format",
+        "schema_version",
+        "canonicalizer",
+        "operation",
+        "context_ref_id",
+        "input_binding_id",
+        "operation_plan_id",
+        "owner_request_id",
+        "owner_result_id",
+        "owner_result_canonical_json",
+        "owner_result_canonical_sha256",
+        "owner_result_canonical_size",
+        "authority_boundary",
+        "limitations"
+      ],
+      "properties": {
+        "result_id": {
+          "type": "string",
+          "pattern": "^feature-studio-service-result:sha256:[0-9a-f]{64}$"
+        },
+        "format": {"const": "workbench-feature-studio-service-result-v1"},
+        "schema_version": {"const": 1},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "operation": {
+          "enum": ["inspect", "plan", "verify", "explain", "export"]
+        },
+        "context_ref_id": {
+          "type": "string",
+          "pattern": "^context-ref:sha256:[0-9a-f]{64}$"
+        },
+        "input_binding_id": {
+          "type": "string",
+          "pattern": "^input-binding:sha256:[0-9a-f]{64}$"
+        },
+        "operation_plan_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^operation-plan:sha256:[0-9a-f]{64}$"
+            },
+            {"type": "null"}
+          ]
+        },
+        "owner_request_id": {
+          "type": "string",
+          "pattern": "^feature-studio-owner-request:sha256:[0-9a-f]{64}$"
+        },
+        "owner_result_id": {
+          "type": "string",
+          "pattern": "^feature-studio-result:sha256:[0-9a-f]{64}$"
+        },
+        "owner_result_canonical_json": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 134217728
+        },
+        "owner_result_canonical_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "owner_result_canonical_size": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 134217728
+        },
+        "authority_boundary": {"$ref": "#/$defs/authorityBoundary"},
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 1024}
+        }
+      }
+    },
+    "jobResultArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "schema_version", "canonicalizer", "job_id"],
+      "properties": {
+        "format": {
+          "const": "workbench-feature-studio-job-result-request-v1"
+        },
+        "schema_version": {"const": 1},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "job_id": {
+          "type": "string",
+          "pattern": "^job-v2:[0-9a-f]{32}$"
+        }
+      }
+    }
+  }
+}

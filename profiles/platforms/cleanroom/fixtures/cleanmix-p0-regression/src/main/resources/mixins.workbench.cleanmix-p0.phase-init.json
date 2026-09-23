@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_11",
+  "target": "@env(INIT)",
+  "package": "dev.workbench.cleanmixp0.mixin",
+  "mixins": ["PhaseMixins$InitMixin"],
+  "injectors": {"defaultRequire": 1}
+}

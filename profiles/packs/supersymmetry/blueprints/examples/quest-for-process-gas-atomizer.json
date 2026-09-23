@@ -1,0 +1,86 @@
+{
+  "format": "workbench-blueprints-current-example-v1",
+  "schema_version": 1,
+  "record_class": "mutable-current-example",
+  "identity_bearing": false,
+  "example_key": "supersymmetry-quest-for-process-gas-atomizer",
+  "researched_on": "2026-08-16",
+  "example_scope": "one-existing-quest-prerequisite-change-extracted-from-a-larger-pull-request",
+  "source_reference": {
+    "repository": "https://github.com/SymmetricDevs/Supersymmetry",
+    "pull_request": 1978,
+    "pull_request_url": "https://github.com/SymmetricDevs/Supersymmetry/pull/1978",
+    "effective_base_revision": "b4338ef203ef40452a62e48019dd8f7b21bf496e",
+    "result_revision": "ef7d3f4f65d12d5fdf3d8f83607a5c2da18c6ea9",
+    "path": "config/betterquesting/DefaultQuests/Quests/5/336324327.json",
+    "before_blob_sha1": "2f3f34f8204b410f50044c9dc12070284e504d76",
+    "after_blob_sha1": "da2f5e8d422cfc6549adbbdcdcfed2fa4abde1a7"
+  },
+  "request": {
+    "add_prerequisite_id": 90454916,
+    "description": null,
+    "quest_id": 336324327,
+    "requirement_type": "IMPLICIT",
+    "title": null
+  },
+  "historical_delta": {
+    "quest_label": "Gas Atomizer",
+    "prerequisite_label": "Hot Isostatic Press",
+    "localization_reference": {
+      "path": "config/betterquesting/resources/supersymmetry/lang/en_us.lang",
+      "base_and_result_blob_sha1": "ee7985c317eca7c9ebdbb1d43aad4744b574586c",
+      "quest_title_key": "susy.quest.db.336324327.title",
+      "prerequisite_title_key": "susy.quest.db.90454916.title"
+    },
+    "before": {
+      "preRequisiteTypes:7": [
+        1
+      ],
+      "preRequisites:11": [
+        757
+      ]
+    },
+    "after": {
+      "preRequisiteTypes:7": [
+        1,
+        1
+      ],
+      "preRequisites:11": [
+        757,
+        90454916
+      ]
+    },
+    "localization_changed": false
+  },
+  "runtime_observation": {
+    "state": "required-not-observed",
+    "required_checks": [
+      "BetterQuesting loads the edited pack-default definition",
+      "the prerequisite is detected for a new player state",
+      "the intended quest becomes reachable only after the prerequisite",
+      "a dedicated server and client agree on the resulting quest state"
+    ]
+  },
+  "authority_boundary": {
+    "historical_source_change_observed": true,
+    "current_source_renderer_implemented": true,
+    "current_transactional_flow_implemented": true,
+    "current_client_runtime_observed": false,
+    "current_dedicated_server_runtime_observed": false,
+    "retained_world_state_migration_demonstrated": false,
+    "pre_existing_graph_health_certified": false,
+    "profile_tested_support": false,
+    "profile_action_authorized": false,
+    "release_qualified": false,
+    "publication_authorized": false
+  },
+  "reuse_requirements": [
+    "treat this as one prerequisite edit extracted from pull request 1978, not as a replay of the whole pull request",
+    "treat the effective base as provenance because it may predate the current Workbench Packwiz profile",
+    "capture the current checkout and require both quest IDs to exist",
+    "reject a duplicate, self-reference, dangling prerequisite, or cycle introduced by the new edge",
+    "review pre-existing graph findings independently because validating one new edge does not certify the baseline graph",
+    "review the exact quest bytes before applying",
+    "test BetterQuesting load, player detection, and retained-world behavior separately"
+  ]
+}

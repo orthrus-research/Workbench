@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-proof-v1.schema.json",
+  "title": "Supersymmetry Blueprints portable proof manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "proof_id",
+    "closure",
+    "run_id",
+    "request_id",
+    "plan_id",
+    "candidate_id",
+    "simulation_id",
+    "release_id",
+    "patch_id",
+    "application_id",
+    "verification_id",
+    "standard_ids",
+    "target",
+    "gate_evidence",
+    "artifacts",
+    "history",
+    "export"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-proof-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "proof_id": {
+      "type": "string",
+      "pattern": "^blueprints-proof:sha256:[0-9a-f]{64}$"
+    },
+    "closure": {
+      "enum": [
+        "release-validated",
+        "target-verified"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^blueprints-run:sha256:[0-9a-f]{64}$"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^blueprints-request:sha256:[0-9a-f]{64}$"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^blueprints-plan:sha256:[0-9a-f]{64}$"
+    },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^blueprints-candidate:sha256:[0-9a-f]{64}$"
+    },
+    "simulation_id": {
+      "type": "string",
+      "pattern": "^blueprints-simulation:sha256:[0-9a-f]{64}$"
+    },
+    "release_id": {
+      "type": "string",
+      "pattern": "^blueprints-release:sha256:[0-9a-f]{64}$"
+    },
+    "patch_id": {
+      "type": "string",
+      "pattern": "^blueprints-patch:sha256:[0-9a-f]{64}$"
+    },
+    "application_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^blueprints-application:sha256:[0-9a-f]{64}$"
+        }
+      ]
+    },
+    "verification_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^blueprints-verification:sha256:[0-9a-f]{64}$"
+        }
+      ]
+    },
+    "standard_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^blueprints-standard:sha256:[0-9a-f]{64}$"
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "baseline_target_state_id",
+        "applied_target_state_id",
+        "verified_target_state_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "baseline_target_state_id": {
+          "type": "string",
+          "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+        },
+        "applied_target_state_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "verified_target_state_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+            }
+          ]
+        }
+      }
+    },
+    "gate_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "stage_id",
+          "status",
+          "evidence_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "stage_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]*$"
+          },
+          "status": {
+            "const": "passed"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "kind",
+          "sha256",
+          "privacy",
+          "included_in_export"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "manifest",
+              "source",
+              "patch",
+              "log",
+              "build",
+              "world",
+              "evidence"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "privacy": {
+            "enum": [
+              "exportable",
+              "local-private"
+            ]
+          },
+          "included_in_export": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "required": [
+        "local_manifest_sha256",
+        "retention_policy_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "local_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "retention_policy_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "export": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "manifest_sha256",
+            "excludes_private",
+            "artifact_ids"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "excludes_private": {
+              "const": true
+            },
+            "artifact_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

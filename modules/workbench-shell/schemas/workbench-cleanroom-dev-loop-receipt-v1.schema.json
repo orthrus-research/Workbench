@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-cleanroom-dev-loop-receipt-v1.schema.json",
+  "title": "Workbench Cleanroom generic fixture dev-loop receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "kind", "receipt_id", "plan_id", "outcome",
+    "artifact", "stages", "target", "limitations"
+  ],
+  "properties": {
+    "format": {"const": "workbench-cleanroom-dev-loop-receipt-v1"},
+    "schema_version": {"const": 1},
+    "kind": {"const": "workbench-cleanroom-dev-loop-receipt"},
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^workbench-cleanroom-dev-loop-receipt:sha256:[0-9a-f]{64}$"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^workbench-cleanroom-dev-loop-plan:sha256:[0-9a-f]{64}$"
+    },
+    "outcome": {"enum": ["passed", "failed"]},
+    "artifact": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/artifact"}]
+    },
+    "stages": {
+      "type": "object", "minProperties": 2, "maxProperties": 3,
+      "required": ["build"],
+      "propertyNames": {"enum": ["build", "client", "server"]},
+      "additionalProperties": {"$ref": "#/$defs/stage"}
+    },
+    "target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run_root_uri", "receipt_uri"],
+      "properties": {
+        "run_root_uri": {"$ref": "#/$defs/fileUri"},
+        "plan_uri": {"$ref": "#/$defs/fileUri"},
+        "receipt_uri": {"$ref": "#/$defs/fileUri"}
+      }
+    },
+    "limitations": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "items": {"type": "string", "minLength": 1, "maxLength": 4096}
+    }
+  },
+  "$defs": {
+    "fileUri": {"type": "string", "pattern": "^file:/", "maxLength": 8192},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "uri", "sha256", "size", "mod_id", "version", "zip_integrity",
+        "refmap", "bytecode"
+      ],
+      "properties": {
+        "uri": {"$ref": "#/$defs/fileUri"},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "size": {"type": "integer", "minimum": 1},
+        "mod_id": {"const": "workbench_daily_loop"},
+        "version": {"const": "1.0.0"},
+        "zip_integrity": {"const": "verified"},
+        "refmap": {"const": "present"},
+        "bytecode": {"const": "verified"}
+      }
+    },
+    "ownerRef": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "owner_id", "record_id", "record_kind", "uri", "digest",
+        "last_verified_state", "verified_at"
+      ],
+      "properties": {
+        "owner_id": {"const": "workbench-shell"},
+        "record_id": {"type": "string", "minLength": 8, "maxLength": 120},
+        "record_kind": {"const": "workbench-live-console-session-v1"},
+        "uri": {"$ref": "#/$defs/fileUri"},
+        "digest": {"$ref": "#/$defs/digest"},
+        "last_verified_state": {
+          "enum": ["allocated", "starting", "running", "complete", "failed", "cancelled", "incomplete"]
+        },
+        "verified_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "stage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {"enum": ["not-run", "running", "passed", "failed"]},
+        "problem": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "effective_exit_code": {"type": "integer", "minimum": 0, "maximum": 255},
+        "console_session_id": {"type": "string", "minLength": 8, "maxLength": 120},
+        "console_session_uri": {"$ref": "#/$defs/fileUri"},
+        "owner_ref": {"$ref": "#/$defs/ownerRef"},
+        "required_markers": {
+          "type": "array", "maxItems": 8,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "observed_markers": {
+          "type": "array", "maxItems": 8,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "controlled_stop": {"type": "boolean"},
+        "artifact_sha256": {"$ref": "#/$defs/digest"},
+        "cleanup": {
+          "type": "object", "additionalProperties": false,
+          "required": ["contained"],
+          "properties": {"contained": {"type": "boolean"}}
+        },
+        "preparation": {"$ref": "#/$defs/serverPreparation"}
+      }
+    },
+    "serverPreparation": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "operation", "scope", "target_uri", "sha256", "size", "state"
+      ],
+      "properties": {
+        "operation": {"const": "materialize-isolated-server-eula"},
+        "scope": {"const": "fresh-isolated-run-target"},
+        "target_uri": {"$ref": "#/$defs/fileUri"},
+        "sha256": {
+          "const": "sha256:ee27072e4a23e088522f740ddaab0c7c4145c186969e90a86254faa3a5ec5ce6"
+        },
+        "size": {"const": 10},
+        "state": {"enum": ["materialized", "failed"]},
+        "problem": {"type": "string", "minLength": 1, "maxLength": 4096}
+      }
+    }
+  }
+}

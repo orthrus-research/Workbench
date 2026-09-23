@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-reproduction-capsule-inspection-v1.schema.json",
+  "title": "Workbench Reproduction Capsule inspection V1",
+  "type": "object", "additionalProperties": false,
+  "required": ["format", "capsule_id", "diagnosis_id", "fingerprint", "member_count", "replay_action", "privacy_review", "limitations"],
+  "properties": {
+    "format": {"const": "workbench-reproduction-capsule-inspection-v1"},
+    "capsule_id": {"type": "string", "pattern": "^workbench-reproduction-capsule:sha256:[0-9a-f]{64}$"},
+    "diagnosis_id": {"type": "string", "pattern": "^workbench-diagnosis:sha256:[0-9a-f]{64}$"},
+    "fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "member_count": {"const": 2},
+    "replay_action": {"$ref": "#/$defs/action"},
+    "privacy_review": {"$ref": "#/$defs/privacy"},
+    "limitations": {"type": "array", "minItems": 1, "maxItems": 128, "items": {"type": "string", "minLength": 1, "maxLength": 8192}}
+  },
+  "$defs": {
+    "action": {
+      "type": "object", "additionalProperties": false,
+      "required": ["action_id", "arguments", "mutation"],
+      "properties": {
+        "action_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,255}$"},
+        "arguments": {"type": "object", "maxProperties": 256},
+        "mutation": {"enum": ["read-only", "isolated-target-only"]}
+      }
+    },
+    "privacy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["approved", "excluded"],
+      "properties": {
+        "approved": {"const": true},
+        "excluded": {
+          "type": "array", "minItems": 3, "maxItems": 64, "uniqueItems": true,
+          "allOf": [
+            {"contains": {"const": "credentials"}},
+            {"contains": {"const": "protected-binaries"}},
+            {"contains": {"const": "personal-worlds"}}
+          ],
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        }
+      }
+    }
+  }
+}

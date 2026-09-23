@@ -1,0 +1,513 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-provenance-normalization-v1.schema.json",
+  "title": "Supersymmetry Atlas runtime provenance normalization v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "normalization_id",
+    "snapshot_id",
+    "source_lock_id",
+    "source_index_id",
+    "mutation_extraction_id",
+    "runtime_bundle_id",
+    "policy_id",
+    "policy_sha256",
+    "scopes",
+    "source_mappings",
+    "configuration_mappings",
+    "operation_candidates",
+    "nodes",
+    "relations",
+    "evidence",
+    "frontiers",
+    "indexes",
+    "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-atlas-provenance-normalization-v1"
+    },
+    "normalization_id": {
+      "type": "string",
+      "pattern": "^atlas-provenance-normalization:sha256:[0-9a-f]{64}$"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+    },
+    "source_lock_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_index_id": {
+      "type": "string",
+      "pattern": "^atlas-source-span-index:sha256:[0-9a-f]{64}$"
+    },
+    "mutation_extraction_id": {
+      "type": "string",
+      "pattern": "^atlas-pack-mutation-extraction:sha256:[0-9a-f]{64}$"
+    },
+    "runtime_bundle_id": {
+      "type": "string",
+      "pattern": "^atlas-provenance-runtime-bundle:sha256:[0-9a-f]{64}$"
+    },
+    "policy_id": {
+      "const": "ATLAS-CAUSAL-PROVENANCE-POLICY-V1"
+    },
+    "policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "profile",
+          "physical_side"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+          },
+          "profile": {
+            "enum": [
+              "COMMON_FINAL_STATE",
+              "CLIENT_JEI_FINAL_STATE",
+              "OFFLINE_ARTIFACT_STATE"
+            ]
+          },
+          "physical_side": {
+            "enum": [
+              "CLIENT",
+              "DEDICATED_SERVER",
+              "OFFLINE"
+            ]
+          }
+        }
+      }
+    },
+    "source_mappings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "source_span_id",
+          "scope",
+          "node_id",
+          "source_span"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source_span_id": {
+            "type": "string",
+            "pattern": "^atlas-source-span:sha256:[0-9a-f]{64}$"
+          },
+          "scope": {
+            "type": "object"
+          },
+          "node_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+          },
+          "source_span": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "configuration_mappings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "configuration_selection_id",
+          "scope",
+          "node_id",
+          "selection"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "configuration_selection_id": {
+            "type": "string",
+            "pattern": "^atlas-pack-configuration:sha256:[0-9a-f]{64}$"
+          },
+          "scope": {
+            "type": "object"
+          },
+          "node_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+          },
+          "selection": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "operation_candidates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "scope",
+          "source_span_node_id",
+          "operation",
+          "execution_state",
+          "promoted_node_id",
+          "transition_relation_ids",
+          "frontier_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-operation-candidate:sha256:[0-9a-f]{64}$"
+          },
+          "scope": {
+            "type": "object"
+          },
+          "source_span_node_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+          },
+          "operation": {
+            "type": "object"
+          },
+          "execution_state": {
+            "enum": [
+              "static-only",
+              "executed-exact"
+            ]
+          },
+          "promoted_node_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transition_relation_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^atlas-provenance-relation:sha256:[0-9a-f]{64}$"
+            }
+          },
+          "frontier_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "node_class",
+          "scope",
+          "identity",
+          "evidence_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+          },
+          "node_class": {
+            "enum": [
+              "source-span",
+              "configuration-entry",
+              "script-operation",
+              "lifecycle-event",
+              "runtime-state",
+              "final-runtime-record"
+            ]
+          },
+          "scope": {
+            "type": "object"
+          },
+          "identity": {
+            "type": "object"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^atlas-provenance-evidence:sha256:[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "relation_id",
+          "predicate",
+          "subject_node_id",
+          "object_node_id",
+          "causal_strength",
+          "lifecycle_stage_id",
+          "evidence_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "relation_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-relation:sha256:[0-9a-f]{64}$"
+          },
+          "predicate": {
+            "enum": [
+              "registers",
+              "loads_configuration",
+              "invokes",
+              "copies",
+              "transforms",
+              "mutates",
+              "removes",
+              "replaces",
+              "reconciles_to",
+              "observed_as_final"
+            ]
+          },
+          "subject_node_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+          },
+          "object_node_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+          },
+          "causal_strength": {
+            "enum": [
+              "possibility",
+              "participation",
+              "transformation",
+              "causation",
+              "identity",
+              "observation"
+            ]
+          },
+          "lifecycle_stage_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^atlas-provenance-evidence:sha256:[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "authority",
+          "record_kind",
+          "record",
+          "record_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-evidence:sha256:[0-9a-f]{64}$"
+          },
+          "authority": {
+            "enum": [
+              "pinned-source",
+              "runtime-mechanics"
+            ]
+          },
+          "record_kind": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+          },
+          "record": {
+            "type": "object"
+          },
+          "record_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "frontiers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "frontier_id",
+          "scope",
+          "primitive_kind",
+          "primitive_id",
+          "anchor_node_id",
+          "operation_candidate_id",
+          "reason_code",
+          "upstream_boundary_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "frontier_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-frontier:sha256:[0-9a-f]{64}$"
+          },
+          "scope": {
+            "type": "object"
+          },
+          "primitive_kind": {
+            "enum": [
+              "configuration-selection",
+              "operation"
+            ]
+          },
+          "primitive_id": {
+            "type": "string"
+          },
+          "anchor_node_id": {
+            "type": "string",
+            "pattern": "^atlas-provenance-node:sha256:[0-9a-f]{64}$"
+          },
+          "operation_candidate_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason_code": {
+            "enum": [
+              "dynamic-script-unresolved",
+              "runtime-transition-unobserved",
+              "identity-reconciliation-unresolved"
+            ]
+          },
+          "upstream_boundary_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "indexes": {
+      "type": "object",
+      "required": [
+        "forward",
+        "reverse"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "forward": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object"
+          }
+        },
+        "reverse": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "scope_count",
+        "source_mapping_count",
+        "configuration_mapping_count",
+        "operation_candidate_count",
+        "executed_operation_count",
+        "node_count",
+        "relation_count",
+        "evidence_count",
+        "frontier_count"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "scope_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_mapping_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "configuration_mapping_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operation_candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "executed_operation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "node_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "relation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "frontier_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

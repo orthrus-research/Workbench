@@ -1,0 +1,1 @@
+fluid {{registry_name}}

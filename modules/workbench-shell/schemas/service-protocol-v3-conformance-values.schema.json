@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/service-protocol-v3-conformance-values.schema.json",
+  "title": "Closed owner-value schemas used only by the retained service protocol V3 vectors",
+  "type": "object",
+  "maxProperties": 0,
+  "additionalProperties": false,
+  "$defs": {
+    "emptyArguments": {
+      "type": "object",
+      "maxProperties": 0,
+      "additionalProperties": false
+    },
+    "contextResolveArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector_kind", "selector_value"],
+      "properties": {
+        "selector_kind": {"enum": ["registered-workspace", "profile-pair"]},
+        "selector_value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "evidenceGetArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_record_id"],
+      "properties": {
+        "evidence_record_id": {
+          "$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceRecordId"
+        }
+      }
+    },
+    "graphQueryArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph_revision_id", "query_expression", "category_keys"],
+      "properties": {
+        "graph_revision_id": {
+          "$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphRevisionId"
+        },
+        "query_expression": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "category_keys": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"
+          }
+        }
+      }
+    },
+    "operationCommitArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["construction_spec_id"],
+      "properties": {
+        "construction_spec_id": {
+          "type": "string",
+          "pattern": "^construction-spec:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "jobGetArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["job_id"],
+      "properties": {
+        "job_id": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobId"
+        }
+      }
+    },
+    "runtimeStartArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime_plan_id"],
+      "properties": {
+        "runtime_plan_id": {
+          "type": "string",
+          "pattern": "^runtime-plan:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "sessionGetArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime_session_id"],
+      "properties": {
+        "runtime_session_id": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/runtimeSessionRecordId"
+        }
+      }
+    },
+    "serviceCapabilitiesResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry_id", "capability_ids"],
+      "properties": {
+        "registry_id": {
+          "type": "string",
+          "pattern": "^component-capability-registry:sha256:[0-9a-f]{64}$"
+        },
+        "capability_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/capabilityId"
+          }
+        }
+      }
+    },
+    "contextGetResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_ref_id"],
+      "properties": {
+        "context_ref_id": {
+          "$ref": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json#/$defs/contextRefId"
+        }
+      }
+    },
+    "contextResolveResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_ref_id", "input_binding_id"],
+      "properties": {
+        "context_ref_id": {
+          "$ref": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json#/$defs/contextRefId"
+        },
+        "input_binding_id": {
+          "$ref": "workbench://schemas/crucible/crucible-input-binding-v2.schema.json#/$defs/inputBindingId"
+        }
+      }
+    },
+    "evidenceResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_record_id"],
+      "properties": {
+        "evidence_record_id": {
+          "$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceRecordId"
+        }
+      }
+    },
+    "graphQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph_revision_id", "result_object_id"],
+      "properties": {
+        "graph_revision_id": {
+          "$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphRevisionId"
+        },
+        "result_object_id": {
+          "$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/blobId"
+        }
+      }
+    },
+    "jobProjectionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["job_id", "latest_event_id"],
+      "properties": {
+        "job_id": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobId"
+        },
+        "latest_event_id": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobEventId"
+        }
+      }
+    },
+    "sessionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime_session_id"],
+      "properties": {
+        "runtime_session_id": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/runtimeSessionRecordId"
+        }
+      }
+    },
+    "acceptedJobResult": {
+      "type": "object",
+      "maxProperties": 0,
+      "additionalProperties": false
+    },
+    "operationPlanValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "consent_prompt", "expected_head_refs"],
+      "properties": {
+        "plan_id": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/operationPlanId"
+        },
+        "consent_prompt": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "expected_head_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json#/$defs/recordRef"
+          }
+        }
+      }
+    }
+  }
+}

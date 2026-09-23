@@ -1,0 +1,83 @@
+name: Bug report
+description: Report a reproducible Workbench failure or incorrect result.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Workbench. Do not include credentials,
+        personal worlds, licensed game/mod artifacts, or private source. Use
+        the private process in SECURITY.md for suspected vulnerabilities.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Select the narrowest component that shows the problem.
+      options:
+        - Workbench Core or CLI
+        - Workbench for VS Code
+        - Workbench for IntelliJ IDEA Community
+        - Atlas or evidence pipeline
+        - Blueprints or construction flow
+        - Profile or runtime provisioning
+        - Documentation
+        - Unsure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or revision
+      description: Give the component version, tag, or full commit SHA.
+      placeholder: workbench-core/v0.1.3 or 40-character commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include operating system, architecture, Java, IDE, and profile where relevant.
+      placeholder: Fedora 42 x86-64, Java 21, Cleanroom profile ...
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: List the smallest repeatable steps and safe inputs.
+      placeholder: |
+        1. Run ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe evidence
+      description: Paste redacted logs, validation output, or links to a minimal public fixture.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues for this failure.
+          required: true
+        - label: I removed secrets, personal data, private paths, and restricted artifacts.
+          required: true
+        - label: This is not a vulnerability report.
+          required: true

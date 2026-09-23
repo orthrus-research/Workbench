@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-feature-runtime-pair-result-v1.schema.json",
+  "title": "Workbench feature physical-side pair composition result V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "request_id", "side", "comparison", "order", "state",
+    "outcome", "comparison_state", "observations", "cleanup", "owner_refs",
+    "composition_passed"
+  ],
+  "properties": {
+    "format": {"const": "workbench-feature-runtime-pair-result-v1"},
+    "request_id": {
+      "type": "string",
+      "pattern": "^workbench-feature-runtime-pair-request:sha256:[0-9a-f]{64}$"
+    },
+    "side": {"enum": ["client", "server"]},
+    "comparison": {"enum": ["aa", "ab", "post-apply", "post-rollback"]},
+    "order": {"enum": ["baseline-first", "candidate-first"]},
+    "state": {"enum": ["complete", "incomplete", "failed"]},
+    "outcome": {"enum": ["passed", "failed", "incomplete"]},
+    "comparison_state": {"type": "string", "minLength": 1, "maxLength": 256},
+    "observations": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": {"$ref": "#/$defs/observation"}
+    },
+    "cleanup": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contained", "owned_processes_running"],
+      "properties": {
+        "contained": {"type": "boolean"},
+        "owned_processes_running": {"type": "boolean"}
+      }
+    },
+    "owner_refs": {
+      "type": "array", "maxItems": 64,
+      "items": {"$ref": "#/$defs/ownerRef"}
+    },
+    "composition_passed": {"type": "boolean"},
+    "owner_error": {"type": "string", "minLength": 1, "maxLength": 1024}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"composition_passed": {"const": true}}},
+      "then": {"properties": {"owner_refs": {"minItems": 1}}}
+    },
+    {
+      "if": {"required": ["owner_error"]},
+      "then": {
+        "properties": {
+          "composition_passed": {"const": false},
+          "owner_refs": {"maxItems": 0}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role", "observation_id", "assertions"],
+      "properties": {
+        "role": {"enum": ["baseline", "candidate"]},
+        "observation_id": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "assertions": {
+          "type": "object", "minProperties": 1, "maxProperties": 32,
+          "additionalProperties": {"enum": ["observed", "failed", "unavailable"]}
+        }
+      }
+    },
+    "ownerRef": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "owner_id", "record_id", "record_kind", "uri", "sha256", "size", "outcome"
+      ],
+      "properties": {
+        "owner_id": {"type": "string", "minLength": 1, "maxLength": 512},
+        "record_id": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "record_kind": {"type": "string", "minLength": 1, "maxLength": 512},
+        "uri": {"type": "string", "pattern": "^file:/", "maxLength": 8192},
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "size": {"type": "integer", "minimum": 0, "maximum": 67108864},
+        "outcome": {"enum": ["passed", "failed", "incomplete"]}
+      }
+    }
+  }
+}

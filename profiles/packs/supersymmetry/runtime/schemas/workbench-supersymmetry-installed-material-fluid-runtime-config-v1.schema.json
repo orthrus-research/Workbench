@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.org/workbench/schemas/workbench-supersymmetry-installed-material-fluid-runtime-config-v1.schema.json",
+  "title": "Supersymmetry installed material-fluid runtime config V1",
+  "description": "Explicit local installed-tool and seed locations for the concrete client and dedicated-server runtime-pair owner. Every path is an absolute local file URI; relative path interpretation is forbidden.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["client", "format", "memory_mib", "schema_version", "server"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-installed-material-fluid-runtime-config-v1"},
+    "schema_version": {"const": 1},
+    "memory_mib": {"type": "integer", "minimum": 1024, "maximum": 131072},
+    "client": {"$ref": "#/$defs/client"},
+    "server": {"$ref": "#/$defs/server"}
+  },
+  "$defs": {
+    "fileUri": {"type": "string", "pattern": "^file:/+[^?#]+$"},
+    "nullableFileUri": {"oneOf": [{"$ref": "#/$defs/fileUri"}, {"type": "null"}]},
+    "timeout": {"type": "number", "exclusiveMinimum": 0},
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attach_timeout_seconds", "launcher", "launcher_executable_uri", "launcher_java_state_uri", "launcher_java_uri", "launcher_profile", "launcher_root_uri", "seed_root_uris", "session_timeout_seconds", "timeout_seconds"],
+      "properties": {
+        "launcher": {"enum": ["prism", "multimc"]},
+        "launcher_executable_uri": {"$ref": "#/$defs/fileUri", "description": "Local URI of the installed PrismLauncher or MultiMC executable."},
+        "launcher_root_uri": {"$ref": "#/$defs/fileUri", "description": "Local URI of the selected launcher's data root containing instances/."},
+        "launcher_profile": {"type": ["string", "null"], "minLength": 1, "description": "Optional launcher account/profile name; null leaves selection to the installed launcher."},
+        "launcher_java_uri": {"$ref": "#/$defs/nullableFileUri", "description": "Optional local URI of an admitted launcher-host Java candidate."},
+        "launcher_java_state_uri": {"$ref": "#/$defs/nullableFileUri", "description": "Optional local URI of the managed launcher-host Java state root."},
+        "seed_root_uris": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/fileUri"}, "description": "Ordered local roots used only to seed hash-matching Packwiz artifacts; the staged pack remains authority."},
+        "timeout_seconds": {"$ref": "#/$defs/timeout", "description": "Client launch/checkpoint timeout."},
+        "attach_timeout_seconds": {"$ref": "#/$defs/timeout", "description": "Bound for attaching the launched client process."},
+        "session_timeout_seconds": {"$ref": "#/$defs/timeout", "description": "Overall observed client-session bound."}
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["java_uri", "packwiz_installer_jar_uri", "seed_receipt_uri", "shutdown_timeout_seconds", "timeout_seconds"],
+      "properties": {
+        "seed_receipt_uri": {"$ref": "#/$defs/fileUri", "description": "Local URI of one identity-valid retained SUSY server materialization V2 receipt, used only as Cleanroom/bootstrap and hash-matched artifact seed authority."},
+        "java_uri": {"$ref": "#/$defs/fileUri", "description": "Local URI of the Java executable used for Packwiz Installer and the dedicated server."},
+        "packwiz_installer_jar_uri": {"$ref": "#/$defs/fileUri", "description": "Local URI of the Packwiz Installer bootstrap JAR."},
+        "timeout_seconds": {"$ref": "#/$defs/timeout", "description": "Dedicated-server readiness and observation timeout."},
+        "shutdown_timeout_seconds": {"$ref": "#/$defs/timeout", "description": "Bound after the explicit Minecraft stop command for all save acknowledgements and exit."}
+      }
+    }
+  }
+}

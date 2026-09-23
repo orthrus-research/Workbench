@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-object-descriptor-v2.schema.json",
+  "title": "Workbench Crucible immutable object descriptor V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "object_id",
+    "sha256",
+    "byte_length",
+    "media_type",
+    "representation",
+    "semantic_role",
+    "described_schema_id",
+    "described_schema_object_descriptor_id",
+    "described_record_kind",
+    "canonical_item_count",
+    "total_order_policy_id",
+    "total_order_authority",
+    "minimum_record_key",
+    "maximum_record_key"
+  ],
+  "properties": {
+    "kind": {"const": "object-descriptor"},
+    "format": {"const": "workbench-crucible-object-descriptor-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-object-descriptor-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {
+      "type": "string",
+      "pattern": "^object-descriptor:sha256:[0-9a-f]{64}$"
+    },
+    "object_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/blobId"},
+    "sha256": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/sha256"},
+    "byte_length": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nonNegativeInteger"},
+    "media_type": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 255,
+      "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*(?:;[a-z0-9!#$&^_.+-]+=[A-Za-z0-9!#$&^_.+-]+)*$"
+    },
+    "representation": {
+      "enum": [
+        "exact-bytes",
+        "canonical-json-value",
+        "canonical-json-record",
+        "canonical-ndjson-shard"
+      ]
+    },
+    "semantic_role": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "described_schema_id": {
+      "oneOf": [
+        {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/schemaId"},
+        {"type": "null"}
+      ]
+    },
+    "described_schema_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableObjectDescriptorId"},
+    "described_record_kind": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        {"type": "null"}
+      ]
+    },
+    "canonical_item_count": {
+      "oneOf": [
+        {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/positiveInteger"},
+        {"type": "null"}
+      ]
+    },
+    "total_order_policy_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullablePolicyId"},
+    "total_order_authority": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableAuthorityBinding"},
+    "minimum_record_key": {
+      "oneOf": [
+        {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticText"},
+        {"type": "null"}
+      ]
+    },
+    "maximum_record_key": {
+      "oneOf": [
+        {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticText"},
+        {"type": "null"}
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"representation": {"const": "exact-bytes"}}},
+      "then": {
+        "properties": {
+          "described_schema_id": {"type": "null"},
+          "described_schema_object_descriptor_id": {"type": "null"},
+          "described_record_kind": {"type": "null"},
+          "canonical_item_count": {"type": "null"},
+          "total_order_policy_id": {"type": "null"},
+          "total_order_authority": {"type": "null"},
+          "minimum_record_key": {"type": "null"},
+          "maximum_record_key": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"representation": {"const": "canonical-json-value"}}},
+      "then": {
+        "properties": {
+          "media_type": {"const": "application/json"},
+          "described_schema_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/schemaId"},
+          "described_schema_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+          "described_record_kind": {"type": "null"},
+          "canonical_item_count": {"const": 1},
+          "total_order_policy_id": {"type": "null"},
+          "total_order_authority": {"type": "null"},
+          "minimum_record_key": {"type": "null"},
+          "maximum_record_key": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"representation": {"const": "canonical-json-record"}}},
+      "then": {
+        "properties": {
+          "media_type": {"const": "application/json"},
+          "described_schema_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/schemaId"},
+          "described_schema_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+          "described_record_kind": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "canonical_item_count": {"const": 1},
+          "total_order_policy_id": {"type": "null"},
+          "total_order_authority": {"type": "null"},
+          "minimum_record_key": {"type": "null"},
+          "maximum_record_key": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"representation": {"const": "canonical-ndjson-shard"}}},
+      "then": {
+        "properties": {
+          "media_type": {"const": "application/x-ndjson"},
+          "described_schema_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/schemaId"},
+          "described_schema_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+          "described_record_kind": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "canonical_item_count": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/positiveInteger"},
+          "total_order_policy_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+          "total_order_authority": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorityBinding"},
+          "minimum_record_key": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticText"},
+          "maximum_record_key": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticText"}
+        }
+      }
+    }
+  ]
+}

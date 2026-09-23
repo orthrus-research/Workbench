@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/profiles/cleanroom/workbench-cleanroom-generic-mod-fixture-lock-v1.schema.json",
+  "$defs": {
+    "digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "file": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$",
+          "type": "string"
+        },
+        "sha256": {"$ref": "#/$defs/digest"},
+        "size": {"minimum": 0, "type": "integer"}
+      },
+      "required": ["path", "sha256", "size"],
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "declaration_id": {"const": "cleanroom-generic-mod-daily-loop-fixture-v1"},
+    "declared_values": {
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "items": {"$ref": "#/$defs/file"},
+          "minItems": 1,
+          "type": "array"
+        },
+        "identity": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {"$ref": "#/$defs/digest"},
+            "fixture_id": {"const": "workbench-fixture:cleanroom:generic-mod-daily-loop"},
+            "revision": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+            "type": {"const": "fixture"}
+          },
+          "required": ["digest", "fixture_id", "revision", "type"],
+          "type": "object"
+        },
+        "tree_digest": {"$ref": "#/$defs/digest"},
+        "tree_digest_algorithm": {"const": "sha256-file-tree-v1"}
+      },
+      "required": ["files", "identity", "tree_digest", "tree_digest_algorithm"],
+      "type": "object"
+    },
+    "format": {"const": "workbench-v2-boundary-owner-declaration-v1"},
+    "identity_ids": {"const": ["fixture.cleanroom-mod"]},
+    "limitations": {
+      "items": {"minLength": 1, "type": "string"},
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "owner_id": {"const": "cleanroom-platform-profile"},
+    "revision": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "schema_version": {"const": 1}
+  },
+  "required": [
+    "declaration_id",
+    "declared_values",
+    "format",
+    "identity_ids",
+    "limitations",
+    "owner_id",
+    "revision",
+    "schema_version"
+  ],
+  "title": "Cleanroom generic mod daily-loop fixture lock V1",
+  "type": "object"
+}

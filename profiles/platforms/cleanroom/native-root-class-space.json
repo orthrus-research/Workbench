@@ -1,0 +1,37 @@
+{
+  "schema": "axiom.native-root-class-space-policy.v1",
+  "profile": "cleanroom",
+  "side": "SERVER",
+  "inputStage": "raw-original-artifacts",
+  "cleanroomRevision": "fe78db8dc4fcee47df7549230858f4c064208d73",
+  "libraryPolicy": "native-identity-runtime.json",
+  "libraryPolicySha256": "53a6d469323f4ca72854a7e2ce4876d2444c4e2b1a089c77a17a198697d483e3",
+  "inputs": [
+    {
+      "path": "com/cleanroommc/cleanroom/0.6.12-alpha/cleanroom-0.6.12-alpha.jar",
+      "sha256": "48043f4ea69605ec9b1250b9bd01106b07023b78614bac734a8a296e690e7893",
+      "size": 6502296,
+      "url": "https://repo.cleanroommc.com/releases/com/cleanroommc/cleanroom/0.6.12-alpha/cleanroom-0.6.12-alpha-universal.jar",
+      "role": "cleanroom-universal"
+    },
+    {
+      "role": "minecraft-server",
+      "path": "com/mojang/minecraft/1.12.2/minecraft-1.12.2-server.jar",
+      "size": 30222121,
+      "sha256": "fe1f9274e6dad9191bf6e6e8e36ee6ebc737f373603df0946aafcded0d53167e",
+      "sha1": "886945bfb2b978778c3a0288fd7fab09d315b25f",
+      "url": "https://piston-data.mojang.com/v1/objects/886945bfb2b978778c3a0288fd7fab09d315b25f/server.jar"
+    }
+  ],
+  "requiredResources": [
+    "binpatches.pack.lzma",
+    "deobf_data-1.12.2.tsrg",
+    "forge_at.cfg",
+    "mcpmod.info"
+  ],
+  "qualification": {
+    "materialInitializationComplete": false,
+    "fullLauncherCompositionQualified": false,
+    "wholePackParity": false
+  }
+}

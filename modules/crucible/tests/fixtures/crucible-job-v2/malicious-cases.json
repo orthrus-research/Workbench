@@ -1,0 +1,21 @@
+{
+  "format": "workbench-crucible-job-v2-malicious-cases-v1",
+  "cases": [
+    {"name": "unknown-top-field", "alias": "submission", "mutation": "unknown-top-field", "expected_phase": "schema", "expected_code": "schema.additionalProperties"},
+    {"name": "mutable-status-field", "alias": "submission", "mutation": "mutable-status-field", "expected_phase": "schema", "expected_code": "schema.additionalProperties"},
+    {"name": "lease-owner-field", "alias": "event_claim_acquired", "mutation": "lease-owner-field", "expected_phase": "schema", "expected_code": "schema.additionalProperties"},
+    {"name": "event-evidence-eligible", "alias": "event_progress_post", "mutation": "event-evidence-eligible", "expected_phase": "schema", "expected_code": "schema.const"},
+    {"name": "event-ordinal-gap", "alias": "event_starting", "mutation": "event-ordinal-gap", "expected_phase": "relation", "expected_code": "relation.event-ordinal"},
+    {"name": "event-context-mismatch", "alias": "event_progress_pre", "mutation": "event-context-mismatch", "expected_phase": "relation", "expected_code": "relation.anchor-mismatch"},
+    {"name": "process-attempt-mismatch", "alias": "process", "mutation": "process-attempt-mismatch", "expected_phase": "relation", "expected_code": "relation.process-owner"},
+    {"name": "second-terminal-seal", "alias": "terminal_seal", "mutation": "second-terminal-seal", "expected_phase": "relation", "expected_code": "relation.multiple-terminal-seals"},
+    {"name": "wrong-event-root", "alias": "terminal_seal", "mutation": "wrong-event-root", "expected_phase": "relation", "expected_code": "relation.seal-root"},
+    {"name": "progress-regression", "alias": "event_progress_post", "mutation": "progress-regression", "expected_phase": "relation", "expected_code": "relation.progress-regression"},
+    {"name": "cancellation-cas-replay", "alias": "event_cancel_requested", "mutation": "cancellation-cas-replay", "expected_phase": "relation", "expected_code": "relation.cancellation-cas"},
+    {"name": "cancellation-observation-replay", "alias": "event_cancel_observed", "mutation": "cancellation-observation-replay", "expected_phase": "relation", "expected_code": "relation.cancellation-observation"},
+    {"name": "recovery-state-lie", "alias": "event_recovery", "mutation": "recovery-state-lie", "expected_phase": "semantic", "expected_code": "semantic.recovery-state"},
+    {"name": "terminal-without-seal", "alias": "terminal_seal", "mutation": "terminal-without-seal", "expected_phase": "relation", "expected_code": "relation.missing-terminal-seal"},
+    {"name": "progress-admission", "alias": "event_progress_post", "mutation": "progress-admission", "expected_phase": "relation", "expected_code": "relation.evidence-ineligible"},
+    {"name": "external-validator-rejects", "alias": "submission", "mutation": "external-validator-rejects", "expected_phase": "relation", "expected_code": "relation.external-reference-rejected"}
+  ]
+}

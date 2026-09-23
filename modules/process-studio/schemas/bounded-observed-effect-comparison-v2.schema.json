@@ -1,0 +1,726 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/bounded-observed-effect-comparison-v2.schema.json",
+  "title": "Workbench Process Studio Bounded Observed-Effect Comparison V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "comparison_id",
+    "authority",
+    "binding",
+    "change_envelope",
+    "comparisons",
+    "envelope_assessment",
+    "summary",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-process-studio-bounded-observed-effect-comparison-v2"
+    },
+    "schema_version": {"const": 2},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "comparison_id": {
+      "type": "string",
+      "pattern": "^workbench-process-studio-bounded-observed-effect-comparison-v2:sha256:[0-9a-f]{64}$"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "claim",
+        "runtime_authority",
+        "semantic_authority",
+        "causality_authority",
+        "construction_authority",
+        "action_authorization"
+      ],
+      "properties": {
+        "owner": {"const": "Process Studio"},
+        "claim": {
+          "const": "bounded structural comparison of source-replayable projections"
+        },
+        "runtime_authority": {"const": "none"},
+        "semantic_authority": {"const": "family-adapters"},
+        "causality_authority": {"const": "none"},
+        "construction_authority": {"const": "none"},
+        "action_authorization": {"const": "none"}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_snapshot_id",
+        "candidate_snapshot_id",
+        "baseline_capture_id",
+        "candidate_capture_id",
+        "baseline_declared_change_envelope_id",
+        "candidate_declared_change_envelope_id",
+        "context_id",
+        "pack_profile_id",
+        "platform_profile_id",
+        "physical_side",
+        "stage",
+        "baseline_projection_id",
+        "candidate_projection_id",
+        "coverage",
+        "change_envelope_id",
+        "bounds"
+      ],
+      "properties": {
+        "baseline_snapshot_id": {"$ref": "#/$defs/nonemptyString"},
+        "candidate_snapshot_id": {"$ref": "#/$defs/nonemptyString"},
+        "baseline_capture_id": {"$ref": "#/$defs/nonemptyString"},
+        "candidate_capture_id": {"$ref": "#/$defs/nonemptyString"},
+        "baseline_declared_change_envelope_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/envelopeId"},
+            {"type": "null"}
+          ]
+        },
+        "candidate_declared_change_envelope_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/envelopeId"},
+            {"type": "null"}
+          ]
+        },
+        "context_id": {"$ref": "#/$defs/nonemptyString"},
+        "pack_profile_id": {"$ref": "#/$defs/nonemptyString"},
+        "platform_profile_id": {"$ref": "#/$defs/nonemptyString"},
+        "physical_side": {"$ref": "#/$defs/nonemptyString"},
+        "stage": {"$ref": "#/$defs/nonemptyString"},
+        "baseline_projection_id": {
+          "$ref": "#/$defs/projectionId"
+        },
+        "candidate_projection_id": {
+          "$ref": "#/$defs/projectionId"
+        },
+        "coverage": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/coverage"}
+        },
+        "change_envelope_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/envelopeId"},
+            {"type": "null"}
+          ]
+        },
+        "bounds": {"$ref": "#/$defs/bounds"}
+      }
+    },
+    "change_envelope": {
+      "oneOf": [
+        {"$ref": "#/$defs/changeEnvelope"},
+        {"type": "null"}
+      ]
+    },
+    "comparisons": {
+      "type": "array",
+      "maxItems": 500000,
+      "items": {"$ref": "#/$defs/comparisonRow"}
+    },
+    "envelope_assessment": {"$ref": "#/$defs/envelopeAssessment"},
+    "summary": {"$ref": "#/$defs/summary"},
+    "limitations": {
+      "const": [
+        "This is a bounded observed-effect comparison, not a safety finding or approval.",
+        "Modified means one stable adapter-owned correspondence with different adapter-owned fingerprints; it does not establish causality.",
+        "No change envelope yields comparison-only state and never an envelope-match claim or authorization.",
+        "Registry presence and registration effects do not prove execution, reachability, balance, playability, or support.",
+        "This fixture slice does not authenticate input ownership, provenance, runtime custody, or envelope timing."
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"change_envelope": {"type": "null"}},
+        "required": ["change_envelope"]
+      },
+      "then": {
+        "properties": {
+          "binding": {
+            "properties": {
+              "baseline_declared_change_envelope_id": {"type": "null"},
+              "candidate_declared_change_envelope_id": {"type": "null"},
+              "change_envelope_id": {"type": "null"}
+            }
+          },
+          "envelope_assessment": {
+            "properties": {"state": {"const": "comparison-only"}}
+          },
+          "summary": {
+            "properties": {"state": {"const": "comparison-only"}}
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "binding": {
+            "properties": {
+              "baseline_declared_change_envelope_id": {"type": "null"},
+              "candidate_declared_change_envelope_id": {"$ref": "#/$defs/envelopeId"},
+              "change_envelope_id": {"$ref": "#/$defs/envelopeId"}
+            }
+          },
+          "envelope_assessment": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "matches-declared-envelope",
+                  "mismatch",
+                  "unresolved"
+                ]
+              }
+            }
+          },
+          "summary": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "matches-declared-envelope",
+                  "mismatch",
+                  "unresolved"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonemptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1048576
+    },
+    "count": {"type": "integer", "minimum": 0, "maximum": 500000},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "projectionId": {
+      "type": "string",
+      "pattern": "^workbench-process-studio-effect-snapshot-projection-v2:sha256:[0-9a-f]{64}$"
+    },
+    "comparisonRowId": {
+      "type": "string",
+      "pattern": "^workbench-process-studio-effect-comparison-v2:sha256:[0-9a-f]{64}$"
+    },
+    "envelopeId": {
+      "type": "string",
+      "pattern": "^workbench-process-studio-effect-change-envelope-v2:sha256:[0-9a-f]{64}$"
+    },
+    "strictJson": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        {"type": "string", "maxLength": 1048576},
+        {
+          "type": "array",
+          "maxItems": 500000,
+          "items": {"$ref": "#/$defs/strictJson"}
+        },
+        {
+          "type": "object",
+          "maxProperties": 500000,
+          "additionalProperties": {"$ref": "#/$defs/strictJson"}
+        }
+      ]
+    },
+    "opaqueCorrelation": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/strictJson"}
+    },
+    "classification": {
+      "enum": [
+        "added",
+        "removed",
+        "modified",
+        "unchanged",
+        "ambiguous",
+        "unresolved"
+      ]
+    },
+    "expectedClassification": {
+      "enum": ["added", "removed", "modified", "unchanged"]
+    },
+    "assessmentState": {
+      "enum": [
+        "comparison-only",
+        "matches-declared-envelope",
+        "mismatch",
+        "unresolved"
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "semantic_owner_id",
+        "adapter_id",
+        "semantic_version",
+        "correlation_policy_id",
+        "fingerprint_policy_id",
+        "state"
+      ],
+      "properties": {
+        "family": {"$ref": "#/$defs/nonemptyString"},
+        "semantic_owner_id": {"$ref": "#/$defs/nonemptyString"},
+        "adapter_id": {"$ref": "#/$defs/nonemptyString"},
+        "semantic_version": {"$ref": "#/$defs/nonemptyString"},
+        "correlation_policy_id": {"$ref": "#/$defs/nonemptyString"},
+        "fingerprint_policy_id": {"$ref": "#/$defs/nonemptyString"},
+        "state": {
+          "enum": [
+            "complete",
+            "partial",
+            "not-observed",
+            "unavailable",
+            "failed"
+          ]
+        }
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_comparisons",
+        "max_envelope_expectations",
+        "max_input_bytes",
+        "max_records_per_snapshot"
+      ],
+      "properties": {
+        "max_comparisons": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500000
+        },
+        "max_envelope_expectations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "max_input_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 268435456
+        },
+        "max_records_per_snapshot": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500000
+        }
+      }
+    },
+    "changeEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "canonicalizer",
+        "envelope_id",
+        "state",
+        "authority",
+        "binding",
+        "expectations",
+        "allow_unlisted_changes",
+        "limitations"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-process-studio-effect-change-envelope-v2"
+        },
+        "schema_version": {"const": 2},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "envelope_id": {"$ref": "#/$defs/envelopeId"},
+        "state": {"const": "closed"},
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner_id",
+            "claim",
+            "causality_authority",
+            "action_authorization"
+          ],
+          "properties": {
+            "owner_id": {"$ref": "#/$defs/nonemptyString"},
+            "claim": {"const": "declared expected structural effects only"},
+            "causality_authority": {"const": "none"},
+            "action_authorization": {"const": "none"}
+          }
+        },
+        "binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseline_snapshot_id",
+            "baseline_capture_id",
+            "context_id",
+            "pack_profile_id",
+            "platform_profile_id",
+            "physical_side",
+            "stage"
+          ],
+          "properties": {
+            "baseline_snapshot_id": {"$ref": "#/$defs/nonemptyString"},
+            "baseline_capture_id": {"$ref": "#/$defs/nonemptyString"},
+            "context_id": {"$ref": "#/$defs/nonemptyString"},
+            "pack_profile_id": {"$ref": "#/$defs/nonemptyString"},
+            "platform_profile_id": {"$ref": "#/$defs/nonemptyString"},
+            "physical_side": {"$ref": "#/$defs/nonemptyString"},
+            "stage": {"$ref": "#/$defs/nonemptyString"}
+          }
+        },
+        "expectations": {
+          "type": "array",
+          "maxItems": 100000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/expectation"}
+        },
+        "allow_unlisted_changes": {"type": "boolean"},
+        "limitations": {
+          "type": "array",
+          "maxItems": 500000,
+          "items": {"$ref": "#/$defs/nonemptyString"}
+        }
+      },
+      "allOf": [
+        {
+          "properties": {"allow_unlisted_changes": {"const": false}}
+        }
+      ]
+    },
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "record_kind",
+        "descriptor_kind",
+        "operation",
+        "correlation",
+        "baseline_semantic_fingerprint",
+        "candidate_semantic_fingerprint"
+      ],
+      "properties": {
+        "family": {"$ref": "#/$defs/nonemptyString"},
+        "record_kind": {
+          "enum": ["registry-observation", "effect-observation"]
+        },
+        "descriptor_kind": {"$ref": "#/$defs/nonemptyString"},
+        "operation": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "correlation": {"$ref": "#/$defs/opaqueCorrelation"},
+        "baseline_semantic_fingerprint": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "candidate_semantic_fingerprint": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"record_kind": {"const": "registry-observation"}},
+            "required": ["record_kind"]
+          },
+          "then": {"properties": {"operation": {"type": "null"}}}
+        },
+        {
+          "if": {
+            "properties": {"record_kind": {"const": "effect-observation"}},
+            "required": ["record_kind"]
+          },
+          "then": {
+            "properties": {
+              "operation": {"$ref": "#/$defs/nonemptyString"}
+            }
+          }
+        }
+      ],
+      "not": {
+        "properties": {
+          "baseline_semantic_fingerprint": {"type": "null"},
+          "candidate_semantic_fingerprint": {"type": "null"}
+        },
+        "required": [
+          "baseline_semantic_fingerprint",
+          "candidate_semantic_fingerprint"
+        ]
+      }
+    },
+    "comparisonRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_id",
+        "canonicalizer",
+        "family",
+        "record_kind",
+        "descriptor_kind",
+        "operation",
+        "correlation",
+        "classification",
+        "reason",
+        "baseline_source_record_ids",
+        "candidate_source_record_ids",
+        "baseline_semantic_fingerprints",
+        "candidate_semantic_fingerprints"
+      ],
+      "properties": {
+        "comparison_id": {"$ref": "#/$defs/comparisonRowId"},
+        "canonicalizer": {"const": "workbench-canonical-json-v2"},
+        "family": {"$ref": "#/$defs/nonemptyString"},
+        "record_kind": {
+          "enum": ["registry-observation", "effect-observation"]
+        },
+        "descriptor_kind": {"$ref": "#/$defs/nonemptyString"},
+        "operation": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "correlation": {
+          "oneOf": [
+            {"$ref": "#/$defs/opaqueCorrelation"},
+            {"type": "null"}
+          ]
+        },
+        "classification": {"$ref": "#/$defs/classification"},
+        "reason": {"$ref": "#/$defs/nonemptyString"},
+        "baseline_source_record_ids": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonemptyString"}
+        },
+        "candidate_source_record_ids": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonemptyString"}
+        },
+        "baseline_semantic_fingerprints": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/sha256"}
+        },
+        "candidate_semantic_fingerprints": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/sha256"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"record_kind": {"const": "registry-observation"}},
+            "required": ["record_kind"]
+          },
+          "then": {"properties": {"operation": {"type": "null"}}}
+        },
+        {
+          "if": {
+            "properties": {"record_kind": {"const": "effect-observation"}},
+            "required": ["record_kind"]
+          },
+          "then": {
+            "properties": {
+              "operation": {"$ref": "#/$defs/nonemptyString"}
+            }
+          }
+        }
+      ],
+      "anyOf": [
+        {
+          "properties": {
+            "baseline_source_record_ids": {"minItems": 1}
+          }
+        },
+        {
+          "properties": {
+            "candidate_source_record_ids": {"minItems": 1}
+          }
+        }
+      ]
+    },
+    "unsupported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "reason", "comparison_id", "expectation"],
+      "properties": {
+        "family": {"$ref": "#/$defs/nonemptyString"},
+        "reason": {"$ref": "#/$defs/nonemptyString"},
+        "comparison_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/comparisonRowId"},
+            {"type": "null"}
+          ]
+        },
+        "expectation": {
+          "oneOf": [
+            {"$ref": "#/$defs/expectation"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "expectationMismatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_id",
+        "expected_classification",
+        "observed_classification",
+        "expected_baseline_semantic_fingerprint",
+        "expected_candidate_semantic_fingerprint",
+        "observed_baseline_semantic_fingerprints",
+        "observed_candidate_semantic_fingerprints"
+      ],
+      "properties": {
+        "comparison_id": {"$ref": "#/$defs/comparisonRowId"},
+        "expected_classification": {
+          "$ref": "#/$defs/expectedClassification"
+        },
+        "observed_classification": {
+          "$ref": "#/$defs/expectedClassification"
+        },
+        "expected_baseline_semantic_fingerprint": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "expected_candidate_semantic_fingerprint": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "observed_baseline_semantic_fingerprints": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/sha256"}
+        },
+        "observed_candidate_semantic_fingerprints": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "envelopeAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "expected_and_observed_comparison_ids",
+        "unexpected_observed_comparison_ids",
+        "expected_not_observed",
+        "unsupported_or_unobservable",
+        "expectation_mismatches"
+      ],
+      "properties": {
+        "state": {"$ref": "#/$defs/assessmentState"},
+        "expected_and_observed_comparison_ids": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/comparisonRowId"}
+        },
+        "unexpected_observed_comparison_ids": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/comparisonRowId"}
+        },
+        "expected_not_observed": {
+          "type": "array",
+          "maxItems": 100000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/expectation"}
+        },
+        "unsupported_or_unobservable": {
+          "type": "array",
+          "maxItems": 500000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/unsupported"}
+        },
+        "expectation_mismatches": {
+          "type": "array",
+          "maxItems": 100000,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/expectationMismatch"}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "comparisons",
+        "by_classification",
+        "structural_changes",
+        "uncertain",
+        "reverse_diff_invariant"
+      ],
+      "properties": {
+        "state": {"$ref": "#/$defs/assessmentState"},
+        "comparisons": {"$ref": "#/$defs/count"},
+        "by_classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "added",
+            "removed",
+            "modified",
+            "unchanged",
+            "ambiguous",
+            "unresolved"
+          ],
+          "properties": {
+            "added": {"$ref": "#/$defs/count"},
+            "removed": {"$ref": "#/$defs/count"},
+            "modified": {"$ref": "#/$defs/count"},
+            "unchanged": {"$ref": "#/$defs/count"},
+            "ambiguous": {"$ref": "#/$defs/count"},
+            "unresolved": {"$ref": "#/$defs/count"}
+          }
+        },
+        "structural_changes": {"$ref": "#/$defs/count"},
+        "uncertain": {"$ref": "#/$defs/count"},
+        "reverse_diff_invariant": {"const": "satisfied"}
+      }
+    }
+  }
+}

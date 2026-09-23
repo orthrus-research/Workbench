@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/gtceu-worldgen-overlay-v1.schema.json",
+  "title": "Workbench Crucible GTCEu worldgen overlay v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "target_inventory_id", "operations"],
+  "properties": {
+    "format": {"const": "workbench-crucible-gtceu-worldgen-overlay-v1"},
+    "schema_version": {"const": 1},
+    "target_inventory_id": {
+      "type": "string",
+      "pattern": "^crucible-gtceu-worldgen:sha256:[0-9a-f]{64}$"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "kind", "relative_path"],
+        "properties": {
+          "op": {"enum": ["add", "replace", "remove"]},
+          "kind": {"enum": ["ore", "fluid"]},
+          "relative_path": {"type": "string", "pattern": "^worldgen/(vein|fluid)/.+\\.json$"},
+          "expected_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "definition": {"type": "object"}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"op": {"const": "add"}}, "required": ["op"]},
+            "then": {
+              "required": ["definition"],
+              "not": {"required": ["expected_sha256"]}
+            }
+          },
+          {
+            "if": {"properties": {"op": {"const": "replace"}}, "required": ["op"]},
+            "then": {"required": ["expected_sha256", "definition"]}
+          },
+          {
+            "if": {"properties": {"op": {"const": "remove"}}, "required": ["op"]},
+            "then": {
+              "required": ["expected_sha256"],
+              "not": {"required": ["definition"]}
+            }
+          }
+        ]
+      }
+    }
+  }
+}

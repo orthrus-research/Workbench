@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/orthrus-research/workbench/packaging/release/schemas/workbench-public-repository-v1.schema.json",
+  "title": "Workbench public repository V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "project",
+    "destination",
+    "hosting_state",
+    "history_policy",
+    "claims"
+  ],
+  "properties": {
+    "format": {"const": "workbench-public-repository-v1"},
+    "schema_version": {"const": 1},
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "display_name", "organization_display_name"],
+      "properties": {
+        "id": {"const": "workbench"},
+        "display_name": {"const": "Workbench"},
+        "organization_display_name": {"const": "Orthrus Research"}
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "organization_login",
+        "repository_name",
+        "full_name",
+        "html_url",
+        "clone_url",
+        "issues_url",
+        "security_advisory_url"
+      ],
+      "properties": {
+        "provider": {"const": "github"},
+        "organization_login": {"const": "orthrus-research"},
+        "repository_name": {"const": "workbench"},
+        "full_name": {"const": "orthrus-research/workbench"},
+        "html_url": {"const": "https://github.com/orthrus-research/workbench"},
+        "clone_url": {"const": "https://github.com/orthrus-research/workbench.git"},
+        "issues_url": {"const": "https://github.com/orthrus-research/workbench/issues"},
+        "security_advisory_url": {
+          "const": "https://github.com/orthrus-research/workbench/security/advisories/new"
+        }
+      }
+    },
+    "hosting_state": {
+      "enum": ["not-created", "private-staging", "public"]
+    },
+    "history_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "public_default_branch",
+        "existing_branches_published",
+        "existing_tags_published",
+        "source_history_retained_outside_public_repository",
+        "requires_clean_reviewed_revision",
+        "export_tool",
+        "tag_namespaces",
+        "workspace_copy_allowed",
+        "mirror_push_allowed"
+      ],
+      "properties": {
+        "kind": {"const": "clean-root-export"},
+        "public_default_branch": {"const": "master"},
+        "existing_branches_published": {"const": false},
+        "existing_tags_published": {"const": false},
+        "source_history_retained_outside_public_repository": {"const": true},
+        "requires_clean_reviewed_revision": {"const": true},
+        "export_tool": {"const": "tools/prepare_public_export.py"},
+        "tag_namespaces": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^workbench-[a-z0-9-]+/v$"
+          }
+        },
+        "workspace_copy_allowed": {"const": false},
+        "mirror_push_allowed": {"const": false}
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "history_pushed",
+        "public_visibility_verified",
+        "repository_created",
+        "repository_settings_applied"
+      ],
+      "properties": {
+        "history_pushed": {
+          "type": "boolean",
+          "description": "The reviewed clean-root Workbench migration baseline was imported and verified; pre-existing README or other history does not satisfy this claim."
+        },
+        "public_visibility_verified": {"type": "boolean"},
+        "repository_created": {"type": "boolean"},
+        "repository_settings_applied": {"type": "boolean"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"hosting_state": {"const": "not-created"}},
+        "required": ["hosting_state"]
+      },
+      "then": {
+        "properties": {
+          "claims": {
+            "properties": {
+              "history_pushed": {"const": false},
+              "public_visibility_verified": {"const": false},
+              "repository_created": {"const": false},
+              "repository_settings_applied": {"const": false}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"hosting_state": {"const": "private-staging"}},
+        "required": ["hosting_state"]
+      },
+      "then": {
+        "properties": {
+          "claims": {
+            "properties": {
+              "public_visibility_verified": {"const": false},
+              "repository_created": {"const": true}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"hosting_state": {"const": "public"}},
+        "required": ["hosting_state"]
+      },
+      "then": {
+        "properties": {
+          "claims": {
+            "properties": {
+              "public_visibility_verified": {"const": true},
+              "repository_created": {"const": true}
+            }
+          }
+        }
+      }
+    }
+  ]
+}

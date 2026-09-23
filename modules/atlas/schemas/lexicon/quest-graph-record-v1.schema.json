@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/quest-graph-record-v1.schema.json",
+  "title": "Supersymmetry static BetterQuesting graph record v1",
+  "type": "object",
+  "required": [
+    "record_type",
+    "id",
+    "snapshot_id",
+    "kind",
+    "subject",
+    "object",
+    "attributes",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "record_type": {
+      "enum": [
+        "node",
+        "edge"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^qg(?:e)?:[a-z0-9][a-z0-9:._/-]*$"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+    },
+    "kind": {
+      "enum": [
+        "quest_line",
+        "quest",
+        "task",
+        "reward",
+        "localization",
+        "resource",
+        "belongs_to_line",
+        "requires_quest",
+        "has_task",
+        "has_reward",
+        "references_identity",
+        "localized_by"
+      ]
+    },
+    "subject": {
+      "type": ["string", "null"]
+    },
+    "object": {
+      "type": ["string", "null"]
+    },
+    "attributes": {
+      "type": "object"
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "source_path",
+        "source_sha256",
+        "json_pointer",
+        "rewrite_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source_path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "json_pointer": {
+          "type": "string"
+        },
+        "rewrite_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]+$"
+          }
+        }
+      }
+    }
+  }
+}

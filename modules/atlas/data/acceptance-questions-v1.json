@@ -1,0 +1,361 @@
+[
+  {
+    "id": "DEVELOPER-DECLARATION-001",
+    "question": "Which source declares this identity?",
+    "audience": "developer",
+    "query": "explain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "declaration",
+      "ownership",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "pinned-source"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "DEVELOPER-PROCESS-USAGE-001",
+    "question": "Which recipes consume and produce it?",
+    "audience": "developer",
+    "query": "explain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "producers",
+      "consumers",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "DEVELOPER-EXECUTION-001",
+    "question": "Which machines can actually execute each recipe?",
+    "audience": "developer",
+    "query": "explain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "recipes",
+      "executable_machines",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "DEVELOPER-RECIPE-DETAILS-001",
+    "question": "What quantities, alternatives, NBT, capabilities, EU/t, duration, and chance apply?",
+    "audience": "developer",
+    "query": "explain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "recipes",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "DEVELOPER-PROFILE-COMPARISON-001",
+    "question": "What differs between COMMON, CLIENT_JEI/HEI, OFFLINE, and dedicated profiles?",
+    "audience": "developer",
+    "query": "compare",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "comparison",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics",
+      "runtime-presentation"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "DEVELOPER-ROW-CLASSIFICATION-001",
+    "question": "Is a row runtime-executable, category-only, procedural, or presentation-only?",
+    "audience": "developer",
+    "query": "explain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "classification",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics",
+      "runtime-presentation"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "DEVELOPER-INFRASTRUCTURE-SEMANTICS-001",
+    "question": "Which implementation, configuration, and runtime rule establishes each infrastructure requirement?",
+    "audience": "developer",
+    "query": "explain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "routes",
+      "prerequisites",
+      "machine_construction",
+      "infrastructure_requirements",
+      "pinned_source",
+      "ownership",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics",
+      "pinned-source"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-PRODUCE-MATERIAL-001",
+    "question": "How do I produce this target?",
+    "audience": "player",
+    "query": "chain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "routes",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-BUILD-PREREQUISITES-001",
+    "question": "What machine, inputs, and reusable requirements must exist before this route runs?",
+    "audience": "player",
+    "query": "chain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "routes",
+      "prerequisites",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-MACHINE-CONSTRUCTION-001",
+    "question": "How do I obtain or construct each required machine?",
+    "audience": "player",
+    "query": "chain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "routes",
+      "prerequisites",
+      "machine_construction",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-INFRASTRUCTURE-REQUIREMENTS-001",
+    "question": "What power, voltage tier, hatches, structures, dimensions, or environmental conditions are required?",
+    "audience": "player",
+    "query": "chain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "routes",
+      "prerequisites",
+      "infrastructure_requirements",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics",
+      "pinned-source"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-INGREDIENT-GROUPING-001",
+    "question": "Which ingredients are alternatives versus jointly required?",
+    "audience": "player",
+    "query": "chain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "routes",
+      "ingredient_slots",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-REUSABLE-REQUIREMENTS-001",
+    "question": "Which catalysts/non-consumables are reusable?",
+    "audience": "player",
+    "query": "chain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "routes",
+      "reusable_requirements",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-BYPRODUCTS-RECYCLING-001",
+    "question": "What byproducts and recycling paths exist?",
+    "audience": "player",
+    "query": "chain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "routes",
+      "byproducts",
+      "recycling_paths",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-QUEST-CONTEXT-001",
+    "question": "Which quest teaches this, and which quest actually gates another quest?",
+    "audience": "player",
+    "query": "quests",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "quests",
+      "quest_prerequisites",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "quest-data"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "PLAYER-VERIFICATION-SCOPE-001",
+    "question": "Is guidance verified for this snapshot/profile?",
+    "audience": "player",
+    "query": "explain",
+    "selector": {
+      "kind": "material",
+      "key": "susy:diluted_oil_light"
+    },
+    "required_fields": [
+      "target",
+      "confidence",
+      "known_gaps",
+      "evidence",
+      "snapshot_id",
+      "profile_scope"
+    ],
+    "required_evidence_bases": [
+      "runtime-mechanics"
+    ],
+    "status": "active"
+  }
+]

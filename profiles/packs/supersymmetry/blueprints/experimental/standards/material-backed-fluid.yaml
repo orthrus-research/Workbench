@@ -1,0 +1,233 @@
+# Experimental plan-stage foundation only. A ready candidate proves deterministic
+# synthesis against the pinned convention; it does not prove Groovy compilation,
+# Cleanroom runtime registration, localization loading, or release readiness.
+schema_version: 1
+format: susy-blueprints-standard-authoring-v1
+contract_id: BLUEPRINTS-IMPLEMENTATION-STANDARD-V1
+standard_key: material-backed-fluid
+version: 0.1.0
+lifecycle: active
+kind: primary
+feature_family: material-backed-fluid
+priority: 100
+specificity: 50
+mandatory_core:
+  id: supersymmetry-preinit-material
+  path: profiles/packs/supersymmetry/blueprints/experimental/templates/material-backed-fluid-preinit.groovy.tpl
+  sha256: 8375e0329339e76304215660218d2dd01288424fc6a58f650b69665c04649e95
+variants:
+  - id: resource-loader-localization
+    priority: 10
+    specificity: 10
+    when: []
+    template:
+      id: supersymmetry-resource-loader-en-us
+      path: profiles/packs/supersymmetry/blueprints/experimental/templates/material-backed-fluid-en-us.lang.tpl
+      sha256: fe03611337ef4310977248e6b5ccc6db636019c6f904b0551fe56fa421f82d17
+    compatible_components: []
+parameters:
+  - name: name
+    class: required
+    value_type: string
+    description: Developer-facing material name used to derive the registry name.
+    constraints:
+      min_length: 1
+      max_length: 96
+      pattern: '^[A-Za-z0-9][A-Za-z0-9 _-]*$'
+  - name: registry_name
+    class: derived
+    value_type: string
+    description: Lowercase Supersymmetry material resource name.
+    constraints:
+      min_length: 1
+      max_length: 96
+      pattern: '^[a-z0-9]+(?:_[a-z0-9]+)*$'
+    derivation:
+      operator: slugify
+      arguments:
+        - operator: parameter
+          arguments:
+            - name
+  - name: material_id
+    class: allocated
+    value_type: integer
+    description: Provisionally allocated GTCEu material registry identifier.
+    constraints:
+      minimum: 20000
+      maximum: 32766
+    allocation_domain: supersymmetry-material-id-experimental
+  - name: color
+    class: required
+    value_type: string
+    description: Six-digit hexadecimal material color rendered as a Groovy literal.
+    constraints:
+      pattern: '^0x[0-9a-f]{6}$'
+  - name: translation
+    class: required
+    value_type: string
+    description: English display name for the generated Resource Loader domain.
+    constraints:
+      min_length: 1
+      max_length: 128
+      pattern: '^[^\r\n=]+$'
+targets:
+  - repository_id: pack
+    integration_surface: groovy-preinit-material-registration
+    allowed_paths:
+      - groovy/preInit/
+  - repository_id: pack
+    integration_surface: resource-loader-localization
+    allowed_paths:
+      - resources/
+composition:
+  allowed: []
+  precedence: []
+atlas:
+  baseline_id: SRC-PACK@9d3aa7ae0294bf27f0b8acbb893d61da23a06972
+  queries:
+    - id: diluted-oil-light-material-convention
+      query_id: CIT-PACK-DILUTED-OIL-MATERIAL
+      result_id: SRC-PACK@9d3aa7ae0294bf27f0b8acbb893d61da23a06972:CIT-PACK-DILUTED-OIL-MATERIAL
+      invariants:
+        - id: builder-id
+          result_path: /registration/material_id
+          operator: equals
+          expected: 20000
+          required: true
+        - id: builder-name
+          result_path: /registration/registry_name
+          operator: equals
+          expected: diluted_oil_light
+          required: true
+        - id: file-sha256
+          result_path: /source/file_sha256
+          operator: equals
+          expected: 29c2813429442300e62c20e66c3988117d5ce9e3b4124d387de4db3f4002661b
+          required: true
+        - id: fluid-form
+          result_path: /registration/form
+          operator: equals
+          expected: liquid
+          required: true
+        - id: namespace-helper
+          result_path: /registration/namespace_helper
+          operator: equals
+          expected: SuSyUtility.susyId
+          required: true
+        - id: source-path
+          result_path: /source/path
+          operator: equals
+          expected: groovy/material/PetrochemistryMaterials.groovy
+          required: true
+        - id: source-revision
+          result_path: /source/revision
+          operator: equals
+          expected: 9d3aa7ae0294bf27f0b8acbb893d61da23a06972
+          required: true
+    - id: diluted-oil-light-localization-convention
+      query_id: SRC-PACK@9d3aa7ae0294bf27f0b8acbb893d61da23a06972:resources/langfiles/lang/en_us.lang#susy.material.diluted_oil_light
+      result_id: source-file:sha256:d23c3107bf54a6a25f59a0f129fb8135e2e71dcc7b08f569fbc6c6db5009cb0a
+      invariants:
+        - id: localization-key
+          result_path: /localization/key
+          operator: equals
+          expected: susy.material.diluted_oil_light
+          required: true
+        - id: localization-path
+          result_path: /source/path
+          operator: equals
+          expected: resources/langfiles/lang/en_us.lang
+          required: true
+        - id: localization-value
+          result_path: /localization/value
+          operator: equals
+          expected: Diluted Light Oil
+          required: true
+        - id: source-revision
+          result_path: /source/revision
+          operator: equals
+          expected: 9d3aa7ae0294bf27f0b8acbb893d61da23a06972
+          required: true
+rendering:
+  outputs:
+    - id: preinit-material-registration
+      repository_id: pack
+      integration_surface: groovy-preinit-material-registration
+      operation: create
+      path:
+        operator: concat
+        arguments:
+          - operator: literal
+            arguments:
+              - groovy/preInit/register_material_
+          - operator: parameter
+            arguments:
+              - registry_name
+          - operator: literal
+            arguments:
+              - .groovy
+      source:
+        kind: template
+        id: supersymmetry-preinit-material
+      variants: []
+    - id: resource-loader-en-us
+      repository_id: pack
+      integration_surface: resource-loader-localization
+      operation: create
+      path:
+        operator: concat
+        arguments:
+          - operator: literal
+            arguments:
+              - resources/susy_blueprint_
+          - operator: parameter
+            arguments:
+              - registry_name
+          - operator: literal
+            arguments:
+              - /lang/en_us.lang
+      source:
+        kind: template
+        id: supersymmetry-resource-loader-en-us
+      variants:
+        - resource-loader-localization
+validation:
+  formatters: []
+  tests: []
+  fixtures: []
+  gates: []
+diagnostics:
+  - code: experimental-plan-only
+    severity: warning
+    template: Experimental plan-stage candidate only; runtime success is unproven.
+    arguments: []
+reconciliation:
+  - id: create-absent-material
+    when:
+      kind: identity-absent
+      fields:
+        - material_id
+        - registry_name
+    outcome: create
+    diagnostic_code: experimental-plan-only
+  - id: recognize-equivalent-material
+    when:
+      kind: identity-equivalent
+      fields:
+        - material_id
+        - registry_name
+    outcome: equivalent
+    diagnostic_code: experimental-plan-only
+migrations: []
+hooks: []
+allocation:
+  domains:
+    - name: supersymmetry-material-id-experimental
+      mode: blueprints-ledger
+      authority_id: blueprints-allocation-ledger-v1
+      evidence:
+        - SRC-GTCEU@9fe140febe8747bbe2f06dfd570421331ec06f4b
+        - SRC-PACK@9d3aa7ae0294bf27f0b8acbb893d61da23a06972
+      pool:
+        minimum: 20000
+        maximum: 32766

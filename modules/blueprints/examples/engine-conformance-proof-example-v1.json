@@ -1,0 +1,193 @@
+{
+  "claims": [
+    "generic-engine-state-machine-conforms",
+    "required-failures-withhold-release",
+    "three-output-modes-share-one-operation-identity"
+  ],
+  "contract_id": "BLUEPRINTS-EXECUTABLE-ENGINE-V1",
+  "fixture_scope": "synthetic-non-authoritative",
+  "format": "workbench-blueprints-engine-conformance-proof-v1",
+  "limitations": [
+    "no-feature-standard-admitted",
+    "no-minecraft-runtime-claim",
+    "no-pack-pattern-authorized"
+  ],
+  "proof_id": "workbench-blueprints-engine-conformance-proof:sha256:000c5e70f5239be6e09202a7d2c10ebac3903ebce4623cca0b36e1c3a678d372",
+  "scenarios": [
+    {
+      "assertions": [
+        "downstream-identities-bound",
+        "generation-advanced",
+        "release-withheld"
+      ],
+      "diagnostic_codes": [
+        "BPA134_INVALIDATED_INPUT"
+      ],
+      "evidence_sha256": "a01bee24ac849fc1b393413d70365d7913fc19aca9a187383b822e8486c3e809",
+      "scenario_id": "candidate-invalidation",
+      "states": [
+        "planned",
+        "invalidated"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "all-eight-core-phases",
+        "history-retained",
+        "private-payloads-excluded",
+        "target-verified"
+      ],
+      "diagnostic_codes": [],
+      "evidence_sha256": "babdc74ab7cfe2036413e31a6356c3417cb1cf5c61e6fc95ab1a3a894f8e224a",
+      "scenario_id": "direct-apply-verification",
+      "states": [
+        "initialized",
+        "planned",
+        "simulated",
+        "released",
+        "applied",
+        "verified"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "portable-proof-exported",
+        "release-validated",
+        "target-unchanged"
+      ],
+      "diagnostic_codes": [],
+      "evidence_sha256": "808d80f4750a9b3a780124d1943e94072ec5512b36e1ddb0b965412f2911e05c",
+      "scenario_id": "instructions-release",
+      "states": [
+        "initialized",
+        "planned",
+        "simulated",
+        "released"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "all-output-modes-exercised",
+        "instructions-patch-direct-same-operations"
+      ],
+      "diagnostic_codes": [],
+      "evidence_sha256": "731014c13aaf8cca06138fa3cd192e3969933480ef7d20281b5025982046a587",
+      "scenario_id": "output-mode-agreement",
+      "states": [
+        "released"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "portable-proof-exported",
+        "release-validated",
+        "target-unchanged"
+      ],
+      "diagnostic_codes": [],
+      "evidence_sha256": "ebfc64e0e20fdad6935aaf9622e137c07911565bfb8c46751eef8d89326638df",
+      "scenario_id": "patch-bundle-release",
+      "states": [
+        "initialized",
+        "planned",
+        "simulated",
+        "released"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "partial-mutation-injected",
+        "rollback-succeeded",
+        "target-restored",
+        "transaction-closed"
+      ],
+      "diagnostic_codes": [
+        "BPA144_APPLICATION_ROLLED_BACK"
+      ],
+      "evidence_sha256": "fda56dfaa5caa55ce97ee62a5f322d93900989d7c35e77d8377bfc03662eabe7",
+      "scenario_id": "rollback-recovery",
+      "states": [
+        "initialized",
+        "planned",
+        "simulated",
+        "released",
+        "application-rejected"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "candidate-metadata-closed",
+        "candidate-payload-not-disclosed",
+        "sealed-locator-content-addressed"
+      ],
+      "diagnostic_codes": [],
+      "evidence_sha256": "e8bda6824534250a371aaabe64f3c136a7796819f15d2701ee6e7d2dc121802e",
+      "scenario_id": "sealed-candidate-boundary",
+      "states": [
+        "initialized",
+        "planned"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "later-lifecycle-rejected",
+        "no-release",
+        "required-gate-failed"
+      ],
+      "diagnostic_codes": [
+        "BPI131_SIMULATION_FAILED"
+      ],
+      "evidence_sha256": "3a14d1853638beace5ba4d628a3f524e51c9451bf5872565a2ddd2bdf14f3809",
+      "scenario_id": "simulation-gate-failure",
+      "states": [
+        "initialized",
+        "planned",
+        "simulation-failed"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "candidate-not-applied",
+        "observed-drift-preserved",
+        "stale-target-detected"
+      ],
+      "diagnostic_codes": [
+        "BPA138_STALE_APPLICATION_TARGET"
+      ],
+      "evidence_sha256": "d3878c016e5837a972e32d96eaafccd9f3cb99c20d128a3861141d568c2c0891",
+      "scenario_id": "stale-target-rejection",
+      "states": [
+        "initialized",
+        "planned",
+        "simulated",
+        "released",
+        "application-rejected"
+      ],
+      "status": "passed"
+    },
+    {
+      "assertions": [
+        "no-candidate",
+        "no-release",
+        "no-standard-no-plan"
+      ],
+      "diagnostic_codes": [
+        "BPI130_PLAN_BLOCKED"
+      ],
+      "evidence_sha256": "a8187739ab32c237b4150f438f501c6dce0e16c6769bdef0a8010273723538f8",
+      "scenario_id": "standard-selection-failure",
+      "states": [
+        "initialized"
+      ],
+      "status": "passed"
+    }
+  ],
+  "schema_version": 1
+}

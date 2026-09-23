@@ -1,0 +1,496 @@
+{
+  "format": "workbench-atlas-recipe-impact-report-v2",
+  "schema_version": 2,
+  "context": {
+    "format": "workbench-atlas-recipe-health-context-v1",
+    "schema_version": 1,
+    "context_type": "categorical-graph-v2",
+    "root": "/fixture/atlas-complete/quest-cycle",
+    "graph_set_id": "workbench-atlas-graph-set-v2:sha256:0b7b48b5ad3c54c8e03c1f8dd539b9f6ceab64462ca403a02f668844ee669b4f",
+    "scope": {
+      "fixture": "complete-impact"
+    },
+    "summary": {
+      "edge_count": 14,
+      "node_count": 14,
+      "partition_count": 1
+    },
+    "capabilities": {
+      "recipe_search": true,
+      "duplicate_signatures": true,
+      "producers": true,
+      "consumers": true,
+      "source_mutations": false,
+      "stoichiometry": false,
+      "reachability": false
+    },
+    "recipe_count": 1,
+    "search": {
+      "requires_semantic_key": false,
+      "selection_is_exact_node_id": true
+    }
+  },
+  "selection": {
+    "selection_id": "workbench-atlas-node-v2:gt-recipe:selected",
+    "kind": "gt-recipe",
+    "semantic_key": "selected",
+    "properties": {
+      "duration": 20,
+      "eut": 30,
+      "hidden": false,
+      "lookup_active": true,
+      "recipe_map": "fixture"
+    },
+    "evidence": []
+  },
+  "scenario": {
+    "kind": "remove-exact-observed-recipe",
+    "selected_recipe_assumed_unavailable": true,
+    "change_interpretation": "a recipe change is assessed only as loss of the selected current recipe; replacement inputs, outputs, and runtime behavior require a new observed graph or a separately validated proposed-recipe model"
+  },
+  "analysis_model": {
+    "kind": "complete-observed-finite-recipe-dependency-exposure",
+    "resource_at_risk_rule": "every observed finite recipe producer is an unavailable candidate",
+    "recipe_at_risk_rule": "at least one exact input selector accepts only resources already classified at risk",
+    "claim_boundary": "candidate dead paths inside observed finite recipe structure; not gameplay reachability"
+  },
+  "exploration": {
+    "mode": "complete-finite",
+    "status": "complete",
+    "graph_node_count": 14,
+    "graph_edge_count": 14,
+    "visited_node_count": 14,
+    "traversed_edge_count": 14,
+    "worklist_event_count": 2,
+    "cycle_algorithm": "iterative-scc"
+  },
+  "evidence_completeness": {
+    "status": "complete-within-declared-model",
+    "graph_incomplete_selector_count": 0,
+    "graph_unknown_lookup_recipe_count": 0,
+    "encountered_incomplete_selector_ids": [],
+    "encountered_unknown_lookup_recipe_ids": []
+  },
+  "direct": {
+    "inputs": [
+      {
+        "relation": "accepts-gt-fluid-input",
+        "semantic_key": "0",
+        "properties": {
+          "amount": 1
+        },
+        "evidence": [],
+        "node": {
+          "selection_id": "workbench-atlas-node-v2:forge-fluid:feed",
+          "kind": "forge-fluid",
+          "semantic_key": "feed",
+          "properties": {
+            "name": "feed"
+          },
+          "evidence": []
+        },
+        "selector": {
+          "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:selected%7Cinput%7C0",
+          "kind": "gt-recipe-input-selector",
+          "semantic_key": "selected|input|0",
+          "properties": {
+            "amount": 1,
+            "non_consumable": false,
+            "ordinal": 0
+          },
+          "evidence": []
+        },
+        "selector_edge": {
+          "relation": "has-fluid-input-selector",
+          "properties": {
+            "ordinal": 0
+          },
+          "evidence": []
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "output": {
+          "relation": "produces-gt-fluid",
+          "semantic_key": "0",
+          "properties": {
+            "amount": 1,
+            "ordinal": 0
+          },
+          "evidence": [],
+          "node": {
+            "selection_id": "workbench-atlas-node-v2:forge-fluid:product",
+            "kind": "forge-fluid",
+            "semantic_key": "product",
+            "properties": {
+              "name": "product"
+            },
+            "evidence": []
+          }
+        },
+        "producer_portfolio": {
+          "status": "sole-observed-finite-producer",
+          "alternative_producers": [],
+          "truncated": false,
+          "evidence_complete": true,
+          "viability": "not-assessed"
+        },
+        "downstream_consumers": [],
+        "downstream_consumers_truncated": false,
+        "downstream_consumers_evidence_complete": true
+      }
+    ]
+  },
+  "propagation": {
+    "status": "complete-within-model",
+    "at_risk_resources": [
+      {
+        "resource": {
+          "selection_id": "workbench-atlas-node-v2:forge-fluid:product",
+          "kind": "forge-fluid",
+          "semantic_key": "product",
+          "properties": {
+            "name": "product"
+          },
+          "evidence": []
+        },
+        "depth": 0,
+        "reason": "all-observed-finite-producers-are-unavailable-candidates",
+        "all_observed_finite_producers": [
+          "workbench-atlas-node-v2:gt-recipe:selected"
+        ]
+      }
+    ],
+    "at_risk_recipes": [],
+    "alternative_dependency_components": []
+  },
+  "progression_signals": {
+    "energy_and_machine_signals": {
+      "observed_recipe_properties": {
+        "eut": 30,
+        "duration": 20,
+        "recipe_map": "fixture",
+        "hidden": false,
+        "lookup_active": true
+      },
+      "recipe_map": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-map:fixture",
+        "kind": "gt-recipe-map",
+        "semantic_key": "fixture",
+        "properties": {
+          "name": "fixture"
+        },
+        "evidence": []
+      },
+      "machines_observed_using_recipe_map": [
+        {
+          "machine": {
+            "selection_id": "workbench-atlas-node-v2:gt-machine:fixture%3Amachine",
+            "kind": "gt-machine",
+            "semantic_key": "fixture:machine",
+            "properties": {
+              "tier": 2
+            },
+            "evidence": []
+          },
+          "map_edge": {
+            "relation": "uses-recipe-map",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          }
+        }
+      ],
+      "machine_numeric_tiers_observed": [
+        2
+      ],
+      "truncated": false,
+      "evidence_complete": true,
+      "interpretation": "numeric EUT and machine tier properties are observed signals; no pack progression tier is inferred"
+    },
+    "quest_signals": {
+      "status": "observed-definition-references",
+      "direct_resource_requirements": [
+        {
+          "quest": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-quest:q0",
+            "kind": "betterquesting-quest",
+            "semantic_key": "q0",
+            "properties": {},
+            "evidence": []
+          },
+          "task": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-task-occurrence:q0%7Ctask",
+            "kind": "betterquesting-task-occurrence",
+            "semantic_key": "q0|task",
+            "properties": {},
+            "evidence": []
+          },
+          "requirement_occurrence": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-fluid-requirement-occurrence:q0%7Crequirement",
+            "kind": "betterquesting-fluid-requirement-occurrence",
+            "semantic_key": "q0|requirement",
+            "properties": {},
+            "evidence": []
+          },
+          "resource": {
+            "selection_id": "workbench-atlas-node-v2:forge-fluid:product",
+            "kind": "forge-fluid",
+            "semantic_key": "product",
+            "properties": {
+              "name": "product"
+            },
+            "evidence": []
+          },
+          "resource_risk_status": "observed-all-finite-producers-at-risk",
+          "requirement_semantics": "exact-observed-resource-reference",
+          "accepted_ore_dictionary_keys": [],
+          "resource_edge": {
+            "relation": "requires-progression-fluid",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          },
+          "task_edge": {
+            "relation": "has-progression-fluid-requirement",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          },
+          "owner_edge": {
+            "relation": "owns-progression-task",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          }
+        }
+      ],
+      "structural_prerequisite_dependents": [
+        {
+          "quest": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-quest:q0",
+            "kind": "betterquesting-quest",
+            "semantic_key": "q0",
+            "properties": {},
+            "evidence": []
+          },
+          "depends_on": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-quest:q2",
+            "kind": "betterquesting-quest",
+            "semantic_key": "q2",
+            "properties": {},
+            "evidence": []
+          },
+          "prerequisite_occurrence": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q0%7Cq2%7C2",
+            "kind": "betterquesting-prerequisite-occurrence",
+            "semantic_key": "q0|q2|2",
+            "properties": {},
+            "evidence": []
+          },
+          "depth": 0,
+          "target_edge": {
+            "relation": "targets-progression-prerequisite",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          },
+          "owner_edge": {
+            "relation": "owns-progression-prerequisite",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          }
+        },
+        {
+          "quest": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-quest:q1",
+            "kind": "betterquesting-quest",
+            "semantic_key": "q1",
+            "properties": {},
+            "evidence": []
+          },
+          "depends_on": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-quest:q0",
+            "kind": "betterquesting-quest",
+            "semantic_key": "q0",
+            "properties": {},
+            "evidence": []
+          },
+          "prerequisite_occurrence": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q1%7Cq0%7C0",
+            "kind": "betterquesting-prerequisite-occurrence",
+            "semantic_key": "q1|q0|0",
+            "properties": {},
+            "evidence": []
+          },
+          "depth": 1,
+          "target_edge": {
+            "relation": "targets-progression-prerequisite",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          },
+          "owner_edge": {
+            "relation": "owns-progression-prerequisite",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          }
+        },
+        {
+          "quest": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-quest:q2",
+            "kind": "betterquesting-quest",
+            "semantic_key": "q2",
+            "properties": {},
+            "evidence": []
+          },
+          "depends_on": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-quest:q1",
+            "kind": "betterquesting-quest",
+            "semantic_key": "q1",
+            "properties": {},
+            "evidence": []
+          },
+          "prerequisite_occurrence": {
+            "selection_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q2%7Cq1%7C1",
+            "kind": "betterquesting-prerequisite-occurrence",
+            "semantic_key": "q2|q1|1",
+            "properties": {},
+            "evidence": []
+          },
+          "depth": 2,
+          "target_edge": {
+            "relation": "targets-progression-prerequisite",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          },
+          "owner_edge": {
+            "relation": "owns-progression-prerequisite",
+            "semantic_key": "singleton",
+            "properties": {},
+            "evidence": []
+          }
+        }
+      ],
+      "prerequisite_cycle_components": [
+        {
+          "component_id": "workbench-atlas-dependency-component-v2:sha256:c835cde0a01d3e42b33c1e6a78bf894428170976b76108d96da114f7c312d77f",
+          "member_node_ids": [
+            "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q0%7Cq2%7C2",
+            "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q1%7Cq0%7C0",
+            "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q2%7Cq1%7C1",
+            "workbench-atlas-node-v2:betterquesting-quest:q0",
+            "workbench-atlas-node-v2:betterquesting-quest:q1",
+            "workbench-atlas-node-v2:betterquesting-quest:q2"
+          ],
+          "root_resource_ids": [],
+          "witness": {
+            "node_ids": [
+              "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q0%7Cq2%7C2",
+              "workbench-atlas-node-v2:betterquesting-quest:q0",
+              "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q1%7Cq0%7C0",
+              "workbench-atlas-node-v2:betterquesting-quest:q1",
+              "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q2%7Cq1%7C1",
+              "workbench-atlas-node-v2:betterquesting-quest:q2",
+              "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q0%7Cq2%7C2"
+            ],
+            "arcs": [
+              {
+                "source_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q0%7Cq2%7C2",
+                "target_id": "workbench-atlas-node-v2:betterquesting-quest:q0",
+                "edge_id": "workbench-atlas-edge-v2:sha256:fec9ee0c56964b7d963eccd2191c736a1e993221bd3666f61bc4b8a2662dc4c7",
+                "relation": "owns-progression-prerequisite",
+                "direction": "reverse"
+              },
+              {
+                "source_id": "workbench-atlas-node-v2:betterquesting-quest:q0",
+                "target_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q1%7Cq0%7C0",
+                "edge_id": "workbench-atlas-edge-v2:sha256:5bda281a5aa2799674b045d2ca9fa70b9d54da8b573fb27c062ec5c153f5bccd",
+                "relation": "targets-progression-prerequisite",
+                "direction": "reverse"
+              },
+              {
+                "source_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q1%7Cq0%7C0",
+                "target_id": "workbench-atlas-node-v2:betterquesting-quest:q1",
+                "edge_id": "workbench-atlas-edge-v2:sha256:0e0a70e314aca4e4d0d028a2cff24c1f7ed9724774591b496065e70e72c80907",
+                "relation": "owns-progression-prerequisite",
+                "direction": "reverse"
+              },
+              {
+                "source_id": "workbench-atlas-node-v2:betterquesting-quest:q1",
+                "target_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q2%7Cq1%7C1",
+                "edge_id": "workbench-atlas-edge-v2:sha256:dac4082473c9fb25456b37e33717b58d9dfa091add3567e76be26de7e73b52c2",
+                "relation": "targets-progression-prerequisite",
+                "direction": "reverse"
+              },
+              {
+                "source_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q2%7Cq1%7C1",
+                "target_id": "workbench-atlas-node-v2:betterquesting-quest:q2",
+                "edge_id": "workbench-atlas-edge-v2:sha256:e1b8f1f1d50a98d9daa6bcc1370ca0768cb75e3579812969264d0544d26342b3",
+                "relation": "owns-progression-prerequisite",
+                "direction": "reverse"
+              },
+              {
+                "source_id": "workbench-atlas-node-v2:betterquesting-quest:q2",
+                "target_id": "workbench-atlas-node-v2:betterquesting-prerequisite-occurrence:q0%7Cq2%7C2",
+                "edge_id": "workbench-atlas-edge-v2:sha256:87f18d11d8c907a29639c07f08b36464d285c0eb5f4417269b5ca3b715b3ea03",
+                "relation": "targets-progression-prerequisite",
+                "direction": "reverse"
+              }
+            ]
+          },
+          "interpretation": "observed BetterQuesting prerequisite dependency component",
+          "viability_effect": "unknown"
+        }
+      ],
+      "interpretation": "these are definition references and prerequisite structure, not observed player blockage or task execution"
+    }
+  },
+  "frontiers": [],
+  "unknowns": [],
+  "evidence_gaps": [
+    {
+      "code": "counterfactual-runtime-not-observed",
+      "message": "Atlas did not execute a runtime with the selected recipe removed or changed."
+    },
+    {
+      "code": "non-recipe-acquisition-not-assessed",
+      "message": "World generation, loot, trade, inventory, commands, and other acquisition domains are not treated as alternative producers."
+    },
+    {
+      "code": "dynamic-recipes-not-executed",
+      "message": "Procedural and contextual recipe rules were not invoked for this counterfactual."
+    },
+    {
+      "code": "stoichiometry-and-chance-not-assessed",
+      "message": "Amounts, reusable inputs, probabilities, throughput, and inventory balance do not establish or refute availability here."
+    },
+    {
+      "code": "progression-reachability-not-proven",
+      "message": "Quest definitions, finite recipes, and machine signals do not prove player reachability or a broken progression path."
+    },
+    {
+      "code": "task-execution-not-invoked",
+      "message": "BetterQuesting task matching, completion, and reward execution were not invoked."
+    },
+    {
+      "code": "pack-tier-policy-not-applied",
+      "message": "Numeric EUT and observed machine tier fields are reported without deriving a pack progression tier."
+    }
+  ],
+  "summary": {
+    "selected_output_count": 1,
+    "sole_observed_finite_producer_output_count": 1,
+    "at_risk_resource_candidate_count": 1,
+    "at_risk_recipe_candidate_count": 0,
+    "quest_requirement_exposure_count": 1,
+    "structural_quest_dependent_count": 3,
+    "alternative_dependency_component_count": 0,
+    "quest_prerequisite_component_count": 1,
+    "truncated": false
+  }
+}

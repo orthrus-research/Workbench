@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-core"
+version = "0.1.8"
+description = "Workbench environment provisioning, coordination, and cleanup"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.2,<0.2.0", "packaging>=24,<27", "PyYAML==6.0.3", "jsonschema==4.19.2", "referencing==0.36.2"]
+
+[project.scripts]
+workbench = "workbench_core.cli:main"
+
+[project.entry-points."workbench.retained_snapshot_providers"]
+core = "workbench_core.retained_snapshots:provider"
+
+[tool.setuptools]
+packages = ["workbench_core", "workbench_core.service", "workbench_core.storage", "workbench_resources.core"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.core" = "."
+
+[tool.setuptools.package-data]
+"workbench_core" = ["schemas/*.json", "data/*.b64"]
+"workbench_core.storage" = ["schemas/*.json"]
+"workbench_resources.core" = ["pyproject.toml", "src/workbench_core/*.py", "src/workbench_core/service/*.py", "src/workbench_core/storage/*.py"]

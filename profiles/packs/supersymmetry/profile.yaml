@@ -1,0 +1,63 @@
+schema_version: 1
+profile_family_id: workbench-pack:supersymmetry
+display_name: Supersymmetry
+status: active-bootstrap
+workspace:
+  kind: packwiz-modpack
+  expected_name: Supersymmetry
+  required_paths:
+    - path: pack.toml
+      kind: file
+    - path: index.toml
+      kind: file
+    - path: config
+      kind: directory
+    - path: groovy
+      kind: directory
+    - path: mods
+      kind: directory
+default_development_profile: cleanroom-provisional
+profiles:
+  cleanroom-provisional:
+    platform_profile_id: workbench-platform:cleanroom:provisional
+    maturity: experimental
+    permitted_operations:
+      - observe
+      - migrate
+      - construct
+    stable_release: false
+  legacy-forge-0.1.16.11:
+    platform:
+      kind: legacy-forge
+      minecraft_version: 1.12.2
+      forge_version: 14.23.5.2860
+    source_lock: source-locks/legacy-forge/source-lock.json
+    maturity: historical
+    permitted_operations:
+      - observe
+      - migrate
+    stable_release: false
+local_target_root: .workbench/targets/supersymmetry
+blueprints:
+  stable_registry: null
+  experimental_registry: blueprints/experimental/standards/registry.json
+  registration_catalog: registration/catalog-v1.json
+  experimental_patterns:
+    - blueprints/experimental/patterns/material-backed-fluid-v1.json
+manuals:
+  families: []
+compatibility_experiments:
+  - patch_id: workbench-pack:supersymmetry:recurrent-complex-1.4.8.6-structure-context-arg3-v1
+    maturity: experimental
+    applies_to:
+      pack_version: 0.1.16.11
+      susycore: 0.1.111
+      recurrent_complex: 1.4.8.6
+    spec: compatibility/recurrent-complex-1.4.8.6-structure-context-arg3-v1.json
+diagnostic_patterns:
+  - pattern_id: workbench-pack:supersymmetry:susy-reccomplex-named-variable-v1
+    maturity: observed
+    spec: diagnostics/susy-reccomplex-named-variable-v1.json
+worldgen_audit:
+  maturity: observed
+  spec: diagnostics/rtg-worldgen-audit-v1.json

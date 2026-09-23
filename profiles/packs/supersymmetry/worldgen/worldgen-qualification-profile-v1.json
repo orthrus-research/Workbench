@@ -1,0 +1,314 @@
+{
+  "boundaries": {
+    "atlas_remains_causal_authority": true,
+    "crucible_remains_experiment_authority": true,
+    "profile_is_pack_specific": true,
+    "static_risk_is_not_causal_proof": true,
+    "strata_remains_final_state_authority": true,
+    "unknown_evidence_fails_closed": true
+  },
+  "capabilities": {
+    "cross-perturbation-final-state": "supported",
+    "execution-order": "supported",
+    "final-exact-capture": "supported",
+    "fresh-world": "supported",
+    "heap-shape": "supported",
+    "independent-jvm": "supported",
+    "multi-seed": "supported",
+    "repeated-pairs": "supported",
+    "scheduled-settle": "unsupported",
+    "stage-checkpoints": "partial",
+    "static-risk-scan": "supported",
+    "traversal-order": "unsupported",
+    "warm-cache-replay": "unsupported"
+  },
+  "cockpit_profile": "profiles/packs/supersymmetry/worldgen/worldgen-cockpit-profile-v1.json",
+  "domains": {
+    "biomes": {
+      "label": "Biome allocation",
+      "signals": [
+        "biome_changed_columns"
+      ]
+    },
+    "caves": {
+      "label": "Cave and void geometry",
+      "signals": [
+        "cave-space"
+      ]
+    },
+    "decoration": {
+      "label": "Decoration, structures, vegetation, and uncategorized blocks",
+      "signals": [
+        "other-block"
+      ]
+    },
+    "fluids": {
+      "label": "Physical fluids",
+      "signals": [
+        "physical-fluid"
+      ]
+    },
+    "lithology": {
+      "label": "Lithology",
+      "signals": [
+        "lithology"
+      ]
+    },
+    "ore": {
+      "label": "Ore final state",
+      "signals": [
+        "ore"
+      ]
+    },
+    "semantic": {
+      "label": "Normalized generator and population events",
+      "signals": [
+        "semantic"
+      ]
+    },
+    "settled-final": {
+      "label": "Entire captured final block state",
+      "signals": [
+        "changed_block_positions"
+      ]
+    },
+    "terrain": {
+      "label": "Terrain surface height",
+      "signals": [
+        "height_changed_columns"
+      ]
+    }
+  },
+  "format": "workbench-worldgen-qualification-profile-v1",
+  "intents": {
+    "caves": {
+      "assurance": "empirical",
+      "minimum_seeds": 1,
+      "required_capabilities": [],
+      "required_domains": [
+        "settled-final",
+        "caves",
+        "lithology",
+        "terrain",
+        "semantic"
+      ],
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical"
+      ],
+      "risk_gate": "report"
+    },
+    "decoration": {
+      "assurance": "empirical",
+      "minimum_seeds": 1,
+      "required_capabilities": [],
+      "required_domains": [
+        "settled-final",
+        "decoration",
+        "biomes",
+        "semantic"
+      ],
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical"
+      ],
+      "risk_gate": "report"
+    },
+    "development": {
+      "assurance": "empirical",
+      "minimum_seeds": 1,
+      "required_capabilities": [],
+      "required_domains": [
+        "settled-final",
+        "terrain",
+        "biomes",
+        "lithology",
+        "caves",
+        "ore",
+        "fluids",
+        "decoration",
+        "semantic"
+      ],
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical"
+      ],
+      "risk_gate": "report"
+    },
+    "ore": {
+      "assurance": "stage-exact",
+      "minimum_seeds": 2,
+      "required_capabilities": [
+        "stage-checkpoints"
+      ],
+      "required_domains": [
+        "settled-final",
+        "ore",
+        "lithology",
+        "caves",
+        "fluids",
+        "semantic"
+      ],
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical",
+        "subsurface",
+        "causal"
+      ],
+      "risk_gate": "review"
+    },
+    "release": {
+      "assurance": "stage-exact",
+      "minimum_seeds": 3,
+      "required_capabilities": [
+        "stage-checkpoints",
+        "traversal-order",
+        "scheduled-settle",
+        "warm-cache-replay"
+      ],
+      "required_domains": [
+        "settled-final",
+        "terrain",
+        "biomes",
+        "lithology",
+        "caves",
+        "ore",
+        "fluids",
+        "decoration",
+        "semantic"
+      ],
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical",
+        "subsurface",
+        "causal",
+        "performance",
+        "observer_overhead"
+      ],
+      "risk_gate": "reject"
+    },
+    "terrain": {
+      "assurance": "empirical",
+      "minimum_seeds": 1,
+      "required_capabilities": [],
+      "required_domains": [
+        "settled-final",
+        "terrain",
+        "biomes",
+        "lithology",
+        "semantic"
+      ],
+      "required_evidence": [
+        "semantic",
+        "final_state",
+        "statistical"
+      ],
+      "risk_gate": "report"
+    }
+  },
+  "limits": {
+    "max_cells": 32,
+    "max_class_bytes": 8388608,
+    "max_classes": 50000,
+    "max_cross_comparisons": 32,
+    "max_findings": 512,
+    "max_jars": 64,
+    "max_uncompressed_bytes": 536870912
+  },
+  "pack_profile": "supersymmetry",
+  "profile_id": "workbench-pack:supersymmetry:worldgen-qualification-v1",
+  "risk_policy": {
+    "dispositions": [],
+    "scan_runtime_mods": true
+  },
+  "schema_version": 1,
+  "suites": {
+    "release": {
+      "heaps": [
+        "3072M",
+        "4096M"
+      ],
+      "mode": "performance",
+      "orders": [
+        "baseline-first",
+        "candidate-first"
+      ],
+      "pair_repetitions": 2,
+      "regions": [
+        "-24,-4,16,16"
+      ],
+      "required_capabilities": [
+        "independent-jvm",
+        "fresh-world",
+        "final-exact-capture",
+        "multi-seed",
+        "execution-order",
+        "heap-shape",
+        "repeated-pairs",
+        "cross-perturbation-final-state",
+        "static-risk-scan"
+      ],
+      "seeds": [
+        8675309,
+        104729,
+        -7046029254386353131
+      ]
+    },
+    "smoke": {
+      "heaps": [
+        "4096M"
+      ],
+      "mode": "fast",
+      "orders": [
+        "baseline-first"
+      ],
+      "pair_repetitions": 1,
+      "regions": [
+        "-2,-2,4,4"
+      ],
+      "required_capabilities": [
+        "independent-jvm",
+        "fresh-world",
+        "final-exact-capture",
+        "static-risk-scan"
+      ],
+      "seeds": [
+        8675309
+      ]
+    },
+    "standard": {
+      "heaps": [
+        "3072M",
+        "4096M"
+      ],
+      "mode": "fast",
+      "orders": [
+        "baseline-first",
+        "candidate-first"
+      ],
+      "pair_repetitions": 1,
+      "regions": [
+        "-2,-2,4,4"
+      ],
+      "required_capabilities": [
+        "independent-jvm",
+        "fresh-world",
+        "final-exact-capture",
+        "multi-seed",
+        "execution-order",
+        "heap-shape",
+        "cross-perturbation-final-state",
+        "static-risk-scan"
+      ],
+      "seeds": [
+        8675309,
+        104729
+      ]
+    }
+  }
+}

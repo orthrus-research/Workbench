@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/schemas/workbench-worldgen-qualification-profile-v1.schema.json",
+  "title": "Workbench Worldgen Qualification Profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "profile_id",
+    "pack_profile",
+    "cockpit_profile",
+    "capabilities",
+    "suites",
+    "intents",
+    "domains",
+    "risk_policy",
+    "limits",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {"const": "workbench-worldgen-qualification-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1},
+    "pack_profile": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$"},
+    "cockpit_profile": {"type": "string", "minLength": 1},
+    "capabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"enum": ["supported", "partial", "static-only", "unsupported"]}
+    },
+    "suites": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/suite"}
+    },
+    "intents": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/intent"}
+    },
+    "domains": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/domain"}
+    },
+    "risk_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scan_runtime_mods", "dispositions"],
+      "properties": {
+        "scan_runtime_mods": {"type": "boolean"},
+        "dispositions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/disposition"}
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_cells", "max_cross_comparisons", "max_jars", "max_classes", "max_class_bytes", "max_uncompressed_bytes", "max_findings"],
+      "properties": {
+        "max_cells": {"type": "integer", "minimum": 1, "maximum": 64},
+        "max_cross_comparisons": {"type": "integer", "minimum": 1},
+        "max_jars": {"type": "integer", "minimum": 1, "maximum": 256},
+        "max_classes": {"type": "integer", "minimum": 1, "maximum": 250000},
+        "max_class_bytes": {"type": "integer", "minimum": 1},
+        "max_uncompressed_bytes": {"type": "integer", "minimum": 1},
+        "max_findings": {"type": "integer", "minimum": 1}
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["atlas_remains_causal_authority", "strata_remains_final_state_authority", "crucible_remains_experiment_authority", "static_risk_is_not_causal_proof", "unknown_evidence_fails_closed", "profile_is_pack_specific"],
+      "properties": {
+        "atlas_remains_causal_authority": {"const": true},
+        "strata_remains_final_state_authority": {"const": true},
+        "crucible_remains_experiment_authority": {"const": true},
+        "static_risk_is_not_causal_proof": {"const": true},
+        "unknown_evidence_fails_closed": {"const": true},
+        "profile_is_pack_specific": {"const": true}
+      }
+    }
+  },
+  "$defs": {
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "seeds", "regions", "orders", "heaps", "pair_repetitions", "required_capabilities"],
+      "properties": {
+        "mode": {"enum": ["fast", "debug", "performance"]},
+        "seeds": {"type": "array", "minItems": 1, "items": {"type": "integer"}},
+        "regions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "orders": {"type": "array", "minItems": 1, "items": {"enum": ["baseline-first", "candidate-first"]}},
+        "heaps": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[1-9][0-9]*[KMGkmg]$"}},
+        "pair_repetitions": {"type": "integer", "minimum": 1},
+        "required_capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_domains", "required_evidence", "required_capabilities", "minimum_seeds", "risk_gate", "assurance"],
+      "properties": {
+        "required_domains": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "required_evidence": {"type": "array", "uniqueItems": true, "items": {"enum": ["semantic", "final_state", "statistical", "subsurface", "causal", "performance", "observer_overhead"]}},
+        "required_capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "minimum_seeds": {"type": "integer", "minimum": 1},
+        "risk_gate": {"enum": ["report", "review", "reject"]},
+        "assurance": {"enum": ["empirical", "stage-exact"]}
+      }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "signals"],
+      "properties": {
+        "label": {"type": "string", "minLength": 1},
+        "signals": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["semantic", "changed_block_positions", "height_changed_columns", "biome_changed_columns", "cave-space", "lithology", "ore", "physical-fluid", "other-block"]}}
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jar_sha256", "class_name", "rule_id", "disposition", "rationale"],
+      "properties": {
+        "jar_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "class_name": {"type": "string", "minLength": 1},
+        "rule_id": {"type": "string", "minLength": 1},
+        "disposition": {"enum": ["accepted", "patched", "rejected"]},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

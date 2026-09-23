@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/blueprints/engine-conformance-proof-v1.schema.json",
+  "title": "Workbench Blueprints synthetic engine conformance proof v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "proof_id",
+    "fixture_scope",
+    "scenarios",
+    "claims",
+    "limitations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "format": {"const": "workbench-blueprints-engine-conformance-proof-v1"},
+    "contract_id": {"const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"},
+    "proof_id": {
+      "type": "string",
+      "pattern": "^workbench-blueprints-engine-conformance-proof:sha256:[0-9a-f]{64}$"
+    },
+    "fixture_scope": {"const": "synthetic-non-authoritative"},
+    "scenarios": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "status",
+          "states",
+          "diagnostic_codes",
+          "assertions",
+          "evidence_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "scenario_id": {
+            "enum": [
+              "candidate-invalidation",
+              "direct-apply-verification",
+              "instructions-release",
+              "output-mode-agreement",
+              "patch-bundle-release",
+              "rollback-recovery",
+              "sealed-candidate-boundary",
+              "simulation-gate-failure",
+              "stale-target-rejection",
+              "standard-selection-failure"
+            ]
+          },
+          "status": {"const": "passed"},
+          "states": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "diagnostic_codes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^BP[A-Z][0-9]{3}_[A-Z0-9_]+$"}
+          },
+          "assertions": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"}
+          },
+          "evidence_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "claims": {
+      "const": [
+        "generic-engine-state-machine-conforms",
+        "required-failures-withhold-release",
+        "three-output-modes-share-one-operation-identity"
+      ]
+    },
+    "limitations": {
+      "const": [
+        "no-feature-standard-admitted",
+        "no-minecraft-runtime-claim",
+        "no-pack-pattern-authorized"
+      ]
+    }
+  }
+}

@@ -1,0 +1,202 @@
+{
+  "schema": "axiom.native-items-source-lock.v1",
+  "revisions": {
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+    "groovyscript": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4"
+  },
+  "references": [
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/ItemAndMetadata.java",
+      "sha256": "ab2714947abee89f704f92a413e8dcc0147ce0702308aaf869263f1f2de7bc33",
+      "gitBlob": "d1ac6e8179ef507d3f933a52e4e841692e04de85"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/ItemMaterialInfo.java",
+      "sha256": "55e2ba2aad0741e71f03e6a8f1cc0aeb6819380fb18fb927ca18445efe9f4cd2",
+      "gitBlob": "b531121c15b1419419e179306159a9a4349cab40"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/UnificationEntry.java",
+      "sha256": "c64bb3f7616a7d33fe7ac5adc462f49cd18e5e367a52554a104ab7e0c44a1356",
+      "gitBlob": "18f3119120fad12d316d2744056e61713f330909"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/ItemVariantMap.java",
+      "sha256": "b5382a21dbe5fdc3f33598d2e4090b45080c172f5661c76741934e23bb020cfe",
+      "gitBlob": "394348da66814e4d1b7d85862302eb63974bbb32"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/SingleItemVariantMap.java",
+      "sha256": "edee9672ef4709c502ec5f68669aea34a19e1db813bb7b9eceed1d96c61324bb",
+      "gitBlob": "dd0702ed0840c3d5179befe742b911beab3f28e9"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/MultiItemVariantMap.java",
+      "sha256": "1820bcf20785ffbf76f579d790b4f44e8c077b08231dcc31d1f6f202cc158a83",
+      "gitBlob": "6c8c149b961cec90ab967365e9ad3ad3177645a0"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/EmptyVariantMap.java",
+      "sha256": "df75271510b6409f44d5ecaa3665de4a5ba50a8608ec37ebeca3b7d11f23078b",
+      "gitBlob": "dcf1c60cf656bc238e4134f215af33f4c45a3c0a"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/stack/UnmodifiableSetViewVariantMap.java",
+      "sha256": "0986dca414d95a0f5992d6fef29c87a24ecdfa308c5978372df7e889f19f3470",
+      "gitBlob": "03729e1a058d79664e2a957b31e78622c641f841"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/OreDictUnifier.java",
+      "sha256": "e9079c04de661acd95695615097f93b2682c9606574d87f3464bc647cf1f7408",
+      "gitBlob": "aeaf123cdb2473fbf992b49fbb3bf12fe4b084e7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/CustomModPriorityComparator.java",
+      "sha256": "0041fb6dff6f95755ab0d1207694f099ce07d9ae4055009490920c813a6d1661",
+      "gitBlob": "6bc173b2754995ee0d026d6e2d3af164034c5385"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/GTValues.java",
+      "sha256": "f2861c31315f5e556705927a63e7649ef0c6ca1c0a420170af38a99146b15675",
+      "gitBlob": "006f9444117742e6caa5eb17237b3f109084ee7c"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/GTUtility.java",
+      "sha256": "c79e1d4d62dc2246ab456c931aa7a44340c146951e1b14585fa3f471fe6beaed",
+      "gitBlob": "b4e3c75aeb8fef2c531f716bff84875224c46f62"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/ConfigHolder.java",
+      "sha256": "79ed084b93af93c4e1c11519b8c2c3ae563067b511c5946d1082dc635536938b",
+      "gitBlob": "caf04defc4835f8f45161482d03b7c66f73dee61"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/CommonProxy.java",
+      "sha256": "9dbb454d86f1c630c006f1a707e2109db2cc53dbc88c59d7ffce1450d2ad1f7f",
+      "gitBlob": "3c474d5edc99ce0422de5412a7fde66b551ddb06"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/CoreModule.java",
+      "sha256": "419bcda8f1e04e17aeae9cf167a45aa8c31aee3413c1c57ce58aad5756d8700b",
+      "gitBlob": "d103159380f9bcf7b944ca2e25e69b9aa08e5676"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/Item.java.patch",
+      "sha256": "fac7985e019fe15f6da6863813d96d8dedc5afdc6c7b1386a05cdeae9fc74b44",
+      "gitBlob": "7f4bc46b87a0c599d8b31031c1b99bee6425c0aa"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/ItemBlock.java.patch",
+      "sha256": "939d87edc49aca5ec5c6a13f72149d136ecd50bc81068b411515acee32c711c1",
+      "gitBlob": "a4ac03a254c06ca5794128daf6244210d2e5fc27"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/ItemStack.java.patch",
+      "sha256": "6beeb1fc2f527260d38bc73f6fcfeba660fa0882c2467b12a739469c234204fb",
+      "gitBlob": "d54dc1bfed96dfe2b7cd5e0ec102f0b2114aab3f"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/crafting/CraftingManager.java.patch",
+      "sha256": "4873f1f9db614bb05f6efb731b68f5a5e3dfbc47f0fa4617ef7e70ff3677fdce",
+      "gitBlob": "022a799b1ed94024f0c22499feebf2f039b4d5b8"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/crafting/Ingredient.java.patch",
+      "sha256": "b816a042ac28969589adbc651cdb7d353eb33030753317a9518be8f56b988395",
+      "gitBlob": "ed21625b0966ac98f0f610320ef8efb6d2a36cdf"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/crafting/ShapedRecipes.java.patch",
+      "sha256": "ec69d9b2469dec7a73fb8c5b9582769a17169ba418eeea78242c36de07218bdf",
+      "gitBlob": "05f13c9953a44d048568a84212d571ffb099195b"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/crafting/ShapelessRecipes.java.patch",
+      "sha256": "ae4972cad6fcf2627208da207372e187e06a42ef296d531e8a0e4f0f07e582a3",
+      "gitBlob": "fd72397db1ba9792432841953b54d8f00d7812f0"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/oredict/OreDictionary.java",
+      "sha256": "b87c73368cbbf57260098db7a259aa13eef651ff15bf82afc8f51c84985fa68d",
+      "gitBlob": "89a2ae48366ded8feceb3a2fd8d8db8e40c2d09a"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/oredict/OreIngredient.java",
+      "sha256": "6c7e04fa03096697e84412079d0477225c332af25dd915b19310329cc381e46f",
+      "gitBlob": "3702e771e45d37377ee894c59dc0df80d3e4e2d0"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/event/AttachCapabilitiesEvent.java",
+      "sha256": "2be793a254f89fd7ac63fbdefff5621b5a25a3a2d1406e509fb7cbc7b4ec5e9b",
+      "gitBlob": "355e20105ca1aa1b3fd5fd80f9354f722cca5900"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/event/ForgeEventFactory.java",
+      "sha256": "d48acd6b08183951e99e9cb8cf1a561fce44068ce9a202909fcd969c6ea41a5c",
+      "gitBlob": "5274dfd5f7b0db86f39f21bb57dac48b8ffae474"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/capabilities/CapabilityDispatcher.java",
+      "sha256": "fa73023ee1fa13aaef8b99033b3502cb7f9f315a44bcb6c083d4a839d2941383",
+      "gitBlob": "cac1d91087cd6bbf6bc103afe662fa3aeeca5358"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/capabilities/Capability.java",
+      "sha256": "dd069d3d09fa6da3c8628fa26301b6abc39bd223a71002eea2aa3fe403c8b03e",
+      "gitBlob": "405c69c4680448422993c761c8e895a525eb13d6"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/capabilities/ICapabilityProvider.java",
+      "sha256": "f5df78cb4374d39e56fb52cf9cff34aa52f16af21184b17430e384f3888528ab",
+      "gitBlob": "0b2bdb28547f249dedb23fee1e62e3292ed96923"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/capabilities/ICapabilitySerializable.java",
+      "sha256": "cf11a268722f67063f9fad0ca3742ae253738ef3a6eab8bb289b911054b3712b",
+      "gitBlob": "3d383882688938dac25731f309763e9e6dd85fec"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/common/util/INBTSerializable.java",
+      "sha256": "7a24307f784304cde002ecbba3f834df71cbaa4039974455d8bf965a72b09b5d",
+      "gitBlob": "17e70e6c8b9c4ef5e104824ccc074e72893a9a39"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/resources/assets/groovyscript/mappings.srg",
+      "sha256": "4305afa2f999e6b3bb0aba8b793052e17f37ebca1c52de313c0cbde633414be4",
+      "gitBlob": "f9e9d06c4b12291cbda20752fb0bf1a4012e367e"
+    }
+  ]
+}

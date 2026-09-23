@@ -1,0 +1,13 @@
+{
+  "format": "workbench-runtime-compatibility-text-patch-v1",
+  "schema_version": 1,
+  "patch_id": "workbench-pack:supersymmetry:rtg-warm-overworld-selector-for-biomes-v1",
+  "description": "Experimental disposable A/B correction for the inverted vanilla WARM BiomeTweaker selector.",
+  "target": {
+    "path": ".minecraft/config/BiomeTweaker/scripts/RTG.cfg",
+    "sha256": "3575fdaba0827aad2e1c4b581b4744a2d08e49e99a6f1ca50295b8964c261de6",
+    "find_utf8": "vanillaWarmOverworldBiomes      = forAllBiomesExcept(",
+    "replace_utf8": "vanillaWarmOverworldBiomes      = forBiomes(",
+    "expected_matches": 1
+  }
+}

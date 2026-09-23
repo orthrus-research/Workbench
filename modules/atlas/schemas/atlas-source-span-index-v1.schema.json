@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-source-span-index-v1.schema.json",
+  "title": "Supersymmetry Atlas exact source-span index v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "index_id",
+    "snapshot_id",
+    "source_lock_id",
+    "source_lock_sha256",
+    "pack_commit",
+    "pack_tree",
+    "extraction_policies",
+    "record_count",
+    "records"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "enum": [
+        1
+      ]
+    },
+    "format": {
+      "enum": [
+        "susy-atlas-source-span-index-v1"
+      ]
+    },
+    "index_id": {
+      "type": "string",
+      "pattern": "^atlas-source-span-index:sha256:[0-9a-f]{64}$"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+    },
+    "source_lock_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_lock_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "pack_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "pack_tree": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "extraction_policies": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "policy_id",
+          "language",
+          "span_semantics",
+          "extraction_state"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "policy_id": {
+            "type": "string",
+            "pattern": "^ATLAS-[A-Z0-9-]+-V1$"
+          },
+          "language": {
+            "enum": [
+              "groovy",
+              "java",
+              "json",
+              "line-config"
+            ]
+          },
+          "span_semantics": {
+            "type": "string",
+            "minLength": 1
+          },
+          "extraction_state": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "source_span_id",
+          "span_kind",
+          "language",
+          "identity",
+          "extraction"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source_span_id": {
+            "type": "string",
+            "pattern": "^atlas-source-span:sha256:[0-9a-f]{64}$"
+          },
+          "span_kind": {
+            "enum": [
+              "call-site",
+              "configuration-entry",
+              "declaration",
+              "field",
+              "method",
+              "script"
+            ]
+          },
+          "language": {
+            "enum": [
+              "groovy",
+              "java",
+              "json",
+              "line-config"
+            ]
+          },
+          "identity": {
+            "type": "object",
+            "required": [
+              "source_lock_id",
+              "source_id",
+              "repository",
+              "revision",
+              "tree",
+              "path",
+              "symbol",
+              "line_start",
+              "line_end",
+              "byte_start",
+              "byte_end",
+              "file_sha256",
+              "span_sha256",
+              "extraction_policy_id"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "source_lock_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_id": {
+                "type": "string",
+                "pattern": "^SRC-[A-Z0-9-]+$"
+              },
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "tree": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1
+              },
+              "line_start": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "line_end": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "byte_start": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "byte_end": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "file_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "span_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "extraction_policy_id": {
+                "type": "string",
+                "pattern": "^ATLAS-[A-Z0-9-]+-V1$"
+              }
+            }
+          },
+          "extraction": {
+            "type": "object",
+            "required": [
+              "state",
+              "syntax_kind"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string",
+                "minLength": 1
+              },
+              "syntax_kind": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

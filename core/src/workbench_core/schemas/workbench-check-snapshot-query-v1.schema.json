@@ -1,0 +1,106 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "snapshot_id",
+    "view_id",
+    "operation",
+    "section_id",
+    "record_key",
+    "blob_sha256",
+    "preferred_bytes",
+    "cursor"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-check-snapshot-query-v1"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^check-snapshot:sha256:[0-9a-f]{64}$"
+    },
+    "view_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "enum": [
+        "summary",
+        "sections",
+        "records",
+        "record",
+        "blob"
+      ]
+    },
+    "section_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.:-]*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "record_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "blob_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "preferred_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cursor": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "snapshot_id",
+            "query_id",
+            "offset"
+          ],
+          "properties": {
+            "snapshot_id": {
+              "type": "string",
+              "pattern": "^check-snapshot:sha256:[0-9a-f]{64}$"
+            },
+            "query_id": {
+              "type": "string",
+              "pattern": "^check-snapshot-query:sha256:[0-9a-f]{64}$"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-core/workbench-check-snapshot-query-v1.schema.json",
+  "title": "Workbench snapshot-bound read query V1"
+}

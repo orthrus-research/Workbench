@@ -1,0 +1,20 @@
+{
+  "jsonrpc": "2.0",
+  "id": "registration-apply-1",
+  "method": "registration/apply",
+  "params": {
+    "pattern": "ore-dictionary-entry",
+    "answers": {
+      "ore_name": "dustWorkbenchProbe",
+      "ingredient": {
+        "kind": "metaitem",
+        "name": "dustSodiumHydroxide"
+      }
+    },
+    "consent": {
+      "approved": true,
+      "plan_id": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "operation_class": "local-mutation"
+    }
+  }
+}

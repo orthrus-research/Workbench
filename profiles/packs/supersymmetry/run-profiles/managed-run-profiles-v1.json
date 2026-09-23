@@ -1,0 +1,78 @@
+{
+  "format": "workbench-managed-run-profile-catalog-v1",
+  "schema_version": 1,
+  "catalog_id": "workbench-pack:supersymmetry:managed-run-profiles-v1",
+  "pack_profile": "supersymmetry",
+  "target": {
+    "capability": "worldgen-dev",
+    "side": "dedicated-server",
+    "worldgen_profile": "supersymmetry"
+  },
+  "recipes": [
+    {
+      "id": "fast",
+      "purpose": "Build and exercise the smallest bounded fresh-world sample for rapid feedback.",
+      "availability": {
+        "state": "available",
+        "reason": "The dedicated-server worldgen runner supports fast mode with the pack fast-region default."
+      },
+      "mode": "fast",
+      "region_default": "fast_region",
+      "diagnostic_sample_modulo": 1,
+      "open_viewer": false,
+      "record_jfr": false
+    },
+    {
+      "id": "debug",
+      "purpose": "Run the bounded debug region with full World Studio diagnostics retained for inspection.",
+      "availability": {
+        "state": "available",
+        "reason": "The dedicated-server worldgen runner supports debug mode with the pack debug-region default."
+      },
+      "mode": "debug",
+      "region_default": "debug_region",
+      "diagnostic_sample_modulo": 1,
+      "open_viewer": false,
+      "record_jfr": false
+    },
+    {
+      "id": "worldgen",
+      "purpose": "Generate the bounded debug region and open its validated local Strata viewer handoff.",
+      "availability": {
+        "state": "available",
+        "reason": "The dedicated-server worldgen runner can retain and open the checked Strata handoff after a debug capture."
+      },
+      "mode": "debug",
+      "region_default": "debug_region",
+      "diagnostic_sample_modulo": 1,
+      "open_viewer": true,
+      "record_jfr": false
+    },
+    {
+      "id": "performance",
+      "purpose": "Capture the bounded debug region with JFR and retain the World Studio performance summary.",
+      "availability": {
+        "state": "available",
+        "reason": "The dedicated-server worldgen runner supports performance mode and bounded JFR capture."
+      },
+      "mode": "performance",
+      "region_default": "debug_region",
+      "diagnostic_sample_modulo": 1,
+      "open_viewer": false,
+      "record_jfr": true
+    },
+    {
+      "id": "proof",
+      "purpose": "Request exact causal world-generation proof through the separate Worldgen Observatory workflow.",
+      "availability": {
+        "state": "unavailable",
+        "reason": "Managed run profiles do not authorize proof capture; proof remains under the separate Worldgen Observatory authority and workflow."
+      },
+      "mode": null,
+      "region_default": null,
+      "diagnostic_sample_modulo": null,
+      "open_viewer": false,
+      "record_jfr": false
+    }
+  ]
+}

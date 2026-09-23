@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-sealed-manifest-v1.schema.json",
+  "title": "Supersymmetry Blueprints sealed candidate manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "plan_id",
+    "target_state_id",
+    "standard_ids",
+    "content_manifest_sha256",
+    "operations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-sealed-manifest-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^blueprints-plan:sha256:[0-9a-f]{64}$"
+    },
+    "target_state_id": {
+      "type": "string",
+      "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+    },
+    "standard_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^blueprints-standard:sha256:[0-9a-f]{64}$"
+      }
+    },
+    "content_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "ordinal",
+          "operation",
+          "path",
+          "content_sha256",
+          "content_base64"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation": {
+            "enum": [
+              "create",
+              "update",
+              "delete"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[^/\\\\](?:.*[^/\\\\])?$"
+          },
+          "content_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "content_base64": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

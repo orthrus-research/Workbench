@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-feature-change-selected-context-v1.schema.json",
+  "title": "Workbench selected feature-change context V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "context_id",
+    "context_sha256",
+    "context_uri",
+    "format",
+    "previous_selection_id",
+    "previous_selection_sha256",
+    "schema_version",
+    "selected_at",
+    "selection_id",
+    "selection_sequence",
+    "session_id",
+    "state"
+  ],
+  "properties": {
+    "context_id": {
+      "oneOf": [
+        {"type": "string", "pattern": "^workbench-feature-change-session-context:sha256:[0-9a-f]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "context_sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "context_uri": {"oneOf": [{"type": "string", "format": "uri", "pattern": "^file:"}, {"type": "null"}]},
+    "format": {"const": "workbench-feature-change-selected-context-v1"},
+    "previous_selection_id": {
+      "oneOf": [
+        {"type": "string", "pattern": "^workbench-feature-change-selection:sha256:[0-9a-f]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "previous_selection_sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "schema_version": {"const": 1},
+    "selected_at": {"type": "string", "format": "date-time"},
+    "selection_id": {"type": "string", "pattern": "^workbench-feature-change-selection:sha256:[0-9a-f]{64}$"},
+    "selection_sequence": {"type": "integer", "minimum": 0},
+    "session_id": {"oneOf": [{"type": "string", "pattern": "^work-session-v2-[0-9a-f]{32}$"}, {"type": "null"}]},
+    "state": {"enum": ["open", "closed"]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"state": {"const": "open"}}, "required": ["state"]},
+      "then": {
+        "properties": {
+          "context_id": {"type": "string"},
+          "context_sha256": {"type": "string"},
+          "context_uri": {"type": "string"},
+          "session_id": {"type": "string"}
+        }
+      },
+      "else": {
+        "properties": {
+          "context_id": {"type": "null"},
+          "context_sha256": {"type": "null"},
+          "context_uri": {"type": "null"},
+          "session_id": {"type": "null"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

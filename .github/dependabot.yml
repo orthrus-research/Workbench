@@ -1,0 +1,40 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /clients/vscode
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      vscode-release-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gradle
+    directory: /clients/intellij-community
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    groups:
+      intellij-community-dependencies:
+        patterns:
+          - "*"

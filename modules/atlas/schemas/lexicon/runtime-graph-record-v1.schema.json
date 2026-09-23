@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/runtime-graph-record-v1.schema.json",
+  "title": "Supersymmetry normalized runtime graph record v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/node"
+    },
+    {
+      "$ref": "#/$defs/edge"
+    },
+    {
+      "$ref": "#/$defs/diagnostic"
+    }
+  ],
+  "$defs": {
+    "scope": {
+      "type": "object",
+      "required": [
+        "snapshot_id",
+        "profile",
+        "physical_side",
+        "adapter"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_id": {
+          "const": "SNAPSHOT-SUSY-0-1-16-11-9D3AA7AE0"
+        },
+        "profile": {
+          "enum": [
+            "COMMON_FINAL_STATE",
+            "CLIENT_JEI_FINAL_STATE",
+            "OFFLINE_ARTIFACT_STATE"
+          ]
+        },
+        "physical_side": {
+          "enum": [
+            "CLIENT",
+            "DEDICATED_SERVER",
+            "OFFLINE"
+          ]
+        },
+        "adapter": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "record_type",
+        "id",
+        "kind",
+        "scope",
+        "attributes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "record_type": {
+          "const": "node"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^rg:(?:common_final_state_client|common_final_state_dedicated_server|client_jei_final_state_client|offline_artifact_state_offline):[a-z][a-z0-9_]*:.+$"
+        },
+        "kind": {
+          "enum": [
+            "mod",
+            "registry",
+            "registry_entry",
+            "block",
+            "item",
+            "item_variant",
+            "fluid",
+            "fluid_variant",
+            "ore_dictionary_key",
+            "material",
+            "material_property",
+            "element",
+            "ore_prefix",
+            "recipe_map",
+            "recipe_category",
+            "recipe",
+            "recipe_wrapper",
+            "recipe_example",
+            "recipe_rule",
+            "process_rule",
+            "constraint",
+            "energy_carrier",
+            "ingredient_type",
+            "ingredient_slot",
+            "ingredient",
+            "machine",
+            "worldgen_deposit",
+            "dimension",
+            "coolant",
+            "fission_fuel",
+            "moderator",
+            "catalyst",
+            "particle",
+            "rocket_component",
+            "resource",
+            "config",
+            "structure"
+          ]
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "attributes": {
+          "type": "object"
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": [
+        "record_type",
+        "id",
+        "predicate",
+        "subject",
+        "object",
+        "scope",
+        "attributes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "record_type": {
+          "const": "edge"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^rge:[0-9a-f]{64}$"
+        },
+        "predicate": {
+          "enum": [
+            "contains",
+            "aliases",
+            "belongs_to_mod",
+            "depends_on",
+            "has_variant",
+            "member_of_ore_dictionary",
+            "unifies_as",
+            "unifies_to",
+            "has_material",
+            "has_property",
+            "has_component",
+            "has_element",
+            "has_form",
+            "has_category",
+            "has_recipe",
+            "has_small_recipe_map",
+            "has_wrapper",
+            "illustrates_rule",
+            "reconciles_to",
+            "delegates_to",
+            "governed_by_rule",
+            "has_slot",
+            "accepts_alternative",
+            "consumes",
+            "may_consume",
+            "produces",
+            "requires",
+            "may_produce",
+            "affects",
+            "executes_recipe_map",
+            "consults_recipe_map",
+            "advertises_recipe_category",
+            "has_constraint",
+            "binds_numeric_id",
+            "selects",
+            "uses_energy",
+            "produces_energy",
+            "transforms_to",
+            "spawns_in",
+            "defined_by_resource",
+            "configured_by"
+          ]
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^rg:(?:common_final_state_client|common_final_state_dedicated_server|client_jei_final_state_client|offline_artifact_state_offline):[a-z][a-z0-9_]*:.+$"
+        },
+        "object": {
+          "type": "string",
+          "pattern": "^rg:(?:common_final_state_client|common_final_state_dedicated_server|client_jei_final_state_client|offline_artifact_state_offline):[a-z][a-z0-9_]*:.+$"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "attributes": {
+          "type": "object"
+        }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": [
+        "record_type",
+        "id",
+        "severity",
+        "code",
+        "scope",
+        "attributes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "record_type": {
+          "const": "diagnostic"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^rgd:[0-9a-f]{64}$"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "attributes": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

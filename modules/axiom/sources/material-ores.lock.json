@@ -1,0 +1,215 @@
+{
+  "schema": "axiom.material-ores-source-lock.v1",
+  "revisions": {
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+    "groovyscript": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4",
+    "susy-core": "2042c2e4f8b2e5fc9691b1b1e74f0ee11632513a"
+  },
+  "references": [
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/block/Block.java.patch",
+      "sha256": "04cbe4bff7412eb32737dd2c7da58c331f802bf955cf00fe692433760bbf1e7e",
+      "gitBlob": "4d314b312eba0c7c10ddb723f165e8cc171c3243"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/block/state/BlockStateContainer.java.patch",
+      "sha256": "cdb8aae6fba51fc81e88e6dda9bf6cf8875b811d62224affced229ca89d13f57",
+      "gitBlob": "1a053209cc573fcbeaa5d27779fd4fa40d224090"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/ItemBlock.java.patch",
+      "sha256": "939d87edc49aca5ec5c6a13f72149d136ecd50bc81068b411515acee32c711c1",
+      "gitBlob": "a4ac03a254c06ca5794128daf6244210d2e5fc27"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/event/RegistryEvent.java",
+      "sha256": "14cef3f80ddaff0df0bf91b2416d698b64f7eac7cd5ad0621d7fb34d74cbf91a",
+      "gitBlob": "946981e92c3b653041fd6963a35bef3585b7c355"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/AccessTransformer.java",
+      "sha256": "750c47d46e6fbca4de047d1f70ba051bca892dd0eeddc842d25ef03f9d30d1df",
+      "gitBlob": "7ae454ab5c4974e27cae3929c676d2f4265fe951"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/resources/assets/groovyscript/mappings.srg",
+      "sha256": "4305afa2f999e6b3bb0aba8b793052e17f37ebca1c52de313c0cbde633414be4",
+      "gitBlob": "f9e9d06c4b12291cbda20752fb0bf1a4012e367e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/GregTechAPI.java",
+      "sha256": "455a9afc116496f006073ca104ec7538098f370df32d2e4b6adfa570f9bda987",
+      "gitBlob": "14188ff6bfa7ce2e89eb7602dec38a52c7a871d7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/block/IStateHarvestLevel.java",
+      "sha256": "d5066fd96d8b14e692bf8db22ab80718f29411176f9b4bd4652920061598f29b",
+      "gitBlob": "b2e64adefe7cc6c42924811387c59fc01c6ad799"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/block/IWalkingSpeedBonus.java",
+      "sha256": "34cc4b8da3cb34835db27c309480f877d0b8d3cab52020fbb1251c19b1fb7c73",
+      "gitBlob": "4b932286cdb9c8abd7aec85c7e2b029103ea0e7b"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/block/VariantBlock.java",
+      "sha256": "042bc0e87c41a3109591dd4278b73d6ed425425f2824bbc28bf3ae2b899bd6c8",
+      "gitBlob": "5b0310263ef2a140fd4fbd25d91ec61c17d085c7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/ore/StoneType.java",
+      "sha256": "1ade5c40ca94715e2a89910ce13920c404324de9115277ec9aaf993e7593f779",
+      "gitBlob": "9e87a43a0b884fa5389295f5dc97a4d02474a8f3"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/unification/ore/StoneTypes.java",
+      "sha256": "5b328aa59615fbe14a650486fde61ac341fdf9599fbe062b1af6f47481170245",
+      "gitBlob": "bbfae9e9c80451ef4599de45b0654f0374aa127c"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/IBlockOre.java",
+      "sha256": "a5f68dddafa8732b5783d659f032840d6a50c9e6688c78ee86e54ad3e3ff511c",
+      "gitBlob": "936a31d356956af271ae2646f359f9982046d0ea"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/Mods.java",
+      "sha256": "e61df0e4b721f0a0a495020465ddef237ef945ced60b1cca3ee5421cfbc9e2a7",
+      "gitBlob": "609f71c1008c3038d537ef83600f1d858a665212"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/worldgen/config/OreConfigUtils.java",
+      "sha256": "bd0c0ad6955ad358a25dc84bd310a358b123c489986a18f50a67c8ae2a1af5c1",
+      "gitBlob": "13a9a86b459b21d406144d7fc60dd5d44f1ed088"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/CommonProxy.java",
+      "sha256": "9dbb454d86f1c630c006f1a707e2109db2cc53dbc88c59d7ffce1450d2ad1f7f",
+      "gitBlob": "3c474d5edc99ce0422de5412a7fde66b551ddb06"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/BlockOre.java",
+      "sha256": "c129ed7995c9dfc7edb4e4afed2fc835b40e6241fc18d44c2c91a250ebbbfd33",
+      "gitBlob": "c0fc037097b5ec47414786bb078909e02df8d0b9"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/MetaBlocks.java",
+      "sha256": "a5f2f4527b0baa5f381b83a7a66e73924cde94d999a9fca1cd8ce3a2fe9b4d9a",
+      "gitBlob": "1cacda968e66199325e1c568985e7810678096e7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/OreItemBlock.java",
+      "sha256": "152417b3c909f2a8a6b96e40f4b1b6cc14c381ab5116775b801db51969ad7aa6",
+      "gitBlob": "2a703c5d1571c5f3502fcb5d3d3c2715e5b38906"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/StoneVariantBlock.java",
+      "sha256": "38d991bc9aca981aa6eabbdae3d9accb2e9ccfecabfbfd9ee1b3e31c05b8bbce",
+      "gitBlob": "39194eea2a0f3e0ec400e00da5ef401502d1757e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/properties/PropertyStoneType.java",
+      "sha256": "a218c10e466d886284a026fc2025de0455a147a5befb1b85231a9258d8794db4",
+      "gitBlob": "8a8b1eebb025dc361a9e5b27d42174320f051ffb"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/CoreModule.java",
+      "sha256": "419bcda8f1e04e17aeae9cf167a45aa8c31aee3413c1c57ce58aad5756d8700b",
+      "gitBlob": "d103159380f9bcf7b944ca2e25e69b9aa08e5676"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/resources/gregtech_at.cfg",
+      "sha256": "0142dc898741a9b6ece5f9b2e8d7153a320a7720ec2c44829f69c762020e2e3e",
+      "gitBlob": "76892c9fc052f305be80b5435d0dbf6a0bde72aa"
+    },
+    {
+      "repository": "susy-core",
+      "path": "LICENSE",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "gitBlob": "f288702d2fa16d3cdf0035b15a9fcbc552cd88e7"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/Supersymmetry.java",
+      "sha256": "c51e3e16cb14a16e379902e8255c673bfcbe45a8b3571d5846d1e208fe32b8a8",
+      "gitBlob": "8dc99471d35550472a9c7604ecf5a5765d6545e3"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/unification/ore/SusyOrePrefix.java",
+      "sha256": "08fee00dd6737b2223fe384a7f9ea52dd9a3a25438448508159b959941ac69ca",
+      "gitBlob": "18a520943918c9c2da63b207e94ea4cbdcd7229b"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/unification/ore/SusyStoneTypes.java",
+      "sha256": "5cffe7eb011c52e42f0b396596c4ba5386b0056416ed1285e60af96365937373",
+      "gitBlob": "e8c39f9691f4a780a7013f085d6545cf9861cda6"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/api/util/SuSyUtility.java",
+      "sha256": "8d0e0f5a544ba1f0c8267007a6056cda20cdb3ae07c41b43707cdcccb75f23e3",
+      "gitBlob": "ffb00c7572f71ebc5a7ac5ce5d1c4056cf880359"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/CommonProxy.java",
+      "sha256": "62b8052634a123109b7efe1f474f574839559b6ab8fe5d1e804f19cc3486c6f6",
+      "gitBlob": "bf18cba6178baf47f1def67153427d72c7f57ae6"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/blocks/SuSyBlocks.java",
+      "sha256": "a4ea0f9fd86506ad7f3cca3dca0a2ce398633da32016245ccaa4b91bd6ff2fb6",
+      "gitBlob": "642835defccc56c74829be63e16fcc0c736370c8"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/blocks/SusyStoneVariantBlock.java",
+      "sha256": "c70a7d89ebae1b6db5d5895dde46c0882dece11dd0cbd8b2fa92713b994a47da",
+      "gitBlob": "50f5d0314e9124b03b10d715c7ebf45f55dec06b"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSyFirstDegreeMaterials.java",
+      "sha256": "a6fc8d43e19be0057145d522e4c50b98b1250dc603672c1ab90143d13da54be5",
+      "gitBlob": "04a5989e6acfd87f7b9bbae0524ffcab65928625"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SuSySecondDegreeMaterials.java",
+      "sha256": "f361bb5908defb4e49fd26977c325c53cb7c20452b0c78c1e41fbeecdffccacc",
+      "gitBlob": "f4a9664f8eab98f4711eea276b2a7cd365fffab1"
+    },
+    {
+      "repository": "susy-core",
+      "path": "src/main/java/supersymmetry/common/materials/SusyMaterials.java",
+      "sha256": "4aa34ecc666ef19560e0b182eceb087e892743487e9fb5e279c2d5e7cac3ac8c",
+      "gitBlob": "c54914b0f67a64b740e27a7a4fec8096d58b64fe"
+    }
+  ]
+}

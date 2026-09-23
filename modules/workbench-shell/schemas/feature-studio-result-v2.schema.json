@@ -1,0 +1,607 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json",
+  "title": "Workbench Feature Studio result V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "result_id",
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "operation",
+    "state",
+    "workspace_label",
+    "context",
+    "feature",
+    "source_locations",
+    "planned_changes",
+    "plan",
+    "assertions",
+    "timings",
+    "actions",
+    "review_binding",
+    "owner_artifacts",
+    "semantic_equivalence",
+    "explanation",
+    "export",
+    "limitations"
+  ],
+  "properties": {
+    "result_id": {"type": "string", "pattern": "^feature-studio-result:sha256:[0-9a-f]{64}$"},
+    "format": {"const": "workbench-feature-studio-result-v2"},
+    "schema_version": {"const": 2},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "operation": {
+      "enum": ["inspect", "plan", "verify", "explain", "export"]
+    },
+    "state": {"enum": ["ready", "incomplete", "complete"]},
+    "workspace_label": {"const": "Materials & Recipes"},
+    "context": {"$ref": "#/$defs/context"},
+    "feature": {"$ref": "#/$defs/feature"},
+    "source_locations": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 32,
+      "items": {"$ref": "#/$defs/sourceLocation"}
+    },
+    "planned_changes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"$ref": "#/$defs/plannedChange"}
+    },
+    "plan": {"$ref": "#/$defs/plan"},
+    "assertions": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {"$ref": "#/$defs/assertion"}
+    },
+    "timings": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/timing"}
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"$ref": "#/$defs/action"}
+    },
+    "review_binding": {"$ref": "#/$defs/reviewBinding"},
+    "owner_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "semantic_equivalence": {"$ref": "#/$defs/semanticEquivalence"},
+    "explanation": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {"$ref": "#/$defs/explanation"}
+    },
+    "export": {
+      "anyOf": [
+        {"$ref": "#/$defs/export"},
+        {"type": "null"}
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"type": "string", "minLength": 1, "maxLength": 4096}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"operation": {"const": "inspect"}}},
+      "then": {
+        "properties": {
+          "state": {"enum": ["ready", "incomplete", "complete"]},
+          "review_binding": {
+            "if": {"properties": {"state": {"const": "catalog-v2-bound"}}},
+            "then": {"properties": {"command_id": {"const": "feature-studio.inspect"}}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"operation": {"const": "plan"}}},
+      "then": {
+        "properties": {
+          "state": {"const": "ready"},
+          "review_binding": {
+            "if": {"properties": {"state": {"const": "catalog-v2-bound"}}},
+            "then": {"properties": {"command_id": {"const": "feature-studio.plan"}}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"operation": {"const": "verify"}}},
+      "then": {
+        "properties": {
+          "state": {"enum": ["ready", "incomplete", "complete"]},
+          "review_binding": {
+            "if": {"properties": {"state": {"const": "catalog-v2-bound"}}},
+            "then": {"properties": {"command_id": {"const": "feature-studio.verify"}}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"operation": {"const": "explain"}}},
+      "then": {
+        "properties": {
+          "state": {"const": "ready"},
+          "review_binding": {
+            "if": {"properties": {"state": {"const": "catalog-v2-bound"}}},
+            "then": {"properties": {"command_id": {"const": "feature-studio.explain"}}}
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"operation": {"const": "export"}}},
+      "then": {
+        "properties": {
+          "state": {"enum": ["ready", "complete"]},
+          "review_binding": {
+            "if": {"properties": {"state": {"const": "catalog-v2-bound"}}},
+            "then": {"properties": {"command_id": {"const": "feature-studio.export"}}}
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"state": {"const": "complete"}}},
+            "then": {"properties": {"export": {"$ref": "#/$defs/export"}}},
+            "else": {"properties": {"export": {"type": "null"}}}
+          }
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"operation": {"enum": ["inspect", "plan", "verify", "explain"]}}},
+      "then": {"properties": {"export": {"type": "null"}}}
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {"enum": ["inspect", "verify"]},
+          "state": {"const": "complete"}
+        },
+        "required": ["operation", "state"]
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {"platform_profile_state": {"const": "profile-observation-bound"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "context": {
+            "properties": {"platform_profile_state": {"const": "profile-observation-bound"}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "platform_profile_id": {"type": "string", "minLength": 1},
+              "pack_profile_id": {"type": "string", "minLength": 1},
+              "profile_assessment_format": {"type": "string", "minLength": 1},
+              "profile_assessment_id": {"type": "string"},
+              "crucible_snapshot_id": {"type": "string"},
+              "runtime_session_id": {"type": "string"},
+              "runtime_plan_id": {"type": "string"},
+              "materialization_id": {"type": "string"},
+              "final_launch_id": {"type": "string"},
+              "evidence_layers": {"properties": {"runtime": {"const": "observed"}}}
+            }
+          },
+          "semantic_equivalence": {
+            "properties": {
+              "profile_state": {"const": "observed"},
+              "profile_semantics": {"$ref": "#/$defs/profileSemantics"},
+              "assertions": {"$ref": "#/$defs/observedAssertions"}
+            }
+          },
+          "assertions": {"$ref": "#/$defs/observedAssertions"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "context": {
+            "properties": {"platform_profile_state": {"const": "pending-verification"}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "context": {
+            "properties": {
+              "platform_profile_id": {"type": "null"},
+              "pack_profile_id": {"type": "null"},
+              "profile_assessment_format": {"type": "null"},
+              "profile_assessment_id": {"type": "null"},
+              "crucible_snapshot_id": {"type": "null"},
+              "runtime_session_id": {"type": "null"},
+              "runtime_plan_id": {"type": "null"},
+              "materialization_id": {"type": "null"},
+              "final_launch_id": {"type": "null"},
+              "evidence_layers": {"properties": {"runtime": {"const": "pending"}}}
+            }
+          },
+          "semantic_equivalence": {
+            "properties": {
+              "profile_state": {"type": "null"},
+              "profile_semantics": {"type": "null"}
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256Id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nullableSha256Id": {
+      "anyOf": [{"$ref": "#/$defs/sha256Id"}, {"type": "null"}]
+    },
+    "nullableContentId": {
+      "type": ["string", "null"],
+      "pattern": "^(?:[a-z][a-z0-9-]*:)?sha256:[0-9a-f]{64}$"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_uri", "source_revision", "source_snapshot_id", "pack_profile_family_id", "platform_profile_id", "pack_profile_id", "profile_assessment_format", "profile_assessment_id", "crucible_snapshot_id", "runtime_session_id", "runtime_plan_id", "materialization_id", "final_launch_id", "runtime_launcher", "runtime_target_policy", "physical_side", "platform_profile_state", "evidence_layers"],
+      "properties": {
+        "workspace_uri": {"type": "string", "format": "uri"},
+        "source_revision": {"type": "string", "minLength": 1, "maxLength": 128},
+        "source_snapshot_id": {"$ref": "#/$defs/sha256Id"},
+        "pack_profile_family_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "platform_profile_id": {"type": ["string", "null"], "maxLength": 256},
+        "pack_profile_id": {"type": ["string", "null"], "maxLength": 256},
+        "profile_assessment_format": {"type": ["string", "null"], "maxLength": 256},
+        "profile_assessment_id": {"$ref": "#/$defs/nullableContentId"},
+        "crucible_snapshot_id": {"$ref": "#/$defs/nullableContentId"},
+        "runtime_session_id": {"$ref": "#/$defs/nullableSha256Id"},
+        "runtime_plan_id": {"$ref": "#/$defs/nullableSha256Id"},
+        "materialization_id": {"$ref": "#/$defs/nullableSha256Id"},
+        "final_launch_id": {"$ref": "#/$defs/nullableSha256Id"},
+        "runtime_launcher": {"enum": ["prism", "multimc"]},
+        "runtime_target_policy": {"const": "fresh-unique-disposable-projection"},
+        "physical_side": {"enum": ["client", "server", "both"]},
+        "platform_profile_state": {"enum": ["pending-verification", "profile-observation-bound"]},
+        "evidence_layers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "planned", "runtime"],
+          "properties": {
+            "source": {"const": "observed-by-owner-census"},
+            "planned": {"const": "ready"},
+            "runtime": {"enum": ["pending", "observed"]}
+          }
+        }
+      }
+    },
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature_kind", "name", "registry_name", "material_id", "symbol_name", "color", "translation", "planned_material_resource", "planned_fluid_registry_name"],
+      "properties": {
+        "feature_kind": {"const": "material-backed-fluid"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "registry_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "material_id": {"type": "integer", "minimum": 0},
+        "symbol_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "color": {"type": "string", "pattern": "^0x[0-9a-f]{6}$"},
+        "translation": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "planned_material_resource": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*:[a-z][a-z0-9_./-]*$"},
+        "planned_fluid_registry_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}
+      }
+    },
+    "sourceLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_uri", "relative_path", "hunk_index", "range", "planned_range", "source_sha256", "planned_sha256", "operation"],
+      "properties": {
+        "workspace_uri": {"type": "string", "format": "uri"},
+        "relative_path": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "hunk_index": {"type": "integer", "minimum": 0},
+        "range": {"$ref": "#/$defs/sourceRange"},
+        "planned_range": {"$ref": "#/$defs/sourceRange"},
+        "source_sha256": {"$ref": "#/$defs/digest"},
+        "planned_sha256": {"$ref": "#/$defs/digest"},
+        "operation": {"enum": ["create", "update", "delete"]}
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flow_plan_id", "blueprint_plan_id", "state"],
+      "properties": {
+        "flow_plan_id": {"$ref": "#/$defs/sha256Id"},
+        "blueprint_plan_id": {"$ref": "#/$defs/sha256Id"},
+        "state": {"enum": ["ready", "blocked"]}
+      }
+    },
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assertion_key", "state"],
+      "properties": {
+        "assertion_key": {"type": "string", "minLength": 1},
+        "state": {"type": "string", "minLength": 1},
+        "meaning": {"type": "string", "minLength": 1}
+      }
+    },
+    "observedAssertions": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "allOf": [
+          {"$ref": "#/$defs/assertion"},
+          {"properties": {"state": {"const": "observed"}}}
+        ]
+      },
+      "allOf": [
+        {"contains": {"properties": {"assertion_key": {"const": "fluid_registration"}}, "required": ["assertion_key"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"assertion_key": {"const": "fml_client_load"}}, "required": ["assertion_key"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"assertion_key": {"const": "groovy_compilation"}}, "required": ["assertion_key"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"assertion_key": {"const": "localization"}}, "required": ["assertion_key"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"assertion_key": {"const": "material_registration"}}, "required": ["assertion_key"]}, "minContains": 1, "maxContains": 1}
+      ]
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timing_key", "value", "unit", "source_role", "start_pointer", "end_pointer", "identity_role"],
+      "properties": {
+        "timing_key": {"type": "string", "minLength": 1},
+        "value": {"type": "integer", "minimum": 0},
+        "unit": {"const": "milliseconds"},
+        "source_role": {"type": "string", "minLength": 1},
+        "start_pointer": {"type": "string", "minLength": 1},
+        "end_pointer": {"type": "string", "minLength": 1},
+        "identity_role": {"const": "operational-only"}
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_id", "operation", "risk", "state", "descriptor_id", "availability_reason"],
+      "properties": {
+        "action_id": {"type": "string", "pattern": "^feature-studio\\.[a-z]+$"},
+        "operation": {"enum": ["inspect", "plan", "verify", "explain", "export"]},
+        "risk": {"enum": ["read-only", "writes-output", "mutating"]},
+        "state": {"enum": ["embedded", "unavailable"]},
+        "descriptor_id": {"type": "string", "pattern": "^feature-studio-capability-binding:sha256:[0-9a-f]{64}$"},
+        "availability_reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "format", "projection_encoding", "canonical_sha256", "canonical_size", "canonical_json", "retained"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "format": {"type": "string", "minLength": 1},
+        "projection_encoding": {"enum": ["workbench-canonical-json-v2", "retained-owner-json-bytes"]},
+        "canonical_sha256": {
+          "anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]
+        },
+        "canonical_size": {"type": ["integer", "null"], "minimum": 2, "maximum": 134217728},
+        "canonical_json": {"type": ["string", "null"], "minLength": 2, "maxLength": 134217728},
+        "retained": {
+          "anyOf": [
+            {"$ref": "#/$defs/retainedArtifact"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"projection_encoding": {"const": "workbench-canonical-json-v2"}}
+          },
+          "then": {
+            "properties": {
+              "canonical_sha256": {"$ref": "#/$defs/digest"},
+              "canonical_size": {"type": "integer"},
+              "canonical_json": {"type": "string"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"projection_encoding": {"const": "retained-owner-json-bytes"}}
+          },
+          "then": {
+            "properties": {
+              "canonical_sha256": {"type": "null"},
+              "canonical_size": {"type": "null"},
+              "canonical_json": {"type": "null"},
+              "retained": {"$ref": "#/$defs/retainedArtifact"}
+            }
+          }
+        }
+      ]
+    },
+    "semanticEquivalence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projection_id", "source_snapshot_id", "flow_plan_id", "blueprint_plan_id", "feature", "assertions", "candidate_id", "staged_tree_id", "profile_state", "profile_semantics"],
+      "properties": {
+        "projection_id": {"type": "string", "pattern": "^feature-studio-semantic-projection:sha256:[0-9a-f]{64}$"},
+        "source_snapshot_id": {"$ref": "#/$defs/sha256Id"},
+        "flow_plan_id": {"$ref": "#/$defs/sha256Id"},
+        "blueprint_plan_id": {"$ref": "#/$defs/sha256Id"},
+        "feature": {"$ref": "#/$defs/feature"},
+        "assertions": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/assertion"}},
+        "candidate_id": {"type": ["string", "null"], "pattern": "^(?:[a-z][a-z0-9-]*:)?sha256:[0-9a-f]{64}$"},
+        "staged_tree_id": {"type": ["string", "null"], "pattern": "^(?:sha256:)?[0-9a-f]{40,64}$"},
+        "profile_state": {"type": ["string", "null"], "maxLength": 128},
+        "profile_semantics": {
+          "anyOf": [
+            {"$ref": "#/$defs/profileSemantics"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "explanation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "title", "detail", "authority", "documentation"],
+      "properties": {
+        "kind": {"enum": ["owner-state", "evidence-state", "next-action"]},
+        "title": {"type": "string", "minLength": 1},
+        "detail": {"type": "string", "minLength": 1},
+        "authority": {"type": "string", "minLength": 1},
+        "documentation": {"type": "string", "minLength": 1}
+      }
+    },
+    "export": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "receipt_id", "directory_uri", "patch_uri", "receipt_uri", "patch_sha256", "patch_size"],
+      "properties": {
+        "state": {"const": "written"},
+        "receipt_id": {"type": "string", "pattern": "^feature-studio-export-receipt:sha256:[0-9a-f]{64}$"},
+        "directory_uri": {"type": "string", "format": "uri"},
+        "patch_uri": {"type": "string", "format": "uri"},
+        "receipt_uri": {"type": "string", "format": "uri"},
+        "patch_sha256": {"$ref": "#/$defs/digest"},
+        "patch_size": {"type": "integer", "minimum": 1}
+      }
+    },
+    "sourceRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_line", "end_line", "coordinate_system"],
+      "properties": {
+        "start_line": {"type": "integer", "minimum": 0},
+        "end_line": {"type": "integer", "minimum": 0},
+        "coordinate_system": {"const": "unified-diff-lines-zero-for-empty-inclusive"}
+      }
+    },
+    "plannedChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "relative_path", "source_sha256", "planned_sha256", "planned_size", "unified_diff"],
+      "properties": {
+        "operation": {"enum": ["create", "update", "delete"]},
+        "relative_path": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "source_sha256": {"$ref": "#/$defs/digest"},
+        "planned_sha256": {"$ref": "#/$defs/digest"},
+        "planned_size": {"type": "integer", "minimum": 0, "maximum": 16777216},
+        "unified_diff": {"type": "string", "minLength": 1, "maxLength": 16777216}
+      }
+    },
+    "retainedArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "sha256", "size"],
+      "properties": {
+        "uri": {"type": "string", "format": "uri"},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "size": {"type": "integer", "minimum": 2, "maximum": 134217728}
+      }
+    },
+    "reviewBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "catalog_digest", "action_digest", "review_digest", "command_id", "flow_plan_id", "source_snapshot_id"],
+      "properties": {
+        "state": {"enum": ["direct-cli", "catalog-v2-bound"]},
+        "catalog_digest": {"$ref": "#/$defs/nullableSha256Id"},
+        "action_digest": {"$ref": "#/$defs/nullableSha256Id"},
+        "review_digest": {"$ref": "#/$defs/nullableSha256Id"},
+        "command_id": {"type": ["string", "null"], "pattern": "^feature-studio\\.[a-z]+$"},
+        "flow_plan_id": {"$ref": "#/$defs/sha256Id"},
+        "source_snapshot_id": {"$ref": "#/$defs/sha256Id"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"state": {"const": "direct-cli"}}},
+          "then": {
+            "properties": {
+              "catalog_digest": {"type": "null"},
+              "action_digest": {"type": "null"},
+              "review_digest": {"type": "null"},
+              "command_id": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"state": {"const": "catalog-v2-bound"}}},
+          "then": {
+            "properties": {
+              "catalog_digest": {"$ref": "#/$defs/sha256Id"},
+              "action_digest": {"$ref": "#/$defs/sha256Id"},
+              "review_digest": {"$ref": "#/$defs/sha256Id"},
+              "command_id": {"type": "string"}
+            }
+          }
+        }
+      ]
+    },
+    "profileSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "platform_profile_id", "pack_profile_id", "checks", "observed", "failed_checks"],
+      "properties": {
+        "state": {"const": "observed"},
+        "platform_profile_id": {"const": "workbench-platform:cleanroom:provisional"},
+        "pack_profile_id": {"const": "workbench-pack:supersymmetry"},
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["color_rgb", "fluid_name", "forge_registry_roundtrip", "has_flammable_flag", "has_fluid_property", "localized_name", "manager_frozen", "material_id", "material_resource"],
+          "properties": {
+            "color_rgb": {"const": true},
+            "fluid_name": {"const": true},
+            "forge_registry_roundtrip": {"const": true},
+            "has_flammable_flag": {"const": true},
+            "has_fluid_property": {"const": true},
+            "localized_name": {"const": true},
+            "manager_frozen": {"const": true},
+            "material_id": {"const": true},
+            "material_resource": {"const": true}
+          }
+        },
+        "observed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["color_rgb", "fluid_name", "forge_registry_roundtrip", "has_flammable_flag", "has_fluid_property", "localized_name", "manager_phase", "material_id", "material_resource"],
+          "properties": {
+            "color_rgb": {"type": "integer", "minimum": 0, "maximum": 16777215},
+            "fluid_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+            "forge_registry_roundtrip": {"const": true},
+            "has_flammable_flag": {"const": true},
+            "has_fluid_property": {"const": true},
+            "localized_name": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "manager_phase": {"const": "FROZEN"},
+            "material_id": {"type": "integer", "minimum": 0},
+            "material_resource": {"type": "string", "pattern": "^susy:[a-z][a-z0-9_]*$"}
+          }
+        },
+        "failed_checks": {
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    }
+  }
+}

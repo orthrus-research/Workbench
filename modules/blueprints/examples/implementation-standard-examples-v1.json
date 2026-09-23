@@ -1,0 +1,113 @@
+{
+  "fixture_authority": "synthetic-non-admitted",
+  "contract_id": "BLUEPRINTS-IMPLEMENTATION-STANDARD-V1",
+  "sources": [
+    {
+      "path": "modules/blueprints/tests/fixtures/supersymmetry/standards/localization-component.yaml",
+      "source_sha256": "4c81cca6dcca17aa24d3236609298e97b95ff05e9a25f2940d2196f371bff0d7",
+      "standard_id": "blueprints-standard:sha256:1ee6013094b498dab59fed549379cbe8c67f3c1008141d7b599b728a017baceb",
+      "standard_sha256": "1ee6013094b498dab59fed549379cbe8c67f3c1008141d7b599b728a017baceb"
+    },
+    {
+      "path": "modules/blueprints/tests/fixtures/supersymmetry/standards/material-backed-fluid.yaml",
+      "source_sha256": "a21efb3a4b73bbf5dc9a2b219907fd4566395fcc9eddc42d13b8c4e14aa1478f",
+      "standard_id": "blueprints-standard:sha256:a395c08226d4d864ff4fba5e521135b8d965ab0cff95a9d72494563542f8eb57",
+      "standard_sha256": "a395c08226d4d864ff4fba5e521135b8d965ab0cff95a9d72494563542f8eb57"
+    }
+  ],
+  "synthetic_registry_id": "blueprints-standard-registry:sha256:617d708cdf780c679e212573de5afd01d21ee5e955ee8c9632ff2a1a475c60f5",
+  "fail_closed_cases": [
+    {
+      "case": "duplicate-yaml-key",
+      "diagnostic": "BPS104_DUPLICATE_KEY"
+    },
+    {
+      "case": "yaml-anchor-or-alias",
+      "diagnostic": "BPS102_YAML_ANCHOR"
+    },
+    {
+      "case": "closed-schema-violation",
+      "diagnostic": "BPS200_SCHEMA"
+    },
+    {
+      "case": "path-traversal",
+      "diagnostic": "BPS202_UNSAFE_PATH"
+    },
+    {
+      "case": "template-or-hook-digest-drift",
+      "diagnostic": "BPS213_ASSET_DIGEST"
+    },
+    {
+      "case": "parameter-class-conflict",
+      "diagnostic": "BPS217_PARAMETER_CLASS"
+    },
+    {
+      "case": "unknown-allocation-domain",
+      "diagnostic": "BPS231_ALLOCATION_DOMAIN"
+    },
+    {
+      "case": "source-gap-used-as-ledger",
+      "diagnostic": "BPS233_ALLOCATION_POOL"
+    },
+    {
+      "case": "undeclared-render-target",
+      "diagnostic": "BPS243_RENDER_TARGET"
+    },
+    {
+      "case": "render-operation-missing-source",
+      "diagnostic": "BPS248_RENDER_SOURCE"
+    },
+    {
+      "case": "invalid-atlas-invariant-expectation",
+      "diagnostic": "BPS249_INVARIANT_EXPECTED"
+    },
+    {
+      "case": "missing-component-version",
+      "diagnostic": "BPS307_UNADMITTED_COMPONENT"
+    },
+    {
+      "case": "stale-registry-lock",
+      "diagnostic": "BPS311_REGISTRY_STALE"
+    },
+    {
+      "case": "immutable-version-edited",
+      "diagnostic": "BPS313_IMMUTABLE_VERSION"
+    },
+    {
+      "case": "immutable-version-removed",
+      "diagnostic": "BPS312_IMMUTABLE_REMOVAL"
+    },
+    {
+      "case": "source-outside-admission-root",
+      "diagnostic": "BPS302_SOURCE_OUTSIDE_REGISTRY"
+    },
+    {
+      "case": "unrecognized-registry-file",
+      "diagnostic": "BPS305_REGISTRY_FILE"
+    },
+    {
+      "case": "allocation-ledger-identity-drift",
+      "diagnostic": "BPS315_LEDGER_ID"
+    },
+    {
+      "case": "allocation-domain-value-reused-after-retirement",
+      "diagnostic": "BPS320_ALLOCATION_REUSE"
+    },
+    {
+      "case": "reservation-outside-admitted-pool",
+      "diagnostic": "BPS325_RESERVATION_RANGE"
+    },
+    {
+      "case": "ledger-generation-skipped",
+      "diagnostic": "BPS326_LEDGER_GENERATION"
+    },
+    {
+      "case": "ledger-parent-compare-and-swap-failed",
+      "diagnostic": "BPS327_LEDGER_CAS"
+    },
+    {
+      "case": "prior-reservation-removed",
+      "diagnostic": "BPS328_RESERVATION_REMOVAL"
+    }
+  ]
+}

@@ -1,0 +1,957 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-v2-common.schema.json",
+  "title": "Workbench Crucible V2 shared schema definitions",
+  "description": "Closed reusable value objects for the Crucible V2 content-addressed record family. The schema root is not an instance format.",
+  "type": "object",
+  "maxProperties": 0,
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "contentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "objectDescriptorId": {
+      "type": "string",
+      "pattern": "^object-descriptor:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["object-descriptor"],
+      "x-workbench-reference-class": "c01"
+    },
+    "evidenceRecordId": {
+      "type": "string",
+      "pattern": "^evidence-record:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["evidence-record"],
+      "x-workbench-reference-class": "c01"
+    },
+    "admissionRecordId": {
+      "type": "string",
+      "pattern": "^admission-record:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["admission-record"],
+      "x-workbench-reference-class": "c01"
+    },
+    "ledgerEntryId": {
+      "type": "string",
+      "pattern": "^ledger-entry:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["ledger-entry"],
+      "x-workbench-reference-class": "c01"
+    },
+    "evidenceSetRevisionId": {
+      "type": "string",
+      "pattern": "^evidence-set-revision:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["evidence-set-revision"],
+      "x-workbench-reference-class": "c01"
+    },
+    "graphRecordId": {
+      "type": "string",
+      "pattern": "^graph-record:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["graph-record"],
+      "x-workbench-reference-class": "c01"
+    },
+    "graphRevisionId": {
+      "type": "string",
+      "pattern": "^graph-revision:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["graph-revision"],
+      "x-workbench-reference-class": "c01"
+    },
+    "graphSetRevisionId": {
+      "type": "string",
+      "pattern": "^graph-set-revision:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["graph-set-revision"],
+      "x-workbench-reference-class": "c01"
+    },
+    "materializationRecipeId": {
+      "type": "string",
+      "pattern": "^materialization-recipe:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["materialization-recipe"],
+      "x-workbench-reference-class": "c01"
+    },
+    "dependencyManifestId": {
+      "type": "string",
+      "pattern": "^dependency-manifest:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["dependency-manifest"],
+      "x-workbench-reference-class": "c01"
+    },
+    "referenceEventId": {
+      "type": "string",
+      "pattern": "^reference-event:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["reference-event"],
+      "x-workbench-reference-class": "c01"
+    },
+    "contextRefId": {
+      "type": "string",
+      "pattern": "^context-ref:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["context-ref"],
+      "x-workbench-reference-class": "external"
+    },
+    "ownerRevisionId": {
+      "type": "string",
+      "pattern": "^owner-revision:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["owner-revision"],
+      "x-workbench-reference-class": "external"
+    },
+    "authorityId": {
+      "type": "string",
+      "pattern": "^authority:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["authority"],
+      "x-workbench-reference-class": "external"
+    },
+    "authorityAdapterId": {
+      "type": "string",
+      "pattern": "^authority-adapter:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["authority-adapter"],
+      "x-workbench-reference-class": "external"
+    },
+    "policyId": {
+      "type": "string",
+      "pattern": "^policy:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["policy"],
+      "x-workbench-reference-class": "external"
+    },
+    "implementationId": {
+      "type": "string",
+      "pattern": "^implementation:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["implementation"],
+      "x-workbench-reference-class": "external"
+    },
+    "componentId": {
+      "type": "string",
+      "pattern": "^component:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["component"],
+      "x-workbench-reference-class": "external"
+    },
+    "dependencyComponentId": {
+      "type": "string",
+      "pattern": "^(?:object-descriptor|implementation|policy|ontology|profile-revision|profile-adapter|tool|component):sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": [
+        "object-descriptor",
+        "implementation",
+        "policy",
+        "ontology",
+        "profile-revision",
+        "profile-adapter",
+        "tool",
+        "component"
+      ],
+      "x-workbench-reference-class": "mixed",
+      "x-workbench-reference-kind-source": "sibling-component-kind"
+    },
+    "producerId": {
+      "type": "string",
+      "pattern": "^producer:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["producer"],
+      "x-workbench-reference-class": "external"
+    },
+    "transportNormalizerId": {
+      "type": "string",
+      "pattern": "^transport-normalizer:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["transport-normalizer"],
+      "x-workbench-reference-class": "external"
+    },
+    "validatorId": {
+      "type": "string",
+      "pattern": "^validator:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["validator"],
+      "x-workbench-reference-class": "external"
+    },
+    "profileAdapterId": {
+      "type": "string",
+      "pattern": "^profile-adapter:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["profile-adapter"],
+      "x-workbench-reference-class": "external"
+    },
+    "validationReceiptId": {
+      "type": "string",
+      "pattern": "^validation-receipt:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["validation-receipt"],
+      "x-workbench-reference-class": "external"
+    },
+    "mergeRecipeId": {
+      "type": "string",
+      "pattern": "^merge-recipe:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["merge-recipe"],
+      "x-workbench-reference-class": "external"
+    },
+    "selectorId": {
+      "type": "string",
+      "pattern": "^selector:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["selector"],
+      "x-workbench-reference-class": "external"
+    },
+    "ontologyId": {
+      "type": "string",
+      "pattern": "^ontology:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["ontology"],
+      "x-workbench-reference-class": "external"
+    },
+    "profileRevisionId": {
+      "type": "string",
+      "pattern": "^profile-revision:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["profile-revision"],
+      "x-workbench-reference-class": "external"
+    },
+    "toolId": {
+      "type": "string",
+      "pattern": "^tool:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["tool"],
+      "x-workbench-reference-class": "external"
+    },
+    "supportDecisionId": {
+      "type": "string",
+      "pattern": "^support-decision:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["support-decision"],
+      "x-workbench-reference-class": "external"
+    },
+    "validationRequirementId": {
+      "type": "string",
+      "pattern": "^validation-requirement:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["validation-requirement"],
+      "x-workbench-reference-class": "external"
+    },
+    "conformanceCaseId": {
+      "type": "string",
+      "pattern": "^conformance-case:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["conformance-case"],
+      "x-workbench-reference-class": "external"
+    },
+    "compatibilityDecisionId": {
+      "type": "string",
+      "pattern": "^compatibility-decision:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["compatibility-decision"],
+      "x-workbench-reference-class": "external"
+    },
+    "derivationStepId": {
+      "type": "string",
+      "pattern": "^derivation-step:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["derivation-step"],
+      "x-workbench-reference-class": "embedded"
+    },
+    "actorId": {
+      "type": "string",
+      "pattern": "^actor:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["actor"],
+      "x-workbench-reference-class": "external"
+    },
+    "authorizationDecisionId": {
+      "type": "string",
+      "pattern": "^authorization-decision:sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["authorization-decision"],
+      "x-workbench-reference-class": "external"
+    },
+    "subjectIdentityId": {
+      "$ref": "#/$defs/contentId",
+      "x-workbench-reference-kinds": [],
+      "x-workbench-reference-class": "subject-identity",
+      "x-workbench-reference-kind-source": "recipe-subject-contract"
+    },
+    "c01RecordId": {
+      "type": "string",
+      "pattern": "^(?:object-descriptor|evidence-record|admission-record|ledger-entry|evidence-set-revision|graph-record|graph-revision|graph-set-revision|materialization-recipe|dependency-manifest|reference-event):sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": [
+        "object-descriptor",
+        "evidence-record",
+        "admission-record",
+        "ledger-entry",
+        "evidence-set-revision",
+        "graph-record",
+        "graph-revision",
+        "graph-set-revision",
+        "materialization-recipe",
+        "dependency-manifest",
+        "reference-event"
+      ],
+      "x-workbench-reference-class": "c01"
+    },
+    "evidenceOrAdmissionRecordId": {
+      "type": "string",
+      "pattern": "^(?:evidence-record|admission-record):sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["evidence-record", "admission-record"],
+      "x-workbench-reference-class": "c01",
+      "x-workbench-reference-kind-source": "sibling-entry-record-kind"
+    },
+    "admissionCandidateId": {
+      "type": "string",
+      "pattern": "^(?:object-descriptor|evidence-record):sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": ["object-descriptor", "evidence-record"],
+      "x-workbench-reference-class": "c01",
+      "x-workbench-reference-kind-source": "sibling-candidate-kind"
+    },
+    "dynamicReferenceTargetId": {
+      "type": "string",
+      "pattern": "^(?:evidence-set-revision|graph-revision|graph-set-revision):sha256:[0-9a-f]{64}$",
+      "x-workbench-reference-kinds": [
+        "evidence-set-revision",
+        "graph-revision",
+        "graph-set-revision"
+      ],
+      "x-workbench-reference-class": "c01",
+      "x-workbench-reference-kind-source": "sibling-new-target-kind"
+    },
+    "nullableObjectDescriptorId": {
+      "oneOf": [
+        {"$ref": "#/$defs/objectDescriptorId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableEvidenceRecordId": {
+      "oneOf": [
+        {"$ref": "#/$defs/evidenceRecordId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableAdmissionRecordId": {
+      "oneOf": [
+        {"$ref": "#/$defs/admissionRecordId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableLedgerEntryId": {
+      "oneOf": [
+        {"$ref": "#/$defs/ledgerEntryId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableDependencyManifestId": {
+      "oneOf": [
+        {"$ref": "#/$defs/dependencyManifestId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableReferenceEventId": {
+      "oneOf": [
+        {"$ref": "#/$defs/referenceEventId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableDynamicReferenceTargetId": {
+      "oneOf": [
+        {"$ref": "#/$defs/dynamicReferenceTargetId"},
+        {"type": "null"}
+      ]
+    },
+    "nullableMergeRecipeId": {
+      "oneOf": [
+        {"$ref": "#/$defs/mergeRecipeId"},
+        {"type": "null"}
+      ]
+    },
+    "nullablePolicyId": {
+      "oneOf": [
+        {"$ref": "#/$defs/policyId"},
+        {"type": "null"}
+      ]
+    },
+    "blobId": {
+      "type": "string",
+      "pattern": "^workbench-blob-v2:sha256:[0-9a-f]{64}$"
+    },
+    "schemaId": {
+      "type": "string",
+      "pattern": "^workbench://schemas/[a-z0-9._/-]+\\.schema\\.json$"
+    },
+    "semanticIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+    },
+    "semanticText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "reasonCode": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807
+    },
+    "signedInteger": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "authorityBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_authority_id",
+        "owner_revision_id",
+        "authority_adapter_id"
+      ],
+      "properties": {
+        "owner_authority_id": {"$ref": "#/$defs/authorityId"},
+        "owner_revision_id": {"$ref": "#/$defs/ownerRevisionId"},
+        "authority_adapter_id": {"$ref": "#/$defs/authorityAdapterId"}
+      }
+    },
+    "nullableAuthorityBinding": {
+      "oneOf": [
+        {"$ref": "#/$defs/authorityBinding"},
+        {"type": "null"}
+      ]
+    },
+    "profileAdapterBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_adapter_id", "profile_authority"],
+      "properties": {
+        "profile_adapter_id": {"$ref": "#/$defs/profileAdapterId"},
+        "profile_authority": {"$ref": "#/$defs/authorityBinding"}
+      }
+    },
+    "profileSupportBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_revision_id",
+        "profile_adapter_id",
+        "profile_authority",
+        "support_decision_ids"
+      ],
+      "properties": {
+        "profile_revision_id": {"$ref": "#/$defs/profileRevisionId"},
+        "profile_adapter_id": {"$ref": "#/$defs/profileAdapterId"},
+        "profile_authority": {"$ref": "#/$defs/authorityBinding"},
+        "support_decision_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/supportDecisionId"}
+        }
+      }
+    },
+    "componentBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component_id", "implementation_id"],
+      "properties": {
+        "component_id": {"$ref": "#/$defs/componentId"},
+        "implementation_id": {"$ref": "#/$defs/implementationId"}
+      }
+    },
+    "dependencyComponentBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_key",
+        "component_role",
+        "component_kind",
+        "component_id",
+        "authority_binding"
+      ],
+      "properties": {
+        "component_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "component_role": {"$ref": "#/$defs/semanticIdentifier"},
+        "component_kind": {
+          "enum": [
+            "object-descriptor",
+            "implementation",
+            "policy",
+            "ontology",
+            "profile-revision",
+            "profile-adapter",
+            "tool",
+            "component"
+          ]
+        },
+        "component_id": {"$ref": "#/$defs/dependencyComponentId"},
+        "authority_binding": {"$ref": "#/$defs/nullableAuthorityBinding"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "component_kind": {
+                "enum": [
+                  "implementation",
+                  "policy",
+                  "ontology",
+                  "profile-revision",
+                  "profile-adapter"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "authority_binding": {"$ref": "#/$defs/authorityBinding"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "object-descriptor"}}},
+          "then": {"properties": {"authority_binding": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "object-descriptor"}}},
+          "then": {"properties": {"component_id": {"$ref": "#/$defs/objectDescriptorId"}}}
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "implementation"}}},
+          "then": {"properties": {"component_id": {"$ref": "#/$defs/implementationId"}}}
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "policy"}}},
+          "then": {"properties": {"component_id": {"$ref": "#/$defs/policyId"}}}
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "ontology"}}},
+          "then": {"properties": {"component_id": {"$ref": "#/$defs/ontologyId"}}}
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "profile-revision"}}},
+          "then": {"properties": {"component_id": {"$ref": "#/$defs/profileRevisionId"}}}
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "profile-adapter"}}},
+          "then": {"properties": {"component_id": {"$ref": "#/$defs/profileAdapterId"}}}
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "tool"}}},
+          "then": {"properties": {"component_id": {"$ref": "#/$defs/toolId"}}}
+        },
+        {
+          "if": {"properties": {"component_kind": {"const": "component"}}},
+          "then": {"properties": {"component_id": {"$ref": "#/$defs/componentId"}}}
+        }
+      ]
+    },
+    "limitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "detail"],
+      "properties": {
+        "code": {"$ref": "#/$defs/reasonCode"},
+        "detail": {"$ref": "#/$defs/semanticText"}
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "severity", "code", "message", "supporting_record_ids"],
+      "properties": {
+        "ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "severity": {"enum": ["info", "warning", "error"]},
+        "code": {"$ref": "#/$defs/reasonCode"},
+        "message": {"$ref": "#/$defs/semanticText"},
+        "supporting_record_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/c01RecordId"}
+        }
+      }
+    },
+    "evidenceState": {
+      "enum": [
+        "known",
+        "known-absent",
+        "partial",
+        "bounded",
+        "truncated",
+        "unavailable",
+        "unresolved",
+        "inapplicable",
+        "conflicted"
+      ]
+    },
+    "completenessState": {
+      "enum": [
+        "complete",
+        "partial",
+        "bounded",
+        "truncated",
+        "unavailable",
+        "unresolved",
+        "inapplicable",
+        "conflicted"
+      ]
+    },
+    "supportState": {
+      "enum": [
+        "experimental",
+        "provisional",
+        "tested-supported",
+        "unsupported",
+        "unavailable"
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "coverage_object_descriptor_id", "omitted_at_least"],
+      "properties": {
+        "state": {"$ref": "#/$defs/completenessState"},
+        "coverage_object_descriptor_id": {"$ref": "#/$defs/nullableObjectDescriptorId"},
+        "omitted_at_least": {
+          "oneOf": [
+            {"$ref": "#/$defs/positiveInteger"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "entireObjectLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"const": "entire-object"}
+      }
+    },
+    "byteRangeLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "start", "length"],
+      "properties": {
+        "kind": {"const": "byte-range"},
+        "start": {"$ref": "#/$defs/nonNegativeInteger"},
+        "length": {"$ref": "#/$defs/positiveInteger"}
+      }
+    },
+    "recordOrdinalLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ordinal"],
+      "properties": {
+        "kind": {"const": "record-ordinal"},
+        "ordinal": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "jsonPointerLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pointer"],
+      "properties": {
+        "kind": {"const": "json-pointer"},
+        "pointer": {
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
+        }
+      }
+    },
+    "recordKeyLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": {"const": "record-key"},
+        "key": {"$ref": "#/$defs/semanticText"}
+      }
+    },
+    "coordinateRangeLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "dimension", "minimum", "maximum"],
+      "properties": {
+        "kind": {"const": "coordinate-range"},
+        "dimension": {"$ref": "#/$defs/signedInteger"},
+        "minimum": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {"$ref": "#/$defs/signedInteger"}
+        },
+        "maximum": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {"$ref": "#/$defs/signedInteger"}
+        }
+      }
+    },
+    "objectLocator": {
+      "oneOf": [
+        {"$ref": "#/$defs/entireObjectLocator"},
+        {"$ref": "#/$defs/byteRangeLocator"},
+        {"$ref": "#/$defs/recordOrdinalLocator"},
+        {"$ref": "#/$defs/jsonPointerLocator"},
+        {"$ref": "#/$defs/recordKeyLocator"},
+        {"$ref": "#/$defs/coordinateRangeLocator"}
+      ]
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "object_descriptor_id", "locator"],
+      "properties": {
+        "role": {"$ref": "#/$defs/semanticIdentifier"},
+        "object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"},
+        "locator": {"$ref": "#/$defs/objectLocator"}
+      }
+    },
+    "legacyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "original_id",
+        "artifact_object_descriptor_id",
+        "validator_id",
+        "profile_adapter_binding",
+        "mapping_manifest_object_descriptor_id",
+        "limitations"
+      ],
+      "properties": {
+        "format": {"$ref": "#/$defs/semanticIdentifier"},
+        "original_id": {"$ref": "#/$defs/semanticText"},
+        "artifact_object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"},
+        "validator_id": {"$ref": "#/$defs/validatorId"},
+        "profile_adapter_binding": {"$ref": "#/$defs/profileAdapterBinding"},
+        "mapping_manifest_object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"},
+        "limitations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/limitation"}
+        }
+      }
+    },
+    "graphRecordKind": {
+      "enum": [
+        "node",
+        "edge",
+        "property",
+        "evidence-link",
+        "refinement-mapping",
+        "frontier",
+        "conflict"
+      ]
+    },
+    "graphPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "partition_key",
+        "shard_ordinal",
+        "record_kind",
+        "object_descriptor_id",
+        "record_count",
+        "minimum_record_key",
+        "maximum_record_key",
+        "semantic_root"
+      ],
+      "properties": {
+        "partition_key": {"$ref": "#/$defs/semanticText"},
+        "shard_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "record_kind": {"$ref": "#/$defs/graphRecordKind"},
+        "object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"},
+        "record_count": {"$ref": "#/$defs/positiveInteger"},
+        "minimum_record_key": {"$ref": "#/$defs/semanticText"},
+        "maximum_record_key": {"$ref": "#/$defs/semanticText"},
+        "semantic_root": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "membershipPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "partition_key",
+        "shard_ordinal",
+        "object_descriptor_id",
+        "record_count",
+        "minimum_record_key",
+        "maximum_record_key",
+        "semantic_root"
+      ],
+      "properties": {
+        "partition_key": {"$ref": "#/$defs/semanticText"},
+        "shard_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"},
+        "record_count": {"$ref": "#/$defs/positiveInteger"},
+        "minimum_record_key": {"$ref": "#/$defs/semanticText"},
+        "maximum_record_key": {"$ref": "#/$defs/semanticText"},
+        "semantic_root": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "recordCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodes",
+        "edges",
+        "properties",
+        "evidence_links",
+        "refinement_mappings",
+        "frontiers",
+        "conflicts"
+      ],
+      "properties": {
+        "nodes": {"$ref": "#/$defs/nonNegativeInteger"},
+        "edges": {"$ref": "#/$defs/nonNegativeInteger"},
+        "properties": {"$ref": "#/$defs/nonNegativeInteger"},
+        "evidence_links": {"$ref": "#/$defs/nonNegativeInteger"},
+        "refinement_mappings": {"$ref": "#/$defs/nonNegativeInteger"},
+        "frontiers": {"$ref": "#/$defs/nonNegativeInteger"},
+        "conflicts": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {"$ref": "#/$defs/sha256"},
+        {"type": "null"}
+      ]
+    },
+    "recordRoots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodes",
+        "edges",
+        "properties",
+        "evidence_links",
+        "refinement_mappings",
+        "frontiers",
+        "conflicts"
+      ],
+      "properties": {
+        "nodes": {"$ref": "#/$defs/nullableSha256"},
+        "edges": {"$ref": "#/$defs/nullableSha256"},
+        "properties": {"$ref": "#/$defs/nullableSha256"},
+        "evidence_links": {"$ref": "#/$defs/nullableSha256"},
+        "refinement_mappings": {"$ref": "#/$defs/nullableSha256"},
+        "frontiers": {"$ref": "#/$defs/nullableSha256"},
+        "conflicts": {"$ref": "#/$defs/nullableSha256"}
+      }
+    },
+    "graphMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category_id", "resolution_id", "graph_revision_id", "alignment"],
+      "properties": {
+        "category_id": {"$ref": "#/$defs/semanticIdentifier"},
+        "resolution_id": {"$ref": "#/$defs/semanticIdentifier"},
+        "graph_revision_id": {"$ref": "#/$defs/graphRevisionId"},
+        "alignment": {"$ref": "#/$defs/graphMemberAlignment"}
+      }
+    },
+    "graphMemberAlignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatibility_decision_id",
+        "decision_authority",
+        "compatibility_rule_id",
+        "compatibility_constraints_object_descriptor_id",
+        "member_context_ref_id",
+        "target_context_ref_id",
+        "member_evidence_set_revision_ids",
+        "target_evidence_set_revision_ids",
+        "context_result",
+        "evidence_result",
+        "outcome"
+      ],
+      "properties": {
+        "compatibility_decision_id": {"$ref": "#/$defs/compatibilityDecisionId"},
+        "decision_authority": {"$ref": "#/$defs/authorityBinding"},
+        "compatibility_rule_id": {"$ref": "#/$defs/policyId"},
+        "compatibility_constraints_object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"},
+        "member_context_ref_id": {"$ref": "#/$defs/contextRefId"},
+        "target_context_ref_id": {"$ref": "#/$defs/contextRefId"},
+        "member_evidence_set_revision_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/evidenceSetRevisionId"}
+        },
+        "target_evidence_set_revision_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/evidenceSetRevisionId"}
+        },
+        "context_result": {"enum": ["exact", "policy-compatible"]},
+        "evidence_result": {"enum": ["exact", "policy-compatible"]},
+        "outcome": {"const": "compatible"}
+      }
+    },
+    "auxiliaryGraphMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph_revision_id", "alignment"],
+      "properties": {
+        "graph_revision_id": {"$ref": "#/$defs/graphRevisionId"},
+        "alignment": {"$ref": "#/$defs/graphMemberAlignment"}
+      }
+    },
+    "sourceGraphPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "graph_input_contract_key",
+        "graph_revision_id",
+        "partition_key",
+        "shard_ordinal",
+        "record_kind"
+      ],
+      "properties": {
+        "graph_input_contract_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "graph_revision_id": {"$ref": "#/$defs/graphRevisionId"},
+        "partition_key": {"$ref": "#/$defs/semanticText"},
+        "shard_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "record_kind": {"$ref": "#/$defs/graphRecordKind"}
+      }
+    },
+    "graphInputBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph_input_contract_key", "graph_revision_id"],
+      "properties": {
+        "graph_input_contract_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "graph_revision_id": {"$ref": "#/$defs/graphRevisionId"}
+      }
+    },
+    "sourceGraphRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph_input_contract_key", "graph_record_id"],
+      "properties": {
+        "graph_input_contract_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "graph_record_id": {"$ref": "#/$defs/graphRecordId"}
+      }
+    },
+    "outputGraphPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["partition_key", "shard_ordinal", "record_kind"],
+      "properties": {
+        "partition_key": {"$ref": "#/$defs/semanticText"},
+        "shard_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "record_kind": {"$ref": "#/$defs/graphRecordKind"}
+      }
+    },
+    "sourceEvidencePartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_set_revision_id", "partition_key", "shard_ordinal"],
+      "properties": {
+        "evidence_set_revision_id": {"$ref": "#/$defs/evidenceSetRevisionId"},
+        "partition_key": {"$ref": "#/$defs/semanticText"},
+        "shard_ordinal": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "sourceAdmissionPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_set_revision_id", "partition_key", "shard_ordinal"],
+      "properties": {
+        "evidence_set_revision_id": {"$ref": "#/$defs/evidenceSetRevisionId"},
+        "partition_key": {"$ref": "#/$defs/semanticText"},
+        "shard_ordinal": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    }
+  }
+}

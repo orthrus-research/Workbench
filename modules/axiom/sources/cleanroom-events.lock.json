@@ -1,0 +1,33 @@
+{
+  "schema": "axiom.event-source-lock.v1",
+  "repository": "https://github.com/CleanroomMC/Cleanroom",
+  "revision": "fe78db8dc4fcee47df7549230858f4c064208d73",
+  "platform": "cleanroom-0.6.12-alpha",
+  "references": [
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/Cancelable.java", "sha256": "230b8f198ddf362fa1d1cdacb22ac8347304a70901c5a698a099d2661e6f3e2a"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/Event.java", "sha256": "e615b133143aea2669b4d3d9937168bf64d5043e96552a15420bd9a858651147"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/EventPriority.java", "sha256": "a2271242f761383e4f0490d23017c063bc5c986f1ac56d2702121b07aac3d81a"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/ListenerList.java", "sha256": "c572e4763c8d90d877ab4cc67f65d1686ad8a7cfee892e19590c2a9aaff62cea"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/EventBus.java", "sha256": "bdeb5ae37f450918ed17251d77b77285b3123b812687bd7ae9cbc95480f35eec"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/ASMEventHandler.java", "sha256": "22ca66105b6b04b0729e5f5009b5eb2719f8763a9d99382a7be7f8fb35a67957"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/EventListenerFactory.java", "sha256": "543ec827e018fdfeb920eb016fa64384c8e81956d2dc69073cd32888c8a148f1"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/IEventListener.java", "sha256": "806d67e3f5ada822f783d30909bdb246ff5c0cddcb8b00949b8527fe4eba90ab"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/IEventExceptionHandler.java", "sha256": "7cbe1640bdb7f8521cadf78a472cd54137b3fd294352ffad3799f1dc2ab1c0e8"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/IContextSetter.java", "sha256": "c2ffb8db8c1fef3ccff22555f2e1f4abaff135047211c5d21180608df53acde1"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/IGenericEvent.java", "sha256": "6cf53c8cef09f13cde1773d68141518865a6b243b4abe6f94053a2f7408fb341"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/SubscribeEvent.java", "sha256": "a2c54c4d7642d4d7575273333481a8d73c0af610f19f7bcb0c34131009ccdb56"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/EventSubscriptionTransformer.java", "sha256": "dfb23b3b0e67124e218d297df35beba6362c19db0b84fa26fac04f0fe3479490"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/asm/transformers/EventSubscriberTransformer.java", "sha256": "6e23fd35994415304e003ee4933488d666ef694ba353b6d1ed21f9da5f6d0f81"},
+    {"path": "src/main/java/net/minecraftforge/fml/common/eventhandler/GenericEvent.java", "sha256": "1f03071844597f6f67169ab3743b46417053b4899ea0420b1046511cbad89f3f"}
+  ],
+  "oracleLibraries": [
+    {"path": "com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar", "sha256": "dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3"},
+    {"path": "com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2.jar", "sha256": "8a8f81cf9b359e3f6dfa691a1e776985c061ef2f223c9b2c80753e1b458e8064"},
+    {"path": "com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar", "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7"},
+    {"path": "org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar", "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"},
+    {"path": "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "sha256": "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb"},
+    {"path": "org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar", "sha256": "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b"},
+    {"path": "org/apache/logging/log4j/log4j-api/2.26.0/log4j-api-2.26.0.jar", "sha256": "820de7bbaf430eaf2e3e5ccb92f23e2085797c5ac4d4f7fc6c8b660fbefa1dbc"},
+    {"path": "org/apache/logging/log4j/log4j-core/2.26.0/log4j-core-2.26.0.jar", "sha256": "406bb3132c47a5d322e5c571feb0787ca84496469f346eb51f1ef2ee45499902"}
+  ]
+}

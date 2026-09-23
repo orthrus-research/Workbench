@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-project-intelligence"
+version = "0.1.1"
+description = "Workbench project-intelligence module"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.0,<0.2.0", "PyYAML==6.0.3"]
+
+[project.entry-points."workbench.modules"]
+"project-intelligence" = "workbench_registration_project_intelligence:module"
+
+[project.entry-points."workbench.workspace_inspectors"]
+workspace = "workbench_project_intelligence.workspace_doctor:new_report"
+
+[tool.setuptools]
+packages = ["workbench_project_intelligence", "workbench_resources.modules.project-intelligence"]
+py-modules = ["workbench_registration_project_intelligence"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.project-intelligence" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.modules.project-intelligence" = ["pyproject.toml", "README.md", "schemas/**/*", "src/**/*.py"]
+
+[tool.workbench]
+module-id = "project-intelligence"
+requires = []
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]

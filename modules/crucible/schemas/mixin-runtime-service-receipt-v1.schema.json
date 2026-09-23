@@ -1,0 +1,588 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/mixin-runtime-service-receipt-v1.schema.json",
+  "title": "Workbench Crucible Mixin runtime service receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "receipt_id",
+    "canonicalization_id",
+    "session",
+    "artifacts",
+    "evidence",
+    "observations",
+    "provider_enumeration",
+    "summary",
+    "limitations",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-crucible-mixin-runtime-service-receipt-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^crucible-mixin-runtime-service-receipt:sha256:[0-9a-f]{64}$"
+    },
+    "canonicalization_id": {
+      "const": "workbench-canonical-json-v1"
+    },
+    "session": {
+      "$ref": "#/$defs/session"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "provider_enumeration": {
+      "$ref": "#/$defs/providerEnumeration"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nonempty"
+      }
+    },
+    "boundaries": {
+      "$ref": "#/$defs/boundaries"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonnegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_id",
+        "launch_id",
+        "profile_id",
+        "side",
+        "candidate_toolchain_lock_sha256",
+        "component_topology_receipt_id",
+        "component_topology_receipt_sha256"
+      ],
+      "properties": {
+        "session_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "launch_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "side": {
+          "enum": ["client", "dedicated_server", "integrated_server"]
+        },
+        "candidate_toolchain_lock_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "component_topology_receipt_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-topology-receipt:sha256:[0-9a-f]{64}$"
+        },
+        "component_topology_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_sha256", "size_bytes", "role", "label"],
+      "properties": {
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "role": {
+          "enum": [
+            "mixin_runtime",
+            "service_provider",
+            "runtime_dependency",
+            "other"
+          ]
+        },
+        "label": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_sha256", "size_bytes", "kind", "label"],
+      "properties": {
+        "source_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "kind": {
+          "enum": [
+            "runtime_log",
+            "runtime_probe",
+            "service_loader_enumeration"
+          ]
+        },
+        "label": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "kind",
+        "service_name",
+        "evidence_sha256",
+        "source_record"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "initialization_report",
+            "selection_report",
+            "subsystem_report"
+          ]
+        },
+        "service_name": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_record": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "service_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "subsystem_version": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "environment": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "source_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "logger": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "level": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "thread": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "wallclock": {
+          "$ref": "#/$defs/nonempty"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "subsystem_report"
+              }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": [
+              "subsystem_version",
+              "environment",
+              "source_artifact_sha256"
+            ]
+          }
+        }
+      ]
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_class",
+        "service_name",
+        "provider_artifact_sha256"
+      ],
+      "properties": {
+        "service_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "provider_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "service_name": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "providerEnumeration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "mechanism",
+        "providers",
+        "evidence_sha256",
+        "evidence_id",
+        "source_record",
+        "failure"
+      ],
+      "properties": {
+        "state": {
+          "enum": ["not_enumerated", "enumerated", "failed"]
+        },
+        "mechanism": {
+          "oneOf": [
+            {
+              "const": "java.util.ServiceLoader.iterator"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provider"
+          }
+        },
+        "evidence_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^crucible-mixin-service-provider-enumeration:sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_record": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonempty"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/enumerationFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "not_enumerated"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "providers": {
+                "maxItems": 0
+              },
+              "mechanism": {
+                "type": "null"
+              },
+              "evidence_sha256": {
+                "type": "null"
+              },
+              "evidence_id": {
+                "type": "null"
+              },
+              "source_record": {
+                "type": "null"
+              },
+              "failure": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "failed"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "providers": {
+                "maxItems": 0
+              },
+              "mechanism": {
+                "const": "java.util.ServiceLoader.iterator"
+              },
+              "evidence_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "evidence_id": {
+                "type": "string",
+                "pattern": "^crucible-mixin-service-provider-enumeration:sha256:[0-9a-f]{64}$"
+              },
+              "source_record": {
+                "$ref": "#/$defs/nonempty"
+              },
+              "failure": {
+                "$ref": "#/$defs/enumerationFailure"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "enumerated"
+              }
+            },
+            "required": ["state"]
+          },
+          "then": {
+            "properties": {
+              "mechanism": {
+                "const": "java.util.ServiceLoader.iterator"
+              },
+              "evidence_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "evidence_id": {
+                "type": "string",
+                "pattern": "^crucible-mixin-service-provider-enumeration:sha256:[0-9a-f]{64}$"
+              },
+              "source_record": {
+                "$ref": "#/$defs/nonempty"
+              },
+              "failure": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "enumerationFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "exception_class", "message"],
+      "properties": {
+        "stage": {
+          "enum": [
+            "service_interface_load",
+            "service_loader_create",
+            "service_loader_iteration",
+            "provider_name",
+            "provider_code_source",
+            "artifact_measurement"
+          ]
+        },
+        "exception_class": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "message": {
+          "$ref": "#/$defs/nonempty"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_count",
+        "observation_kind_counts",
+        "reported_selection_report_count",
+        "reported_service_names",
+        "reported_selection_state",
+        "enumerated_provider_count",
+        "enumerated_provider_uniqueness",
+        "enumerated_distinct_service_name_count",
+        "duplicate_enumerated_service_names"
+      ],
+      "properties": {
+        "observation_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "observation_kind_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(initialization_report|selection_report|subsystem_report)$": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            }
+          }
+        },
+        "reported_selection_report_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "reported_service_names": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        },
+        "reported_selection_state": {
+          "enum": [
+            "not_reported",
+            "one_name_reported",
+            "conflicting_names_reported"
+          ]
+        },
+        "enumerated_provider_count": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enumerated_provider_uniqueness": {
+          "enum": ["unknown", "none", "exactly_one", "multiple"]
+        },
+        "enumerated_distinct_service_name_count": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duplicate_enumerated_service_names": {
+          "oneOf": [
+            {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/nonempty"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reported_selection_is_not_provider_enumeration",
+        "reported_service_name_establishes_implementation_class",
+        "mixin_runtime_code_source_is_not_service_provider_attribution",
+        "provider_enumeration_is_not_runtime_selection",
+        "provider_enumeration_mechanism_bound",
+        "failed_enumeration_partial_set_published",
+        "final_transformations_proved",
+        "final_class_bytes_captured"
+      ],
+      "properties": {
+        "reported_selection_is_not_provider_enumeration": {
+          "const": true
+        },
+        "reported_service_name_establishes_implementation_class": {
+          "const": false
+        },
+        "mixin_runtime_code_source_is_not_service_provider_attribution": {
+          "const": true
+        },
+        "provider_enumeration_is_not_runtime_selection": {
+          "const": true
+        },
+        "provider_enumeration_mechanism_bound": {
+          "const": true
+        },
+        "failed_enumeration_partial_set_published": {
+          "const": false
+        },
+        "final_transformations_proved": {
+          "const": false
+        },
+        "final_class_bytes_captured": {
+          "const": false
+        }
+      }
+    }
+  }
+}

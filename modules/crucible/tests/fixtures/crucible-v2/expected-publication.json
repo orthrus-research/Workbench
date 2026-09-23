@@ -1,0 +1,453 @@
+{
+  "aliases": {
+    "admission-record": "admission-record:sha256:59d60c8e7c0bb8faaa349ba23d56cb360f3969ce5e265096f0b3233387881027",
+    "admission-shard": "object-descriptor:sha256:af7c2d40a472e60f08fb88c8c6ce42823d54a6302aea48c886d8ea57eca757ab",
+    "compatibility-constraints": "object-descriptor:sha256:8fe24948a5ac9ee722ecdb948128b0af9cadc3f83c9b3c59102c82081494c2b7",
+    "dependency-lock": "object-descriptor:sha256:059d826a926ff87cb76c628e504236fd82c76599ab334cc5300a7b9580bdfa2c",
+    "dependency-manifest": "dependency-manifest:sha256:672a9de5a70af730cf5ad5e3cf2708a5d12f64261bfc3a791f09891aa0d1e66a",
+    "dependency-manifest:baseline": "dependency-manifest:sha256:876218b3ed54e1f1e266cc4ea66f123fd060159cfcdab5fa644dda357e38899e",
+    "dependency-manifest:coarse": "dependency-manifest:sha256:2cbc83bea1fbb95b4e69b8ec567b08be61c8a2ddfeee7c59c0d260a2830f3a0c",
+    "dependency-manifest:empty": "dependency-manifest:sha256:3d1e1c4866a17c96dbd6d8cd0961e7567d649bb07c169d6253d4c5143e38ab2b",
+    "dependency-manifest:refinement": "dependency-manifest:sha256:9db08c9b737dfad2f2f30afbad452bb35832162c7e46ce5b83608ee6e4bcda7f",
+    "evidence-payload": "object-descriptor:sha256:6769af431419ba8b152c26080ae21ea28ebe6808088b00fba907829ee2d6750b",
+    "evidence-record": "evidence-record:sha256:f4d913b462047f982fb015eae2b35bdd7eed98bad577fa7cbc1c1394de3d4787",
+    "evidence-set-revision": "evidence-set-revision:sha256:9324e74e0262461d4821c0cf4ea0a76a081d62891ef4946204a916232401fa7c",
+    "evidence-shard": "object-descriptor:sha256:23188d4d24f4292ec1be3ba6b64adb4dee55d0a01c0df8f17a6d943a2798f9b4",
+    "graph-record:conflict": "graph-record:sha256:ba4feef973b26f49934df8eb89f073adab7ec4824f29d555720c55b2c64a2b22",
+    "graph-record:conflict-target": "graph-record:sha256:b255e9ee78478a70a73c201cb98aeebcd53b9c0e238632d55d8e054fb18e1454",
+    "graph-record:edge": "graph-record:sha256:ca3cdc2d764c5e4d6a0aece6ea7c7bc1303374ebc1f66db654cb17a8b77558f6",
+    "graph-record:evidence-link": "graph-record:sha256:051d79dee7fed355cb98fc0084fc8f568f7683f6c0bd912c4eab6df9d955fcb8",
+    "graph-record:frontier": "graph-record:sha256:922867a60027408b30066f6ec36a1191bfaec7f72805c8b45801f75599fb0ad0",
+    "graph-record:node": "graph-record:sha256:cc229907b1ce215d4c8b8bd4a47948b714d15cfe627ddcaccb721d89666e4a7c",
+    "graph-record:node-beta": "graph-record:sha256:863f2b30d5135dd12dcf06d29e2f8e233a0b16fd4d1a555e2e901b00a51d76de",
+    "graph-record:node-coarse": "graph-record:sha256:31499b57667be32eb4e5a4e8e9b6205935de24da7857a7cfc2ca722180ff6041",
+    "graph-record:property": "graph-record:sha256:d5d0fea915712d754f28969844cc949f0fc6e2659a85c5bb3e9570234dc0adfa",
+    "graph-record:refinement-mapping": "graph-record:sha256:d87df1f142a2b50b7d0787db3fcc9f1d0cb00baf5e96431e34a2b6507a9bb089",
+    "graph-revision": "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48",
+    "graph-revision:baseline": "graph-revision:sha256:c77e58b6d65c72bc0d30631da84a02f75aed77580cf0a09477ee9931de3a9318",
+    "graph-revision:coarse": "graph-revision:sha256:06deab5c3392f7c5c8050929c33c975ea5d2c1aaa29ba815fae8ec4f1533545c",
+    "graph-revision:empty": "graph-revision:sha256:bda0ead782b0abaac988973b2e58bb0685e40837b871675bec6c15fe334f78c5",
+    "graph-revision:refinement": "graph-revision:sha256:3e61b9689ddc6e3fcf140f2e92f0b7c1c08ae32e19b5e8b841fb88575da81fa6",
+    "graph-set-revision": "graph-set-revision:sha256:4787938dc61694dc247a4cceb4e1b6253dbd18868504ab7bf258c4db408f398a",
+    "graph-shard:baseline": "object-descriptor:sha256:8e33262755b31d5feda0465c843c7d850ea5e95c7055ca1867f81b8e22aadfaa",
+    "graph-shard:coarse": "object-descriptor:sha256:6eeba226992d284bcfb07c2fc56aea4e95dde37004f09d102755a22b5c0d77d2",
+    "graph-shard:conflict": "object-descriptor:sha256:99058cc8cc0da3d3b553d310ca7014f24e32e6d49740cc0613d6b660c2150c26",
+    "graph-shard:edge": "object-descriptor:sha256:a5ebe2d7318460421c3d65c9f8dba28513a560f552931e8412886eb8cfb91468",
+    "graph-shard:evidence-link": "object-descriptor:sha256:d23774a8c0404704168762c703df0e924946baa3f4cbfa5560316c7d8b5d18f7",
+    "graph-shard:frontier": "object-descriptor:sha256:f5697c40ee7eebc80488e78dd0aecdc010f0b25929a55f567e183cd5bd4a53e6",
+    "graph-shard:node": "object-descriptor:sha256:1df30a6b07f33c0f2c3d462593311b789bf9bd8d8ddf9b7ca05a078e273de4f5",
+    "graph-shard:property": "object-descriptor:sha256:fefa879d3a704e53d1acb6c7b42b512056b4a12787ded6912ce8f57a4654a292",
+    "graph-shard:refinement": "object-descriptor:sha256:deae72e8f001d7c6043a60a444b69050b7ece8b8e30bd8254fe1272b02096113",
+    "ledger-entry:evidence": "ledger-entry:sha256:4de936180b8974f07a8a98ec24b51a952f2a46009f36c65b0db6216025300e60",
+    "ledger-head": "ledger-entry:sha256:1760e7e4e7647164161fa2a0fe0c598a3ad87bee1db56ca1febe97fffa4350ae",
+    "materialization-recipe": "materialization-recipe:sha256:e5d36a896a2ee41f69ca73381951a19d92ecb3504e6cad077f71dfb1e9be136c",
+    "parameter-schema": "object-descriptor:sha256:f91ac399e3b7e09e86cf21a578d207f9bc65de3145a7a53ac2ef0dfb662ba9ed",
+    "parameter-values": "object-descriptor:sha256:fbd85471585eff48bbb8049fcec113d93d827edfbe626f8057dfdc980c2322d4",
+    "property-schema": "object-descriptor:sha256:f91ac399e3b7e09e86cf21a578d207f9bc65de3145a7a53ac2ef0dfb662ba9ed",
+    "property-value": "object-descriptor:sha256:1a881c5e4014994587fef93f0a53565424542bfac99723aff5f1210ec238962c",
+    "reference-event": "reference-event:sha256:7b4669e664a777b47732958ae1c764e7b60ad660f75ef0b626bcdef3f07e9969",
+    "refinement-summary": "object-descriptor:sha256:3176206d2689fa8553334b4ba6b40861cff96a1e3179a044f61556447f98f124",
+    "resource-limits": "object-descriptor:sha256:5ac63c5604a99107ac245a4f485b45fbc50768b92a82a9f32797ed0b4b4192bc",
+    "runtime-environment": "object-descriptor:sha256:95f9f4c35eb5cc94476aaf53986955c306ebcd9eb082fd20effcab5e9ee0d662",
+    "schema:admission-record": "object-descriptor:sha256:8d6eeacd3797a77a143d38c12e65ab8778c8612ac97e5653f22b8e4bae38e691",
+    "schema:evidence-record": "object-descriptor:sha256:2e1d1c388db00d239e078e9611fb35407f804ca30f2fcadf41761d690864522c",
+    "schema:graph-record": "object-descriptor:sha256:90cfdd2489c58fdd2bd86deeba1b5f3faabb08be9d78e65faa0248e4b0ae7567",
+    "schema:synthetic-subject": "object-descriptor:sha256:44eb870a40d09b15d90fd7d67ca2f6e0f8a0e748074b80b3857892d8c4123820",
+    "schema:synthetic-values": "object-descriptor:sha256:f91ac399e3b7e09e86cf21a578d207f9bc65de3145a7a53ac2ef0dfb662ba9ed",
+    "selector": "object-descriptor:sha256:aa2e37b09638eea4cb7563fce0bd12959b398fd60e789ab3411bc16d19ababef",
+    "source-tree": "object-descriptor:sha256:8d12d946a5b11e0866df748a42319b87187703391023238f6479041e630a3c9f",
+    "source:a": "object-descriptor:sha256:7124c5cd9f72f8ebf37cd1928505a7d955c488303993f10611db8d9a8eb1cfc6",
+    "source:b": "object-descriptor:sha256:d9c476e9f840a022f1195606b216950be4ba80c2325d7c44c2a912c73e7de5db",
+    "subject-identity:alpha": "object-descriptor:sha256:2d7cb691828998d5bba96cdf62d0a4eaccbdf3c92bc5187e512145c5fd7c07ef",
+    "subject-identity:beta": "object-descriptor:sha256:827582872a765b7ff3029ee887538e9d60268e50ff08355ab76b6dfb13c001a4",
+    "validation-result": "object-descriptor:sha256:e5ff60770d672a5f26ff3175244589a04b0d45007fbcd44809b77a93d1da9f1d"
+  },
+  "blob_object_ids": [
+    "workbench-blob-v2:sha256:0f98306adb638e8a1c7098dc3e83ed7bae5b2a2363ff4a1a14a6d12a0f35383c",
+    "workbench-blob-v2:sha256:1038ae391b7073c442eb3d69b814b8364104115ca73ae0e2adf863c5e617b707",
+    "workbench-blob-v2:sha256:1253dfad2f3771b5d67277bafef4b8cf3ae80a63d0b81794daa9767aadaf508b",
+    "workbench-blob-v2:sha256:12a4e46e3ad718b783d2b98dcfaa7768bdeff95bef7389951c002ef9d8e3204c",
+    "workbench-blob-v2:sha256:285893b88c0029a898ae0423bb6fe0c9676ecba8fb2a4b045c881244367825d4",
+    "workbench-blob-v2:sha256:35cda9bf27b989f6ddde69d6aeec2b6152e1c60c1b277811038ec67ce44e9f52",
+    "workbench-blob-v2:sha256:43d0116c4840dae22b8bee3ca563cf97873d817e2b4ffbc2af33623d311f32ed",
+    "workbench-blob-v2:sha256:44cb9ca929b624764316d9524b6aaf7d1df2f8054ff4205bc46eca4f88de7140",
+    "workbench-blob-v2:sha256:48f78e2b0ab9ff87768f83cefaa8c5360c97e1a6c898711164598154f91602b3",
+    "workbench-blob-v2:sha256:4dd09d133ce62ff4e3412657659991201659d226987053003a4c4312e5765c2a",
+    "workbench-blob-v2:sha256:4ddf2a06006c1230591b6dab425b9d69e84c755fcbe758b573628d14ea1eef02",
+    "workbench-blob-v2:sha256:52a5217216b8de72ecda1216ebba5581eecc290c6b8fd898ea6d9caabd7e595c",
+    "workbench-blob-v2:sha256:57b8b5069f61e78089b0bab4a74577c90eb595dc0724fd4f87d47a6f8009b14d",
+    "workbench-blob-v2:sha256:5aaa5b31adc0e4ab51d1ee69b889229d151605aef9bdd80418cf3f863e622f68",
+    "workbench-blob-v2:sha256:6e446b23ac0236566a54c07ad0bc37c72348ec64efd06ebc86fd79c63f24da21",
+    "workbench-blob-v2:sha256:773f38aef102e5e99145be7a0642da46047b1d4016c7544670820ec9748c8408",
+    "workbench-blob-v2:sha256:7e87698f2f1dec16b09a36a1f50e749869b2e6de192b63911d3737992891ce63",
+    "workbench-blob-v2:sha256:87a89cda99377fa7d4b77401266ab31c84f3cb0376f95221efa03c3320037f43",
+    "workbench-blob-v2:sha256:9d187a1122247e2efe1fc05b23cb86524ab5b9510bb6d2b27c8adfcdb2a5aebf",
+    "workbench-blob-v2:sha256:a5ce06db347959fd4bb236998efcde579bb68a3dd001ca5d613144b53915db7d",
+    "workbench-blob-v2:sha256:ab88b438b331246e803111251155da0af597b8e7db5a51864214c4ee4f51e525",
+    "workbench-blob-v2:sha256:b2b2a56ae0cfa3bec5184307ccb2f18440d14ca57b4a46249a4f453d2acef3ec",
+    "workbench-blob-v2:sha256:b595cb5b5d92d4865ea81fcab6fb754c0487921cb045cbbe519b66ecf500223f",
+    "workbench-blob-v2:sha256:d27ed977b5ac9e19be81e9be733a783a1db4314e7f60c8d01a7eca04d763bf00",
+    "workbench-blob-v2:sha256:d3c3ee73bc94003a0eaee99e2dd20141b3c7927b559bee3620cce884fadc1b6e",
+    "workbench-blob-v2:sha256:d75ffb973d17896751bfc67d743ed22e86b18116200d0fbfbbefa29514a8b1ac",
+    "workbench-blob-v2:sha256:de2817eb16a4138d6614433e2e7a211a8312ef7fc83c84edc373941748b1972b",
+    "workbench-blob-v2:sha256:e4e47024b1fdddc65c127584f2acb6714e994581ce2dcc60b97d3126c83546e0",
+    "workbench-blob-v2:sha256:e5360c9945b54b73e56f8d0cd957045a6ca98feeee83885cb4df2482f131a544",
+    "workbench-blob-v2:sha256:ee19980359b1442f716e4e03898fd28f0def469a381051d496723a91321e8547",
+    "workbench-blob-v2:sha256:fd0427cadd2ed5fe709e9405b9869bee0cf5216c99146fc0b7c221a6b3ee996f"
+  ],
+  "external_record_ids": [
+    "actor:sha256:396f1659ddfd8886d56922268dfde7ec074cbd5d97bcdf6d6c9466e05f30df1e",
+    "authority-adapter:sha256:0d8092a7b617b3abfc63ddf97ecba632972478b3fd9e218868130f3e24e8c691",
+    "authority-adapter:sha256:175aa9fcd0441a14c8d678a3f6fbf2282b68ef1a837ea5b0f4333c1d811c5f5c",
+    "authority-adapter:sha256:318c80ebbdfab4ac4c9344b3603883f9235128e0bfe37131b7227e73e0c2c5e8",
+    "authority-adapter:sha256:9093f57040bf9355cca8e3b59ae76d84164dbcb423c40584520c692f42570a9b",
+    "authority-adapter:sha256:c613ba15ac8afdb473df56223da9261e956e2c97e64195a11df0f48bc5e18554",
+    "authority:sha256:2c41e054f14dd2f50f356925bf1885979c5de9e9c6bcd331a9e2058dbfcb4dc7",
+    "authority:sha256:4bf8a79a2df9d58b0e04f85cfa0407bb185ecf8083c552466ac5c2eb5a9d82fa",
+    "authority:sha256:8f448a265fdd89f875172591a2139813f66a074822eaef669fa70ed3fc5a2966",
+    "authority:sha256:acf0fbae82dc84eb983752e09b9a5c07ba889f987d95955d41ebe63cd2557390",
+    "authority:sha256:df0e9f093137d4ee4bde6dadb0a5077cc10b4f3af74916bc080a57a0ff4004b6",
+    "authorization-decision:sha256:33de2a45e7f5cbb0a1948a1ba4e36416c4b664c7f5d7afeb855f1c02ed3b2b82",
+    "compatibility-decision:sha256:021878cbb046a4d434dc775fcb1b73c9e1108bc57ea2a34829d68f2890ccbf9d",
+    "compatibility-decision:sha256:6faf4bc87142c1c5342b968fbf272859e2fec8f4fe3b7eeb7b0da827731a4458",
+    "compatibility-decision:sha256:ec97a23aac9cd48cb2e092b1a82c37ecf2c3734d7ae60c694fca64b214cb9e32",
+    "component:sha256:4228ba97aaf8b123244778c4c5c95407dea4ee3ec8bacb9793daa2a28127db11",
+    "component:sha256:872a29d228c01f17322226907bfeaa5df64958e10ea67d1ffcb5d2b894ef148b",
+    "conformance-case:sha256:d0fe837610fedfde0dce940f6789ddaddf98b9a525cd57bc86b3489054328d1f",
+    "context-ref:sha256:a2e3ec738b990bba755f4f0cc0b73fdef7ca6b4659607465053272df136d8098",
+    "implementation:sha256:238ca05cc74d34ed95de7d3e1a619bb1f2a5a7d4128f5890250a7b4d420a1dce",
+    "implementation:sha256:90e5fd2e03a7e230c69859b27a544518b1e2edfe94735773f6e6371c00ae2403",
+    "implementation:sha256:c4ec14a91136dcfd4425d53fe8ea432db8ae3c1b89c5fcfcc07311cdc5dd14f3",
+    "owner-revision:sha256:024db2e897bf80fe629719ac0c214e7e39ea425d100fed3966c4dda0e32a224f",
+    "owner-revision:sha256:38ca338a0d7fd0be1763280fb88be16b6c6d2c537d94ee19340f24b86d6210fd",
+    "owner-revision:sha256:95d8ded34a5175db69031c8944fb7457f43e5a9a95d2d4999109193bd31287a3",
+    "owner-revision:sha256:b7cb915cc9f4749a770eadd010563cab3c33c0c8eae968836056eae2f5d5c046",
+    "owner-revision:sha256:fdec930ebacdd55ec161df0340924f73e42f3f461144f1ab44156986be10e694",
+    "policy:sha256:084d526b184b860dfcb708a61de82b7d86718b8e8d5269456c56d5fbaddb1bb9",
+    "policy:sha256:0b8bfc8fffd222927182ab40d1b601decc642e9cec23434814e365b2459e6967",
+    "policy:sha256:1a31a623844bb23dfb58ae79ca1a1ab8ddda7e756b29f233cb4f839ac15f9349",
+    "policy:sha256:2587f20c6f52166f73fd41395f580113c2454f6c2aeab01a0990b4cc03d59db6",
+    "policy:sha256:2c11cd436f30b67de346465b41140e029ddfd6703c11d64cb17808381b5f0d61",
+    "policy:sha256:5a060e49939440cd8f7eaa78e0d9032bbfe9479391383699f3e338c78be52e36",
+    "policy:sha256:5c60fe31f74131db52b746c9aa6a2a24db8a1b54d38e3ff39d769bbb649c24a7",
+    "policy:sha256:5cdf402acd50ad040ff7a0e5ee3f48b85e92cbce5ce576d107a4ac8c98cb821d",
+    "policy:sha256:676d2a609b0ae20d3b68bb9dc02c0c1682eb9fa324684f6c9459550935c8b5b2",
+    "policy:sha256:68831f2436c48342eb9ae667e6176c773bef6dfeb81cb177c1e52f67ccc98a1e",
+    "policy:sha256:755cf2ba5722543ad7c80ced56820d2390e21a2c3cba99e2fe01485be679871f",
+    "policy:sha256:7c0dd74f5fa8a0ba671d5066a66bd5d0f006cc153d6c6360e33a65eca4ccb673",
+    "policy:sha256:82f0c909b48d9d41f840ed44b550f987c0959da8321754908f91a855533a0ebf",
+    "policy:sha256:840fc32e77f2a5cac292bc1dadefb4d10566fee46496d4863ad1b7ed2cab9a28",
+    "policy:sha256:97f179a741923460d48007a0dec58084a9a50a64fe53fe2085deb0534c85f6a4",
+    "policy:sha256:9a69ea2aa04fcb5d33ee6be60ea20d96a5e313c9d4f081b03375bc9ef2769d0d",
+    "policy:sha256:a15d30fafde9350e42b17cbc1c21797436318193c1dac35389d1a4d8c094b600",
+    "policy:sha256:a6a54a024a8b721eacd25522f8f614b2d80ba85ae60f454cbfe656748b9677d0",
+    "policy:sha256:a8862ccf9bd1cebdb933f07ffddce53cb576b0e2dd1d72f435b67f82a038c457",
+    "policy:sha256:a9d4e50f3ba8648191d9c229d86ccf1e3ac4ed693be7777323e99104188495d8",
+    "policy:sha256:e6c0ca7aa258d217cbaf349931369c365747fa2db9ab4fc1c189a438515053c2",
+    "producer:sha256:98441fa5a0543d0f6eab64ad59a02390940d5e54405e785dcb9efbf67dbd93f4",
+    "profile-adapter:sha256:9860f904fbd62f0e6326f16edb14ed79bde9b62c66d8b87062f93a9eb4943d40",
+    "profile-revision:sha256:67a8d5ab083bd0d910e8017f7ddfd1e08b60b35db673a2c5622cfea0d7fd0d26",
+    "selector:sha256:226dc915a5335298680526a94bb58d2298b5495cbaf2254035427ca84af763f3",
+    "support-decision:sha256:288f82cae4f755c43cdfa92947e0716299098405ee5bf9b11eaddfdcd675acd4",
+    "tool:sha256:98768af94ac6b4d17fc7258d1df32b0057befe799a5dfd4df384c68ba1f5cd37",
+    "tool:sha256:ee3bc3a9c8636c545fb883e8f5751abcf24c8a9e2c017c6f2f43f1cc0af9fda1",
+    "transport-normalizer:sha256:c765b468a29df86430fe7582230f5d45237dbd798105e090464263cdf58f69ba",
+    "validation-requirement:sha256:05f5f6952fc7cf35ae65e92c9f127119b36a361422c3b304120bbbee1200c508",
+    "validator:sha256:b6c2664432286bb392e5d694628fbe7ad1a9d6955d120c12aab59bcc0935b80b"
+  ],
+  "external_scope_oracle": {
+    "count": 58,
+    "semantic_root": "3df36487519b0592c4ccbe8daf9e11dd2fb63e2a4380b3c885fbfdb8cc272e44"
+  },
+  "format": "workbench-crucible-v2-synthetic-publication-summary-v1",
+  "graph_record_ids_by_body_kind": {
+    "conflict": [
+      "graph-record:sha256:b255e9ee78478a70a73c201cb98aeebcd53b9c0e238632d55d8e054fb18e1454",
+      "graph-record:sha256:ba4feef973b26f49934df8eb89f073adab7ec4824f29d555720c55b2c64a2b22"
+    ],
+    "edge": [
+      "graph-record:sha256:ca3cdc2d764c5e4d6a0aece6ea7c7bc1303374ebc1f66db654cb17a8b77558f6"
+    ],
+    "evidence-link": [
+      "graph-record:sha256:051d79dee7fed355cb98fc0084fc8f568f7683f6c0bd912c4eab6df9d955fcb8"
+    ],
+    "frontier": [
+      "graph-record:sha256:922867a60027408b30066f6ec36a1191bfaec7f72805c8b45801f75599fb0ad0"
+    ],
+    "node": [
+      "graph-record:sha256:cc229907b1ce215d4c8b8bd4a47948b714d15cfe627ddcaccb721d89666e4a7c",
+      "graph-record:sha256:863f2b30d5135dd12dcf06d29e2f8e233a0b16fd4d1a555e2e901b00a51d76de",
+      "graph-record:sha256:31499b57667be32eb4e5a4e8e9b6205935de24da7857a7cfc2ca722180ff6041"
+    ],
+    "property": [
+      "graph-record:sha256:d5d0fea915712d754f28969844cc949f0fc6e2659a85c5bb3e9570234dc0adfa"
+    ],
+    "refinement-mapping": [
+      "graph-record:sha256:d87df1f142a2b50b7d0787db3fcc9f1d0cb00baf5e96431e34a2b6507a9bb089"
+    ]
+  },
+  "policy_expectation_oracle": {
+    "count": 84,
+    "semantic_root": "0aafd589354fcb5a36473f113db7796c7699b031bf830dc6bb530948ac4efcac"
+  },
+  "record_ids": [
+    "object-descriptor:sha256:8d6eeacd3797a77a143d38c12e65ab8778c8612ac97e5653f22b8e4bae38e691",
+    "object-descriptor:sha256:2e1d1c388db00d239e078e9611fb35407f804ca30f2fcadf41761d690864522c",
+    "object-descriptor:sha256:90cfdd2489c58fdd2bd86deeba1b5f3faabb08be9d78e65faa0248e4b0ae7567",
+    "object-descriptor:sha256:44eb870a40d09b15d90fd7d67ca2f6e0f8a0e748074b80b3857892d8c4123820",
+    "object-descriptor:sha256:f91ac399e3b7e09e86cf21a578d207f9bc65de3145a7a53ac2ef0dfb662ba9ed",
+    "object-descriptor:sha256:7124c5cd9f72f8ebf37cd1928505a7d955c488303993f10611db8d9a8eb1cfc6",
+    "object-descriptor:sha256:d9c476e9f840a022f1195606b216950be4ba80c2325d7c44c2a912c73e7de5db",
+    "object-descriptor:sha256:6769af431419ba8b152c26080ae21ea28ebe6808088b00fba907829ee2d6750b",
+    "object-descriptor:sha256:e5ff60770d672a5f26ff3175244589a04b0d45007fbcd44809b77a93d1da9f1d",
+    "object-descriptor:sha256:aa2e37b09638eea4cb7563fce0bd12959b398fd60e789ab3411bc16d19ababef",
+    "object-descriptor:sha256:fbd85471585eff48bbb8049fcec113d93d827edfbe626f8057dfdc980c2322d4",
+    "object-descriptor:sha256:8d12d946a5b11e0866df748a42319b87187703391023238f6479041e630a3c9f",
+    "object-descriptor:sha256:059d826a926ff87cb76c628e504236fd82c76599ab334cc5300a7b9580bdfa2c",
+    "object-descriptor:sha256:95f9f4c35eb5cc94476aaf53986955c306ebcd9eb082fd20effcab5e9ee0d662",
+    "object-descriptor:sha256:5ac63c5604a99107ac245a4f485b45fbc50768b92a82a9f32797ed0b4b4192bc",
+    "object-descriptor:sha256:8fe24948a5ac9ee722ecdb948128b0af9cadc3f83c9b3c59102c82081494c2b7",
+    "object-descriptor:sha256:1a881c5e4014994587fef93f0a53565424542bfac99723aff5f1210ec238962c",
+    "object-descriptor:sha256:3176206d2689fa8553334b4ba6b40861cff96a1e3179a044f61556447f98f124",
+    "evidence-record:sha256:f4d913b462047f982fb015eae2b35bdd7eed98bad577fa7cbc1c1394de3d4787",
+    "ledger-entry:sha256:4de936180b8974f07a8a98ec24b51a952f2a46009f36c65b0db6216025300e60",
+    "admission-record:sha256:59d60c8e7c0bb8faaa349ba23d56cb360f3969ce5e265096f0b3233387881027",
+    "ledger-entry:sha256:1760e7e4e7647164161fa2a0fe0c598a3ad87bee1db56ca1febe97fffa4350ae",
+    "object-descriptor:sha256:af7c2d40a472e60f08fb88c8c6ce42823d54a6302aea48c886d8ea57eca757ab",
+    "object-descriptor:sha256:23188d4d24f4292ec1be3ba6b64adb4dee55d0a01c0df8f17a6d943a2798f9b4",
+    "evidence-set-revision:sha256:9324e74e0262461d4821c0cf4ea0a76a081d62891ef4946204a916232401fa7c",
+    "object-descriptor:sha256:2d7cb691828998d5bba96cdf62d0a4eaccbdf3c92bc5187e512145c5fd7c07ef",
+    "object-descriptor:sha256:827582872a765b7ff3029ee887538e9d60268e50ff08355ab76b6dfb13c001a4",
+    "materialization-recipe:sha256:e5d36a896a2ee41f69ca73381951a19d92ecb3504e6cad077f71dfb1e9be136c",
+    "graph-record:sha256:cc229907b1ce215d4c8b8bd4a47948b714d15cfe627ddcaccb721d89666e4a7c",
+    "graph-record:sha256:863f2b30d5135dd12dcf06d29e2f8e233a0b16fd4d1a555e2e901b00a51d76de",
+    "graph-record:sha256:31499b57667be32eb4e5a4e8e9b6205935de24da7857a7cfc2ca722180ff6041",
+    "graph-record:sha256:ca3cdc2d764c5e4d6a0aece6ea7c7bc1303374ebc1f66db654cb17a8b77558f6",
+    "graph-record:sha256:d5d0fea915712d754f28969844cc949f0fc6e2659a85c5bb3e9570234dc0adfa",
+    "graph-record:sha256:051d79dee7fed355cb98fc0084fc8f568f7683f6c0bd912c4eab6df9d955fcb8",
+    "graph-record:sha256:922867a60027408b30066f6ec36a1191bfaec7f72805c8b45801f75599fb0ad0",
+    "graph-record:sha256:b255e9ee78478a70a73c201cb98aeebcd53b9c0e238632d55d8e054fb18e1454",
+    "graph-record:sha256:ba4feef973b26f49934df8eb89f073adab7ec4824f29d555720c55b2c64a2b22",
+    "object-descriptor:sha256:1df30a6b07f33c0f2c3d462593311b789bf9bd8d8ddf9b7ca05a078e273de4f5",
+    "object-descriptor:sha256:a5ebe2d7318460421c3d65c9f8dba28513a560f552931e8412886eb8cfb91468",
+    "object-descriptor:sha256:fefa879d3a704e53d1acb6c7b42b512056b4a12787ded6912ce8f57a4654a292",
+    "object-descriptor:sha256:d23774a8c0404704168762c703df0e924946baa3f4cbfa5560316c7d8b5d18f7",
+    "object-descriptor:sha256:f5697c40ee7eebc80488e78dd0aecdc010f0b25929a55f567e183cd5bd4a53e6",
+    "object-descriptor:sha256:99058cc8cc0da3d3b553d310ca7014f24e32e6d49740cc0613d6b660c2150c26",
+    "dependency-manifest:sha256:672a9de5a70af730cf5ad5e3cf2708a5d12f64261bfc3a791f09891aa0d1e66a",
+    "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48",
+    "object-descriptor:sha256:6eeba226992d284bcfb07c2fc56aea4e95dde37004f09d102755a22b5c0d77d2",
+    "dependency-manifest:sha256:2cbc83bea1fbb95b4e69b8ec567b08be61c8a2ddfeee7c59c0d260a2830f3a0c",
+    "graph-revision:sha256:06deab5c3392f7c5c8050929c33c975ea5d2c1aaa29ba815fae8ec4f1533545c",
+    "object-descriptor:sha256:8e33262755b31d5feda0465c843c7d850ea5e95c7055ca1867f81b8e22aadfaa",
+    "dependency-manifest:sha256:876218b3ed54e1f1e266cc4ea66f123fd060159cfcdab5fa644dda357e38899e",
+    "graph-revision:sha256:c77e58b6d65c72bc0d30631da84a02f75aed77580cf0a09477ee9931de3a9318",
+    "dependency-manifest:sha256:3d1e1c4866a17c96dbd6d8cd0961e7567d649bb07c169d6253d4c5143e38ab2b",
+    "graph-revision:sha256:bda0ead782b0abaac988973b2e58bb0685e40837b871675bec6c15fe334f78c5",
+    "graph-record:sha256:d87df1f142a2b50b7d0787db3fcc9f1d0cb00baf5e96431e34a2b6507a9bb089",
+    "object-descriptor:sha256:deae72e8f001d7c6043a60a444b69050b7ece8b8e30bd8254fe1272b02096113",
+    "dependency-manifest:sha256:9db08c9b737dfad2f2f30afbad452bb35832162c7e46ce5b83608ee6e4bcda7f",
+    "graph-revision:sha256:3e61b9689ddc6e3fcf140f2e92f0b7c1c08ae32e19b5e8b841fb88575da81fa6",
+    "graph-set-revision:sha256:4787938dc61694dc247a4cceb4e1b6253dbd18868504ab7bf258c4db408f398a",
+    "reference-event:sha256:7b4669e664a777b47732958ae1c764e7b60ad660f75ef0b626bcdef3f07e9969"
+  ],
+  "record_kind_counts": {
+    "admission-record": 1,
+    "dependency-manifest": 5,
+    "evidence-record": 1,
+    "evidence-set-revision": 1,
+    "graph-record": 10,
+    "graph-revision": 5,
+    "graph-set-revision": 1,
+    "ledger-entry": 2,
+    "materialization-recipe": 1,
+    "object-descriptor": 31,
+    "reference-event": 1
+  },
+  "reference_target": "graph-set-revision:sha256:4787938dc61694dc247a4cceb4e1b6253dbd18868504ab7bf258c4db408f398a",
+  "roots": {
+    "admission_partitions": [
+      {
+        "partition_key": "synthetic",
+        "semantic_root": "7c2a98291ab22107bbd77aafa50a377436e433ec199e58d37dff50fb9339bc1a",
+        "shard_ordinal": 0
+      }
+    ],
+    "aggregate": {
+      "dependency_manifests": {
+        "dependency-manifest:sha256:2cbc83bea1fbb95b4e69b8ec567b08be61c8a2ddfeee7c59c0d260a2830f3a0c": "488651d9a3bbfa19dec5ea9bfb911672e120d9ec656506da5a313beeddf6cf5c",
+        "dependency-manifest:sha256:3d1e1c4866a17c96dbd6d8cd0961e7567d649bb07c169d6253d4c5143e38ab2b": "40eec2393c47501dd0a37d93a9e0cd7a7991252dd7338a2e4908ab5ac6b1f9c8",
+        "dependency-manifest:sha256:672a9de5a70af730cf5ad5e3cf2708a5d12f64261bfc3a791f09891aa0d1e66a": "ea02c1c58a4c85e0f37f82bb4090cc5a67c200002bef0163b39300e8bc9a68c5",
+        "dependency-manifest:sha256:876218b3ed54e1f1e266cc4ea66f123fd060159cfcdab5fa644dda357e38899e": "64046b63ed806b31926be03cab7ba27a0e84c15d0e2071fc1d6d5afffb99948f",
+        "dependency-manifest:sha256:9db08c9b737dfad2f2f30afbad452bb35832162c7e46ce5b83608ee6e4bcda7f": "d000c930902be4c1fe7856bf1f936cafb3d365b56c193117f327938da1e5e34b"
+      },
+      "evidence_set_revision": "2544b23f58ee539c1d674ddb5ec72ca347673ef32dd5c04bf1c20b9f179b18aa",
+      "graph_revisions": {
+        "graph-revision:sha256:06deab5c3392f7c5c8050929c33c975ea5d2c1aaa29ba815fae8ec4f1533545c": "7fd46285c9930f8ad2fb501028b5285ed4c0b05ebf07719ef66e7045faad1d07",
+        "graph-revision:sha256:3e61b9689ddc6e3fcf140f2e92f0b7c1c08ae32e19b5e8b841fb88575da81fa6": "f9ba53175e2c94465d033360c5d61c0903973a3fbb9eabe935d1875281fbe5e0",
+        "graph-revision:sha256:bda0ead782b0abaac988973b2e58bb0685e40837b871675bec6c15fe334f78c5": "8e4c6d2198aeef6936bcb22d9a2fbf4c4ed295afb105391efaf1931cc6a1a509",
+        "graph-revision:sha256:c77e58b6d65c72bc0d30631da84a02f75aed77580cf0a09477ee9931de3a9318": "b5c286d232dd7b497a4d0702726b326987caecefcf32b2bfcc710ddc99ebac5f",
+        "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48": "62ee61f41ba8a1bcdafb457959e6eab5315e0d747ad2afae3db25b374382e047"
+      },
+      "graph_set_revision": "b2233b5e58475ab109cf780ff65bce04477007dcd4289b635da5a4619188f4a8"
+    },
+    "dependency_footprints": [
+      {
+        "dependency_manifest_id": "dependency-manifest:sha256:672a9de5a70af730cf5ad5e3cf2708a5d12f64261bfc3a791f09891aa0d1e66a",
+        "footprint_roots": [
+          "3ac9321401b54c2b9ab9a26f053b59b25a5bd4abe60935890e71a3b6ecde30d5"
+        ]
+      },
+      {
+        "dependency_manifest_id": "dependency-manifest:sha256:2cbc83bea1fbb95b4e69b8ec567b08be61c8a2ddfeee7c59c0d260a2830f3a0c",
+        "footprint_roots": [
+          "b63f799305dea351f90387edc2ce5e635bde9e05e9519f7f72a37d31a1c6b36b"
+        ]
+      },
+      {
+        "dependency_manifest_id": "dependency-manifest:sha256:876218b3ed54e1f1e266cc4ea66f123fd060159cfcdab5fa644dda357e38899e",
+        "footprint_roots": [
+          "089d01b2abdc29173abc9495ef733bcd6e4655df6aa86843379509988127ed63"
+        ]
+      },
+      {
+        "dependency_manifest_id": "dependency-manifest:sha256:3d1e1c4866a17c96dbd6d8cd0961e7567d649bb07c169d6253d4c5143e38ab2b",
+        "footprint_roots": []
+      },
+      {
+        "dependency_manifest_id": "dependency-manifest:sha256:9db08c9b737dfad2f2f30afbad452bb35832162c7e46ce5b83608ee6e4bcda7f",
+        "footprint_roots": [
+          "ed7f6faa6c6eb732d89b79c1783b7fbf6b5460d21ac3a7329a1e0e62803cc2ac"
+        ]
+      }
+    ],
+    "effective_admission": "0c259e1c71516aba2dbd73f31f378fbfac25a41389ca047c3fc55d12e3997bc5",
+    "effective_evidence": "467268950f93a47d49eda618d52687752203582f3e9a0c160ce2490fdbf9a15e",
+    "evidence_partitions": [
+      {
+        "partition_key": "synthetic",
+        "semantic_root": "f8d60d1200b58f3d33bfbd2d99a97064bfca5a0a13cdd2d6f3a8d6ec31866927",
+        "shard_ordinal": 0
+      }
+    ],
+    "graph_partitions": [
+      {
+        "graph_revision_id": "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48",
+        "partition_key": "synthetic.main",
+        "record_kind": "node",
+        "semantic_root": "0c2c87f0be0c98171a2aa1ec49c8eacc9851fbcad151ff7444497466207a75c1",
+        "shard_ordinal": 0
+      },
+      {
+        "graph_revision_id": "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48",
+        "partition_key": "synthetic.main",
+        "record_kind": "edge",
+        "semantic_root": "02086c0cc7e03d9af0afbe931049583e61991126538d17840715ff5d2ca3e816",
+        "shard_ordinal": 0
+      },
+      {
+        "graph_revision_id": "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48",
+        "partition_key": "synthetic.main",
+        "record_kind": "property",
+        "semantic_root": "21b70dd890dbfb1d169b263340e96a41a737e5d2596e9c49cd82df813b32238f",
+        "shard_ordinal": 0
+      },
+      {
+        "graph_revision_id": "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48",
+        "partition_key": "synthetic.main",
+        "record_kind": "evidence-link",
+        "semantic_root": "316d30f4694d6a22411d7a4afb997409bbe48f11866148e92368e961d779cd56",
+        "shard_ordinal": 0
+      },
+      {
+        "graph_revision_id": "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48",
+        "partition_key": "synthetic.main",
+        "record_kind": "frontier",
+        "semantic_root": "79c5d899fcaa8c2236a81a491fd6649eb023d9bd1e7c5ca1178cff3affe0525e",
+        "shard_ordinal": 0
+      },
+      {
+        "graph_revision_id": "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48",
+        "partition_key": "synthetic.main",
+        "record_kind": "conflict",
+        "semantic_root": "a303fc0152fbe305f25b774bb929f30af47b674d74047049f420235d94dfcc74",
+        "shard_ordinal": 0
+      },
+      {
+        "graph_revision_id": "graph-revision:sha256:06deab5c3392f7c5c8050929c33c975ea5d2c1aaa29ba815fae8ec4f1533545c",
+        "partition_key": "synthetic.coarse",
+        "record_kind": "node",
+        "semantic_root": "75d6ddecdaa902276934d63ceade33243de3a84bcd4195a80c35ff2dec7fac27",
+        "shard_ordinal": 0
+      },
+      {
+        "graph_revision_id": "graph-revision:sha256:c77e58b6d65c72bc0d30631da84a02f75aed77580cf0a09477ee9931de3a9318",
+        "partition_key": "synthetic.baseline",
+        "record_kind": "node",
+        "semantic_root": "b33d88638b20a7f8fe9f6f8e96c7d4c544b252943577c715d1c0f7b8d9d6b2cf",
+        "shard_ordinal": 0
+      },
+      {
+        "graph_revision_id": "graph-revision:sha256:3e61b9689ddc6e3fcf140f2e92f0b7c1c08ae32e19b5e8b841fb88575da81fa6",
+        "partition_key": "synthetic.refinement",
+        "record_kind": "refinement-mapping",
+        "semantic_root": "37c2fca9c4b42e0cba0eb216d567bf6863c62a10731ec5247892cfb5b790bfbc",
+        "shard_ordinal": 0
+      }
+    ],
+    "graph_records": {
+      "graph-revision:sha256:06deab5c3392f7c5c8050929c33c975ea5d2c1aaa29ba815fae8ec4f1533545c": {
+        "conflicts": null,
+        "edges": null,
+        "evidence_links": null,
+        "frontiers": null,
+        "nodes": "c71d80b75e12e75f8424306565ed8e1eb5376d162fd2efffba9f5465cb0143e8",
+        "properties": null,
+        "refinement_mappings": null
+      },
+      "graph-revision:sha256:3e61b9689ddc6e3fcf140f2e92f0b7c1c08ae32e19b5e8b841fb88575da81fa6": {
+        "conflicts": null,
+        "edges": null,
+        "evidence_links": null,
+        "frontiers": null,
+        "nodes": null,
+        "properties": null,
+        "refinement_mappings": "7da1af0a79e04a87d44465230197a0fa6917f3f9f991049aa34558ff6bb50f37"
+      },
+      "graph-revision:sha256:bda0ead782b0abaac988973b2e58bb0685e40837b871675bec6c15fe334f78c5": {
+        "conflicts": null,
+        "edges": null,
+        "evidence_links": null,
+        "frontiers": null,
+        "nodes": null,
+        "properties": null,
+        "refinement_mappings": null
+      },
+      "graph-revision:sha256:c77e58b6d65c72bc0d30631da84a02f75aed77580cf0a09477ee9931de3a9318": {
+        "conflicts": null,
+        "edges": null,
+        "evidence_links": null,
+        "frontiers": null,
+        "nodes": "15d45b75ae13ce04f3c0b4fcdbf45f035b826cdce5fd2a1b39e4ef39a8049612",
+        "properties": null,
+        "refinement_mappings": null
+      },
+      "graph-revision:sha256:f076b83602a33b593a100e2ac7ecb5673f7e3750def329e8a83d10dae83a4a48": {
+        "conflicts": "521218268094fb237960862389c87715f8e143cd429c6f7c8c01eb1b55ea136c",
+        "edges": "23b9baf9c3392d9ab552c59d3703179398f906cf88ccce11913e202da55b97bb",
+        "evidence_links": "da7027c6e44ecc0577d1c9562c8cef66647df18350424e066634fdbba89dc6e2",
+        "frontiers": "633715986953bcc57b47a76aa8275afa16042b51afa564b33b31d7cebcfb85e5",
+        "nodes": "23062c0ed5c3d9e985e81ca971fd5b4573414c818afefed9345fca5f679a84dc",
+        "properties": "9c61464a502f74314a5fd5b177ed25bd3b0d7cdeb7fab86792f2879d0ff498ae",
+        "refinement_mappings": null
+      }
+    }
+  },
+  "trusted_adapter_ids": [
+    "authority-adapter:sha256:0d8092a7b617b3abfc63ddf97ecba632972478b3fd9e218868130f3e24e8c691",
+    "authority-adapter:sha256:175aa9fcd0441a14c8d678a3f6fbf2282b68ef1a837ea5b0f4333c1d811c5f5c",
+    "authority-adapter:sha256:318c80ebbdfab4ac4c9344b3603883f9235128e0bfe37131b7227e73e0c2c5e8",
+    "authority-adapter:sha256:9093f57040bf9355cca8e3b59ae76d84164dbcb423c40584520c692f42570a9b",
+    "authority-adapter:sha256:c613ba15ac8afdb473df56223da9261e956e2c97e64195a11df0f48bc5e18554"
+  ]
+}

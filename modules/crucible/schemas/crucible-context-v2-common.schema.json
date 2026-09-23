@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-context-v2-common.schema.json",
+  "title": "Workbench Crucible context V2 common definitions",
+  "$defs": {
+    "semanticIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+    },
+    "schemaIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^workbench://[A-Za-z0-9._~!$&'()*+,;=:@%/-]+$"
+    },
+    "signedInteger": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "storeId": {"type": "string", "pattern": "^store:sha256:[0-9a-f]{64}$"},
+    "workspaceId": {"type": "string", "pattern": "^workspace:sha256:[0-9a-f]{64}$"},
+    "workspaceRegistrationRevisionId": {"type": "string", "pattern": "^workspace-registration-revision:sha256:[0-9a-f]{64}$"},
+    "platformProfileRevisionId": {"type": "string", "pattern": "^platform-profile-revision:sha256:[0-9a-f]{64}$"},
+    "packProfileRevisionId": {"type": "string", "pattern": "^pack-profile-revision:sha256:[0-9a-f]{64}$"},
+    "profileAdapterId": {"type": "string", "pattern": "^profile-adapter:sha256:[0-9a-f]{64}$"},
+    "supportDecisionId": {"type": "string", "pattern": "^support-decision:sha256:[0-9a-f]{64}$"},
+    "authorityId": {"type": "string", "pattern": "^authority:sha256:[0-9a-f]{64}$"},
+    "ownerRevisionId": {"type": "string", "pattern": "^owner-revision:sha256:[0-9a-f]{64}$"},
+    "authorityAdapterId": {"type": "string", "pattern": "^authority-adapter:sha256:[0-9a-f]{64}$"},
+    "sourceLockId": {"type": "string", "pattern": "^source-lock:sha256:[0-9a-f]{64}$"},
+    "dependencyLockId": {"type": "string", "pattern": "^dependency-lock:sha256:[0-9a-f]{64}$"},
+    "artifactLockId": {"type": "string", "pattern": "^artifact-lock:sha256:[0-9a-f]{64}$"},
+    "configurationLockId": {"type": "string", "pattern": "^configuration-lock:sha256:[0-9a-f]{64}$"},
+    "runtimeTargetId": {"type": "string", "pattern": "^runtime-target:sha256:[0-9a-f]{64}$"},
+    "installedRuntimeId": {"type": "string", "pattern": "^installed-runtime:sha256:[0-9a-f]{64}$"},
+    "runtimeEpochId": {"type": "string", "pattern": "^runtime-epoch:sha256:[0-9a-f]{64}$"},
+    "worldInstanceId": {"type": "string", "pattern": "^world-instance:sha256:[0-9a-f]{64}$"},
+    "worldCreationReceiptId": {"type": "string", "pattern": "^world-creation-receipt:sha256:[0-9a-f]{64}$"},
+    "saveLineageId": {"type": "string", "pattern": "^save-lineage:sha256:[0-9a-f]{64}$"},
+    "worldEpochId": {"type": "string", "pattern": "^world-epoch:sha256:[0-9a-f]{64}$"},
+    "worldGeneratorId": {"type": "string", "pattern": "^world-generator:sha256:[0-9a-f]{64}$"},
+    "worldTypeId": {"type": "string", "pattern": "^world-type:sha256:[0-9a-f]{64}$"},
+    "dimensionInstanceId": {"type": "string", "pattern": "^dimension-instance:sha256:[0-9a-f]{64}$"},
+    "dimensionRegistryId": {"type": "string", "pattern": "^dimension-registry:sha256:[0-9a-f]{64}$"},
+    "worldProviderId": {"type": "string", "pattern": "^world-provider:sha256:[0-9a-f]{64}$"},
+    "experimentId": {"type": "string", "pattern": "^experiment:sha256:[0-9a-f]{64}$"},
+    "fixtureId": {"type": "string", "pattern": "^fixture:sha256:[0-9a-f]{64}$"},
+    "actionId": {"type": "string", "pattern": "^action:sha256:[0-9a-f]{64}$"},
+    "captureScopeId": {"type": "string", "pattern": "^capture-scope:sha256:[0-9a-f]{64}$"},
+    "privacyClassId": {"type": "string", "pattern": "^privacy-class:sha256:[0-9a-f]{64}$"},
+    "resourceBudgetClassId": {"type": "string", "pattern": "^resource-budget-class:sha256:[0-9a-f]{64}$"},
+    "evidenceSetRevisionId": {"type": "string", "pattern": "^evidence-set-revision:sha256:[0-9a-f]{64}$"},
+    "graphRevisionId": {"type": "string", "pattern": "^graph-revision:sha256:[0-9a-f]{64}$"},
+    "graphSetRevisionId": {"type": "string", "pattern": "^graph-set-revision:sha256:[0-9a-f]{64}$"},
+    "materializationRecipeId": {"type": "string", "pattern": "^materialization-recipe:sha256:[0-9a-f]{64}$"},
+    "objectDescriptorId": {"type": "string", "pattern": "^object-descriptor:sha256:[0-9a-f]{64}$"},
+    "ontologyId": {"type": "string", "pattern": "^ontology:sha256:[0-9a-f]{64}$"},
+    "policyId": {"type": "string", "pattern": "^policy:sha256:[0-9a-f]{64}$"},
+    "queryIndexDescriptorId": {"type": "string", "pattern": "^query-index-descriptor:sha256:[0-9a-f]{64}$"},
+    "transportNormalizerId": {"type": "string", "pattern": "^transport-normalizer:sha256:[0-9a-f]{64}$"},
+    "authorityBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_authority_id", "owner_revision_id", "authority_adapter_id"],
+      "properties": {
+        "owner_authority_id": {"$ref": "#/$defs/authorityId"},
+        "owner_revision_id": {"$ref": "#/$defs/ownerRevisionId"},
+        "authority_adapter_id": {"$ref": "#/$defs/authorityAdapterId"}
+      }
+    },
+    "supportState": {
+      "enum": ["experimental", "provisional", "tested-supported", "unsupported"]
+    },
+    "workspaceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_id", "workspace_registration_revision_id"],
+      "properties": {
+        "workspace_id": {"$ref": "#/$defs/workspaceId"},
+        "workspace_registration_revision_id": {"$ref": "#/$defs/workspaceRegistrationRevisionId"}
+      }
+    },
+    "platformProfileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform_profile_revision_id", "profile_adapter_id", "profile_authority", "support_decision_ids", "support_state"],
+      "properties": {
+        "platform_profile_revision_id": {"$ref": "#/$defs/platformProfileRevisionId"},
+        "profile_adapter_id": {"$ref": "#/$defs/profileAdapterId"},
+        "profile_authority": {"$ref": "#/$defs/authorityBinding"},
+        "support_decision_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/supportDecisionId"}
+        },
+        "support_state": {"$ref": "#/$defs/supportState"}
+      }
+    },
+    "packProfileScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "none"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "pack_profile_revision_id", "profile_adapter_id", "profile_authority", "support_decision_ids", "support_state"],
+          "properties": {
+            "kind": {"const": "selected"},
+            "pack_profile_revision_id": {"$ref": "#/$defs/packProfileRevisionId"},
+            "profile_adapter_id": {"$ref": "#/$defs/profileAdapterId"},
+            "profile_authority": {"$ref": "#/$defs/authorityBinding"},
+            "support_decision_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/supportDecisionId"}
+            },
+            "support_state": {"$ref": "#/$defs/supportState"}
+          }
+        }
+      ]
+    },
+    "profileScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "pack"],
+      "properties": {
+        "platform": {"$ref": "#/$defs/platformProfileBinding"},
+        "pack": {"$ref": "#/$defs/packProfileScope"}
+      }
+    },
+    "runtimeScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "none"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "runtime_target_id", "installed_runtime_id", "runtime_epoch_id", "side", "configuration_lock_ids"],
+          "properties": {
+            "kind": {"const": "selected"},
+            "runtime_target_id": {"$ref": "#/$defs/runtimeTargetId"},
+            "installed_runtime_id": {"$ref": "#/$defs/installedRuntimeId"},
+            "runtime_epoch_id": {"$ref": "#/$defs/runtimeEpochId"},
+            "side": {"enum": ["client", "integrated-server", "dedicated-server"]},
+            "configuration_lock_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/configurationLockId"}
+            }
+          }
+        }
+      ]
+    },
+    "worldGenerationScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "not-applicable"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "seed", "world_type_id", "generator_id", "generator_configuration_object_descriptor_id"],
+          "properties": {
+            "kind": {"const": "applicable"},
+            "seed": {"$ref": "#/$defs/signedInteger"},
+            "world_type_id": {"$ref": "#/$defs/worldTypeId"},
+            "generator_id": {"$ref": "#/$defs/worldGeneratorId"},
+            "generator_configuration_object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"}
+          }
+        }
+      ]
+    },
+    "worldScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "none"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "runtime_epoch_id", "world_instance_id", "world_creation_receipt_id", "save_lineage_id", "world_epoch_id", "generation"],
+          "properties": {
+            "kind": {"const": "selected"},
+            "runtime_epoch_id": {"$ref": "#/$defs/runtimeEpochId"},
+            "world_instance_id": {"$ref": "#/$defs/worldInstanceId"},
+            "world_creation_receipt_id": {"$ref": "#/$defs/worldCreationReceiptId"},
+            "save_lineage_id": {"$ref": "#/$defs/saveLineageId"},
+            "world_epoch_id": {"$ref": "#/$defs/worldEpochId"},
+            "generation": {"$ref": "#/$defs/worldGenerationScope"}
+          }
+        }
+      ]
+    },
+    "dimensionScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "none"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "world_epoch_id", "dimension_instance_id", "numeric_dimension_id", "dimension_registry_id", "provider_id"],
+          "properties": {
+            "kind": {"const": "selected"},
+            "world_epoch_id": {"$ref": "#/$defs/worldEpochId"},
+            "dimension_instance_id": {"$ref": "#/$defs/dimensionInstanceId"},
+            "numeric_dimension_id": {"$ref": "#/$defs/signedInteger"},
+            "dimension_registry_id": {"$ref": "#/$defs/dimensionRegistryId"},
+            "provider_id": {"$ref": "#/$defs/worldProviderId"}
+          }
+        }
+      ]
+    },
+    "chunkCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "z"],
+      "properties": {
+        "x": {"$ref": "#/$defs/signedInteger"},
+        "z": {"$ref": "#/$defs/signedInteger"}
+      }
+    },
+    "regionScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "none"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "dimension_instance_id", "minimum_chunk_inclusive", "maximum_chunk_exclusive"],
+          "properties": {
+            "kind": {"const": "chunk-bounds"},
+            "dimension_instance_id": {"$ref": "#/$defs/dimensionInstanceId"},
+            "minimum_chunk_inclusive": {"$ref": "#/$defs/chunkCoordinate"},
+            "maximum_chunk_exclusive": {"$ref": "#/$defs/chunkCoordinate"}
+          }
+        }
+      ]
+    },
+    "operationScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope_kind", "scope_id"],
+      "properties": {
+        "scope_kind": {"enum": ["experiment", "fixture", "action", "capture-scope"]},
+        "scope_id": {
+          "type": "string",
+          "pattern": "^(?:experiment|fixture|action|capture-scope):sha256:[0-9a-f]{64}$"
+        }
+      },
+      "allOf": [
+        {"if": {"properties": {"scope_kind": {"const": "experiment"}}}, "then": {"properties": {"scope_id": {"$ref": "#/$defs/experimentId"}}}},
+        {"if": {"properties": {"scope_kind": {"const": "fixture"}}}, "then": {"properties": {"scope_id": {"$ref": "#/$defs/fixtureId"}}}},
+        {"if": {"properties": {"scope_kind": {"const": "action"}}}, "then": {"properties": {"scope_id": {"$ref": "#/$defs/actionId"}}}},
+        {"if": {"properties": {"scope_kind": {"const": "capture-scope"}}}, "then": {"properties": {"scope_id": {"$ref": "#/$defs/captureScopeId"}}}}
+      ]
+    },
+    "inputKey": {"$ref": "#/$defs/semanticIdentifier"},
+    "evidenceSetBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "evidence_set_revision_id"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "evidence_set_revision_id": {"$ref": "#/$defs/evidenceSetRevisionId"}
+      }
+    },
+    "graphBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "graph_revision_id"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "graph_revision_id": {"$ref": "#/$defs/graphRevisionId"}
+      }
+    },
+    "graphSetBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "graph_set_revision_id"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "graph_set_revision_id": {"$ref": "#/$defs/graphSetRevisionId"}
+      }
+    },
+    "recipeBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "materialization_recipe_id"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "materialization_recipe_id": {"$ref": "#/$defs/materializationRecipeId"}
+      }
+    },
+    "schemaBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "schema_id", "schema_object_descriptor_id"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "schema_id": {"$ref": "#/$defs/schemaIdentifier"},
+        "schema_object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"}
+      }
+    },
+    "ontologyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "ontology_id", "authority_binding"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "ontology_id": {"$ref": "#/$defs/ontologyId"},
+        "authority_binding": {"$ref": "#/$defs/authorityBinding"}
+      }
+    },
+    "adapterBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "adapter_kind", "adapter_id", "authority_binding"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "adapter_kind": {"enum": ["authority-adapter", "profile-adapter", "transport-normalizer"]},
+        "adapter_id": {"type": "string", "pattern": "^(?:authority-adapter|profile-adapter|transport-normalizer):sha256:[0-9a-f]{64}$"},
+        "authority_binding": {"$ref": "#/$defs/authorityBinding"}
+      },
+      "allOf": [
+        {"if": {"properties": {"adapter_kind": {"const": "authority-adapter"}}}, "then": {"properties": {"adapter_id": {"$ref": "#/$defs/authorityAdapterId"}}}},
+        {"if": {"properties": {"adapter_kind": {"const": "profile-adapter"}}}, "then": {"properties": {"adapter_id": {"$ref": "#/$defs/profileAdapterId"}}}},
+        {"if": {"properties": {"adapter_kind": {"const": "transport-normalizer"}}}, "then": {"properties": {"adapter_id": {"$ref": "#/$defs/transportNormalizerId"}}}}
+      ]
+    },
+    "policyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "policy_id", "authority_binding"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "policy_id": {"$ref": "#/$defs/policyId"},
+        "authority_binding": {"$ref": "#/$defs/authorityBinding"}
+      }
+    },
+    "indexBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_key", "query_index_descriptor_id"],
+      "properties": {
+        "input_key": {"$ref": "#/$defs/inputKey"},
+        "query_index_descriptor_id": {"$ref": "#/$defs/queryIndexDescriptorId"}
+      }
+    }
+  }
+}

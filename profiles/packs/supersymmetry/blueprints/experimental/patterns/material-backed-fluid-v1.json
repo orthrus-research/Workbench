@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "format": "workbench-blueprints-convention-patch-v1",
+  "pattern_key": "supersymmetry-material-backed-fluid",
+  "version": "1.0.0",
+  "lifecycle": "experimental",
+  "authority": {
+    "profile": "workbench-pack:supersymmetry",
+    "observed_revision": "97a44866fe2079f30b4a89721a2625d2dd02f411",
+    "organization": "central-material-declaration-plus-petrochemistry-register-plus-central-en-us-fluids"
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "minimum": null,
+      "maximum": null,
+      "min_length": 1,
+      "max_length": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 _-]*$"
+    },
+    "registry_name": {
+      "type": "string",
+      "minimum": null,
+      "maximum": null,
+      "min_length": 1,
+      "max_length": 96,
+      "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+    },
+    "symbol_name": {
+      "type": "string",
+      "minimum": null,
+      "maximum": null,
+      "min_length": 1,
+      "max_length": 96,
+      "pattern": "^[A-Z][A-Za-z0-9]*$"
+    },
+    "material_id": {
+      "type": "integer",
+      "minimum": 20000,
+      "maximum": 20999,
+      "min_length": null,
+      "max_length": null,
+      "pattern": null
+    },
+    "color": {
+      "type": "string",
+      "minimum": null,
+      "maximum": null,
+      "min_length": 8,
+      "max_length": 8,
+      "pattern": "^0x[0-9a-f]{6}$"
+    },
+    "translation": {
+      "type": "string",
+      "minimum": null,
+      "maximum": null,
+      "min_length": 1,
+      "max_length": 128,
+      "pattern": "^[^\\r\\n=]+$"
+    }
+  },
+  "allocation": {
+    "domain": "supersymmetry-petrochemistry-material-id-experimental",
+    "minimum": 20000,
+    "maximum": 20999,
+    "owner_path": "groovy/material/PetrochemistryMaterials.groovy"
+  },
+  "atlas": {
+    "baseline_id": "SRC-PACK@9d3aa7ae0294bf27f0b8acbb893d61da23a06972",
+    "queries": [
+      {
+        "id": "diluted-oil-light-material-convention",
+        "query_id": "CIT-PACK-DILUTED-OIL-MATERIAL",
+        "result_id": "SRC-PACK@9d3aa7ae0294bf27f0b8acbb893d61da23a06972:CIT-PACK-DILUTED-OIL-MATERIAL",
+        "invariants": [
+          {
+            "id": "builder-id",
+            "result_path": "/registration/material_id",
+            "operator": "equals",
+            "expected": 20000
+          },
+          {
+            "id": "builder-name",
+            "result_path": "/registration/registry_name",
+            "operator": "equals",
+            "expected": "diluted_oil_light"
+          },
+          {
+            "id": "fluid-form",
+            "result_path": "/registration/form",
+            "operator": "equals",
+            "expected": "liquid"
+          },
+          {
+            "id": "namespace-helper",
+            "result_path": "/registration/namespace_helper",
+            "operator": "equals",
+            "expected": "SuSyUtility.susyId"
+          },
+          {
+            "id": "source-path",
+            "result_path": "/source/path",
+            "operator": "equals",
+            "expected": "groovy/material/PetrochemistryMaterials.groovy"
+          },
+          {
+            "id": "source-revision",
+            "result_path": "/source/revision",
+            "operator": "equals",
+            "expected": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972"
+          }
+        ]
+      },
+      {
+        "id": "diluted-oil-light-localization-convention",
+        "query_id": "SRC-PACK@9d3aa7ae0294bf27f0b8acbb893d61da23a06972:resources/langfiles/lang/en_us.lang#susy.material.diluted_oil_light",
+        "result_id": "source-file:sha256:d23c3107bf54a6a25f59a0f129fb8135e2e71dcc7b08f569fbc6c6db5009cb0a",
+        "invariants": [
+          {
+            "id": "localization-key",
+            "result_path": "/localization/key",
+            "operator": "equals",
+            "expected": "susy.material.diluted_oil_light"
+          },
+          {
+            "id": "localization-path",
+            "result_path": "/source/path",
+            "operator": "equals",
+            "expected": "resources/langfiles/lang/en_us.lang"
+          },
+          {
+            "id": "localization-value",
+            "result_path": "/localization/value",
+            "operator": "equals",
+            "expected": "Diluted Light Oil"
+          },
+          {
+            "id": "source-revision",
+            "result_path": "/source/revision",
+            "operator": "equals",
+            "expected": "9d3aa7ae0294bf27f0b8acbb893d61da23a06972"
+          }
+        ]
+      }
+    ]
+  },
+  "edits": [
+    {
+      "id": "declare-susy-material",
+      "path": "groovy/material/SuSyMaterials.groovy",
+      "position": "before",
+      "anchor": "    // First Degree Materials A\n",
+      "snippet": "    public static Material {{symbol_name}}\n\n",
+      "required_once": [
+        "class SuSyMaterials {",
+        "    // Petrochem Materials\n",
+        "    // First Degree Materials A\n"
+      ],
+      "forbidden": [
+        "public static Material {{symbol_name}}\n"
+      ]
+    },
+    {
+      "id": "register-petrochemistry-material",
+      "path": "groovy/material/PetrochemistryMaterials.groovy",
+      "position": "before",
+      "anchor": "\n    }\n}",
+      "snippet": "\n\n        {{symbol_name}} = new Material.Builder({{material_id}}, SuSyUtility.susyId('{{registry_name}}'))\n                .liquid()\n                .color({{color}})\n                .flags(FLAMMABLE)\n                .build()",
+      "required_once": [
+        "class PetrochemistryMaterials {",
+        "    static void register() {",
+        "import static material.SuSyMaterials.*"
+      ],
+      "forbidden": [
+        "SuSyUtility.susyId('{{registry_name}}')"
+      ]
+    },
+    {
+      "id": "localize-material-fluid",
+      "path": "resources/langfiles/lang/en_us.lang",
+      "position": "before",
+      "anchor": "\n# Thermodynamics\n",
+      "snippet": "\nsusy.material.{{registry_name}}={{translation}}\n",
+      "required_once": [
+        "# Fluids\n",
+        "\n# Thermodynamics\n"
+      ],
+      "forbidden": [
+        "susy.material.{{registry_name}}="
+      ]
+    }
+  ]
+}

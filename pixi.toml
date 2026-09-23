@@ -1,0 +1,89 @@
+[workspace]
+name = "workbench"
+description = "Cleanroom-first Minecraft 1.12.2 developer environment"
+authors = ["Workbench maintainers"]
+channels = ["conda-forge"]
+channel-priority = "strict"
+conda-pypi-map = false
+requires-pixi = "==0.75.0"
+exclude-newer = "2026-08-14T00:00:00Z"
+platforms = [
+  { name = "linux-x86-64", platform = "linux-64", glibc = "2.28" },
+  { name = "linux-arm64", platform = "linux-aarch64", glibc = "2.28" },
+  { name = "windows-x86-64", platform = "win-64", windows = "10.0.26100" },
+  { name = "windows-arm64", platform = "win-arm64", windows = "10.0.26100" },
+  { name = "macos-x86-64", platform = "osx-64", macos = "15.0" },
+  { name = "macos-arm64", platform = "osx-arm64", macos = "15.0" },
+]
+
+[dependencies]
+python = "==3.14.6"
+
+[pypi-dependencies]
+packaging = "==26.0"
+PyYAML = "==6.0.3"
+jsonschema = "==4.19.2"
+referencing = "==0.36.2"
+
+[pypi-options]
+no-build = true
+index-strategy = "first-index"
+
+[tasks]
+setup = { cmd = "python tools/pixi_setup.py", description = "Provision the locked Workbench core and exact Cleanroom Java runtime" }
+setup-core = { cmd = "python tools/pixi_setup.py --core-only", description = "Verify the locked Workbench core without downloading Java" }
+workbench = { cmd = "python tools/workbench.py", description = "Run the Workbench command surface" }
+doctor = { cmd = "python tools/workbench.py doctor", description = "Inspect a workspace without changing it" }
+environment-status = { cmd = "python tools/workbench.py environment status", description = "Report Pixi/source/package provenance, footprint, and repair guidance without changing it" }
+console = { cmd = "python tools/workbench.py console wizard", description = "Open the interactive Workbench command wizard" }
+version = { cmd = "python tools/workbench.py --version", description = "Report the exact Workbench core identity" }
+component-versions = { cmd = "python tools/component_versions.py check", description = "Validate native package and IDE client version authorities" }
+test-packaging = { cmd = "python -m unittest validation.tests.test_public_package validation.tests.test_platform_matrix validation.tests.test_install_workbench validation.tests.test_component_versions", description = "Run native distribution and source-environment checks" }
+validate = { cmd = "python validation/validate.py", description = "Run fast developer-facing validation" }
+
+[feature.workspace-tools]
+platforms = [
+  "linux-x86-64",
+  "linux-arm64",
+  "windows-x86-64",
+  "macos-x86-64",
+  "macos-arm64",
+]
+
+[feature.workspace-tools.dependencies]
+git = "==2.55.0"
+
+[feature.release-tools.dependencies]
+pip = "==26.1.2"
+
+[feature.release-tools.tasks]
+build-wheelhouse = { cmd = "python tools/build_native_distribution.py", description = "Build a hash-locked native wheelhouse for this Python target" }
+install-workbench = { cmd = "python tools/install_workbench.py", description = "Install a trusted native wheelhouse into a new dedicated environment" }
+
+[feature.compatibility-runtime]
+platforms = [
+  "linux-x86-64",
+  "linux-arm64",
+  "windows-x86-64",
+  "macos-x86-64",
+  "macos-arm64",
+]
+
+[feature.compatibility-runtime.dependencies]
+python = "==3.13.14"
+git = "==2.55.0"
+
+[feature.compatibility-runtime.pypi-dependencies]
+packaging = "==26.0"
+PyYAML = "==6.0.3"
+jsonschema = "==4.19.2"
+referencing = "==0.36.2"
+
+[feature.compatibility-runtime.pypi-options]
+no-build = true
+index-strategy = "first-index"
+
+[environments]
+workspace = { features = ["workspace-tools"], solve-group = "workbench" }
+release = { features = ["release-tools"], solve-group = "workbench" }
+compatibility = { features = ["compatibility-runtime"], no-default-feature = true }

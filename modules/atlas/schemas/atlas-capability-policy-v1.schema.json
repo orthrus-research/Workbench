@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-capability-policy-v1.schema.json",
+  "title": "Supersymmetry Atlas target capability policy v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "policy_id",
+    "admitted_target_kinds",
+    "selector_policies",
+    "metadata_sections",
+    "section_policies"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "enum": [1]
+    },
+    "policy_id": {
+      "enum": ["ATLAS-CAPABILITY-POLICY-V1"]
+    },
+    "admitted_target_kinds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "material",
+          "item",
+          "item-variant",
+          "fluid",
+          "fluid-variant",
+          "ore-dictionary",
+          "ore-prefix",
+          "recipe",
+          "recipe-map",
+          "machine",
+          "recipe-rule",
+          "process-rule",
+          "worldgen-deposit",
+          "quest",
+          "entity"
+        ]
+      }
+    },
+    "selector_policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "runtime_kind",
+          "key_kinds"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "material",
+              "item",
+              "item-variant",
+              "fluid",
+              "fluid-variant",
+              "ore-dictionary",
+              "ore-prefix",
+              "recipe",
+              "recipe-map",
+              "machine",
+              "recipe-rule",
+              "process-rule",
+              "worldgen-deposit",
+              "quest",
+              "entity"
+            ]
+          },
+          "runtime_kind": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "key_kinds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            }
+          }
+        }
+      }
+    },
+    "metadata_sections": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "runtime",
+          "evidence",
+          "snapshot_id",
+          "profile_scope",
+          "known_gaps",
+          "assertions"
+        ]
+      }
+    },
+    "section_policies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "section",
+          "target_kinds",
+          "required_authorities",
+          "optional_authorities",
+          "rationale"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "section": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "target_kinds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "material",
+                "item",
+                "item-variant",
+                "fluid",
+                "fluid-variant",
+                "ore-dictionary",
+                "ore-prefix",
+                "recipe",
+                "recipe-map",
+                "machine",
+                "recipe-rule",
+                "process-rule",
+                "worldgen-deposit",
+                "quest",
+                "entity"
+              ]
+            }
+          },
+          "required_authorities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "runtime-mechanics",
+                "runtime-presentation",
+                "pinned-source",
+                "quest-data",
+                "curated-interpretation",
+                "placed-world-observation"
+              ]
+            }
+          },
+          "optional_authorities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "runtime-mechanics",
+                "runtime-presentation",
+                "pinned-source",
+                "quest-data",
+                "curated-interpretation",
+                "placed-world-observation"
+              ]
+            }
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S(?:.*\\S)?$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-crucible"
+version = "0.1.3"
+description = "Workbench crucible module"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.0,<0.2.0", "jsonschema==4.19.2", "referencing==0.36.2"]
+
+[project.entry-points."workbench.modules"]
+"crucible" = "workbench_registration_crucible:module"
+
+[tool.setuptools]
+packages = ["workbench_crucible_context", "workbench_crucible_diagnostics", "workbench_crucible_gtceu_subsurface", "workbench_crucible_gtceu_worldgen", "workbench_crucible_gtceu_worldgen_impact", "workbench_crucible_jobs", "workbench_crucible_kernel", "workbench_crucible_materializer", "workbench_crucible_mixin_custody", "workbench_crucible_mixins", "workbench_crucible_run_profiles", "workbench_crucible_runtime_snapshot", "workbench_crucible_service", "workbench_crucible_stage_snapshot", "workbench_crucible_strata_observation", "workbench_crucible_strata_micro_region", "workbench_crucible", "workbench_crucible_worldgen_iteration", "workbench_crucible_observatory", "workbench_crucible_worldgen", "workbench_resources.modules.crucible"]
+py-modules = ["workbench_registration_crucible"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.crucible" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.modules.crucible" = ["pyproject.toml", "README.md", "contracts/**/*", "schemas/**/*", "src/**/*.py", "tests/fixtures/**/*", "tools/**/*.py"]
+
+[tool.workbench]
+module-id = "crucible"
+requires = []
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]

@@ -1,0 +1,15 @@
+{
+  "compatibility_annotation_descriptor": "Lorg/spongepowered/asm/mixin/Compatibility;",
+  "component": {
+    "distribution": "CleanMix",
+    "distribution_version": "0.7.0",
+    "source_revision": "24898e32adc735fe48f4a3732b1831bd566c4626"
+  },
+  "default_class_compatibility": "0.6.0",
+  "format": "workbench-mixin-ap-compatibility-policy-v1",
+  "member_key_encoding": "cleanmix-class-member-v1",
+  "metadata_resource": "cleanmix_version_compatibility.json",
+  "mixin_annotation_descriptor": "Lorg/spongepowered/asm/mixin/Mixin;",
+  "policy_id": "workbench-cleanroom-cleanmix-0.7.0-ap-compatibility-policy-v1",
+  "schema_version": 1
+}

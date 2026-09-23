@@ -1,0 +1,473 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/packwiz-materialization-receipt-v2.schema.json",
+  "title": "Workbench local Packwiz materialization receipt V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "materialization_id",
+    "operation_class",
+    "state",
+    "readiness",
+    "plan_id",
+    "request",
+    "workspace",
+    "project",
+    "source_snapshot",
+    "refreshed_pack",
+    "tools",
+    "option_policy",
+    "packwiz_options",
+    "bootstrap_source",
+    "seeds",
+    "launcher",
+    "payload",
+    "target",
+    "evidence",
+    "warnings",
+    "limitations"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-packwiz-materialization-receipt-v2"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "materialization_id": {
+      "$ref": "#/$defs/sha256Id"
+    },
+    "operation_class": {
+      "const": "local-mutation"
+    },
+    "state": {
+      "const": "materialized"
+    },
+    "readiness": {
+      "const": "pack-payload-installed"
+    },
+    "plan_id": {
+      "$ref": "#/$defs/sha256Id"
+    },
+    "request": {
+      "type": "object",
+      "required": ["launcher", "side"],
+      "properties": {
+        "launcher": {
+          "enum": ["prism", "multimc"]
+        },
+        "side": {
+          "const": "client"
+        }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "project": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "source_snapshot": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "refreshed_pack": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "tools": {
+      "type": "object",
+      "required": ["installer", "java", "packwiz"]
+    },
+    "option_policy": {
+      "$ref": "#/$defs/optionPolicy"
+    },
+    "packwiz_options": {
+      "$ref": "#/$defs/packwizOptions"
+    },
+    "bootstrap_source": {
+      "$ref": "#/$defs/bootstrapSource"
+    },
+    "seeds": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "launcher": {
+      "type": "object",
+      "required": [
+        "manifest_sha256_after",
+        "manifest_sha256_before",
+        "manifest_uri"
+      ],
+      "properties": {
+        "manifest_sha256_after": {
+          "$ref": "#/$defs/sha256"
+        },
+        "manifest_sha256_before": {
+          "$ref": "#/$defs/sha256"
+        },
+        "manifest_uri": {
+          "$ref": "#/$defs/fileUri"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["file_count", "root_uri", "total_bytes", "tree_sha256"],
+      "properties": {
+        "file_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "root_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tree_sha256": {
+          "$ref": "#/$defs/sha256Id"
+        }
+      }
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "evidence": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonempty"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonempty"
+      }
+    }
+  },
+  "$defs": {
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sha256Id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "fileUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^file:"
+    },
+    "byteIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "size"],
+      "properties": {
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "installerState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relative_path",
+        "uri",
+        "cached_side",
+        "initial",
+        "final"
+      ],
+      "properties": {
+        "relative_path": {
+          "const": "packwiz.json"
+        },
+        "uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "cached_side": {
+          "const": "client"
+        },
+        "initial": {
+          "$ref": "#/$defs/byteIdentity"
+        },
+        "final": {
+          "$ref": "#/$defs/byteIdentity"
+        }
+      }
+    },
+    "optionalFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metadata_path",
+        "metafile_sha256",
+        "output_path",
+        "output_sha256",
+        "output_size",
+        "name",
+        "side",
+        "declared_default",
+        "applied",
+        "present"
+      ],
+      "properties": {
+        "metadata_path": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "metafile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "output_path": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "output_sha256": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "output_size": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "null"}
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "side": {
+          "enum": ["client", "both"]
+        },
+        "declared_default": {
+          "type": "boolean"
+        },
+        "applied": {
+          "type": "boolean"
+        },
+        "present": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "declared_default": {"const": false},
+                "applied": {"const": false}
+              }
+            },
+            {
+              "properties": {
+                "declared_default": {"const": true},
+                "applied": {"const": true}
+              }
+            }
+          ]
+        },
+        {
+          "if": {
+            "properties": {"present": {"const": true}}
+          },
+          "then": {
+            "properties": {
+              "output_sha256": {"$ref": "#/$defs/sha256"},
+              "output_size": {"type": "integer", "minimum": 0},
+              "applied": {"const": true}
+            }
+          },
+          "else": {
+            "properties": {
+              "output_sha256": {"type": "null"},
+              "output_size": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "applied": {"const": true}
+            },
+            "required": ["side", "applied"]
+          },
+          "then": {
+            "properties": {"present": {"const": true}}
+          },
+          "else": {
+            "properties": {"present": {"const": false}}
+          }
+        }
+      ]
+    },
+    "optionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["side", "optional_files", "launcher_metadata"],
+      "properties": {
+        "side": {
+          "const": "client"
+        },
+        "optional_files": {
+          "const": "pack-declared-defaults"
+        },
+        "launcher_metadata": {
+          "const": "isolated-empty-sentinel"
+        }
+      }
+    },
+    "packwizOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "policy_version",
+        "policy_sha256",
+        "decisions_sha256",
+        "optional_count",
+        "enabled_count",
+        "disabled_count",
+        "installer_state",
+        "files"
+      ],
+      "properties": {
+        "policy": {
+          "const": "pack-declared-defaults"
+        },
+        "policy_version": {
+          "const": 1
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256Id"
+        },
+        "decisions_sha256": {
+          "$ref": "#/$defs/sha256Id"
+        },
+        "optional_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "enabled_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "disabled_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "installer_state": {
+          "$ref": "#/$defs/installerState"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/optionalFile"
+          }
+        }
+      }
+    },
+    "bootstrapSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_root_uri",
+        "receipt_uri",
+        "receipt_sha256",
+        "receipt_size",
+        "launcher_tree"
+      ],
+      "properties": {
+        "fixture_root_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "receipt_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "receipt_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "launcher_tree": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["file_count", "total_bytes", "tree_sha256"],
+          "properties": {
+            "file_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "total_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "tree_sha256": {
+              "$ref": "#/$defs/sha256Id"
+            }
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variant",
+        "variant_id",
+        "variant_root_uri",
+        "fixture_root_uri",
+        "instance_root_uri",
+        "receipt_uri"
+      ],
+      "properties": {
+        "variant": {
+          "const": "packwiz-v2"
+        },
+        "variant_id": {
+          "$ref": "#/$defs/sha256Id"
+        },
+        "variant_root_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "fixture_root_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "instance_root_uri": {
+          "$ref": "#/$defs/fileUri"
+        },
+        "receipt_uri": {
+          "allOf": [
+            {"$ref": "#/$defs/fileUri"},
+            {"pattern": "/receipts/packwiz-materialization-v2\\.json$"}
+          ]
+        }
+      }
+    }
+  }
+}

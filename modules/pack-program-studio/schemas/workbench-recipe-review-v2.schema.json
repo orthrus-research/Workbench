@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-recipe-review-v2.schema.json",
+  "title": "Workbench Recipe Review V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "report_id",
+    "operation_class",
+    "authority",
+    "source_report",
+    "profile",
+    "selection",
+    "summary",
+    "files",
+    "machine_recipes",
+    "direct_removal_calls",
+    "attention",
+    "review_guidance",
+    "evidence",
+    "limitations",
+    "next_actions"
+  ],
+  "properties": {
+    "format": {"const": "workbench-recipe-review-v2"},
+    "schema_version": {"const": 2},
+    "report_id": {
+      "type": "string",
+      "pattern": "^workbench-recipe-review:sha256:[0-9a-f]{64}$"
+    },
+    "operation_class": {"const": "read-only"},
+    "authority": {
+      "type": "object",
+      "required": ["analysis_owner", "git_identity_owner", "construction_authority"]
+    },
+    "source_report": {
+      "type": "object",
+      "required": ["format", "schema_version", "report_id", "availability"],
+      "properties": {
+        "format": {"const": "workbench-groovy-pack-program-report-v1"},
+        "schema_version": {"const": 1},
+        "report_id": {"type": "string"},
+        "availability": {"const": "rerun with --full-json-v1"}
+      }
+    },
+    "profile": {"type": "object"},
+    "selection": {"type": "object"},
+    "summary": {
+      "type": "object",
+      "required": [
+        "status",
+        "strict_exit_code",
+        "analysis_state",
+        "comparison_state",
+        "runtime_state",
+        "changed_source_files",
+        "machine_recipes",
+        "direct_removal_source_statements"
+      ],
+      "properties": {
+        "status": {"enum": ["ready", "attention", "blocked"]},
+        "strict_exit_code": {"enum": [0, 1, 2]},
+        "analysis_state": {"type": "string"},
+        "comparison_state": {"type": "string"},
+        "runtime_state": {"type": "string"},
+        "changed_source_files": {"type": "integer", "minimum": 0},
+        "machine_recipes": {"$ref": "#/$defs/changeCounts"},
+        "direct_removal_source_statements": {"type": "object"}
+      }
+    },
+    "files": {
+      "type": "object",
+      "required": ["added", "modified", "removed"],
+      "properties": {
+        "added": {"$ref": "#/$defs/boundedPaths"},
+        "modified": {"$ref": "#/$defs/boundedPaths"},
+        "removed": {"$ref": "#/$defs/boundedPaths"}
+      }
+    },
+    "machine_recipes": {
+      "type": "object",
+      "required": ["modified", "added", "removed", "pairing_boundary"],
+      "properties": {
+        "modified": {"$ref": "#/$defs/boundedRows"},
+        "added": {"$ref": "#/$defs/boundedRows"},
+        "removed": {"$ref": "#/$defs/boundedRows"},
+        "pairing_boundary": {"type": "string", "minLength": 1}
+      }
+    },
+    "direct_removal_calls": {
+      "type": "object",
+      "required": ["added", "removed", "boundary"],
+      "properties": {
+        "added": {"$ref": "#/$defs/boundedRows"},
+        "removed": {"$ref": "#/$defs/boundedRows"},
+        "boundary": {"type": "string", "minLength": 1}
+      }
+    },
+    "attention": {"type": "object"},
+    "review_guidance": {"type": "object"},
+    "evidence": {"type": "object"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "next_actions": {"type": "array", "items": {"type": "object"}}
+  },
+  "$defs": {
+    "changeCounts": {
+      "type": "object",
+      "required": ["modified", "added", "removed"],
+      "properties": {
+        "modified": {"type": "integer", "minimum": 0},
+        "added": {"type": "integer", "minimum": 0},
+        "removed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "boundedRows": {
+      "type": "object",
+      "required": ["rows", "row_count", "truncated"],
+      "properties": {
+        "rows": {"type": "array", "maxItems": 200, "items": {"type": "object"}},
+        "row_count": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "boundedPaths": {
+      "type": "object",
+      "required": ["paths", "path_count", "truncated"],
+      "properties": {
+        "paths": {"type": "array", "maxItems": 2000, "items": {"type": "string"}},
+        "path_count": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"}
+      }
+    }
+  }
+}

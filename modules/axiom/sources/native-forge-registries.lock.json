@@ -1,0 +1,96 @@
+{
+  "schema": "axiom.native-forge-registry-source-lock.v1",
+  "revision": "fe78db8dc4fcee47df7549230858f4c064208d73",
+  "references": [
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/IForgeRegistryEntry.java",
+      "gitBlob": "ec5fb6eec31153e7f87f16612f7f6b0022514c17",
+      "sha256": "0a0a885d02d269793974dde935ca1eb3a045d0baadb5d93a24289c417589f3c8"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/IRegistryDelegate.java",
+      "gitBlob": "d1262fb443620336261a5a8bb7ca7f2ee102c8c4",
+      "sha256": "d5a5c1e60e41464f24576cc4e6c956b3d461a29566319719cde38f62b45ad13f"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/RegistryDelegate.java",
+      "gitBlob": "65f73ffe548cac69bf1138b470512dec3153f04e",
+      "sha256": "dd506627244da46265a1fb74c91f3fc8dd2153c338f959d44dbd2e968a7428e1"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/IForgeRegistry.java",
+      "gitBlob": "c72bf673f19eece95a2d220512fb795033f4b7d6",
+      "sha256": "7317d1205f1e7757434077b1d1571e684ce5f67956ccc27dcf202b2109374ca8"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/IForgeRegistryInternal.java",
+      "gitBlob": "2e06d099985417630b698fb0598558044d96ddd3",
+      "sha256": "601237286733f63fb2396e42044bf12a9fa8207c1a274bb2b60a0b43699e0ac0"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/IForgeRegistryModifiable.java",
+      "gitBlob": "5d44f56cfe983368417b14a59341c535b06993c3",
+      "sha256": "3885c541072a3a7d929bff8f6e616d0b214940b808b78a80f1f254fc0e9fc924"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/ILockableRegistry.java",
+      "gitBlob": "ef59ffcfaadf5c7c60a1e3fd50077c522c24dd5d",
+      "sha256": "53a131ebb816275f278356f2b5db4affd13e696f5606eb9b946fdf8631b726a4"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/ForgeRegistry.java",
+      "gitBlob": "707e4d505202496bb0f814af7b0990237b6ccd09",
+      "sha256": "f91f9766266ee6ec1fa5f7c1d80a2057a4144869ba3592bed5d3aca9c4bae75b"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/RegistryManager.java",
+      "gitBlob": "d257af577abac2bf42b3a010ece95eb8a91badab",
+      "sha256": "e7c88f4dbe65a7691b06ec6cd66f6b03a9707976e7702af4eb0045d1f0938272"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/RegistryBuilder.java",
+      "gitBlob": "6064ed1ec414b4806b4d9aee613eeecfaf6e9290",
+      "sha256": "19c49864a3957a7de5a254f2b878fffbabaca813d30743302b5d6ca7c1aa9f26"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/NamespacedWrapper.java",
+      "gitBlob": "e51b07217c9663c002f6a2ddd0c547defd722de0",
+      "sha256": "1cc91262806e3dcce4fa6695fb9ed52d2342816d024e15451b45a6764548b5ab"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/GameData.java",
+      "gitBlob": "07d241bf8ec556a88bbc765b3ce7c10032978fd8",
+      "sha256": "ed47f38eb4a14896413804f3c9564b7282e960885d6da43dab5667f1d54a1eb7"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/FMLLog.java",
+      "gitBlob": "222dcaaceead1067cb06b8db8a9edfef1615ca12",
+      "sha256": "dcf8e07bcc6b38025f26c74c6c97b668f1178851c1797bf9eb35f199c3a821d5"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/fml/common/registry/GameRegistry.java",
+      "gitBlob": "c6629aea40a628a9b6f4225327f5e4c895d07aab",
+      "sha256": "b3ff9f75ce2038345d6ab3ba62577cf8396a1c05c72426b32bf5f13ffbbba9ff"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/registries/NamespacedDefaultedWrapper.java",
+      "gitBlob": "dab1f73806fafc7a283ce2dbba8e79518f1990f5",
+      "sha256": "902219a28b73a8b84f9d0f5393fd73cea524f0ca82c18314fe93c90afe8336eb"
+    }
+  ]
+}

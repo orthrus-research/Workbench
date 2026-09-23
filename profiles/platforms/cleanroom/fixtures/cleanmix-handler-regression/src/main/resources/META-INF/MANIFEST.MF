@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+ModType: CRL
+FMLCorePlugin: dev.workbench.cleanmixhandler.bootstrap.HarnessLoadingPlugin
+FMLCorePluginContainsFMLMod: true
+MixinConfigs: mixins.workbench.cleanmix-handler-regression.json
+ForceLoadAsMod: true

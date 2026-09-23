@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": "runtime-diagnose-1",
+  "method": "runtime/diagnose",
+  "params": {
+    "receipt_uri": "file:///workspace/.workbench/evidence/runtime/launch/runtime-launch-v1.json",
+    "artifact_root_uris": [
+      "file:///workspace/.workbench/fixtures/client/instance"
+    ]
+  }
+}

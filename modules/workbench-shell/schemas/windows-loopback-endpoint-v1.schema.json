@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/windows-loopback-endpoint-v1.schema.json",
+  "title": "Workbench Windows authenticated loopback endpoint V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "endpoint_id",
+    "format",
+    "host",
+    "port",
+    "schema_version"
+  ],
+  "properties": {
+    "endpoint_id": {
+      "type": "string",
+      "pattern": "^windows-loopback-endpoint:sha256:[0-9a-f]{64}$"
+    },
+    "format": {"const": "workbench-windows-loopback-endpoint-v1"},
+    "host": {"const": "127.0.0.1"},
+    "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+    "schema_version": {"const": 1}
+  }
+}

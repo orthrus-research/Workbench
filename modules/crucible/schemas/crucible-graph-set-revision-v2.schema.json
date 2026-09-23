@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-graph-set-revision-v2.schema.json",
+  "title": "Workbench Crucible graph-set revision V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "graph_set_family_id",
+    "purpose_id",
+    "composition_owner",
+    "context_ref_id",
+    "evidence_set_revision_ids",
+    "profile_support_bindings",
+    "compatibility_rule_id",
+    "compatibility_rule_authority",
+    "compatibility_constraints_object_descriptor_id",
+    "members",
+    "join_graphs",
+    "refinement_graphs",
+    "coverage",
+    "completeness",
+    "support_state",
+    "limitations",
+    "conflict_record_ids",
+    "aggregate_semantic_root"
+  ],
+  "properties": {
+    "kind": {"const": "graph-set-revision"},
+    "format": {"const": "workbench-crucible-graph-set-revision-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-graph-set-revision-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {
+      "type": "string",
+      "pattern": "^graph-set-revision:sha256:[0-9a-f]{64}$"
+    },
+    "graph_set_family_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "purpose_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "composition_owner": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorityBinding"},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/contextRefId"},
+    "evidence_set_revision_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceSetRevisionId"}
+    },
+    "profile_support_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/profileSupportBinding"}
+    },
+    "compatibility_rule_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/policyId"},
+    "compatibility_rule_authority": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorityBinding"},
+    "compatibility_constraints_object_descriptor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/objectDescriptorId"},
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphMember"}
+    },
+    "join_graphs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/auxiliaryGraphMember"}
+    },
+    "refinement_graphs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/auxiliaryGraphMember"}
+    },
+    "coverage": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/coverage"},
+    "completeness": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/completenessState"},
+    "support_state": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/supportState"},
+    "limitations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/limitation"}
+    },
+    "conflict_record_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphRecordId"}
+    },
+    "aggregate_semantic_root": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/sha256"}
+  }
+}

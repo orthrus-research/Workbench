@@ -1,0 +1,195 @@
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.27-kappa'
+}
+
+group = producer_group
+version = producer_version
+
+layout.buildDirectory = file(
+    '../../../../../../.workbench/build/supersymmetry/ultimate-runtime-graph-producer'
+)
+
+base {
+    archivesName = producer_archive
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.cleanroommc.com' }
+}
+
+def gregTechJar = providers.gradleProperty('workbenchGregTechJar')
+def groovyScriptJar = providers.gradleProperty('workbenchGroovyScriptJar')
+def suSyJar = providers.gradleProperty('workbenchSuSyJar')
+def supercriticalJar = providers.gradleProperty('workbenchSupercriticalJar')
+def betterQuestingJar = providers.gradleProperty('workbenchBetterQuestingJar')
+def appliedEnergisticsJar = providers.gradleProperty('workbenchAppliedEnergisticsJar')
+def techGunsJar = providers.gradleProperty('workbenchTechGunsJar')
+def industrialRenewalJar = providers.gradleProperty('workbenchIndustrialRenewalJar')
+def rsGaugesJar = providers.gradleProperty('workbenchRsGaugesJar')
+def rfToolsJar = providers.gradleProperty('workbenchRfToolsJar')
+def mcJtyLibJar = providers.gradleProperty('workbenchMcJtyLibJar')
+def openComputersJar = providers.gradleProperty('workbenchOpenComputersJar')
+def biomesOPlentyJar = providers.gradleProperty('workbenchBiomesOPlentyJar')
+def recurrentComplexJar = providers.gradleProperty('workbenchRecurrentComplexJar')
+def ivToolkitJar = providers.gradleProperty('workbenchIvToolkitJar')
+def caveGeneratorJar = providers.gradleProperty('workbenchCaveGeneratorJar')
+def jeiJar = providers.gradleProperty('workbenchJeiJar')
+
+dependencies {
+    if (groovyScriptJar.isPresent()) {
+        compileOnly files(groovyScriptJar.get())
+    }
+    if (gregTechJar.isPresent()) {
+        compileOnly files(gregTechJar.get())
+    }
+    if (suSyJar.isPresent()) {
+        compileOnly files(suSyJar.get())
+    }
+    if (supercriticalJar.isPresent()) {
+        compileOnly files(supercriticalJar.get())
+    }
+    if (betterQuestingJar.isPresent()) {
+        compileOnly files(betterQuestingJar.get())
+    }
+    if (appliedEnergisticsJar.isPresent()) {
+        compileOnly files(appliedEnergisticsJar.get())
+    }
+    if (techGunsJar.isPresent()) {
+        compileOnly files(techGunsJar.get())
+    }
+    if (industrialRenewalJar.isPresent()) {
+        compileOnly files(industrialRenewalJar.get())
+    }
+    if (rsGaugesJar.isPresent()) {
+        compileOnly files(rsGaugesJar.get())
+    }
+    if (rfToolsJar.isPresent()) {
+        compileOnly files(rfToolsJar.get())
+    }
+    if (mcJtyLibJar.isPresent()) {
+        compileOnly files(mcJtyLibJar.get())
+    }
+    if (openComputersJar.isPresent()) {
+        compileOnly files(openComputersJar.get())
+    }
+    if (biomesOPlentyJar.isPresent()) {
+        compileOnly files(biomesOPlentyJar.get())
+    }
+    if (recurrentComplexJar.isPresent()) {
+        compileOnly files(recurrentComplexJar.get())
+    }
+    if (ivToolkitJar.isPresent()) {
+        compileOnly files(ivToolkitJar.get())
+    }
+    if (caveGeneratorJar.isPresent()) {
+        compileOnly files(caveGeneratorJar.get())
+    }
+    if (jeiJar.isPresent()) {
+        compileOnly files(jeiJar.get())
+    }
+}
+
+unimined.minecraft {
+    version minecraft_version
+
+    mappings {
+        mcp(mcp_channel, mcp_version)
+    }
+
+    cleanroom {
+        loader cleanroom_version
+    }
+
+    defaultRemapJar = false
+    remap(tasks.named('jar').get())
+}
+
+tasks.withType(JavaCompile).configureEach {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+    options.encoding = 'UTF-8'
+    doFirst {
+        if (!groovyScriptJar.isPresent() || !gregTechJar.isPresent()
+            || !suSyJar.isPresent() || !supercriticalJar.isPresent()
+            || !betterQuestingJar.isPresent() || !appliedEnergisticsJar.isPresent()
+            || !techGunsJar.isPresent() || !industrialRenewalJar.isPresent()
+            || !rsGaugesJar.isPresent() || !rfToolsJar.isPresent()
+            || !mcJtyLibJar.isPresent() || !openComputersJar.isPresent()
+            || !biomesOPlentyJar.isPresent() || !recurrentComplexJar.isPresent()
+            || !ivToolkitJar.isPresent() || !caveGeneratorJar.isPresent()
+            || !jeiJar.isPresent()) {
+            throw new GradleException(
+                'compile requires exact -PworkbenchGroovyScriptJar, '
+                    + '-PworkbenchGregTechJar, -PworkbenchSuSyJar, '
+                    + '-PworkbenchSupercriticalJar, and '
+                    + '-PworkbenchBetterQuestingJar, '
+                    + '-PworkbenchAppliedEnergisticsJar, and '
+                    + '-PworkbenchTechGunsJar, '
+                    + '-PworkbenchIndustrialRenewalJar, '
+                    + '-PworkbenchRsGaugesJar, -PworkbenchRfToolsJar, '
+                    + '-PworkbenchMcJtyLibJar, and '
+                    + '-PworkbenchOpenComputersJar, '
+                    + '-PworkbenchBiomesOPlentyJar, '
+                    + '-PworkbenchRecurrentComplexJar, '
+                    + '-PworkbenchIvToolkitJar, and '
+                    + '-PworkbenchCaveGeneratorJar, and '
+                    + '-PworkbenchJeiJar dependencies'
+            )
+        }
+        [
+            'GroovyScript': file(groovyScriptJar.get()),
+            'GTCEu': file(gregTechJar.get()),
+            'SuSy': file(suSyJar.get()),
+            'Supercritical': file(supercriticalJar.get()),
+            'BetterQuesting': file(betterQuestingJar.get()),
+            'Applied Energistics 2': file(appliedEnergisticsJar.get()),
+            'TechGuns': file(techGunsJar.get()),
+            'Industrial Renewal': file(industrialRenewalJar.get()),
+            'RSGauges': file(rsGaugesJar.get()),
+            'ReFinedTools': file(rfToolsJar.get()),
+            'McJtyLib': file(mcJtyLibJar.get()),
+            'OpenComputers': file(openComputersJar.get()),
+            'Biomes O Plenty': file(biomesOPlentyJar.get()),
+            'Recurrent Complex': file(recurrentComplexJar.get()),
+            'IvToolkit': file(ivToolkitJar.get()),
+            'Cave Generator': file(caveGeneratorJar.get()),
+            'Had Enough Items': file(jeiJar.get())
+        ].each { label, dependency ->
+            if (!dependency.isFile()) {
+                throw new GradleException(label + ' compile dependency is not a regular file: ' + dependency)
+            }
+        }
+    }
+}
+
+tasks.named('processResources').configure {
+    inputs.property('producerVersion', project.version)
+    inputs.property('minecraftVersion', minecraft_version)
+    filesMatching('mcmod.info') {
+        expand(version: project.version, mcversion: minecraft_version)
+    }
+}
+
+tasks.named('jar').configure {
+    archiveClassifier = 'dev'
+    manifest {
+        attributes(
+            'ModType': 'CRL',
+            'FMLCorePlugin': 'dev.workbench.crucible.runtimegraph.core.RuntimeGraphLoadingPlugin',
+            'FMLCorePluginContainsFMLMod': 'true',
+            'ForceLoadAsMod': 'true'
+        )
+    }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    finalizedBy(tasks.named('remapJar'))
+}

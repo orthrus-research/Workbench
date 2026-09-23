@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-groovy-pack-profile-v1.schema.json",
+  "title": "Workbench Groovy pack program profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "profile_id",
+    "pack_profile_id",
+    "platform_profile",
+    "source_layout",
+    "expected_run_config",
+    "rules",
+    "identity_policies",
+    "limitations"
+  ],
+  "properties": {
+    "format": {"const": "workbench-groovy-pack-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"type": "string", "minLength": 1},
+    "pack_profile_id": {"type": "string", "minLength": 1},
+    "platform_profile": {"type": "string", "minLength": 1},
+    "source_layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["groovy_root", "run_config", "max_files", "max_file_bytes", "max_total_bytes"],
+      "properties": {
+        "groovy_root": {"type": "string", "minLength": 1},
+        "run_config": {"type": "string", "minLength": 1},
+        "max_files": {"type": "integer", "minimum": 1},
+        "max_file_bytes": {"type": "integer", "minimum": 1},
+        "max_total_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "expected_run_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack_name", "pack_id"],
+      "properties": {
+        "pack_name": {"type": "string"},
+        "pack_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/rule"}
+    },
+    "identity_policies": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/identityPolicy"}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "argument", "mode"],
+      "properties": {
+        "field": {"type": "string", "minLength": 1},
+        "argument": {"type": ["integer", "null"], "minimum": 0},
+        "mode": {
+          "enum": ["integer", "string", "first-string", "wrapped-string", "expression", "qualifier", "terminal"]
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "category", "kind", "operation", "match", "captures", "identity_fields", "reload", "description"],
+      "properties": {
+        "rule_id": {"type": "string", "minLength": 1},
+        "category": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "operation": {"type": "string", "minLength": 1},
+        "match": {"type": "object", "minProperties": 1},
+        "captures": {"type": "array", "items": {"$ref": "#/$defs/capture"}},
+        "identity_fields": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "reload": {"enum": ["stage", "unknown", "restart-required"]},
+        "description": {"type": "string", "minLength": 1}
+      }
+    },
+    "identityPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "rule_id", "field", "identity_kind", "disposition", "save_risk"],
+      "properties": {
+        "policy_id": {"type": "string", "minLength": 1},
+        "rule_id": {"type": "string", "minLength": 1},
+        "field": {"type": "string", "minLength": 1},
+        "identity_kind": {"type": "string", "minLength": 1},
+        "disposition": {"enum": ["review", "reject"]},
+        "save_risk": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

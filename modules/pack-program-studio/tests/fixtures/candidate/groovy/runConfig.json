@@ -1,0 +1,17 @@
+{
+  "packName": "Supersymmetry",
+  "packId": "supersymmetry",
+  "version": "fixture",
+  "debug": false,
+  "loaders": {
+    "preInit": [
+      "classes/",
+      "material/",
+      "preInit/"
+    ],
+    "postInit": [
+      "prePostInit/",
+      "postInit/"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "api": {
+    "pull_request_url_template": "https://api.github.com/repos/SymmetricDevs/Supersymmetry/pulls/{number}"
+  },
+  "format": "workbench-pull-request-provider-profile-v1",
+  "git_refs": {
+    "head_template": "refs/pull/{number}/head",
+    "merge_template": "refs/pull/{number}/merge"
+  },
+  "profile_id": "workbench-pack:supersymmetry:github-pull-requests-v1",
+  "project_id": "supersymmetry",
+  "provider": "github",
+  "repository": {
+    "name": "Supersymmetry",
+    "owner": "SymmetricDevs"
+  },
+  "schema_version": 1,
+  "web": {
+    "pull_request_url_template": "https://github.com/SymmetricDevs/Supersymmetry/pull/{number}"
+  }
+}

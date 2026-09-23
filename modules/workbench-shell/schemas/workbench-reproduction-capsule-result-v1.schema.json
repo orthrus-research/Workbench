@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/workbench-reproduction-capsule-result-v1.schema.json",
+  "title": "Workbench Reproduction Capsule publication result V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "capsule_id", "diagnosis_id", "path", "size", "sha256"],
+  "properties": {
+    "format": {"const": "workbench-reproduction-capsule-result-v1"},
+    "capsule_id": {"type": "string", "pattern": "^workbench-reproduction-capsule:sha256:[0-9a-f]{64}$"},
+    "diagnosis_id": {"type": "string", "pattern": "^workbench-diagnosis:sha256:[0-9a-f]{64}$"},
+    "path": {"type": "string", "minLength": 1, "maxLength": 8192},
+    "size": {"type": "integer", "minimum": 1, "maximum": 16777216},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

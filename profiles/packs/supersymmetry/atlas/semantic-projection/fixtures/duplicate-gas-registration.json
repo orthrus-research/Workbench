@@ -1,0 +1,112 @@
+{
+  "declarations": [
+    {
+      "alias": "sulfur_trioxide_reaction_mixture_gas_acidic",
+      "attributes": {
+        "fluid_state": "gas",
+        "label": "Sulfur Trioxide Reaction Mixture gas",
+        "properties": [
+          "acidic"
+        ]
+      },
+      "descriptor": {
+        "domain": "material-fluid-state",
+        "key": {
+          "material": "susy:sulfur_trioxide_reaction_mixture",
+          "state": "gas"
+        },
+        "kind": "material-fluid-state"
+      },
+      "lifecycle": {
+        "stage": "material"
+      },
+      "provenance": {
+        "commit": "c70451a",
+        "line": 2362,
+        "path": "groovy/material/FirstDegreeMaterialsA.groovy",
+        "source_url": "https://github.com/SymmetricDevs/Supersymmetry/commit/333c982"
+      }
+    },
+    {
+      "alias": "sulfur_trioxide_reaction_mixture_gas_plain",
+      "attributes": {
+        "fluid_state": "gas",
+        "label": "Sulfur Trioxide Reaction Mixture gas",
+        "properties": []
+      },
+      "descriptor_alias": "sulfur_trioxide_reaction_mixture_gas_acidic",
+      "lifecycle": {
+        "stage": "material"
+      },
+      "provenance": {
+        "commit": "c70451a",
+        "line": 2363,
+        "path": "groovy/material/FirstDegreeMaterialsA.groovy",
+        "source_url": "https://github.com/SymmetricDevs/Supersymmetry/commit/333c982"
+      }
+    }
+  ],
+  "expected": {
+    "diagnostic_codes": [
+      "DUPLICATE_REGISTRATION"
+    ],
+    "failed_aliases": [
+      "sulfur_trioxide_reaction_mixture_gas_acidic"
+    ]
+  },
+  "fixture": "duplicate-gas-registration",
+  "format": "workbench-supersymmetry-semantic-regression-fixture-v1",
+  "historical_evidence": {
+    "fix_commit": "333c982",
+    "fix_summary": "Remove the second .gas() call after .gas(new FluidBuilder().acidic()).",
+    "replay_ref": "c70451a",
+    "source_profile": "legacy-forge-0.1.16.11"
+  },
+  "runtime": {
+    "capture": {
+      "capture_id": "supersymmetry-history:duplicate-gas-registration:pre-fix",
+      "evidence_kind": "historical-regression-replay"
+    },
+    "effects": [
+      {
+        "descriptor_alias": "sulfur_trioxide_reaction_mixture_gas_acidic",
+        "operation": "register-fluid-state",
+        "provenance": {
+          "line": 2362,
+          "path": "groovy/material/FirstDegreeMaterialsA.groovy"
+        },
+        "state": {
+          "properties": [
+            "acidic"
+          ],
+          "result": "accepted"
+        }
+      },
+      {
+        "descriptor_alias": "sulfur_trioxide_reaction_mixture_gas_acidic",
+        "operation": "register-fluid-state",
+        "provenance": {
+          "line": 2363,
+          "path": "groovy/material/FirstDegreeMaterialsA.groovy"
+        },
+        "state": {
+          "properties": [],
+          "result": "duplicate-attempt"
+        }
+      }
+    ],
+    "registry": [
+      {
+        "descriptor_alias": "sulfur_trioxide_reaction_mixture_gas_acidic",
+        "provenance": {
+          "observation": "One final material fluid state remains after two observed calls."
+        },
+        "state": {
+          "registered": true
+        }
+      }
+    ],
+    "stage": "material"
+  },
+  "schema_version": 1
+}

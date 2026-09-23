@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.dev/workbench/schemas/workbench-supersymmetry-github-pr-provider-v1.schema.json",
+  "title": "Workbench Supersymmetry GitHub pull-request provider profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "profile_id",
+    "project_id",
+    "provider",
+    "repository",
+    "api",
+    "web",
+    "git_refs"
+  ],
+  "properties": {
+    "format": {"const": "workbench-pull-request-provider-profile-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"const": "workbench-pack:supersymmetry:github-pull-requests-v1"},
+    "project_id": {"const": "supersymmetry"},
+    "provider": {"const": "github"},
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "name"],
+      "properties": {
+        "owner": {"const": "SymmetricDevs"},
+        "name": {"const": "Supersymmetry"}
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pull_request_url_template"],
+      "properties": {
+        "pull_request_url_template": {
+          "const": "https://api.github.com/repos/SymmetricDevs/Supersymmetry/pulls/{number}"
+        }
+      }
+    },
+    "web": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pull_request_url_template"],
+      "properties": {
+        "pull_request_url_template": {
+          "const": "https://github.com/SymmetricDevs/Supersymmetry/pull/{number}"
+        }
+      }
+    },
+    "git_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head_template", "merge_template"],
+      "properties": {
+        "head_template": {"const": "refs/pull/{number}/head"},
+        "merge_template": {"const": "refs/pull/{number}/merge"}
+      }
+    }
+  }
+}

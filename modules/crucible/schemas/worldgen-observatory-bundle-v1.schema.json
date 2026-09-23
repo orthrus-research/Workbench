@@ -1,0 +1,551 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/worldgen-observatory-bundle-v1.schema.json",
+  "title": "Workbench Crucible Worldgen Observatory capture bundle v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "run",
+    "records",
+    "semantic_fingerprints",
+    "summary",
+    "publication"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "workbench-crucible-worldgen-observatory-bundle-v1"
+    },
+    "contract_id": {
+      "const": "WORKBENCH-CRUCIBLE-WORLDGEN-OBSERVATORY-CAPTURE-V1"
+    },
+    "run": {
+      "$ref": "#/$defs/run"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "workbench://schemas/crucible/worldgen-observatory-record-v1.schema.json"
+      }
+    },
+    "semantic_fingerprints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/semanticFingerprint"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "publication": {
+      "$ref": "#/$defs/publication"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "qualifiedId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]*:[A-Za-z0-9._:-]+$"
+    },
+    "chunk": {
+      "type": "object",
+      "required": [
+        "x",
+        "z"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "integer"
+        },
+        "z": {
+          "type": "integer"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "capture_mode",
+        "capture_plan_sha256",
+        "fixture_id",
+        "fixture_sha256",
+        "environment",
+        "world"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "pattern": "^crucible-worldgen-run:sha256:[0-9a-f]{64}$"
+        },
+        "capture_mode": {
+          "enum": [
+            "summary",
+            "trace",
+            "forensic",
+            "lossless-fixture"
+          ]
+        },
+        "capture_plan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "fixture_id": {
+          "$ref": "#/$defs/qualifiedId"
+        },
+        "fixture_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "environment": {
+          "$ref": "#/$defs/environment"
+        },
+        "world": {
+          "$ref": "#/$defs/world"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "minecraft_version",
+        "platform_profile_id",
+        "platform_profile_sha256",
+        "pack_profile_id",
+        "pack_profile_sha256",
+        "snapshot_id",
+        "physical_side",
+        "runtime_java",
+        "mapping_namespace",
+        "transformed_runtime_sha256",
+        "mod_set_sha256",
+        "configuration_set_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "minecraft_version": {
+          "const": "1.12.2"
+        },
+        "platform_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "pack_profile_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "pack_profile_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physical_side": {
+          "enum": [
+            "CLIENT",
+            "DEDICATED_SERVER"
+          ]
+        },
+        "runtime_java": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mapping_namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transformed_runtime_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mod_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "required": [
+        "world_instance_id",
+        "world_seed_sha256",
+        "world_type",
+        "generator_options_sha256",
+        "dimension_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "world_instance_id": {
+          "$ref": "#/$defs/qualifiedId"
+        },
+        "world_seed_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "world_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generator_options_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "dimension_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "fingerprintScope": {
+      "type": "object",
+      "required": [
+        "comparison_scope_sha256",
+        "dimension_id",
+        "chunk",
+        "stage_id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "comparison_scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "dimension_id": {
+          "type": "integer"
+        },
+        "chunk": {
+          "$ref": "#/$defs/chunk"
+        },
+        "stage_id": {
+          "$ref": "#/$defs/qualifiedId"
+        }
+      }
+    },
+    "semanticFingerprint": {
+      "type": "object",
+      "required": [
+        "fingerprint_id",
+        "checkpoint_ordinal",
+        "checkpoint_id",
+        "canonicalization_id",
+        "scope",
+        "included_domains",
+        "excluded_observation_fields",
+        "semantic_state_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint_id": {
+          "type": "string",
+          "pattern": "^crucible-worldgen-fingerprint:sha256:[0-9a-f]{64}$"
+        },
+        "checkpoint_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkpoint_id": {
+          "$ref": "#/$defs/qualifiedId"
+        },
+        "canonicalization_id": {
+          "$ref": "#/$defs/qualifiedId"
+        },
+        "scope": {
+          "$ref": "#/$defs/fingerprintScope"
+        },
+        "included_domains": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "block_states",
+              "biomes",
+              "heightmaps",
+              "chunk_flags",
+              "structures",
+              "tile_entities",
+              "scheduled_ticks"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "excluded_observation_fields": {
+          "type": "array",
+          "minItems": 7,
+          "items": {
+            "enum": [
+              "wall_clock",
+              "monotonic_ns",
+              "thread_key",
+              "thread_sequence",
+              "lamport",
+              "timing_metrics",
+              "runtime_object_identity"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "semantic_state_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "record_count",
+        "last_ordinal",
+        "span_enter_count",
+        "span_return_count",
+        "span_throw_count",
+        "open_span_ids",
+        "coverage_state",
+        "dropped_record_count",
+        "limitations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "record_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "span_enter_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "span_return_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "span_throw_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "open_span_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/qualifiedId"
+          },
+          "uniqueItems": true
+        },
+        "coverage_state": {
+          "enum": [
+            "complete",
+            "sampled",
+            "truncated",
+            "incomplete"
+          ]
+        },
+        "dropped_record_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "completionSeal": {
+      "type": "object",
+      "required": [
+        "capture_id",
+        "run_manifest_sha256",
+        "records_sha256",
+        "semantic_fingerprints_sha256",
+        "record_count",
+        "last_ordinal",
+        "sealed_after_stop_record"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "capture_id": {
+          "type": "string",
+          "pattern": "^crucible-worldgen-capture:sha256:[0-9a-f]{64}$"
+        },
+        "run_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "records_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "semantic_fingerprints_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sealed_after_stop_record": {
+          "const": true
+        }
+      }
+    },
+    "crashResidue": {
+      "type": "object",
+      "required": [
+        "residue_id",
+        "reason",
+        "last_complete_ordinal",
+        "open_span_ids",
+        "recoverable",
+        "diagnostic_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "residue_id": {
+          "type": "string",
+          "pattern": "^crucible-worldgen-residue:sha256:[0-9a-f]{64}$"
+        },
+        "reason": {
+          "enum": [
+            "process_crash",
+            "forced_termination",
+            "probe_failure",
+            "io_failure",
+            "budget_exceeded",
+            "fixture_aborted",
+            "unknown"
+          ]
+        },
+        "last_complete_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "open_span_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/qualifiedId"
+          },
+          "uniqueItems": true
+        },
+        "recoverable": {
+          "type": "boolean"
+        },
+        "diagnostic_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "required": [
+        "state",
+        "completion_seal",
+        "crash_residue"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "completed",
+            "incomplete"
+          ]
+        },
+        "completion_seal": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/completionSeal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "crash_residue": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/crashResidue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "completed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "completion_seal": {
+                "$ref": "#/$defs/completionSeal"
+              },
+              "crash_residue": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "incomplete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "completion_seal": {
+                "type": "null"
+              },
+              "crash_residue": {
+                "$ref": "#/$defs/crashResidue"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

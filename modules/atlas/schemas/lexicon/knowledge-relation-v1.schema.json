@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/knowledge-relation-v1.schema.json",
+  "title": "Supersymmetry canonical relationship v1",
+  "type": "object",
+  "required": ["id", "snapshot_id", "subject", "predicate", "object", "status", "claim_id"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^REL-[A-Z0-9-]+$"},
+    "snapshot_id": {"type": "string"},
+    "subject": {"type": "string"},
+    "predicate": {"enum": ["declares", "owns", "mutates", "removes", "consumes", "produces", "executes_on", "registered_during", "configured_by", "serialized_by", "rendered_by", "integrates_with", "validated_by", "affects", "documented_by", "supersedes"]},
+    "object": {"type": "string"},
+    "status": {"enum": ["planned", "researching", "inferred", "verified", "stale"]},
+    "claim_id": {"type": ["string", "null"]}
+  }
+}

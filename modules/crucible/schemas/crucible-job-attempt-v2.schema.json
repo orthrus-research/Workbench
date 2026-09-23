@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-job-attempt-v2.schema.json",
+  "title": "Workbench Crucible durable job attempt V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind", "format", "schema_version", "schema_id", "canonicalizer", "id",
+    "job_id", "job_submission_id", "attempt_id", "attempt_ordinal",
+    "previous_attempt_record_id", "context_ref_id", "input_binding_id", "attempt_reason",
+    "handler_implementation_id", "service_instance_id", "resource_claim_keys",
+    "session_id", "retry_decision_id", "created_at", "evidence_eligible"
+  ],
+  "properties": {
+    "kind": {"const": "job-attempt"},
+    "format": {"const": "workbench-crucible-job-attempt-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-job-attempt-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobAttemptRecordId"},
+    "job_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobId"},
+    "job_submission_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobSubmissionId"},
+    "attempt_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/attemptId"},
+    "attempt_ordinal": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nonNegativeInteger"},
+    "previous_attempt_record_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableJobAttemptRecordId"},
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/contextRefId"},
+    "input_binding_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/inputBindingId"},
+    "attempt_reason": {"enum": ["initial", "retry-after-failure", "retry-after-crash", "manual-retry", "recovery-adoption"]},
+    "handler_implementation_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/implementationId"},
+    "service_instance_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/serviceInstanceId"},
+    "resource_claim_keys": {
+      "type": "array", "uniqueItems": true,
+      "items": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"}
+    },
+    "session_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableSessionId"},
+    "retry_decision_id": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableRetryDecisionId"},
+    "created_at": {"$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/timestamp"},
+    "evidence_eligible": {"const": false}
+  }
+}

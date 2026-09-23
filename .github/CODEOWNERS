@@ -1,0 +1,10 @@
+# Bootstrap ownership for the first public release. Replace single-person
+# routing with Orthrus Research teams after those teams exist and have access.
+* @zestehl
+
+# These paths carry repository policy, release authority, or public automation.
+/.github/ @zestehl
+/GOVERNANCE.md @zestehl
+/SECURITY.md @zestehl
+/packaging/release/ @zestehl
+/validation/ @zestehl

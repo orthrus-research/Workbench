@@ -1,0 +1,426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/external-diagnostic-health-receipt-v1.schema.json",
+  "title": "Workbench Crucible external diagnostic-health receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "receipt_id",
+    "canonicalization_id",
+    "session",
+    "subject",
+    "inputs",
+    "policy",
+    "rule_results",
+    "summary",
+    "boundaries"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-crucible-external-diagnostic-health-receipt-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^crucible-external-diagnostic-health:sha256:[0-9a-f]{64}$"
+    },
+    "canonicalization_id": {
+      "const": "workbench-canonical-json-v1"
+    },
+    "session": {
+      "$ref": "#/$defs/session"
+    },
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "inputs": {
+      "$ref": "#/$defs/inputs"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "rule_results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/ruleResult"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "boundaries": {
+      "$ref": "#/$defs/boundaries"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+    },
+    "singleLine": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audit_id",
+        "case_id",
+        "outcome",
+        "observer_enabled",
+        "candidate_lock_file_sha256",
+        "candidate_lock_canonical_sha256",
+        "installed_mod_set_file_sha256",
+        "installed_mod_set_canonical_sha256"
+      ],
+      "properties": {
+        "audit_id": {
+          "type": "string",
+          "pattern": "^crucible-exact-runtime-session-audit:sha256:[0-9a-f]{64}$"
+        },
+        "case_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "outcome": {
+          "const": "completed"
+        },
+        "observer_enabled": {
+          "type": "boolean"
+        },
+        "candidate_lock_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_lock_canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "installed_mod_set_file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "installed_mod_set_canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_sha256",
+        "installed_relative_path",
+        "installed_size_bytes"
+      ],
+      "properties": {
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "installed_relative_path": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "installed_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_sha256", "size_bytes"],
+      "properties": {
+        "file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "policyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_sha256", "size_bytes", "canonical_sha256"],
+      "properties": {
+        "file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "canonical_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session_audit", "launch_log", "policy"],
+      "properties": {
+        "session_audit": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "launch_log": {
+          "$ref": "#/$defs/fileBinding"
+        },
+        "policy": {
+          "$ref": "#/$defs/policyBinding"
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "disposition",
+        "logger",
+        "level",
+        "message_prefix"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "disposition": {
+          "enum": ["fail", "review"]
+        },
+        "logger": {
+          "$ref": "#/$defs/singleLine"
+        },
+        "level": {
+          "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"]
+        },
+        "message_prefix": {
+          "$ref": "#/$defs/singleLine"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "policy_id",
+        "owner_profile_id",
+        "subject_artifact_sha256",
+        "log_format",
+        "match_semantics",
+        "zero_match_state",
+        "rules"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-crucible-literal-diagnostic-policy-v1"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "policy_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "owner_profile_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "subject_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "log_format": {
+          "const": "forge-log4j2-bracketed-v1"
+        },
+        "match_semantics": {
+          "const": "literal-logger-level-message-prefix-v1"
+        },
+        "zero_match_state": {
+          "const": "inconclusive"
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      }
+    },
+    "nullableLine": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ruleResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "disposition",
+        "occurrence_count",
+        "first_line",
+        "last_line",
+        "message_sha256s"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "disposition": {
+          "enum": ["fail", "review"]
+        },
+        "occurrence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "first_line": {
+          "$ref": "#/$defs/nullableLine"
+        },
+        "last_line": {
+          "$ref": "#/$defs/nullableLine"
+        },
+        "message_sha256s": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_state",
+        "rule_count",
+        "matched_rule_count",
+        "unmatched_rule_count",
+        "fail_matched_rule_count",
+        "review_matched_rule_count",
+        "fail_occurrence_count",
+        "review_occurrence_count",
+        "total_match_occurrence_count",
+        "matched_log_line_count",
+        "total_log_line_count",
+        "parsed_log_line_count",
+        "unparsed_log_line_count",
+        "clean_compatibility_seal_allowed"
+      ],
+      "properties": {
+        "gate_state": {
+          "enum": ["fail", "review", "inconclusive"]
+        },
+        "rule_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "matched_rule_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmatched_rule_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fail_matched_rule_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "review_matched_rule_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fail_occurrence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "review_occurrence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_match_occurrence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matched_log_line_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_log_line_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parsed_log_line_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unparsed_log_line_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "clean_compatibility_seal_allowed": {
+          "const": false
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arbitrary_executable_patterns_supported",
+        "fail_match_blocks_clean_compatibility_seal",
+        "free_form_log_is_authoritative",
+        "log_absence_proves_diagnostic_absence",
+        "profile_literal_policy_is_gate_authority",
+        "review_match_requires_review",
+        "subject_artifact_execution_proved",
+        "zero_matches_prove_health"
+      ],
+      "properties": {
+        "arbitrary_executable_patterns_supported": {
+          "const": false
+        },
+        "fail_match_blocks_clean_compatibility_seal": {
+          "const": true
+        },
+        "free_form_log_is_authoritative": {
+          "const": false
+        },
+        "log_absence_proves_diagnostic_absence": {
+          "const": false
+        },
+        "profile_literal_policy_is_gate_authority": {
+          "const": true
+        },
+        "review_match_requires_review": {
+          "const": true
+        },
+        "subject_artifact_execution_proved": {
+          "const": false
+        },
+        "zero_matches_prove_health": {
+          "const": false
+        }
+      }
+    }
+  }
+}

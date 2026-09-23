@@ -1,0 +1,73 @@
+{
+  "format": "workbench-canonical-json-v2-valid-vectors-v1",
+  "canonicalizer": "workbench-canonical-json-v2",
+  "max_nesting_depth": 256,
+  "content_domain_utf8": "workbench-content-v2\n",
+  "content_domain_utf8_hex": "776f726b62656e63682d636f6e74656e742d76320a",
+  "vectors": [
+    {
+      "name": "semantic-header-and-utf8-key-order",
+      "description": "Sorts the semantic header by unsigned UTF-8 key bytes and omits only the top-level id.",
+      "input_json": "{\"kind\":\"canonical-vector\",\"id\":\"canonical-vector:sha256:00338eda989780e4819e51eeae2db724da1bc3700a7bfeaaf0d6db1234d746b9\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\"}",
+      "expected_canonical_body_utf8_hex": "7b2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c226b696e64223a2263616e6f6e6963616c2d766563746f72227d",
+      "expected_canonical_body_sha256": "25543b8a000b43be04ba86556393dbf80e78d47b75c898ba9911728c9309a914",
+      "expected_content_id": "canonical-vector:sha256:00338eda989780e4819e51eeae2db724da1bc3700a7bfeaaf0d6db1234d746b9"
+    },
+    {
+      "name": "unicode-order-and-no-normalization",
+      "description": "Distinguishes decomposed and precomposed keys, decodes input escapes, emits scalar values directly, and orders keys by unsigned UTF-8 bytes.",
+      "input_json": "{\"payload\":{\"😀\":\"astral\",\"\\ud800\\udc00\":\"supplementary-plane\",\"\\ue000\":\"bmp-private-use\",\"\\u03a9\":\"omega\",\"é\":\"precomposed\",\"z\":\"ascii-z\",\"e\\u0301\":\"decomposed\",\"a\":\"ascii-a\"},\"kind\":\"canonical-vector\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"id\":\"canonical-vector:sha256:b907b440e8763977576aaa6ec57c806b5a61cd1d929877f9519c816d18e8691b\",\"format\":\"workbench-canonical-vector-v1\"}",
+      "expected_canonical_body_utf8_hex": "7b2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c226b696e64223a2263616e6f6e6963616c2d766563746f72222c227061796c6f6164223a7b2261223a2261736369692d61222c2265cc81223a226465636f6d706f736564222c227a223a2261736369692d7a222c22c3a9223a22707265636f6d706f736564222c22cea9223a226f6d656761222c22ee8080223a22626d702d707269766174652d757365222c22f0908080223a22737570706c656d656e746172792d706c616e65222c22f09f9880223a2261737472616c227d7d",
+      "expected_canonical_body_sha256": "aa75807960f0e2996d023b92a454547acd3d71c93e0c6522ecbb143db10eeed0",
+      "expected_content_id": "canonical-vector:sha256:b907b440e8763977576aaa6ec57c806b5a61cd1d929877f9519c816d18e8691b"
+    },
+    {
+      "name": "control-quote-reverse-solidus-escaping",
+      "description": "Canonicalizes every U+0000 through U+001F code point to lowercase \\u00xx while using only required escapes for quotation mark and reverse solidus.",
+      "input_json": "{\"text\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/\",\"id\":\"canonical-vector:sha256:31be012f3754f605ab41ac51f7d25faab36bdae0d391b9119285a68d31762247\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"format\":\"workbench-canonical-vector-v1\",\"kind\":\"canonical-vector\"}",
+      "expected_canonical_body_utf8_hex": "7b2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c226b696e64223a2263616e6f6e6963616c2d766563746f72222c2274657874223a225c75303030305c75303030315c75303030325c75303030335c75303030345c75303030355c75303030365c75303030375c75303030385c75303030395c75303030615c75303030625c75303030635c75303030645c75303030655c75303030665c75303031305c75303031315c75303031325c75303031335c75303031345c75303031355c75303031365c75303031375c75303031385c75303031395c75303031615c75303031625c75303031635c75303031645c75303031655c75303031665c225c5c2f227d",
+      "expected_canonical_body_sha256": "664c677804bd30f9954570fa78fdc54233f9714214a52e4656579daf605d7ef5",
+      "expected_content_id": "canonical-vector:sha256:31be012f3754f605ab41ac51f7d25faab36bdae0d391b9119285a68d31762247"
+    },
+    {
+      "name": "signed-64-bit-boundaries-and-minimal-integers",
+      "description": "Retains both signed 64-bit boundaries and canonicalizes negative zero to minimal zero.",
+      "input_json": "{\"numbers\":{\"zero\":-0,\"small_negative\":-42,\"minimum\":-9223372036854775808,\"maximum\":9223372036854775807},\"kind\":\"canonical-vector\",\"format\":\"workbench-canonical-vector-v1\",\"id\":\"canonical-vector:sha256:d7e91795b7cc1d00eef80d43cf8f8e5e3ab5e20d28f8eae8c35af2b7655621da\",\"canonicalizer\":\"workbench-canonical-json-v2\"}",
+      "expected_canonical_body_utf8_hex": "7b2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c226b696e64223a2263616e6f6e6963616c2d766563746f72222c226e756d62657273223a7b226d6178696d756d223a393232333337323033363835343737353830372c226d696e696d756d223a2d393232333337323033363835343737353830382c22736d616c6c5f6e65676174697665223a2d34322c227a65726f223a307d7d",
+      "expected_canonical_body_sha256": "019629694b236f5b1dfa38b7029cdcc8b78e57b8050c21d5215a422a957e1c9e",
+      "expected_content_id": "canonical-vector:sha256:d7e91795b7cc1d00eef80d43cf8f8e5e3ab5e20d28f8eae8c35af2b7655621da"
+    },
+    {
+      "name": "ordered-arrays-null-and-booleans",
+      "description": "Preserves nested array order and encodes null and both boolean values literally.",
+      "input_json": "{\"value\":[null,true,false,[-1,0,1],{\"z\":null,\"a\":[false,true]}],\"id\":\"canonical-vector:sha256:2091a1441fdc17681872deab85410fe486d1ac54d0672f21f5a89d9385e2134b\",\"kind\":\"canonical-vector\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"format\":\"workbench-canonical-vector-v1\"}",
+      "expected_canonical_body_utf8_hex": "7b2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c226b696e64223a2263616e6f6e6963616c2d766563746f72222c2276616c7565223a5b6e756c6c2c747275652c66616c73652c5b2d312c302c315d2c7b2261223a5b66616c73652c747275655d2c227a223a6e756c6c7d5d7d",
+      "expected_canonical_body_sha256": "8c9488a19b6fdc7c6bbe5f8f350edc556bcf600b05544341324b888569bd14a7",
+      "expected_content_id": "canonical-vector:sha256:2091a1441fdc17681872deab85410fe486d1ac54d0672f21f5a89d9385e2134b"
+    },
+    {
+      "name": "valid-unicode-scalar-boundaries",
+      "description": "Emits DEL, U+0080, U+2028, an astral emoji, and U+10FFFF directly as UTF-8 after decoding valid JSON escapes.",
+      "input_json": "{\"scalar_text\":\"A\\u007f\\u0080\\u2028\\ud83d\\ude00\\udbff\\udfff\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\",\"kind\":\"canonical-vector\",\"id\":\"canonical-vector:sha256:4d427b6709bfdcc1847fd96002443f55112eecc0ff3cb933d90f37c17cabbd62\"}",
+      "expected_canonical_body_utf8_hex": "7b2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c226b696e64223a2263616e6f6e6963616c2d766563746f72222c227363616c61725f74657874223a22417fc280e280a8f09f9880f48fbfbf227d",
+      "expected_canonical_body_sha256": "a4fb06bce05e0e0f9f2ea4af6478bbc01fce676d07d51a843ee5818863205d2d",
+      "expected_content_id": "canonical-vector:sha256:4d427b6709bfdcc1847fd96002443f55112eecc0ff3cb933d90f37c17cabbd62"
+    },
+    {
+      "name": "prototype-looking-keys-are-data",
+      "description": "Treats empty, constructor, and __proto__ keys as ordinary data without prototype mutation.",
+      "input_json": "{\"payload\":{\"constructor\":2,\"__proto__\":1,\"\":0},\"canonicalizer\":\"workbench-canonical-json-v2\",\"id\":\"domain-probe:sha256:15424f9612d3f9637cff20354854a2817052874ef3b203ca079d261d721ef8e1\",\"format\":\"workbench-canonical-vector-v1\",\"kind\":\"domain-probe\"}",
+      "expected_canonical_body_utf8_hex": "7b2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c226b696e64223a22646f6d61696e2d70726f6265222c227061796c6f6164223a7b22223a302c225f5f70726f746f5f5f223a312c22636f6e7374727563746f72223a327d7d",
+      "expected_canonical_body_sha256": "c236b5bcc9e9fa9c1f56905d220643071f598959f7f5c03e25b31440785c3434",
+      "expected_content_id": "domain-probe:sha256:15424f9612d3f9637cff20354854a2817052874ef3b203ca079d261d721ef8e1"
+    },
+    {
+      "name": "only-top-level-id-is-omitted",
+      "description": "Omits the record identity field while retaining an identically named nested semantic field.",
+      "input_json": "{\"payload\":{\"id\":\"nested-id-is-semantic\"},\"id\":\"id-scope-vector:sha256:a70f98856c49c282b0acaf4b093b93cfe900bc4ebf312f52c215641e354ee616\",\"kind\":\"id-scope-vector\",\"format\":\"workbench-canonical-vector-v1\",\"canonicalizer\":\"workbench-canonical-json-v2\"}",
+      "expected_canonical_body_utf8_hex": "7b2263616e6f6e6963616c697a6572223a22776f726b62656e63682d63616e6f6e6963616c2d6a736f6e2d7632222c22666f726d6174223a22776f726b62656e63682d63616e6f6e6963616c2d766563746f722d7631222c226b696e64223a2269642d73636f70652d766563746f72222c227061796c6f6164223a7b226964223a226e65737465642d69642d69732d73656d616e746963227d7d",
+      "expected_canonical_body_sha256": "091c9262ac7a638e0a9435908d3854b45874e2ff59dd78c231d0624434f5f8eb",
+      "expected_content_id": "id-scope-vector:sha256:a70f98856c49c282b0acaf4b093b93cfe900bc4ebf312f52c215641e354ee616"
+    }
+  ]
+}

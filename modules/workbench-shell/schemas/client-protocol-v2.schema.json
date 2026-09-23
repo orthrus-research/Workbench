@@ -1,0 +1,1161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/client-protocol-v2.schema.json",
+  "title": "Workbench client protocol V2 messages",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/initializeRequest"
+    },
+    {
+      "$ref": "#/$defs/workspaceInspectRequest"
+    },
+    {
+      "$ref": "#/$defs/runtimePlanRequest"
+    },
+    {
+      "$ref": "#/$defs/runtimeDiagnoseRequest"
+    },
+    {
+      "$ref": "#/$defs/instanceSelectRequest"
+    },
+    {
+      "$ref": "#/$defs/instanceCurrentRequest"
+    },
+    {
+      "$ref": "#/$defs/registrationCapabilitiesRequest"
+    },
+    {
+      "$ref": "#/$defs/registrationPlanRequest"
+    },
+    {
+      "$ref": "#/$defs/registrationApplyRequest"
+    },
+    {
+      "$ref": "#/$defs/shutdownRequest"
+    },
+    {
+      "$ref": "#/$defs/initializeResponse"
+    },
+    {
+      "$ref": "#/$defs/workspaceInspectResponse"
+    },
+    {
+      "$ref": "#/$defs/runtimePlanResponse"
+    },
+    {
+      "$ref": "#/$defs/runtimeDiagnoseResponse"
+    },
+    {
+      "$ref": "#/$defs/instanceSelectResponse"
+    },
+    {
+      "$ref": "#/$defs/instanceCurrentResponse"
+    },
+    {
+      "$ref": "#/$defs/registrationCapabilitiesResponse"
+    },
+    {
+      "$ref": "#/$defs/registrationPlanResponse"
+    },
+    {
+      "$ref": "#/$defs/registrationApplyResponse"
+    },
+    {
+      "$ref": "#/$defs/shutdownResponse"
+    },
+    {
+      "$ref": "#/$defs/errorResponse"
+    }
+  ],
+  "$defs": {
+    "requestId": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "sha256Identity": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "localFileUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^file:"
+    },
+    "protocolVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "major",
+        "minor"
+      ],
+      "properties": {
+        "major": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minor": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "executionHost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "initializeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "client",
+        "workspace_roots",
+        "execution_host"
+      ],
+      "properties": {
+        "protocol_version": {
+          "$ref": "#/$defs/protocolVersion"
+        },
+        "client": {
+          "$ref": "#/$defs/client"
+        },
+        "workspace_roots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^file:"
+          },
+          "uniqueItems": true
+        },
+        "execution_host": {
+          "$ref": "#/$defs/executionHost"
+        },
+        "required_methods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "initializeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "initialize"
+        },
+        "params": {
+          "$ref": "#/$defs/initializeParams"
+        }
+      }
+    },
+    "emptyParams": {
+      "type": "object",
+      "maxProperties": 0
+    },
+    "workspaceInspectRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "workspace/inspect"
+        },
+        "params": {
+          "$ref": "#/$defs/emptyParams"
+        }
+      }
+    },
+    "runtimePlanRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "runtime/plan"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "side",
+            "launcher"
+          ],
+          "properties": {
+            "side": {
+              "enum": [
+                "client",
+                "server"
+              ]
+            },
+            "launcher": {
+              "enum": [
+                "prism",
+                "multimc",
+                "dedicated-server"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "runtimeDiagnoseRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "runtime/diagnose"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "receipt_uri"
+          ],
+          "properties": {
+            "receipt_uri": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^file:"
+            },
+            "artifact_root_uris": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^file:"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "instanceSelectRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "instance/select"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instance_uri"
+          ],
+          "properties": {
+            "instance_uri": {
+              "$ref": "#/$defs/localFileUri"
+            }
+          }
+        }
+      }
+    },
+    "instanceCurrentRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "instance/current"
+        },
+        "params": {
+          "$ref": "#/$defs/emptyParams"
+        }
+      }
+    },
+    "registrationCapabilitiesRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "registration/capabilities"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "registrationPlanRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "registration/plan"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pattern",
+            "answers"
+          ],
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "minLength": 1
+            },
+            "answers": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "registrationApplyRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "registration/apply"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pattern",
+            "answers",
+            "consent"
+          ],
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "minLength": 1
+            },
+            "answers": {
+              "type": "object"
+            },
+            "consent": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "approved",
+                "plan_id",
+                "operation_class"
+              ],
+              "properties": {
+                "approved": {
+                  "const": true
+                },
+                "plan_id": {
+                  "$ref": "#/$defs/sha256Identity"
+                },
+                "operation_class": {
+                  "const": "local-mutation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "shutdownRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "method": {
+          "const": "shutdown"
+        },
+        "params": {
+          "$ref": "#/$defs/emptyParams"
+        }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "identity",
+        "verified"
+      ],
+      "properties": {
+        "kind": {
+          "const": "source-tree"
+        },
+        "identity": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "verified": {
+          "const": false
+        }
+      }
+    },
+    "methodCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "operation_class"
+      ],
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation_class": {
+          "enum": [
+            "read-only",
+            "reversible",
+            "destructive"
+          ]
+        }
+      }
+    },
+    "unavailableMethod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "const": "unavailable"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "featureCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature",
+        "available",
+        "reason"
+      ],
+      "properties": {
+        "feature": {
+          "type": "string",
+          "minLength": 1
+        },
+        "available": {
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "initializeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "protocol_version",
+        "server",
+        "client",
+        "workspace",
+        "capabilities"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-initialize-result-v2"
+        },
+        "schema_version": {
+          "const": 2
+        },
+        "protocol_version": {
+          "$ref": "#/$defs/protocolVersion"
+        },
+        "server": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "distribution"
+          ],
+          "properties": {
+            "name": {
+              "const": "workbench-shell"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "distribution": {
+              "$ref": "#/$defs/distribution"
+            }
+          }
+        },
+        "client": {
+          "$ref": "#/$defs/client"
+        },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root_uri",
+            "execution_host"
+          ],
+          "properties": {
+            "root_uri": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^file:"
+            },
+            "execution_host": {
+              "$ref": "#/$defs/executionHost"
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "supported_methods",
+            "unavailable_methods",
+            "features"
+          ],
+          "properties": {
+            "supported_methods": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/methodCapability"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "unavailable_methods": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/unavailableMethod"
+              },
+              "uniqueItems": true
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/featureCapability"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "initializeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "$ref": "#/$defs/initializeResult"
+        }
+      }
+    },
+    "workspaceInspectResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "format",
+            "schema_version",
+            "workspace_context"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-foundation-bootstrap-v2"
+            },
+            "schema_version": {
+              "const": 2
+            },
+            "workspace_context": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "runtimePlanResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "format",
+            "schema_version",
+            "state"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-runtime-plan-v1"
+            },
+            "schema_version": {
+              "const": 1
+            },
+            "state": {
+              "enum": [
+                "ready",
+                "blocked"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "runtimeDiagnoseResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "format",
+            "schema_version",
+            "diagnosis_id",
+            "operation_class",
+            "authority",
+            "state",
+            "findings"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-runtime-diagnosis-v2"
+            },
+            "schema_version": {
+              "const": 2
+            },
+            "diagnosis_id": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "operation_class": {
+              "const": "read-only"
+            },
+            "authority": {
+              "type": "object"
+            },
+            "state": {
+              "enum": [
+                "blocked",
+                "checkpoint-reached",
+                "inconclusive"
+              ]
+            },
+            "findings": {
+              "type": "array"
+            }
+          }
+        }
+      }
+    },
+    "instanceSelectResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "format",
+            "schema_version",
+            "outcome",
+            "selection",
+            "selection_uri"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-active-instance-result-v1"
+            },
+            "schema_version": {
+              "const": 1
+            },
+            "outcome": {
+              "const": "selected"
+            },
+            "selection": {
+              "type": "object"
+            },
+            "selection_uri": {
+              "$ref": "#/$defs/localFileUri"
+            }
+          }
+        }
+      }
+    },
+    "instanceCurrentResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "format",
+            "schema_version",
+            "selection_id",
+            "state",
+            "selection_uri"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-active-instance-v1"
+            },
+            "schema_version": {
+              "const": 1
+            },
+            "selection_id": {
+              "$ref": "#/$defs/sha256Identity"
+            },
+            "state": {
+              "const": "active"
+            },
+            "selection_uri": {
+              "$ref": "#/$defs/localFileUri"
+            }
+          }
+        }
+      }
+    },
+    "registrationCapabilitiesResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "format",
+            "schema_version",
+            "catalog_id",
+            "families",
+            "patterns"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-registration-capabilities-v1"
+            },
+            "schema_version": {
+              "const": 1
+            },
+            "catalog_id": {
+              "$ref": "#/$defs/sha256Identity"
+            },
+            "families": {
+              "type": "array"
+            },
+            "patterns": {
+              "type": "array"
+            }
+          }
+        }
+      }
+    },
+    "registrationPlanResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "format",
+            "schema_version",
+            "plan_id",
+            "state",
+            "operations"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-registration-plan-v1"
+            },
+            "schema_version": {
+              "const": 1
+            },
+            "plan_id": {
+              "$ref": "#/$defs/sha256Identity"
+            },
+            "state": {
+              "const": "ready"
+            },
+            "operations": {
+              "type": "array",
+              "minItems": 1
+            }
+          }
+        }
+      }
+    },
+    "registrationApplyResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "format",
+            "schema_version",
+            "outcome",
+            "plan",
+            "receipt"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-registration-result-v1"
+            },
+            "schema_version": {
+              "const": 1
+            },
+            "outcome": {
+              "const": "applied"
+            },
+            "plan": {
+              "type": "object"
+            },
+            "receipt": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "shutdownResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "result"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "result": {
+          "type": "null"
+        }
+      }
+    },
+    "errorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonrpc",
+        "id",
+        "error"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/requestId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "integer"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "data": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  }
+}

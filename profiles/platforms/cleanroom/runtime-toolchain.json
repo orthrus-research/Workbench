@@ -1,0 +1,129 @@
+{
+  "format": "workbench-cleanroom-native-runtime-lock-v1",
+  "cleanroom_version": "0.6.12-alpha",
+  "source_revision": "fe78db8dc4fcee47df7549230858f4c064208d73",
+  "bootstrap": {
+    "url": "https://github.com/CleanroomMC/Cleanroom/releases/download/0.6.12-alpha/cleanroom-0.6.12-alpha.zip",
+    "sha256": "d6536796df0ce02e043f7cec59d344fca7c0dee00f013dd4d89a7a0db4c4cb32",
+    "metadata_entry": "patches/net.minecraftforge.json"
+  },
+  "native_service_expectations": {
+    "launch_main_class": "top.outlands.foundation.boot.Foundation"
+  },
+  "artifacts": [
+    {
+      "coordinate": "com.cleanroommc:cleanroom:0.6.12-alpha",
+      "filename": "cleanroom-0.6.12-alpha.jar",
+      "role": "platform-runtime",
+      "url": "https://repo.cleanroommc.com/releases/com/cleanroommc/cleanroom/0.6.12-alpha/cleanroom-0.6.12-alpha-universal.jar",
+      "size": 6502296,
+      "sha1": "42107e390eb890fbb5ade733cd22c78da395a25e",
+      "sha256": "48043f4ea69605ec9b1250b9bd01106b07023b78614bac734a8a296e690e7893"
+    },
+    {
+      "coordinate": "org.ow2.asm:asm:9.10.1",
+      "filename": "asm-9.10.1.jar",
+      "role": "bytecode-api",
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar",
+      "size": 126151,
+      "sha1": "ada2141c0cc52ee8f5c48cd5fa4ce0e794f22236",
+      "sha256": "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb"
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-commons:9.10.1",
+      "filename": "asm-commons-9.10.1.jar",
+      "role": "bytecode-api",
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar",
+      "size": 74840,
+      "sha1": "4229e4c55fd8e01c23f9fe9884075cc628aacc50",
+      "sha256": "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895"
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-tree:9.10.1",
+      "filename": "asm-tree-9.10.1.jar",
+      "role": "bytecode-api",
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar",
+      "size": 51958,
+      "sha1": "e244332a17564c1d1572449399a842de35881be2",
+      "sha256": "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b"
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-util:9.10.1",
+      "filename": "asm-util-9.10.1.jar",
+      "role": "bytecode-api",
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar",
+      "size": 95628,
+      "sha1": "7bb9d450e8d4cbf9f9e04096c44bbfe7fba80b15",
+      "sha256": "1bb99d091fba2597dc6d51193e9bbcf0d8447e7ed96bd8f0198b18152f09655c"
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-analysis:9.10.1",
+      "filename": "asm-analysis-9.10.1.jar",
+      "role": "bytecode-api",
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar",
+      "size": 35140,
+      "sha1": "8d49f14d51f632cb1d87c88d1ceaf50db0d8af1b",
+      "sha256": "dede75a21306b65974ecd8f87114ff6970f09fb794157a4ca09ab25c888c2bfc"
+    },
+    {
+      "coordinate": "org.ow2.asm:asm-deprecated:7.1",
+      "filename": "asm-deprecated-7.1.jar",
+      "role": "legacy-asm-compatibility-overlay",
+      "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-deprecated/7.1/asm-deprecated-7.1.jar",
+      "size": 9152,
+      "sha1": "004ad3a41a931f2ef0aa8f8dc5d7c82090d744c1",
+      "sha256": "774b81f7f282848b5e97e8e367b683fed2114ca8b39de3f56bc179d3e2a18f01"
+    },
+    {
+      "coordinate": "top.outlands:foundation:0.19.11",
+      "filename": "foundation-0.19.11.jar",
+      "role": "launch-and-transformer-host",
+      "url": "https://repo.cleanroommc.com/releases/top/outlands/foundation/0.19.11/foundation-0.19.11.jar",
+      "size": 55607,
+      "sha1": "d09a565ce42656fcb975cde37f6df5187513e584",
+      "sha256": "a9f5cf9cb54715edf22d6bcb49bae50f281f818b1731f53f22aab85a48a7b54b"
+    },
+    {
+      "coordinate": "com.google.guava:guava:33.6.0-jre",
+      "filename": "guava-33.6.0-jre.jar",
+      "role": "candidate-selected-cleanmix-runtime-dependency",
+      "url": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar",
+      "size": 3064793,
+      "sha1": "c376b13067cc99a5774403530953f7b05a91e218",
+      "sha256": "dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3"
+    },
+    {
+      "coordinate": "com.google.code.gson:gson:2.14.0",
+      "filename": "gson-2.14.0.jar",
+      "role": "candidate-selected-cleanmix-runtime-dependency",
+      "url": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.14.0/gson-2.14.0.jar",
+      "size": 313604,
+      "sha1": "efc0e34ede4e3204eaefb84a00e55e8c86634382",
+      "sha256": "2cbd119bf1961c28788310963dc80ba65f58cdeec1dd139c8bdb1240faa2c36f"
+    },
+    {
+      "coordinate": "com.cleanroommc:cleanmix:0.7.2",
+      "filename": "cleanmix-0.7.2.jar",
+      "role": "mixin-engine",
+      "url": "https://repo.cleanroommc.com/releases/com/cleanroommc/cleanmix/0.7.2/cleanmix-0.7.2.jar",
+      "size": 1095887,
+      "sha1": "b8793a2f5b29799853dc4bf070707f91112ea2ed",
+      "sha256": "0b92f8443dd5972346e4ee60a421407cf0215dbf1c9cd06b6f435e3f5f9a0d04"
+    },
+    {
+      "coordinate": "com.cleanroommc:mixinextras-common:0.5.5",
+      "filename": "mixinextras-common-0.5.5.jar",
+      "role": "mixin-extension",
+      "url": "https://repo.cleanroommc.com/releases/com/cleanroommc/mixinextras-common/0.5.5/mixinextras-common-0.5.5.jar",
+      "size": 725959,
+      "sha1": "05a822b77f347f39bd821c2c4759a22686800e05",
+      "sha256": "6aa293132763b356fe6de570c18535acb93ab5509e0dd2e50fec8747373765e6"
+    }
+  ],
+  "qualification_granted": false,
+  "limitations": [
+    "Artifact hashes bind the published native runtime, not successful startup or gameplay.",
+    "Historical 0.6.8-alpha transformer and worldgen qualification evidence does not transfer to this runtime.",
+    "JDK vendor and exact version are declared separately in provisional.yaml."
+  ]
+}

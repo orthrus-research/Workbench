@@ -1,0 +1,420 @@
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.27-kappa'
+}
+
+group = fixture_group
+version = fixture_version
+
+layout.buildDirectory = file(
+    '../../../../../../.workbench/build/cleanroom/0.6.8-alpha/worldgen-observatory-fixture'
+)
+
+base {
+    archivesName = fixture_archive
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+sourceSets {
+    cleanmixTraceAgent {
+        java.srcDir 'src/cleanmixTraceAgent/java'
+    }
+    cleanmixTracePatched {
+        java.srcDir 'src/cleanmixTracePatched/java'
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.cleanmixTraceAgent.output
+    }
+    cleanmixHandlerRegression {
+        java.srcDir '../../../fixtures/cleanmix-handler-regression/src/main/java'
+        resources.srcDir '../../../fixtures/cleanmix-handler-regression/src/main/resources'
+        compileClasspath += sourceSets.main.compileClasspath
+    }
+    cleanmixP0Regression {
+        java.srcDir '../../../fixtures/cleanmix-p0-regression/src/main/java'
+        resources.srcDir '../../../fixtures/cleanmix-p0-regression/src/main/resources'
+        compileClasspath += sourceSets.main.compileClasspath
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.cleanroommc.com' }
+}
+
+dependencies {
+    // Cleanroom 0.6.8-alpha embeds the same MixinExtras line.  Declaring it
+    // compile-only keeps the fixture jar free of a second transformer copy.
+    compileOnly 'com.cleanroommc:mixinextras-common:0.5.5'
+    cleanmixTracePatchedCompileOnly 'com.cleanroommc:cleanmix:0.7.0'
+    cleanmixTracePatchedCompileOnly 'com.google.guava:guava:33.6.0-jre'
+    cleanmixTraceAgentImplementation 'org.ow2.asm:asm:9.10.1'
+    cleanmixTraceAgentImplementation 'org.ow2.asm:asm-commons:9.10.1'
+}
+
+unimined.minecraft {
+    version minecraft_version
+
+    mappings {
+        mcp(mcp_channel, mcp_version)
+    }
+
+    cleanroom {
+        loader cleanroom_version
+    }
+
+    defaultRemapJar = false
+    remap(tasks.named('jar').get())
+}
+
+tasks.named('jar').configure {
+    archiveClassifier = 'dev'
+    manifest {
+        attributes(
+            'ModType': 'CRL',
+            'FMLCorePlugin': 'dev.workbench.worldgenobservatory.probe.ObservatoryLoadingPlugin',
+            'FMLCorePluginContainsFMLMod': 'true',
+            'ForceLoadAsMod': 'true',
+            'MixinConfigs': 'mixins.workbench_worldgen_observatory.early.json'
+        )
+    }
+    finalizedBy(tasks.named('remapJar'))
+}
+
+tasks.named('compileCleanmixTracePatchedJava').configure {
+    dependsOn(tasks.named('compileCleanmixTraceAgentJava'))
+}
+
+tasks.named('compileCleanmixHandlerRegressionJava', JavaCompile).configure {
+    classpath = tasks.named('compileJava', JavaCompile).get().classpath
+}
+
+tasks.named('compileCleanmixP0RegressionJava', JavaCompile).configure {
+    classpath = tasks.named('compileJava', JavaCompile).get().classpath
+}
+
+def cleanmixDiscoveryTraceAgentJar = tasks.register('cleanmixDiscoveryTraceAgentJar', Jar) {
+    archiveClassifier = 'cleanmix-discovery-trace-agent'
+    from(sourceSets.cleanmixTraceAgent.output)
+    from {
+        configurations.cleanmixTraceAgentRuntimeClasspath.collect { dependency ->
+            dependency.isDirectory() ? dependency : zipTree(dependency)
+        }
+    }
+    exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA', 'META-INF/MANIFEST.MF'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(sourceSets.cleanmixTracePatched.output.classesDirs) {
+        into 'workbench/cleanmix-discovery-trace/instrumented'
+    }
+    manifest {
+        attributes(
+            'Premain-Class': 'dev.workbench.crucible.cleanmixtrace.CleanMixDiscoveryTraceAgent',
+            'Can-Redefine-Classes': 'false',
+            'Can-Retransform-Classes': 'false'
+        )
+    }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+def cleanmixHandlerRegressionJar = tasks.register('cleanmixHandlerRegressionJar', Jar) {
+    archiveBaseName = 'cleanmix-handler-regression'
+    archiveVersion = '0.1.0'
+    from(sourceSets.cleanmixHandlerRegression.output)
+    manifest {
+        attributes(
+            'ModType': 'CRL',
+            'FMLCorePlugin': 'dev.workbench.cleanmixhandler.bootstrap.HarnessLoadingPlugin',
+            'FMLCorePluginContainsFMLMod': 'true',
+            'ForceLoadAsMod': 'true',
+            'MixinConfigs': 'mixins.workbench.cleanmix-handler-regression.json'
+        )
+    }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+def cleanmixP0RegressionJar = tasks.register('cleanmixP0RegressionJar', Jar) {
+    archiveBaseName = 'cleanmix-p0-regression'
+    archiveVersion = '0.1.0'
+    from(sourceSets.cleanmixP0Regression.output)
+    manifest {
+        attributes(
+            'ModType': 'CRL',
+            'FMLCorePlugin': 'dev.workbench.cleanmixp0.bootstrap.P0LoadingPlugin',
+            'FMLCorePluginContainsFMLMod': 'true',
+            'ForceLoadAsMod': 'true'
+        )
+    }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+tasks.withType(JavaCompile).configureEach {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    options.encoding = 'UTF-8'
+}
+
+def serverRunDirectory = providers.gradleProperty('workbenchServerRunDir')
+def cleanmixTraceOutput = providers.gradleProperty('workbenchCleanMixTraceOutput')
+def cleanmixTraceCaptureId = providers.gradleProperty('workbenchCleanMixTraceCaptureId')
+def cleanmixComponentOutput = providers.gradleProperty('workbenchCleanMixComponentOutput')
+def cleanmixComponentCaptureId = providers.gradleProperty('workbenchCleanMixComponentCaptureId')
+def cleanmixConfigLifecycleOutput = providers.gradleProperty('workbenchCleanMixConfigLifecycleOutput')
+def cleanmixConfigLifecycleCaptureId = providers.gradleProperty('workbenchCleanMixConfigLifecycleCaptureId')
+def cleanmixTransformerChainOutput = providers.gradleProperty('workbenchCleanMixTransformerChainOutput')
+def cleanmixTransformerChainCaptureId = providers.gradleProperty('workbenchCleanMixTransformerChainCaptureId')
+def cleanmixFinalDefinitionOutput = providers.gradleProperty('workbenchCleanMixFinalDefinitionOutput')
+def cleanmixFinalDefinitionCaptureId = providers.gradleProperty('workbenchCleanMixFinalDefinitionCaptureId')
+def cleanmixFinalDefinitionTargets = providers.gradleProperty('workbenchCleanMixFinalDefinitionTargets')
+def cleanmixFinalDefinitionInputSha256 = providers.gradleProperty('workbenchCleanMixFinalDefinitionInputSha256')
+def cleanmixDirectApplicationOutput = providers.gradleProperty('workbenchCleanMixDirectApplicationOutput')
+def cleanmixDirectApplicationCaptureId = providers.gradleProperty('workbenchCleanMixDirectApplicationCaptureId')
+def cleanmixDirectApplicationTargets = providers.gradleProperty('workbenchCleanMixDirectApplicationTargets')
+tasks.matching { task -> task.name in ['runServer', 'runClient'] }.configureEach {
+    // Unimined's exact development target is already MCP-named. The shipped
+    // jar must retain its MCP-to-SRG refmap, so disable that refmap only for
+    // this development run task.
+    jvmArgs '-Dmixin.env.disableRefMap=true'
+    if (serverRunDirectory.isPresent()) {
+        workingDir = file(serverRunDirectory.get())
+    }
+    if ((cleanmixTraceOutput.isPresent() || cleanmixComponentOutput.isPresent())
+            || cleanmixConfigLifecycleOutput.isPresent()
+            || cleanmixTransformerChainOutput.isPresent()
+            || cleanmixFinalDefinitionOutput.isPresent()
+            || cleanmixDirectApplicationOutput.isPresent()) {
+        dependsOn(cleanmixDiscoveryTraceAgentJar)
+        jvmArgs "-javaagent:${cleanmixDiscoveryTraceAgentJar.get().archiveFile.get().asFile.absolutePath}"
+    }
+    if (cleanmixTraceOutput.isPresent()) {
+        systemProperty 'workbench.cleanmix.discovery_trace.enabled', 'true'
+        systemProperty 'workbench.cleanmix.discovery_trace.output', cleanmixTraceOutput.get()
+        systemProperty(
+            'workbench.cleanmix.discovery_trace.capture_id',
+            cleanmixTraceCaptureId.getOrElse('unbound')
+        )
+    }
+    if (cleanmixComponentOutput.isPresent()) {
+        systemProperty 'workbench.cleanmix.service_components.enabled', 'true'
+        systemProperty 'workbench.cleanmix.service_components.output', cleanmixComponentOutput.get()
+        systemProperty(
+            'workbench.cleanmix.service_components.capture_id',
+            cleanmixComponentCaptureId.getOrElse('unbound')
+        )
+    }
+    if (cleanmixConfigLifecycleOutput.isPresent()) {
+        systemProperty 'workbench.cleanmix.config_lifecycle.enabled', 'true'
+        systemProperty 'workbench.cleanmix.config_lifecycle.output', cleanmixConfigLifecycleOutput.get()
+        systemProperty(
+            'workbench.cleanmix.config_lifecycle.capture_id',
+            cleanmixConfigLifecycleCaptureId.getOrElse('unbound')
+        )
+    }
+    if (cleanmixTransformerChainOutput.isPresent()) {
+        systemProperty 'workbench.cleanmix.transformer_chain.enabled', 'true'
+        systemProperty 'workbench.cleanmix.transformer_chain.output', cleanmixTransformerChainOutput.get()
+        systemProperty(
+            'workbench.cleanmix.transformer_chain.capture_id',
+            cleanmixTransformerChainCaptureId.getOrElse('unbound')
+        )
+    }
+    if (cleanmixFinalDefinitionOutput.isPresent()) {
+        systemProperty 'foundation.dump', 'true'
+        systemProperty 'workbench.cleanmix.final_definition.enabled', 'true'
+        systemProperty 'workbench.cleanmix.final_definition.output', cleanmixFinalDefinitionOutput.get()
+        systemProperty(
+            'workbench.cleanmix.final_definition.capture_id',
+            cleanmixFinalDefinitionCaptureId.getOrElse('unbound')
+        )
+        systemProperty(
+            'workbench.cleanmix.final_definition.targets',
+            cleanmixFinalDefinitionTargets.getOrElse('')
+        )
+        if (cleanmixFinalDefinitionInputSha256.isPresent()) {
+            systemProperty(
+                'workbench.cleanmix.final_definition.expected_input_sha256',
+                cleanmixFinalDefinitionInputSha256.get()
+            )
+        }
+    }
+    if (cleanmixDirectApplicationOutput.isPresent()) {
+        systemProperty 'workbench.cleanmix.direct_application.enabled', 'true'
+        systemProperty 'workbench.cleanmix.direct_application.output', cleanmixDirectApplicationOutput.get()
+        systemProperty(
+            'workbench.cleanmix.direct_application.capture_id',
+            cleanmixDirectApplicationCaptureId.getOrElse('unbound')
+        )
+        systemProperty(
+            'workbench.cleanmix.direct_application.targets',
+            cleanmixDirectApplicationTargets.getOrElse('')
+        )
+    }
+    doFirst {
+        if (!serverRunDirectory.isPresent()) {
+            throw new GradleException(
+                'runtime launch requires -PworkbenchServerRunDir=<absolute ignored target directory>'
+            )
+        }
+        File requestedDirectory = new File(serverRunDirectory.get())
+        if (!requestedDirectory.isAbsolute()) {
+            throw new GradleException('workbenchServerRunDir must be an absolute path')
+        }
+        if (cleanmixTraceOutput.isPresent()) {
+            File requestedTrace = new File(cleanmixTraceOutput.get())
+            if (!requestedTrace.isAbsolute()) {
+                throw new GradleException('workbenchCleanMixTraceOutput must be an absolute path')
+            }
+            if (requestedTrace.exists()) {
+                throw new GradleException(
+                    'workbenchCleanMixTraceOutput must not already exist: ' + requestedTrace
+                )
+            }
+            File traceParent = requestedTrace.parentFile
+            if (traceParent == null || (!traceParent.exists() && !traceParent.mkdirs())) {
+                throw new GradleException(
+                    'could not create workbenchCleanMixTraceOutput parent: ' + traceParent
+                )
+            }
+        }
+        if (cleanmixComponentOutput.isPresent()) {
+            File requestedComponents = new File(cleanmixComponentOutput.get())
+            if (!requestedComponents.isAbsolute()) {
+                throw new GradleException('workbenchCleanMixComponentOutput must be an absolute path')
+            }
+            if (requestedComponents.exists()) {
+                throw new GradleException(
+                    'workbenchCleanMixComponentOutput must not already exist: '
+                        + requestedComponents
+                )
+            }
+            File componentParent = requestedComponents.parentFile
+            if (componentParent == null
+                    || (!componentParent.exists() && !componentParent.mkdirs())) {
+                throw new GradleException(
+                    'could not create workbenchCleanMixComponentOutput parent: '
+                        + componentParent
+                )
+            }
+        }
+        if (cleanmixConfigLifecycleOutput.isPresent()) {
+            File requestedLifecycle = new File(cleanmixConfigLifecycleOutput.get())
+            if (!requestedLifecycle.isAbsolute()) {
+                throw new GradleException(
+                    'workbenchCleanMixConfigLifecycleOutput must be an absolute path'
+                )
+            }
+            if (requestedLifecycle.exists()) {
+                throw new GradleException(
+                    'workbenchCleanMixConfigLifecycleOutput must not already exist: '
+                        + requestedLifecycle
+                )
+            }
+            File lifecycleParent = requestedLifecycle.parentFile
+            if (lifecycleParent == null
+                    || (!lifecycleParent.exists() && !lifecycleParent.mkdirs())) {
+                throw new GradleException(
+                    'could not create workbenchCleanMixConfigLifecycleOutput parent: '
+                        + lifecycleParent
+                )
+            }
+        }
+        if (cleanmixTransformerChainOutput.isPresent()) {
+            File requestedChain = new File(cleanmixTransformerChainOutput.get())
+            if (!requestedChain.isAbsolute()) {
+                throw new GradleException(
+                    'workbenchCleanMixTransformerChainOutput must be an absolute path'
+                )
+            }
+            if (requestedChain.exists()) {
+                throw new GradleException(
+                    'workbenchCleanMixTransformerChainOutput must not already exist: '
+                        + requestedChain
+                )
+            }
+            File chainParent = requestedChain.parentFile
+            if (chainParent == null || (!chainParent.exists() && !chainParent.mkdirs())) {
+                throw new GradleException(
+                    'could not create workbenchCleanMixTransformerChainOutput parent: '
+                        + chainParent
+                )
+            }
+        }
+        if (cleanmixFinalDefinitionOutput.isPresent()) {
+            File requestedDefinitions = new File(cleanmixFinalDefinitionOutput.get())
+            if (!requestedDefinitions.isAbsolute()) {
+                throw new GradleException(
+                    'workbenchCleanMixFinalDefinitionOutput must be an absolute path'
+                )
+            }
+            if (requestedDefinitions.exists()) {
+                throw new GradleException(
+                    'workbenchCleanMixFinalDefinitionOutput must not already exist: '
+                        + requestedDefinitions
+                )
+            }
+            if (!cleanmixFinalDefinitionTargets.isPresent()
+                    || cleanmixFinalDefinitionTargets.get().trim().isEmpty()) {
+                throw new GradleException(
+                    'workbenchCleanMixFinalDefinitionTargets must be nonempty'
+                )
+            }
+            File definitionParent = requestedDefinitions.parentFile
+            if (definitionParent == null
+                    || (!definitionParent.exists() && !definitionParent.mkdirs())) {
+                throw new GradleException(
+                    'could not create workbenchCleanMixFinalDefinitionOutput parent: '
+                        + definitionParent
+                )
+            }
+        }
+        if (cleanmixDirectApplicationOutput.isPresent()) {
+            File requestedApplications = new File(cleanmixDirectApplicationOutput.get())
+            if (!requestedApplications.isAbsolute()) {
+                throw new GradleException(
+                    'workbenchCleanMixDirectApplicationOutput must be an absolute path'
+                )
+            }
+            if (requestedApplications.exists()) {
+                throw new GradleException(
+                    'workbenchCleanMixDirectApplicationOutput must not already exist: '
+                        + requestedApplications
+                )
+            }
+            if (!cleanmixDirectApplicationTargets.isPresent()
+                    || cleanmixDirectApplicationTargets.get().trim().isEmpty()) {
+                throw new GradleException(
+                    'workbenchCleanMixDirectApplicationTargets must be nonempty'
+                )
+            }
+            File applicationParent = requestedApplications.parentFile
+            if (applicationParent == null
+                    || (!applicationParent.exists() && !applicationParent.mkdirs())) {
+                throw new GradleException(
+                    'could not create workbenchCleanMixDirectApplicationOutput parent: '
+                        + applicationParent
+                )
+            }
+        }
+        File disabledDevExtra = new File(requestedDirectory, '.workbench-disabled-dev-extra')
+        if (disabledDevExtra.exists()) {
+            throw new GradleException(
+                'reserved disabled Cleanroom development extra path must not exist: '
+                    + disabledDevExtra
+            )
+        }
+        List<String> exactJvmArgs = new ArrayList<>(getJvmArgs())
+        exactJvmArgs.removeIf { argument ->
+            argument == '-Dcrl.dev.extrapath'
+                || argument.startsWith('-Dcrl.dev.extrapath=')
+        }
+        setJvmArgs(exactJvmArgs)
+        systemProperties.remove('crl.dev.extrapath')
+        systemProperty 'crl.dev.extrapath', disabledDevExtra.absolutePath
+    }
+}

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+license = "LGPL-3.0-only"
+license-files = ["LICENSE", "NOTICE.md"]
+name = "workbench-blueprints"
+version = "0.1.1"
+description = "Workbench blueprints module"
+requires-python = ">=3.12,<3.15"
+dependencies = ["workbench-api>=0.1.0,<0.2.0", "workbench-project-intelligence>=0.1.0,<0.2.0", "PyYAML==6.0.3", "jsonschema==4.19.2"]
+
+[project.entry-points."workbench.modules"]
+"blueprints" = "workbench_registration_blueprints:module"
+
+[tool.setuptools]
+packages = ["workbench_blueprints", "workbench_resources.modules.blueprints"]
+py-modules = ["workbench_registration_blueprints"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"workbench_resources.modules.blueprints" = "."
+
+[tool.setuptools.package-data]
+"workbench_resources.modules.blueprints" = ["pyproject.toml", "README.md", "contracts/**/*", "schemas/**/*", "src/**/*.py"]
+
+[tool.workbench]
+module-id = "blueprints"
+requires = ["project-intelligence"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "**/*.egg-info/*", "**/node_modules/*", "**/.gradle/*", "**/build/*"]

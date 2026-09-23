@@ -1,0 +1,225 @@
+import groovy.json.JsonSlurper
+import java.util.jar.JarFile
+
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.unimined' version '1.4.27-kappa'
+}
+
+group = fixture_group
+version = fixture_version
+
+layout.buildDirectory = file(
+    '../../../../../.workbench/build/cleanroom/0.6.8-alpha/generic-mod-daily-loop'
+)
+
+base {
+    archivesName = fixture_archive
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.cleanroommc.com' }
+}
+
+dependencies {
+    annotationProcessor 'com.cleanroommc:cleanmix:0.7.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.9.2'
+}
+
+unimined.minecraft {
+    version minecraft_version
+
+    mappings {
+        mcp(mcp_channel, mcp_version)
+    }
+
+    cleanroom {
+        loader cleanroom_version
+    }
+
+    defaultRemapJar = false
+    remap(tasks.named('jar').get())
+}
+
+def generatedRefmap = layout.buildDirectory.file(
+    'generated/mixin/mixins.workbench_daily_loop.refmap.json'
+)
+def mixinSrg = file('mixin-mcp-to-srg.srg')
+
+tasks.named('compileJava', JavaCompile).configure {
+    doFirst {
+        generatedRefmap.get().asFile.parentFile.mkdirs()
+    }
+    options.compilerArgs.addAll([
+        "-AoutRefMapFile=${generatedRefmap.get().asFile.absolutePath}",
+        "-AreobfSrgFile=${mixinSrg.absolutePath}",
+        '-AdefaultObfuscationEnv=searge'
+    ])
+}
+
+tasks.named('processResources').configure {
+    dependsOn(tasks.named('compileJava'))
+    from(generatedRefmap) {
+        into ''
+    }
+}
+
+tasks.named('jar').configure {
+    archiveClassifier = 'dev'
+    manifest {
+        attributes(
+            'ModType': 'CRL',
+            'ForceLoadAsMod': 'true',
+            'MixinConfigs': 'mixins.workbench_daily_loop.json'
+        )
+    }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    finalizedBy(tasks.named('remapJar'))
+}
+
+tasks.named('sourcesJar').configure {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+tasks.withType(JavaCompile).configureEach {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test').configure {
+    useJUnitPlatform()
+}
+
+def selectedFixtureArtifact = providers.gradleProperty('workbenchFixtureArtifact')
+def remapJarTask = tasks.named('remapJar')
+def ignoredRoot = rootProject.file('../../../../../.workbench').toPath().normalize()
+
+def verifyFixtureArtifact = tasks.register('verifyFixtureArtifact') {
+    group = 'verification'
+    description = 'Fail closed unless the remapped daily-loop fixture JAR is complete.'
+    dependsOn(remapJarTask)
+
+    doLast {
+        File artifact = selectedFixtureArtifact.isPresent()
+            ? file(selectedFixtureArtifact.get())
+            : remapJarTask.get().archiveFile.get().asFile
+        if (selectedFixtureArtifact.isPresent()) {
+            if (!artifact.isAbsolute()) {
+                throw new GradleException('workbenchFixtureArtifact must be an absolute path')
+            }
+            if (!artifact.toPath().normalize().startsWith(ignoredRoot)) {
+                throw new GradleException(
+                    'workbenchFixtureArtifact must stay inside ignored .workbench storage'
+                )
+            }
+        }
+        if (!artifact.isFile() || artifact.length() == 0L) {
+            throw new GradleException("fixture artifact is missing or empty: ${artifact}")
+        }
+
+        JarFile jar = new JarFile(artifact)
+        try {
+            def requiredEntries = [
+                'mcmod.info',
+                'pack.mcmeta',
+                'mixins.workbench_daily_loop.json',
+                'mixins.workbench_daily_loop.refmap.json',
+                'assets/workbench_daily_loop/lang/en_us.lang',
+                'assets/workbench_daily_loop/blockstates/probe_block.json',
+                'assets/workbench_daily_loop/models/block/probe_block.json',
+                'assets/workbench_daily_loop/models/item/probe_block.json',
+                'dev/workbench/dailyloop/DailyLoopMod.class',
+                'dev/workbench/dailyloop/DailyLoopContent.class',
+                'dev/workbench/dailyloop/DailyLoopProbe.class',
+                'dev/workbench/dailyloop/mixin/MixinBlock.class'
+            ]
+            requiredEntries.each { entry ->
+                if (jar.getEntry(entry) == null) {
+                    throw new GradleException("fixture artifact missing required entry ${entry}")
+                }
+            }
+            if (jar.manifest.mainAttributes.getValue('MixinConfigs') !=
+                'mixins.workbench_daily_loop.json') {
+                throw new GradleException('fixture artifact has the wrong MixinConfigs manifest')
+            }
+            if (jar.entries().toList().any { entry ->
+                entry.name.startsWith('org/spongepowered/asm/mixin/')
+            }) {
+                throw new GradleException('fixture artifact embeds a second Mixin implementation')
+            }
+
+            def metadata = new JsonSlurper().parse(
+                jar.getInputStream(jar.getEntry('mcmod.info'))
+            )
+            if (!(metadata instanceof List) || metadata.size() != 1 ||
+                metadata[0].modid != 'workbench_daily_loop' ||
+                metadata[0].version != fixture_version) {
+                throw new GradleException('fixture artifact mod identity is not exact')
+            }
+            def refmap = new JsonSlurper().parse(
+                jar.getInputStream(jar.getEntry('mixins.workbench_daily_loop.refmap.json'))
+            )
+            if (!(refmap.mappings instanceof Map) || refmap.mappings.isEmpty()) {
+                throw new GradleException('fixture artifact refmap has no generated mappings')
+            }
+            byte[] bytecode = jar.getInputStream(
+                jar.getEntry('dev/workbench/dailyloop/DailyLoopMod.class')
+            ).bytes
+            if (bytecode.length < 4 ||
+                (bytecode[0] & 0xFF) != 0xCA ||
+                (bytecode[1] & 0xFF) != 0xFE ||
+                (bytecode[2] & 0xFF) != 0xBA ||
+                (bytecode[3] & 0xFF) != 0xBE) {
+                throw new GradleException('fixture artifact has corrupt mod bytecode')
+            }
+        } finally {
+            jar.close()
+        }
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn(verifyFixtureArtifact)
+}
+
+def dailyLoopRunDirectory = providers.gradleProperty('workbenchDailyLoopRunDir')
+
+tasks.matching { task -> task.name in ['runClient', 'runServer'] }.configureEach {
+    // Unimined development classes are MCP-named while the distributable JAR
+    // retains its MCP-to-SRG refmap.  Keep that refmap out of this exact dev
+    // execution, matching the existing Cleanroom observatory fixture.
+    jvmArgs '-Dmixin.env.disableRefMap=true'
+    dependsOn(verifyFixtureArtifact)
+    if (dailyLoopRunDirectory.isPresent()) {
+        workingDir = file(dailyLoopRunDirectory.get())
+    }
+    doFirst {
+        if (!dailyLoopRunDirectory.isPresent()) {
+            throw new GradleException(
+                'runClient/runServer require -PworkbenchDailyLoopRunDir=<absolute ignored target directory>'
+            )
+        }
+        File requestedDirectory = new File(dailyLoopRunDirectory.get())
+        if (!requestedDirectory.isAbsolute()) {
+            throw new GradleException('workbenchDailyLoopRunDir must be absolute')
+        }
+        requestedDirectory.mkdirs()
+        if (!requestedDirectory.isDirectory()) {
+            throw new GradleException(
+                'workbenchDailyLoopRunDir could not be materialized as a directory'
+            )
+        }
+    }
+}

@@ -1,0 +1,2 @@
+CL: net/minecraft/block/Block net/minecraft/block/Block
+MD: net/minecraft/block/Block/getTranslationKey ()Ljava/lang/String; net/minecraft/block/Block/func_149739_a ()Ljava/lang/String;

@@ -1,0 +1,1024 @@
+{
+  "applicability": {
+    "artifact_role": "authored-consumer-mod",
+    "candidate_family": "cleanroom",
+    "platform_mode": "native-cleanmix",
+    "profile_maturity": "experimental",
+    "scope": "Static inspection of a mod artifact intended to run on a candidate that provides CleanMix, MixinExtras, Foundation, ASM, and the embedded MixinBooter compatibility API."
+  },
+  "behavior_epochs": [
+    {
+      "epoch_id": "mixinbooter-pre-11",
+      "evidence_refs": [
+        "cleanroom-mixinbooter-loader",
+        "cleanroom-mixinbooter-tags"
+      ],
+      "match": {
+        "component": "standalone-mixinbooter",
+        "version_range": "<11.0"
+      },
+      "scanner_treatment": "historical-profile-only",
+      "semantics": [
+        "Registration may use early and late loader APIs rather than native manifest discovery.",
+        "This epoch is not a valid construction target for a native Cleanroom candidate."
+      ]
+    },
+    {
+      "epoch_id": "cleanmix-release-0.5.x",
+      "evidence_refs": [
+        "cleanmix-0.5.0-tag",
+        "cleanmix-0.5.1-tag"
+      ],
+      "match": {
+        "component": "cleanmix",
+        "version_range": ">=0.5.0 <0.6.0"
+      },
+      "scanner_treatment": "historical-review",
+      "semantics": [
+        "This release line predates CleanMix compatibility metadata.",
+        "Do not infer candidate 0.7.x preparation, plugin-gating, accessor, or phase-transition behavior from a 0.5.x observation."
+      ]
+    },
+    {
+      "epoch_id": "cleanmix-release-0.6.x",
+      "evidence_refs": [
+        "cleanmix-0.6.0-tag",
+        "cleanmix-compatibility-source"
+      ],
+      "match": {
+        "component": "cleanmix",
+        "version_range": ">=0.6.0 <0.7.0"
+      },
+      "scanner_treatment": "historical-review",
+      "semantics": [
+        "CleanMix introduced class- and member-level compatibility metadata.",
+        "The 0.6.0 compatibility boundary selects newer initializer handling and is required for enum extension support."
+      ]
+    },
+    {
+      "epoch_id": "cleanmix-release-0.7.x",
+      "evidence_refs": [
+        "cleanmix-0.7.0-tag",
+        "cleanmix-0.7-config-gating",
+        "cleanmix-0.7-phase-begin",
+        "cleanmix-0.7-phase-hint"
+      ],
+      "match": {
+        "component": "cleanmix",
+        "version_range": ">=0.7.0 <0.8.0"
+      },
+      "scanner_treatment": "candidate-native",
+      "semantics": [
+        "Configuration-consumption gating retains phase information.",
+        "A phase transition begins the service phase before transformer refresh processing.",
+        "Phase changes hint the transformer so pending configurations are processed promptly.",
+        "This runtime release epoch does not create a new compatibility-metadata boundary beyond 0.6.0."
+      ]
+    },
+    {
+      "epoch_id": "cleanmix-compatibility-0.1.0",
+      "evidence_refs": [
+        "cleanmix-compatibility-source"
+      ],
+      "match": {
+        "component": "cleanmix-compatibility-metadata",
+        "version_range": ">=0.1.0 <0.6.0"
+      },
+      "scanner_treatment": "legacy-behavior",
+      "semantics": [
+        "CleanMix 0.7.0 treats 0.1.0 as the baseline and the fallback for missing metadata.",
+        "Metadata absence is therefore observable behavior selection, not neutral absence."
+      ]
+    },
+    {
+      "epoch_id": "cleanmix-compatibility-0.6.0",
+      "evidence_refs": [
+        "cleanmix-compatibility-source"
+      ],
+      "match": {
+        "component": "cleanmix-compatibility-metadata",
+        "version_range": ">=0.6.0"
+      },
+      "scanner_treatment": "candidate-latest-known-boundary",
+      "semantics": [
+        "CleanMix 0.7.0 declares 0.6.0 as its latest compatibility boundary.",
+        "Values above 0.6.0 parse, but this policy does not invent additional behavioral distinctions."
+      ]
+    }
+  ],
+  "doctor_rules": {
+    "artifact.compatibility_metadata": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.compatibility.absent",
+          "match": {
+            "condition": "metadata_resource_absent"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "CleanMix 0.7.0 silently falls back to compatibility 0.1.0 when cleanmix_version_compatibility.json is absent."
+        },
+        {
+          "finding_id": "cleanroom.mixin.compatibility.invalid-version",
+          "match": {
+            "condition": "entry_version_does_not_match",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+            "part_maximum": 999
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "The runtime ignores malformed compatibility entries and falls back, which conceals the author's intended behavior."
+        },
+        {
+          "finding_id": "cleanroom.mixin.compatibility.above-known-boundary",
+          "match": {
+            "condition": "entry_version_greater_than",
+            "version": "0.6.0"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "The candidate parser accepts higher semantic versions, but its latest declared behavior boundary is 0.6.0."
+        },
+        {
+          "finding_id": "cleanroom.mixin.compatibility.orphan-key",
+          "match": {
+            "condition": "entry_key_has_no_scanned_mixin_or_member"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "Stale metadata cannot select behavior for a class or member that is not in the artifact."
+        }
+      ],
+      "resource": "cleanmix_version_compatibility.json"
+    },
+    "artifact.embedded_packages": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.embedded.native-toolchain-package",
+          "match": {
+            "condition": "any_original_namespace_prefix_matches",
+            "prefixes_ref": "forbidden_embedded_content.package_prefixes"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "A consumer artifact must not provide a second copy or split package for a native transformer, service, bytecode API, or platform dependency."
+        },
+        {
+          "finding_id": "cleanroom.mixin.embedded.relocated-toolchain-copy",
+          "match": {
+            "condition": "scanner_identifies_relocated_copy_of_forbidden_component"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "Relocation avoids an original-namespace split package, but the extra transformer-adjacent implementation remains part of the artifact's risk inventory."
+        }
+      ]
+    },
+    "artifact.mixin_configs": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.config.registered-resource-missing",
+          "match": {
+            "condition": "production_route_names_missing_config_resource"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "CleanMix cannot load a registered configuration resource that is absent."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.unregistered-resource",
+          "match": {
+            "condition": "config_resource_has_no_production_registration_route"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "A resource or development property is not evidence that production discovery will submit the configuration."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.invalid-json",
+          "match": {
+            "condition": "config_is_not_valid_json_object"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "Invalid configuration JSON is a load failure."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.invalid-min-version",
+          "match": {
+            "condition": "min_version_is_invalid",
+            "grammar": "runtime_capabilities.version_number_grammar",
+            "part_maximum": 32767
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "A malformed minVersion becomes VersionNumber.NONE, while a numeric part above 32767 throws IllegalArgumentException; neither is an admissible declaration of runtime intent."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.unsupported-min-version",
+          "match": {
+            "condition": "min_version_greater_than",
+            "version_ref": "runtime_capabilities.upstream_mixin_version"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "The configuration requires a newer Sponge Mixin API than this CleanMix candidate declares."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.required-feature-unavailable",
+          "match": {
+            "condition": "required_feature_is_unknown_or_candidate_proven_unavailable",
+            "states_ref": "runtime_capabilities.required_feature_states"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "CleanMix trims and uppercases each requiredFeatures entry and treats an unknown or inactive feature as unavailable, so an identifier unknown to the exact candidate cannot express an admissible requirement."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.required-feature-runtime-state",
+          "match": {
+            "condition": "required_feature_activation_depends_on_runtime_state",
+            "states_ref": "runtime_capabilities.required_feature_states"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "The feature exists in the candidate, but its activation depends on the process-wide compatibility level and effective JRE/ASM support at configuration initialisation time."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.unsupported-java-level",
+          "match": {
+            "condition": "compatibility_level_is_not_enum_name",
+            "enum_names_ref": "runtime_capabilities.compatibility_level_names"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "CleanMix trims and uppercases compatibilityLevel and then performs exact CompatibilityLevel enum lookup; names outside JAVA_6 through JAVA_25 fail configuration initialisation."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.java-level-effective-support",
+          "match": {
+            "condition": "compatibility_level_above_mixin_max_supported",
+            "java_major_ref": "runtime_capabilities.maximum_mixin_supported_compatibility"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "The enum name is admitted, but CleanMix declares JAVA_13 as MAX_SUPPORTED and effective support also depends on the launch JRE and ASM; a static consumer archive cannot prove that runtime state."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.mod-selector-is-default-alias",
+          "match": {
+            "condition": "first_environment_selector_payload_equals",
+            "value": "MOD"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "MOD is not a CleanMix phase. In 0.7.0 it resolves through a null phase to DEFAULT; any intended mod-presence gating must be demonstrated separately, normally by the config plugin."
+        },
+        {
+          "finding_id": "cleanroom.mixin.config.unknown-environment-selector",
+          "match": {
+            "allowlisted_environment_payload": "MOD",
+            "condition": "selector_resolves_unknown_or_fallback"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "CleanMix recognizes only case-sensitive @env/@environment tokens with uppercase-letter payloads and otherwise tries the entire raw value as an exact phase; unknown or unrecognized values silently fall back or resolve through DEFAULT."
+        }
+      ]
+    },
+    "artifact.mixins": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.class.missing",
+          "match": {
+            "condition": "listed_mixin_class_missing"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "Every class named by a config must be present."
+        },
+        {
+          "finding_id": "cleanroom.mixin.class.duplicate-listing",
+          "match": {
+            "condition": "mixin_class_listed_more_than_once_across_common_client_server"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "Duplicate registration obscures side and application intent."
+        },
+        {
+          "finding_id": "cleanroom.mixin.class.outside-config-package",
+          "match": {
+            "condition": "listed_mixin_class_not_beneath_config_package"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "Mixin config entries are resolved relative to the declared package."
+        },
+        {
+          "finding_id": "cleanroom.mixin.class.targets-native-toolchain",
+          "match": {
+            "condition": "mixin_targets_forbidden_native_namespace",
+            "prefixes_ref": "forbidden_embedded_content.package_prefixes"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "A consumer mod must not patch the native transformation service, host, or bytecode implementation without a separately declared experimental platform profile."
+        }
+      ]
+    },
+    "artifact.overlaps": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.overlap.competing-overwrite",
+          "match": {
+            "condition": "same_target_member_has_multiple_overwrites"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "Multiple overwrites of one target member do not compose."
+        },
+        {
+          "finding_id": "cleanroom.mixin.overlap.exclusive-injection",
+          "match": {
+            "condition": "same_target_instruction_has_multiple_exclusive_injections"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "error"
+          },
+          "rationale": "Redirect-like exclusive injections at one instruction are order-sensitive and commonly incompatible."
+        },
+        {
+          "finding_id": "cleanroom.mixin.overlap.shared-target",
+          "match": {
+            "condition": "remaining_overlap_present"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "A shared target is evidence for compatibility review, not proof of a conflict."
+        }
+      ]
+    },
+    "artifact.owner_id_collisions": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.owner-id.collision",
+          "match": {
+            "condition": "collision_present"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "CleanMix derives diagnostic ownership from Cleanroom mod discovery; a reused owner ID makes attribution ambiguous."
+        }
+      ]
+    },
+    "artifact.plugin": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.plugin.class-missing",
+          "match": {
+            "condition": "declared_plugin_class_missing"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "The plugin is absent from the owning archive, but this receipt has no explicit dependency roles or class-resolution edges with which to prove it absent from the runtime dependency closure."
+        },
+        {
+          "finding_id": "cleanroom.mixin.plugin.wrong-interface",
+          "match": {
+            "condition": "declared_plugin_does_not_implement",
+            "interface": "org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "CleanMix expects IMixinConfigPlugin. The direct class-header table does not declare it, but V1 does not resolve superclass inheritance or dependencies and therefore cannot prove the runtime contract absent."
+        },
+        {
+          "finding_id": "cleanroom.mixin.plugin.mod-selector-without-plugin",
+          "match": {
+            "condition": "config_uses_mod_selector_and_declares_no_plugin"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "@env(MOD) itself is only a DEFAULT alias and supplies no mod-presence decision."
+        },
+        {
+          "finding_id": "cleanroom.mixin.plugin.programmatic-gating",
+          "match": {
+            "condition": "plugin_declared"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "info"
+          },
+          "rationale": "Static inspection can prove the plugin class and contract, but not its runtime gating decisions."
+        }
+      ]
+    },
+    "artifact.refmap": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.refmap.resource-missing",
+          "match": {
+            "condition": "declared_refmap_resource_missing"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "A declared but absent reference map is a packaging defect."
+        },
+        {
+          "finding_id": "cleanroom.mixin.refmap.omitted-for-obfuscated-target",
+          "match": {
+            "condition": "no_refmap_and_minecraft_or_forge_targets_present"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "An omitted refmap may be intentional with stable runtime names, but mappings-dependent targets need explicit review."
+        },
+        {
+          "finding_id": "cleanroom.mixin.refmap.invalid-json",
+          "match": {
+            "condition": "declared_refmap_is_not_valid_json_object"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "An unreadable reference map cannot support remapping."
+        }
+      ]
+    },
+    "artifact.registration_routes": {
+      "rules": [
+        {
+          "finding_id": "cleanroom.mixin.registration.native-service-provider",
+          "match": {
+            "condition": "consumer_declares_forbidden_service_descriptor",
+            "descriptors_ref": "forbidden_embedded_content.service_descriptors"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "The platform owns service selection; a consumer-provided service creates a competing authority."
+        },
+        {
+          "finding_id": "cleanroom.mixin.registration.embedded-mixinbooter-plugin",
+          "match": {
+            "condition": "manifest_entry_equals",
+            "name": "FMLCorePlugin",
+            "value": "zone.rong.mixinbooter.MixinBooterPlugin"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "Cleanroom embeds the compatibility API and blacklists the standalone MixinBooter loading plugin."
+        },
+        {
+          "finding_id": "cleanroom.mixin.registration.standalone-mixin-tweaker",
+          "match": {
+            "condition": "manifest_entry_equals",
+            "name": "TweakClass",
+            "value": "org.spongepowered.asm.launch.MixinTweaker"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "New native-Cleanroom construction must use CleanMix platform discovery rather than bootstrap a standalone Mixin service."
+        },
+        {
+          "finding_id": "cleanroom.mixin.registration.development-only",
+          "match": {
+            "condition": "only_route_is_system_property",
+            "property": "crl.dev.mixin"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "crl.dev.mixin is a development convenience and is not production artifact registration."
+        },
+        {
+          "finding_id": "cleanroom.mixin.registration.legacy-loader",
+          "match": {
+            "condition": "route_uses_any_class_or_annotation",
+            "values": [
+              "zone.rong.mixinbooter.IEarlyMixinLoader",
+              "zone.rong.mixinbooter.ILateMixinLoader",
+              "zone.rong.mixinbooter.MixinLoader"
+            ]
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "Cleanroom retains these APIs for compatibility, but native manifest registration is the construction policy."
+        },
+        {
+          "finding_id": "cleanroom.mixin.registration.connector-class-missing",
+          "match": {
+            "condition": "declared_connector_class_missing"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "warning"
+          },
+          "rationale": "The connector is absent from the owning archive, but V1 has no explicit dependency roles or class-resolution edges with which to prove it absent from the runtime dependency closure."
+        },
+        {
+          "finding_id": "cleanroom.mixin.registration.connector",
+          "match": {
+            "condition": "declared_connector_interface_requires_dependency_closure",
+            "interface": "org.spongepowered.asm.mixin.connect.IMixinConnector"
+          },
+          "result": {
+            "disposition": "review",
+            "severity": "info"
+          },
+          "rationale": "MixinConnector is supported, but V1 does not retain connector class-header interfaces, superclass inheritance, dependency closure, or the configurations registered by connect()."
+        },
+        {
+          "finding_id": "cleanroom.mixin.registration.configs",
+          "match": {
+            "condition": "manifest_attribute_present",
+            "delimiter": ",",
+            "name": "MixinConfigs"
+          },
+          "result": {
+            "disposition": "accept",
+            "severity": "info"
+          },
+          "rationale": "CleanMix's default platform agent trims comma-separated MixinConfigs entries and Cleanroom discovery submits the owning container."
+        },
+        {
+          "finding_id": "cleanroom.mixin.registration.none",
+          "match": {
+            "condition": "no_production_registration_route"
+          },
+          "result": {
+            "disposition": "reject",
+            "severity": "error"
+          },
+          "rationale": "A mixin config without a native production route will not be discovered."
+        }
+      ]
+    }
+  },
+  "evidence_boundary": {
+    "artifact_presence_in_installation": "not_observed",
+    "kind": "static-source-policy",
+    "runtime_plugin_decisions": "not_observed",
+    "runtime_service_selection": "not_observed",
+    "transformed_class_outputs": "not_observed"
+  },
+  "evidence_sources": [
+    {
+      "assertions": [
+        "The 0.5.0 release line is distinct historical behavior."
+      ],
+      "id": "cleanmix-0.5.0-tag",
+      "revision": "d6f80e4343d36fea57ba0b8e0dfcbbcc7d0d967c",
+      "url": "https://github.com/CleanroomMC/CleanMix/tree/d6f80e4343d36fea57ba0b8e0dfcbbcc7d0d967c"
+    },
+    {
+      "assertions": [
+        "The 0.5.1 release remains before compatibility metadata."
+      ],
+      "id": "cleanmix-0.5.1-tag",
+      "revision": "f267bf84959ea56417acfe15731568c951cdddba",
+      "url": "https://github.com/CleanroomMC/CleanMix/tree/f267bf84959ea56417acfe15731568c951cdddba"
+    },
+    {
+      "assertions": [
+        "Compatibility annotation and metadata were introduced at 0.6.0."
+      ],
+      "id": "cleanmix-0.6.0-tag",
+      "revision": "ac2b06c920608d566efe57386bf6b9b88552b02d",
+      "url": "https://github.com/CleanroomMC/CleanMix/commit/ac2b06c920608d566efe57386bf6b9b88552b02d"
+    },
+    {
+      "assertions": [
+        "Candidate CleanMix source is tag 0.7.0."
+      ],
+      "id": "cleanmix-0.7.0-tag",
+      "revision": "24898e32adc735fe48f4a3732b1831bd566c4626",
+      "tree_sha1": "7bdf03df469a1bbcf4cf5cba93f74e6bc1641218",
+      "url": "https://github.com/CleanroomMC/CleanMix/tree/24898e32adc735fe48f4a3732b1831bd566c4626"
+    },
+    {
+      "assertions": [
+        "Configuration-consumption gating retains phases in the 0.7.0 epoch."
+      ],
+      "id": "cleanmix-0.7-config-gating",
+      "revision": "0be24ae04cbf027da2fe78f36f6f0ea45192096b",
+      "url": "https://github.com/CleanroomMC/CleanMix/commit/0be24ae04cbf027da2fe78f36f6f0ea45192096b"
+    },
+    {
+      "assertions": [
+        "The service phase begins after transition before refresh processing."
+      ],
+      "id": "cleanmix-0.7-phase-begin",
+      "revision": "a86fa8cc559343a8a9cca62d439e82cdf78a7d6f",
+      "url": "https://github.com/CleanroomMC/CleanMix/commit/a86fa8cc559343a8a9cca62d439e82cdf78a7d6f"
+    },
+    {
+      "assertions": [
+        "Phase changes hint prompt processing of pending configs."
+      ],
+      "id": "cleanmix-0.7-phase-hint",
+      "revision": "24ef30c41c23d778b3fd5ee9606f7965391618d0",
+      "url": "https://github.com/CleanroomMC/CleanMix/commit/24ef30c41c23d778b3fd5ee9606f7965391618d0"
+    },
+    {
+      "assertions": [
+        "Compatibility metadata uses cleanmix_version_compatibility.json.",
+        "Version syntax is major.minor.patch with each part no greater than 999.",
+        "Missing metadata falls back to 0.1.0.",
+        "The latest declared candidate behavior boundary is 0.6.0."
+      ],
+      "id": "cleanmix-compatibility-source",
+      "revision": "24898e32adc735fe48f4a3732b1831bd566c4626",
+      "url": "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/src/main/java/org/spongepowered/asm/mixin/CleanroomUtil.java"
+    },
+    {
+      "assertions": [
+        "The only phase names are PREINIT, INIT, and DEFAULT.",
+        "A null phase resolves to DEFAULT.",
+        "CompatibilityLevel enum names are JAVA_6 through JAVA_25.",
+        "CompatibilityLevel.MAX_SUPPORTED is JAVA_13, and maximum effective support depends on the current JRE and ASM.",
+        "The candidate feature enum contains UNSAFE_INJECTION as enabled and INJECTORS_IN_INTERFACE_MIXINS as conditional on effective and process-wide compatibility support."
+      ],
+      "id": "cleanmix-environment-source",
+      "revision": "24898e32adc735fe48f4a3732b1831bd566c4626",
+      "url": "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/src/main/java/org/spongepowered/asm/mixin/MixinEnvironment.java"
+    },
+    {
+      "assertions": [
+        "Compatibility levels are trimmed, uppercased with Locale.ROOT, and admitted by exact CompatibilityLevel.valueOf lookup.",
+        "requiredFeatures entries are trimmed, uppercased with Locale.ROOT, and rejected by configuration gating when Feature.isActive returns false.",
+        "Target selectors split on each ampersand, vertical bar, or space and select the first case-sensitive @env/@environment token whose payload contains uppercase letters.",
+        "A recognized selector with an unknown payload resolves through null to DEFAULT and stops later selector processing.",
+        "When no environment token is recognized, the complete raw target is matched case-sensitively as a phase and otherwise uses the caller's fallback environment."
+      ],
+      "id": "cleanmix-config-source",
+      "revision": "24898e32adc735fe48f4a3732b1831bd566c4626",
+      "url": "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/src/main/java/org/spongepowered/asm/mixin/transformer/MixinConfig.java"
+    },
+    {
+      "assertions": [
+        "VersionNumber accepts one through four dot-separated numeric parts of one through five digits and an optional hyphen-prefixed alphanumeric, underscore, or hyphen suffix.",
+        "Missing numeric parts compare as zero and suffixes do not participate in comparison.",
+        "Malformed values parse as VersionNumber.NONE, while a numeric part above 32767 throws IllegalArgumentException."
+      ],
+      "id": "cleanmix-version-number-source",
+      "revision": "24898e32adc735fe48f4a3732b1831bd566c4626",
+      "url": "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/src/main/java/org/spongepowered/asm/util/VersionNumber.java"
+    },
+    {
+      "assertions": [
+        "MixinConfigs is comma-separated.",
+        "MixinConnector is a supported programmatic route.",
+        "Connector loading requires runtime assignability to IMixinConnector."
+      ],
+      "id": "cleanmix-platform-agent",
+      "revision": "24898e32adc735fe48f4a3732b1831bd566c4626",
+      "urls": [
+        "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/src/main/java/org/spongepowered/asm/launch/platform/MixinPlatformAgentDefault.java",
+        "https://github.com/CleanroomMC/CleanMix/blob/24898e32adc735fe48f4a3732b1831bd566c4626/src/main/java/org/spongepowered/asm/launch/platform/MixinConnectorManager.java"
+      ]
+    },
+    {
+      "assertions": [
+        "Cleanroom discovers artifacts carrying MixinConfigs or MixinConnector and submits their containers."
+      ],
+      "id": "cleanroom-mod-discoverer",
+      "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+      "url": "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/java/com/cleanroommc/discovery/CleanroomModDiscoverer.java"
+    },
+    {
+      "assertions": [
+        "CleanMixService is the native service.",
+        "crl.dev.mixin is a comma-separated system-property route.",
+        "The audit trail writes cleanmix.log and is controlled by cleanmix.auditTrail.",
+        "Source ownership resolves through CleanroomModDiscoverer."
+      ],
+      "id": "cleanroom-cleanmix-service",
+      "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+      "url": "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/java/com/cleanroommc/cleanmix/service/CleanMixService.java"
+    },
+    {
+      "assertions": [
+        "Cleanroom retains early and late MixinBooter loader compatibility APIs."
+      ],
+      "id": "cleanroom-mixinbooter-loader",
+      "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+      "url": "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/java/com/cleanroommc/cleanmix/CleanMixHooks.java"
+    },
+    {
+      "assertions": [
+        "The embedded MixinBooter compatibility API reports version 11.8."
+      ],
+      "id": "cleanroom-mixinbooter-tags",
+      "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+      "url": "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/java/zone/rong/mixinbooter/Tags.java"
+    },
+    {
+      "assertions": [
+        "Cleanroom blacklists the standalone MixinBooter loading plugin because it is integrated."
+      ],
+      "id": "cleanroom-loading-plugin-blacklist",
+      "revision": "9946eb1f17a66a72d518e5e4a92d45c62c6d33fc",
+      "url": "https://github.com/CleanroomMC/Cleanroom/blob/9946eb1f17a66a72d518e5e4a92d45c62c6d33fc/src/main/java/net/minecraftforge/common/ForgeEarlyConfig.java"
+    },
+    {
+      "assertions": [
+        "@env(MOD) is an observed first-party convention paired with a config plugin."
+      ],
+      "id": "cleanroom-first-party-mod-selector-convention",
+      "revision": "41059e52c4f5ea7ec3913615eb8bdc61b2dc3558",
+      "url": "https://github.com/CleanroomMC/Fugue/blob/41059e52c4f5ea7ec3913615eb8bdc61b2dc3558/src/main/resources/fugue.mixin.mod.json"
+    }
+  ],
+  "finding_contract": {
+    "dispositions": [
+      "accept",
+      "review",
+      "reject"
+    ],
+    "evaluation": "Emit every matching rule. Reject dominates review, and review dominates accept for the artifact summary.",
+    "severities": [
+      "info",
+      "warning",
+      "error"
+    ]
+  },
+  "forbidden_embedded_content": {
+    "package_prefixes": [
+      {
+        "component": "mixinextras",
+        "path_prefix": "com/llamalad7/mixinextras/",
+        "reason": "The candidate supplies MixinExtras.",
+        "relocated_copy": "review"
+      },
+      {
+        "component": "cleanmix-service",
+        "path_prefix": "com/cleanroommc/cleanmix/",
+        "reason": "The candidate supplies the CleanMix service integration.",
+        "relocated_copy": "reject"
+      },
+      {
+        "component": "guava",
+        "path_prefix": "com/google/common/",
+        "reason": "The candidate supplies Guava; an original-namespace copy is a split package.",
+        "relocated_copy": "review"
+      },
+      {
+        "component": "gson",
+        "path_prefix": "com/google/gson/",
+        "reason": "The candidate supplies Gson; an original-namespace copy is a split package.",
+        "relocated_copy": "review"
+      },
+      {
+        "component": "launchwrapper-host",
+        "path_prefix": "net/minecraft/launchwrapper/",
+        "reason": "Foundation owns the candidate's LaunchWrapper host classes.",
+        "relocated_copy": "reject"
+      },
+      {
+        "component": "asm",
+        "path_prefix": "org/objectweb/asm/",
+        "reason": "The candidate supplies its ASM bytecode API.",
+        "relocated_copy": "review"
+      },
+      {
+        "component": "mixin",
+        "path_prefix": "org/spongepowered/asm/",
+        "reason": "CleanMix supplies the Mixin engine and service API.",
+        "relocated_copy": "reject"
+      },
+      {
+        "component": "mixin-annotation-processor",
+        "path_prefix": "org/spongepowered/tools/obfuscation/",
+        "reason": "Annotation-processor implementation classes do not belong in a runtime consumer artifact.",
+        "relocated_copy": "review"
+      },
+      {
+        "component": "foundation",
+        "path_prefix": "top/outlands/foundation/",
+        "reason": "The candidate supplies Foundation as its launch and transformation host.",
+        "relocated_copy": "reject"
+      },
+      {
+        "component": "mixinbooter-compatibility-api",
+        "path_prefix": "zone/rong/mixinbooter/",
+        "reason": "Cleanroom embeds the MixinBooter 11.8 compatibility API.",
+        "relocated_copy": "reject"
+      }
+    ],
+    "service_descriptors": [
+      "META-INF/services/org.spongepowered.asm.service.IGlobalPropertyService",
+      "META-INF/services/org.spongepowered.asm.service.IMixinService",
+      "META-INF/services/org.spongepowered.asm.service.IMixinServiceBootstrap"
+    ]
+  },
+  "format": "workbench-cleanroom-mixin-doctor-policy-v1",
+  "native_service_expectations": {
+    "audit": {
+      "disable_property": "cleanmix.auditTrail",
+      "path": "logs/cleanmix.log"
+    },
+    "bootstrap_service": "com.cleanroommc.cleanmix.service.CleanMixBootstrap",
+    "global_property_service": "org.spongepowered.asm.service.mojang.Blackboard",
+    "mixin_service": "com.cleanroommc.cleanmix.service.CleanMixService",
+    "mixin_service_name": "CleanMix",
+    "owner_resolver": "com.cleanroommc.discovery.CleanroomModDiscoverer",
+    "selected_mixin_service_count": 1,
+    "side_source": "com.cleanroommc.common.CleanroomEnvironment",
+    "standalone_mixinbooter_service": "absent",
+    "verification_status": "expected-from-bound-source-not-runtime-observed"
+  },
+  "phase_policy": {
+    "known_phases": [
+      {
+        "name": "PREINIT",
+        "ordinal": 0
+      },
+      {
+        "name": "INIT",
+        "ordinal": 1
+      },
+      {
+        "name": "DEFAULT",
+        "ordinal": 2
+      }
+    ],
+    "mod_selector": {
+      "actual_resolution": "DEFAULT",
+      "classification": "first-party-convention-not-a-phase",
+      "selector_payload": "MOD"
+    },
+    "selector_parser": {
+      "environment_token_pattern": "^@env(?:ironment)?\\(([A-Z]+)\\)$",
+      "first_environment_token_wins": true,
+      "raw_phase_match": "exact-case-complete-value",
+      "split_pattern": "[&| ]"
+    },
+    "unknown_selector_policy": "reject-except-explicit-mod-convention-review"
+  },
+  "policy_id": "workbench-cleanroom-mixin-doctor-policy-v1",
+  "registration_policy": {
+    "canonical": {
+      "attribute": "MixinConfigs",
+      "delimiter": ",",
+      "entry_processing": "trim-and-register",
+      "requirements": [
+        "Each named resource exists.",
+        "Each name is unique after trimming.",
+        "The manifest route is present in the production artifact."
+      ]
+    },
+    "development_only": {
+      "delimiter": ",",
+      "production_evidence": false,
+      "system_property": "crl.dev.mixin"
+    },
+    "legacy_compatibility_routes": [
+      "zone.rong.mixinbooter.IEarlyMixinLoader",
+      "zone.rong.mixinbooter.ILateMixinLoader",
+      "zone.rong.mixinbooter.MixinLoader"
+    ],
+    "supported_programmatic": {
+      "attribute": "MixinConnector",
+      "policy": "inspect-connector-and-every-config-it-registers"
+    }
+  },
+  "runtime_capabilities": {
+    "cleanmix_compatibility_default": "0.1.0",
+    "cleanmix_compatibility_latest_boundary": "0.6.0",
+    "compatibility_level_names": [
+      "JAVA_6",
+      "JAVA_7",
+      "JAVA_8",
+      "JAVA_9",
+      "JAVA_10",
+      "JAVA_11",
+      "JAVA_12",
+      "JAVA_13",
+      "JAVA_14",
+      "JAVA_15",
+      "JAVA_16",
+      "JAVA_17",
+      "JAVA_18",
+      "JAVA_19",
+      "JAVA_20",
+      "JAVA_21",
+      "JAVA_22",
+      "JAVA_23",
+      "JAVA_24",
+      "JAVA_25"
+    ],
+    "maximum_mixin_supported_compatibility": 13,
+    "real_phases": [
+      "PREINIT",
+      "INIT",
+      "DEFAULT"
+    ],
+    "required_feature_normalization": "String.trim-then-uppercase-Locale.ROOT",
+    "required_feature_states": {
+      "INJECTORS_IN_INTERFACE_MIXINS": "runtime-compatibility-dependent",
+      "UNSAFE_INJECTION": "statically-active"
+    },
+    "upstream_fabric_mixin_version": "0.17.3",
+    "upstream_mixin_version": "0.8.7",
+    "version_number_grammar": "^([0-9]{1,5})(?:\\.([0-9]{1,5})(?:\\.([0-9]{1,5})(?:\\.([0-9]{1,5}))?)?)?(-[a-zA-Z0-9_\\-]+)?$"
+  },
+  "schema_version": 1,
+  "uncertainties": [
+    {
+      "id": "runtime-service-selection",
+      "resolution": "Require a runtime receipt that enumerates selected service providers.",
+      "statement": "Static source establishes the expected native service but does not prove which provider a particular process selected."
+    },
+    {
+      "id": "connector-output",
+      "resolution": "Observe or instrument connector execution and bind every added configuration.",
+      "statement": "Static class inspection may not enumerate configurations assembled dynamically by MixinConnector."
+    },
+    {
+      "id": "plugin-and-connector-dependency-closure",
+      "resolution": "Add explicit artifact dependency roles, class-resolution edges, class-header inheritance, and connector interface retention before making a terminal missing-class or interface decision.",
+      "statement": "A class absent from its owning archive may be supplied by a declared dependency, and a direct interface table does not close superclass inheritance."
+    },
+    {
+      "id": "plugin-decisions",
+      "resolution": "Record plugin decisions and active mod inventory in a runtime observation.",
+      "statement": "The presence of IMixinConfigPlugin does not prove its shouldApplyMixin decisions."
+    },
+    {
+      "id": "relocation-identification",
+      "resolution": "Inventory relocated dependencies with byte or source provenance.",
+      "statement": "A package-prefix scan proves original namespace duplication but cannot always identify a relocated implementation."
+    }
+  ]
+}

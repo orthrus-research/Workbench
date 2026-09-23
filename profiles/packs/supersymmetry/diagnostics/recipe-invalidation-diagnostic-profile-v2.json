@@ -1,0 +1,36 @@
+{
+  "capability_maturity": "preview",
+  "channels": {
+    "groovy_postinit": {
+      "comparison_format": "workbench-supersymmetry-groovy-conflict-group-comparison-v1",
+      "comparison_function": "compare_recipe_reload_diagnostics",
+      "diagnostic_format": "workbench-supersymmetry-recipe-reload-diagnostic-v1",
+      "diagnostic_function": "build_recipe_reload_diagnostic",
+      "evidence_label": "minecraft-groovy-log",
+      "observer": "atlas/src/recipe_reload_diagnostic.py"
+    },
+    "gt_startup_registration": {
+      "comparison_format": "workbench-supersymmetry-gt-recipe-registration-comparison-v1",
+      "comparison_function": "compare_gt_recipe_registration_diagnostics",
+      "diagnostic_format": "workbench-supersymmetry-gt-recipe-registration-diagnostic-v1",
+      "diagnostic_function": "build_gt_recipe_registration_diagnostic",
+      "evidence_label": "minecraft-latest-log",
+      "observer": "atlas/src/gt_recipe_registration_diagnostic.py"
+    }
+  },
+  "comparison_format": "workbench-supersymmetry-recipe-invalidation-comparison-v2",
+  "comparison_schema": "diagnostics/recipe-invalidation-comparison-v2.schema.json",
+  "composer": {
+    "comparison_function": "compare_recipe_invalidation_diagnostics",
+    "diagnostic_function": "build_recipe_invalidation_diagnostic",
+    "observer": "atlas/src/recipe_invalidation_diagnostic.py"
+  },
+  "contract": "atlas/recipe-invalidation-diagnostic-v2.md",
+  "diagnostic_format": "workbench-supersymmetry-recipe-invalidation-diagnostic-v2",
+  "diagnostic_schema": "diagnostics/recipe-invalidation-diagnostic-v2.schema.json",
+  "format": "workbench-runtime-recipe-invalidation-diagnostic-profile-v2",
+  "pack_profile_id": "workbench-pack:supersymmetry",
+  "profile_id": "workbench-pack:supersymmetry:recipe-invalidation-diagnostic-v2",
+  "runtime_support": "provisional",
+  "schema_version": 2
+}

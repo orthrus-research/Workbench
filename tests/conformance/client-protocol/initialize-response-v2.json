@@ -1,0 +1,85 @@
+{
+  "jsonrpc": "2.0",
+  "id": "initialize-1",
+  "result": {
+    "format": "workbench-initialize-result-v2",
+    "schema_version": 2,
+    "protocol_version": {
+      "major": 2,
+      "minor": 3
+    },
+    "server": {
+      "name": "workbench-shell",
+      "version": "0.1.0-dev",
+      "distribution": {
+        "kind": "source-tree",
+        "identity": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "verified": false
+      }
+    },
+    "client": {
+      "id": "workbench-client:conformance",
+      "kind": "test",
+      "version": "0.0.0"
+    },
+    "workspace": {
+      "root_uri": "file:///workspace",
+      "execution_host": {
+        "kind": "test"
+      }
+    },
+    "capabilities": {
+      "supported_methods": [
+        {
+          "method": "workspace/inspect",
+          "operation_class": "read-only"
+        },
+        {
+          "method": "runtime/plan",
+          "operation_class": "read-only"
+        },
+        {
+          "method": "runtime/diagnose",
+          "operation_class": "read-only"
+        },
+        {
+          "method": "instance/select",
+          "operation_class": "reversible"
+        },
+        {
+          "method": "instance/current",
+          "operation_class": "read-only"
+        },
+        {
+          "method": "registration/capabilities",
+          "operation_class": "read-only"
+        },
+        {
+          "method": "registration/plan",
+          "operation_class": "read-only"
+        },
+        {
+          "method": "registration/apply",
+          "operation_class": "reversible"
+        },
+        {
+          "method": "shutdown",
+          "operation_class": "read-only"
+        }
+      ],
+      "unavailable_methods": [],
+      "features": [
+        {
+          "feature": "cancellation",
+          "available": false,
+          "reason": "The current request handlers do not expose cancellation."
+        },
+        {
+          "feature": "progress",
+          "available": false,
+          "reason": "The current request handlers do not emit progress."
+        }
+      ]
+    }
+  }
+}

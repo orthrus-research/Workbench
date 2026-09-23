@@ -1,0 +1,397 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/feature-studio-snapshot-v2.schema.json",
+  "title": "Workbench Feature Studio read-only snapshot V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshot_id",
+    "format",
+    "schema_version",
+    "canonicalizer",
+    "origin",
+    "result",
+    "workspace_label",
+    "identities",
+    "availability",
+    "context",
+    "feature",
+    "source_locations",
+    "planned_changes",
+    "plan",
+    "assertions",
+    "timings",
+    "actions",
+    "review_binding",
+    "owner_links",
+    "export",
+    "limitations"
+  ],
+  "properties": {
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^feature-studio-snapshot:sha256:[0-9a-f]{64}$"
+    },
+    "format": {"const": "workbench-feature-studio-snapshot-v2"},
+    "schema_version": {"const": 2},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "origin": {"$ref": "#/$defs/origin"},
+    "result": {"$ref": "#/$defs/result"},
+    "workspace_label": {"const": "Materials & Recipes"},
+    "identities": {"$ref": "#/$defs/identities"},
+    "availability": {"$ref": "#/$defs/availability"},
+    "context": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/context"},
+    "feature": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/feature"},
+    "source_locations": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 32,
+      "items": {"$ref": "#/$defs/sourceLocation"}
+    },
+    "planned_changes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/plannedChange"}
+    },
+    "plan": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/plan"},
+    "assertions": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/assertion"}
+    },
+    "timings": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/timing"}
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/action"}
+    },
+    "review_binding": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/reviewBinding"},
+    "owner_links": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/ownerLink"}
+    },
+    "export": {
+      "anyOf": [
+        {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/export"},
+        {"type": "null"}
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"type": "string", "minLength": 1, "maxLength": 4096}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nullableContentId": {
+      "type": ["string", "null"],
+      "pattern": "^(?:[a-z][a-z0-9-]*:)?sha256:[0-9a-f]{64}$"
+    },
+    "sourceLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace_uri",
+        "relative_path",
+        "hunk_index",
+        "range",
+        "planned_range",
+        "source_sha256",
+        "planned_sha256",
+        "operation"
+      ],
+      "properties": {
+        "workspace_uri": {"type": "string", "format": "uri"},
+        "relative_path": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "hunk_index": {"type": "integer", "minimum": 0},
+        "range": {"$ref": "#/$defs/sourceRange"},
+        "planned_range": {"$ref": "#/$defs/sourceRange"},
+        "source_sha256": {"$ref": "#/$defs/digest"},
+        "planned_sha256": {"$ref": "#/$defs/digest"},
+        "operation": {"enum": ["create", "update", "delete"]}
+      }
+    },
+    "sourceRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_line", "end_line", "coordinate_system"],
+      "properties": {
+        "start_line": {"type": "integer", "minimum": 0},
+        "end_line": {"type": "integer", "minimum": 0},
+        "coordinate_system": {
+          "const": "unified-diff-lines-one-based-zero-for-empty-inclusive"
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "start_line": {"const": 0},
+            "end_line": {"const": 0}
+          }
+        },
+        {
+          "properties": {
+            "start_line": {"type": "integer", "minimum": 1},
+            "end_line": {"type": "integer", "minimum": 1}
+          }
+        }
+      ]
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "uri", "sha256", "size", "refresh"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "feature-studio-result-value",
+            "feature-studio-result-file",
+            "material-flow-receipt-v2"
+          ]
+        },
+        "uri": {"type": ["string", "null"], "format": "uri"},
+        "sha256": {
+          "anyOf": [
+            {"$ref": "#/$defs/digest"},
+            {"type": "null"}
+          ]
+        },
+        "size": {
+          "type": ["integer", "null"],
+          "minimum": 2,
+          "maximum": 134217728
+        },
+        "refresh": {"$ref": "#/$defs/refresh"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"kind": {"const": "feature-studio-result-value"}},
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "uri": {"type": "null"},
+              "sha256": {"type": "null"},
+              "size": {"type": "null"},
+              "refresh": {
+                "properties": {
+                  "state": {"const": "unavailable"},
+                  "reason_code": {"const": "feature-studio.snapshot-value-has-no-retained-source"}
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": ["feature-studio-result-file", "material-flow-receipt-v2"]
+              }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "uri": {"type": "string", "format": "uri"},
+              "sha256": {"$ref": "#/$defs/digest"},
+              "size": {"type": "integer", "minimum": 2, "maximum": 134217728},
+              "refresh": {
+                "properties": {
+                  "state": {"const": "available"},
+                  "reason_code": {"const": "feature-studio.snapshot-retained-source"}
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "refresh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason_code"],
+      "properties": {
+        "state": {"enum": ["available", "unavailable"]},
+        "reason_code": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_id", "format", "operation", "state", "semantic_projection_id"],
+      "properties": {
+        "result_id": {
+          "type": "string",
+          "pattern": "^feature-studio-result:sha256:[0-9a-f]{64}$"
+        },
+        "format": {"const": "workbench-feature-studio-result-v2"},
+        "operation": {
+          "enum": ["inspect", "plan", "verify", "explain", "export"]
+        },
+        "state": {"enum": ["ready", "incomplete", "complete"]},
+        "semantic_projection_id": {
+          "type": "string",
+          "pattern": "^feature-studio-semantic-projection:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "identities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_id",
+        "semantic_projection_id",
+        "flow_plan_id",
+        "blueprint_plan_id",
+        "source_snapshot_id",
+        "material_flow_receipt_id",
+        "blueprint_stage_id",
+        "candidate_id",
+        "staged_tree_id",
+        "pack_profile_family_id",
+        "platform_profile_id",
+        "pack_profile_id",
+        "profile_assessment_id",
+        "crucible_snapshot_id",
+        "runtime_session_id",
+        "runtime_plan_id",
+        "materialization_id",
+        "final_launch_id",
+        "export_receipt_id"
+      ],
+      "properties": {
+        "result_id": {
+          "type": "string",
+          "pattern": "^feature-studio-result:sha256:[0-9a-f]{64}$"
+        },
+        "semantic_projection_id": {
+          "type": "string",
+          "pattern": "^feature-studio-semantic-projection:sha256:[0-9a-f]{64}$"
+        },
+        "flow_plan_id": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/sha256Id"},
+        "blueprint_plan_id": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/sha256Id"},
+        "source_snapshot_id": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/sha256Id"},
+        "material_flow_receipt_id": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/nullableSha256Id"},
+        "blueprint_stage_id": {"$ref": "#/$defs/nullableContentId"},
+        "candidate_id": {"$ref": "#/$defs/nullableContentId"},
+        "staged_tree_id": {
+          "type": ["string", "null"],
+          "pattern": "^(?:sha256:)?[0-9a-f]{40,64}$"
+        },
+        "pack_profile_family_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "platform_profile_id": {"type": ["string", "null"], "maxLength": 256},
+        "pack_profile_id": {"type": ["string", "null"], "maxLength": 256},
+        "profile_assessment_id": {"$ref": "#/$defs/nullableContentId"},
+        "crucible_snapshot_id": {"$ref": "#/$defs/nullableContentId"},
+        "runtime_session_id": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/nullableSha256Id"},
+        "runtime_plan_id": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/nullableSha256Id"},
+        "materialization_id": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/nullableSha256Id"},
+        "final_launch_id": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/nullableSha256Id"},
+        "export_receipt_id": {
+          "type": ["string", "null"],
+          "pattern": "^feature-studio-export-receipt:sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_state",
+        "plan_state",
+        "platform_profile_state",
+        "source_state",
+        "planned_state",
+        "runtime_state"
+      ],
+      "properties": {
+        "result_state": {"enum": ["ready", "incomplete", "complete"]},
+        "plan_state": {"enum": ["ready", "blocked"]},
+        "platform_profile_state": {"enum": ["pending-verification", "profile-observation-bound"]},
+        "source_state": {"const": "observed-by-owner-census"},
+        "planned_state": {"const": "ready"},
+        "runtime_state": {"enum": ["pending", "observed"]}
+      }
+    },
+    "ownerLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "format",
+        "owner_id",
+        "projection_encoding",
+        "canonical_sha256",
+        "canonical_size",
+        "retained"
+      ],
+      "properties": {
+        "role": {"type": "string", "minLength": 1, "maxLength": 256},
+        "format": {"type": "string", "minLength": 1, "maxLength": 256},
+        "owner_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 512},
+        "projection_encoding": {
+          "enum": ["workbench-canonical-json-v2", "retained-owner-json-bytes"]
+        },
+        "canonical_sha256": {
+          "anyOf": [
+            {"$ref": "#/$defs/digest"},
+            {"type": "null"}
+          ]
+        },
+        "canonical_size": {
+          "type": ["integer", "null"],
+          "minimum": 2,
+          "maximum": 134217728
+        },
+        "retained": {
+          "anyOf": [
+            {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/retainedArtifact"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "projection_encoding": {"const": "workbench-canonical-json-v2"}
+            },
+            "required": ["projection_encoding"]
+          },
+          "then": {
+            "properties": {
+              "canonical_sha256": {"$ref": "#/$defs/digest"},
+              "canonical_size": {"type": "integer", "minimum": 2, "maximum": 134217728}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "projection_encoding": {"const": "retained-owner-json-bytes"}
+            },
+            "required": ["projection_encoding"]
+          },
+          "then": {
+            "properties": {
+              "canonical_sha256": {"type": "null"},
+              "canonical_size": {"type": "null"},
+              "retained": {"$ref": "workbench://schemas/workbench-shell/feature-studio-result-v2.schema.json#/$defs/retainedArtifact"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-worldgen-cockpit-report-v1.schema.json",
+  "title": "Workbench Worldgen Cockpit report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "report_id",
+    "created_at",
+    "mode",
+    "status",
+    "coverage",
+    "profile",
+    "alignment",
+    "sides",
+    "evidence",
+    "decision",
+    "visual",
+    "navigation",
+    "limitations",
+    "reproduction_command"
+  ],
+  "properties": {
+    "format": {"const": "workbench-worldgen-cockpit-report-v1"},
+    "schema_version": {"const": 1},
+    "report_id": {"type": "string", "pattern": "^workbench-worldgen-cockpit:sha256:[0-9a-f]{64}$"},
+    "created_at": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["fast", "debug", "performance"]},
+    "status": {"enum": ["equivalent", "changed", "unstable", "incomparable"]},
+    "coverage": {"enum": ["complete-for-mode", "partial", "incomparable"]},
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "pack_profile", "path", "sha256"],
+      "properties": {
+        "profile_id": {"type": "string", "minLength": 1},
+        "pack_profile": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "alignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aligned", "seed", "dimension_id", "chunk_region", "chunk_window", "checks", "failed_checks"],
+      "properties": {
+        "aligned": {"type": "boolean"},
+        "seed": {"type": ["integer", "null"]},
+        "dimension_id": {"type": "integer"},
+        "chunk_region": {"type": ["array", "null"], "items": {"type": "integer"}},
+        "chunk_window": {"type": "object"},
+        "checks": {"type": "array", "items": {"type": "object"}},
+        "failed_checks": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "sides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "candidate"],
+      "properties": {
+        "baseline": {"$ref": "#/$defs/side"},
+        "candidate": {"$ref": "#/$defs/side"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semantic", "final_state", "statistical", "subsurface", "causal", "performance", "observer_overhead"],
+      "properties": {
+        "semantic": {"$ref": "#/$defs/evidence"},
+        "final_state": {"$ref": "#/$defs/evidence"},
+        "statistical": {"$ref": "#/$defs/evidence"},
+        "subsurface": {"$ref": "#/$defs/evidence"},
+        "causal": {"$ref": "#/$defs/evidence"},
+        "performance": {"$ref": "#/$defs/evidence"},
+        "observer_overhead": {"$ref": "#/$defs/evidence"}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headline", "behavior_changed", "comparison_kind", "reproducibility_status", "performance_regression_count", "causal_status", "next_actions"],
+      "properties": {
+        "headline": {"type": "string", "minLength": 1},
+        "behavior_changed": {"type": ["boolean", "null"]},
+        "comparison_kind": {"enum": ["identical-input-control", "before-after", "incomparable"]},
+        "reproducibility_status": {"enum": ["stable-in-scope", "failed-in-scope", "not-calibrated", "unavailable"]},
+        "performance_regression_count": {"type": ["integer", "null"], "minimum": 0},
+        "causal_status": {"type": ["string", "null"]},
+        "next_actions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "min_chunk_x", "min_chunk_z", "width", "height", "cells", "legend", "top_outliers"],
+      "properties": {
+        "kind": {"const": "aligned-chunk-difference-grid"},
+        "min_chunk_x": {"type": "integer"},
+        "min_chunk_z": {"type": "integer"},
+        "width": {"type": "integer", "minimum": 0},
+        "height": {"type": "integer", "minimum": 0},
+        "cells": {"type": "array", "items": {"type": "object"}},
+        "legend": {"type": "array", "items": {"type": "string"}},
+        "top_outliers": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "navigation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "label", "target"],
+        "properties": {
+          "kind": {"type": "string", "minLength": 1},
+          "label": {"type": "string", "minLength": 1},
+          "target": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "limitations": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "reproduction_command": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "binding": {
+      "type": "object",
+      "required": ["kind", "authority", "path", "sha256", "size_bytes"],
+      "properties": {
+        "kind": {"type": "string"},
+        "authority": {"type": "string"},
+        "path": {"type": "string"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "iteration_report", "profile", "sample", "plan", "worldgen_artifact", "runtime", "summary", "strata_manifest", "viewer_handoff", "viewer_url", "jfr_summary"],
+      "properties": {
+        "label": {"type": "string"},
+        "iteration_report": {"$ref": "#/$defs/binding"},
+        "profile": {"type": "object"},
+        "sample": {"type": "object"},
+        "plan": {"type": "object"},
+        "worldgen_artifact": {"type": "object"},
+        "runtime": {"type": "string"},
+        "summary": {"$ref": "#/$defs/binding"},
+        "strata_manifest": {"type": "object"},
+        "viewer_handoff": {"$ref": "#/$defs/binding"},
+        "viewer_url": {"type": "string"},
+        "jfr_summary": {"anyOf": [{"$ref": "#/$defs/binding"}, {"type": "null"}]}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["state", "authority", "limitations"],
+      "properties": {
+        "state": {"type": "string", "minLength": 1},
+        "authority": {"type": "string", "minLength": 1},
+        "summary": {},
+        "details": {},
+        "limitations": {"type": "array", "items": {"type": "string"}},
+        "sources": {"type": "array"},
+        "equivalent": {"type": "boolean"},
+        "block_state_deltas": {"type": "array"},
+        "chunks": {"type": "array"},
+        "topology": {"type": "object"},
+        "paired_sample": {"type": "object"},
+        "height_absolute_delta": {"type": "object"},
+        "cave_volume": {"type": "object"},
+        "ore_mass": {"type": "object"},
+        "biome_distribution": {"type": "object"},
+        "changed_blocks_per_changed_chunk": {"type": "object"},
+        "outliers": {"type": "array"}
+      }
+    }
+  }
+}

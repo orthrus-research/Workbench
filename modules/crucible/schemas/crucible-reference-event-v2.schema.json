@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible/crucible-reference-event-v2.schema.json",
+  "title": "Workbench Crucible immutable reference transition event V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "format",
+    "schema_version",
+    "schema_id",
+    "canonicalizer",
+    "id",
+    "context_ref_id",
+    "reference_namespace",
+    "reference_name",
+    "transition_sequence",
+    "prior_event_id",
+    "expected_old_target_id",
+    "new_target_kind",
+    "new_target_id",
+    "authorization_authority",
+    "actor_id",
+    "tool_id",
+    "authorization_decision_id",
+    "reason_code"
+  ],
+  "properties": {
+    "kind": {"const": "reference-event"},
+    "format": {"const": "workbench-crucible-reference-event-v2"},
+    "schema_version": {"const": 2},
+    "schema_id": {"const": "workbench://schemas/crucible/crucible-reference-event-v2.schema.json"},
+    "canonicalizer": {"const": "workbench-canonical-json-v2"},
+    "id": {
+      "type": "string",
+      "pattern": "^reference-event:sha256:[0-9a-f]{64}$"
+    },
+    "context_ref_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/contextRefId"},
+    "reference_namespace": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "reference_name": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/semanticIdentifier"},
+    "transition_sequence": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nonNegativeInteger"},
+    "prior_event_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableReferenceEventId"},
+    "expected_old_target_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/nullableDynamicReferenceTargetId"},
+    "new_target_kind": {"enum": ["evidence-set-revision", "graph-revision", "graph-set-revision"]},
+    "new_target_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/dynamicReferenceTargetId"},
+    "authorization_authority": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorityBinding"},
+    "actor_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/actorId"},
+    "tool_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/toolId"},
+    "authorization_decision_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/authorizationDecisionId"},
+    "reason_code": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/reasonCode"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"new_target_kind": {"const": "evidence-set-revision"}}},
+      "then": {
+        "properties": {
+          "new_target_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceSetRevisionId"},
+          "expected_old_target_id": {
+            "oneOf": [
+              {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/evidenceSetRevisionId"},
+              {"type": "null"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"new_target_kind": {"const": "graph-revision"}}},
+      "then": {
+        "properties": {
+          "new_target_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphRevisionId"},
+          "expected_old_target_id": {
+            "oneOf": [
+              {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphRevisionId"},
+              {"type": "null"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"new_target_kind": {"const": "graph-set-revision"}}},
+      "then": {
+        "properties": {
+          "new_target_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphSetRevisionId"},
+          "expected_old_target_id": {
+            "oneOf": [
+              {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/graphSetRevisionId"},
+              {"type": "null"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"transition_sequence": {"const": 0}}},
+      "then": {
+        "properties": {
+          "prior_event_id": {"type": "null"},
+          "expected_old_target_id": {"type": "null"}
+        }
+      },
+      "else": {
+        "properties": {
+          "transition_sequence": {"minimum": 1},
+          "prior_event_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/referenceEventId"},
+          "expected_old_target_id": {"$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/dynamicReferenceTargetId"}
+        }
+      }
+    }
+  ]
+}

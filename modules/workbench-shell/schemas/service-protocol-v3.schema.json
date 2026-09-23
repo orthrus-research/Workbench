@@ -1,0 +1,1960 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/workbench-shell/service-protocol-v3.schema.json",
+  "title": "Workbench local service and stdio protocol V3 messages",
+  "oneOf": [
+    {"$ref": "#/$defs/initializeRequest"},
+    {"$ref": "#/$defs/initializeResponse"},
+    {"$ref": "#/$defs/capabilityRequest"},
+    {"$ref": "#/$defs/objectReadRequest"},
+    {"$ref": "#/$defs/jobCancelRequest"},
+    {"$ref": "#/$defs/subscriptionRequest"},
+    {"$ref": "#/$defs/domainResponse"},
+    {"$ref": "#/$defs/progressNotification"},
+    {"$ref": "#/$defs/subscriptionEventNotification"},
+    {"$ref": "#/$defs/jsonRpcErrorResponse"}
+  ],
+  "$defs": {
+    "protocolVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["major", "minor"],
+      "properties": {
+        "major": {"const": 3},
+        "minor": {"type": "integer", "minimum": 0}
+      }
+    },
+    "jsonRpcId": {
+      "oneOf": [
+        {"type": "string", "minLength": 1, "maxLength": 256},
+        {"type": "integer", "minimum": 0}
+      ]
+    },
+    "contentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:sha256:[0-9a-f]{64}$"
+    },
+    "contextRefId": {
+      "$ref": "workbench://schemas/crucible/crucible-context-ref-v2.schema.json#/$defs/contextRefId"
+    },
+    "nullableContextRefId": {
+      "oneOf": [
+        {"$ref": "#/$defs/contextRefId"},
+        {"type": "null"}
+      ]
+    },
+    "inputBindingId": {
+      "$ref": "workbench://schemas/crucible/crucible-input-binding-v2.schema.json#/$defs/inputBindingId"
+    },
+    "nullableInputBindingId": {
+      "oneOf": [
+        {"$ref": "#/$defs/inputBindingId"},
+        {"type": "null"}
+      ]
+    },
+    "capabilityId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/capabilityId"
+    },
+    "handlerId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/handlerId"
+    },
+    "implementationId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/implementationId"
+    },
+    "operationPlanId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/operationPlanId"
+    },
+    "consentDecisionId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/consentDecisionId"
+    },
+    "objectDescriptorId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/objectDescriptorId"
+    },
+    "blobId": {
+      "$ref": "workbench://schemas/crucible/crucible-v2-common.schema.json#/$defs/blobId"
+    },
+    "continuationId": {
+      "type": "string",
+      "pattern": "^continuation:sha256:[0-9a-f]{64}$"
+    },
+    "nullableContinuationId": {
+      "oneOf": [
+        {"$ref": "#/$defs/continuationId"},
+        {"type": "null"}
+      ]
+    },
+    "serviceDistributionId": {
+      "type": "string",
+      "pattern": "^service-distribution:sha256:[0-9a-f]{64}$"
+    },
+    "jobId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobId"
+    },
+    "jobSubmissionId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobSubmissionId"
+    },
+    "jobEventId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobEventId"
+    },
+    "nullableJobEventId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableJobEventId"
+    },
+    "jobTerminalSealId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/jobTerminalSealId"
+    },
+    "nullableJobTerminalSealId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableJobTerminalSealId"
+    },
+    "runtimeSessionRecordId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/runtimeSessionRecordId"
+    },
+    "sessionId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/sessionId"
+    },
+    "referenceEventId": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/referenceEventId"
+    },
+    "graphRevisionId": {
+      "type": "string",
+      "pattern": "^graph-revision:sha256:[0-9a-f]{64}$"
+    },
+    "graphSetRevisionId": {
+      "type": "string",
+      "pattern": "^graph-set-revision:sha256:[0-9a-f]{64}$"
+    },
+    "lifecycleState": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/lifecycleState"
+    },
+    "mutationState": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/mutationState"
+    },
+    "semanticIdentifier": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/semanticIdentifier"
+    },
+    "timestamp": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/timestamp"
+    },
+    "nullableTimestamp": {
+      "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/nullableTimestamp"
+    },
+    "schemaId": {
+      "type": "string",
+      "pattern": "^workbench://schemas/[A-Za-z0-9._/-]+\\.schema\\.json(?:#/[A-Za-z0-9_.$/~-]+)?$"
+    },
+    "nullableSchemaId": {
+      "oneOf": [
+        {"$ref": "#/$defs/schemaId"},
+        {"type": "null"}
+      ]
+    },
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "operationClass": {
+      "enum": [
+        "inspect",
+        "query",
+        "compare",
+        "visualize",
+        "experimental-materialize",
+        "disposable-runtime-execute",
+        "developer-world-mutate",
+        "stable-construct",
+        "publish-or-release"
+      ]
+    },
+    "supportState": {
+      "enum": [
+        "experimental",
+        "provisional",
+        "tested-supported",
+        "unsupported"
+      ]
+    },
+    "profileRevisionRef": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile_kind", "profile_revision_id"],
+          "properties": {
+            "profile_kind": {"const": "platform-profile-revision"},
+            "profile_revision_id": {
+              "$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/platformProfileRevisionId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["profile_kind", "profile_revision_id"],
+          "properties": {
+            "profile_kind": {"const": "pack-profile-revision"},
+            "profile_revision_id": {
+              "$ref": "workbench://schemas/crucible/crucible-context-v2-common.schema.json#/$defs/packProfileRevisionId"
+            }
+          }
+        }
+      ]
+    },
+    "completenessState": {
+      "enum": [
+        "complete",
+        "partial",
+        "bounded",
+        "truncated",
+        "unavailable",
+        "unresolved",
+        "inapplicable",
+        "conflicted"
+      ]
+    },
+    "requestId": {
+      "type": "string",
+      "pattern": "^request-v3:[0-9a-f]{32}$"
+    },
+    "clientSessionId": {
+      "type": "string",
+      "pattern": "^client-session-v3:[0-9a-f]{32}$"
+    },
+    "subscriptionId": {
+      "type": "string",
+      "pattern": "^subscription-v3:[0-9a-f]{32}$"
+    },
+    "streamGeneration": {
+      "type": "string",
+      "pattern": "^stream-generation-v3:[0-9a-f]{32}$"
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "pattern": "^idempotency-v3:[0-9a-f]{32}$"
+    },
+    "nullableIdempotencyKey": {
+      "oneOf": [
+        {"$ref": "#/$defs/idempotencyKey"},
+        {"type": "null"}
+      ]
+    },
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "positiveInteger": {"type": "integer", "minimum": 1},
+    "nullableNonNegativeInteger": {
+      "oneOf": [
+        {"$ref": "#/$defs/nonNegativeInteger"},
+        {"type": "null"}
+      ]
+    },
+    "recordRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_kind", "record_id"],
+      "properties": {
+        "record_kind": {"$ref": "#/$defs/semanticIdentifier"},
+        "record_id": {"$ref": "#/$defs/contentId"}
+      },
+      "$comment": "Composition rejects a record_id whose content-ID prefix does not equal record_kind."
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["budget_key", "unit", "limit"],
+      "properties": {
+        "budget_key": {"$ref": "#/$defs/semanticIdentifier"},
+        "unit": {
+          "enum": ["bytes", "milliseconds", "records", "objects", "pages", "events", "slots"]
+        },
+        "limit": {"$ref": "#/$defs/positiveInteger"}
+      }
+    },
+    "commitBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_id",
+        "consent_record_id",
+        "expected_head_refs",
+        "idempotency_key"
+      ],
+      "properties": {
+        "plan_id": {"$ref": "#/$defs/operationPlanId"},
+        "consent_record_id": {"$ref": "#/$defs/consentDecisionId"},
+        "expected_head_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/recordRef"}
+        },
+        "idempotency_key": {"$ref": "#/$defs/idempotencyKey"}
+      }
+    },
+    "nullableCommitBinding": {
+      "oneOf": [
+        {"$ref": "#/$defs/commitBinding"},
+        {"type": "null"}
+      ]
+    },
+    "requestBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "request_id",
+        "capability_id",
+        "capability_version",
+        "context_ref_id",
+        "input_binding_id",
+        "intent",
+        "operation_class",
+        "resource_budgets",
+        "deadline",
+        "idempotency_key",
+        "commit"
+      ],
+      "properties": {
+        "protocol_version": {"$ref": "#/$defs/protocolVersion"},
+        "request_id": {"$ref": "#/$defs/requestId"},
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "capability_version": {"$ref": "#/$defs/semanticVersion"},
+        "context_ref_id": {"$ref": "#/$defs/nullableContextRefId"},
+        "input_binding_id": {"$ref": "#/$defs/nullableInputBindingId"},
+        "intent": {"$ref": "#/$defs/semanticIdentifier"},
+        "operation_class": {"$ref": "#/$defs/operationClass"},
+        "resource_budgets": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/budget"}
+        },
+        "deadline": {"$ref": "#/$defs/nullableTimestamp"},
+        "idempotency_key": {"$ref": "#/$defs/nullableIdempotencyKey"},
+        "commit": {"$ref": "#/$defs/nullableCommitBinding"}
+      }
+    },
+    "exactRequestBinding": {
+      "allOf": [
+        {"$ref": "#/$defs/requestBinding"},
+        {
+          "properties": {
+            "context_ref_id": {"$ref": "#/$defs/contextRefId"},
+            "input_binding_id": {"$ref": "#/$defs/inputBindingId"}
+          }
+        }
+      ]
+    },
+    "genericArguments": {
+      "$comment": "The selected capability request schema must close and validate this value before handler dispatch.",
+      "type": "object"
+    },
+    "capabilityParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "arguments"],
+      "properties": {
+        "request": {"$ref": "#/$defs/requestBinding"},
+        "arguments": {"$ref": "#/$defs/genericArguments"}
+      }
+    },
+    "genericMethod": {
+      "enum": [
+        "service/capabilities",
+        "service/health",
+        "service/shutdown",
+        "context/list",
+        "context/get",
+        "context/resolve",
+        "context/register",
+        "object/stat",
+        "evidence/planAdmission",
+        "evidence/commitAdmission",
+        "evidence/get",
+        "evidence/history",
+        "graph/materialize",
+        "graph/get",
+        "graph/query",
+        "graph/diff",
+        "graph/impact",
+        "operation/plan",
+        "operation/commit",
+        "job/get",
+        "job/list",
+        "runtime/plan",
+        "runtime/start",
+        "runtime/stop",
+        "runtime/status",
+        "runtime/instrument",
+        "session/get",
+        "session/events",
+        "session/export"
+      ]
+    },
+    "capabilityRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "id": {"$ref": "#/$defs/jsonRpcId"},
+        "method": {"$ref": "#/$defs/genericMethod"},
+        "params": {"$ref": "#/$defs/capabilityParams"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "enum": [
+                  "service/capabilities",
+                  "service/health",
+                  "service/shutdown",
+                  "context/list",
+                  "context/resolve",
+                  "context/register"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "properties": {
+                  "request": {
+                    "properties": {
+                      "context_ref_id": {"type": "null"},
+                      "input_binding_id": {"type": "null"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"method": {"const": "context/get"}}},
+          "then": {
+            "properties": {
+              "params": {
+                "properties": {
+                  "request": {
+                    "properties": {
+                      "context_ref_id": {"$ref": "#/$defs/contextRefId"},
+                      "input_binding_id": {"type": "null"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "not": {
+                  "enum": [
+                    "service/capabilities",
+                    "service/health",
+                    "service/shutdown",
+                    "context/list",
+                    "context/get",
+                    "context/resolve",
+                    "context/register"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "properties": {
+                  "request": {
+                    "properties": {
+                      "context_ref_id": {"$ref": "#/$defs/contextRefId"},
+                      "input_binding_id": {"$ref": "#/$defs/inputBindingId"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "initializeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "id": {"$ref": "#/$defs/jsonRpcId"},
+        "method": {"const": "service/initialize"},
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "protocol_version",
+            "request_id",
+            "client",
+            "transport",
+            "required_capability_ids",
+            "required_features",
+            "maximum_frame_bytes"
+          ],
+          "properties": {
+            "protocol_version": {"$ref": "#/$defs/protocolVersion"},
+            "request_id": {"$ref": "#/$defs/requestId"},
+            "client": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["client_id", "kind", "version"],
+              "properties": {
+                "client_id": {"$ref": "#/$defs/semanticIdentifier"},
+                "kind": {"enum": ["cli", "ide", "studio", "explorer", "automation", "test"]},
+                "version": {"$ref": "#/$defs/semanticVersion"}
+              }
+            },
+            "transport": {"enum": ["local-endpoint", "stdio"]},
+            "required_capability_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/capabilityId"}
+            },
+            "required_features": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "contexts",
+                  "object-range-reads",
+                  "durable-jobs",
+                  "progress-and-cancellation",
+                  "continuations",
+                  "subscriptions"
+                ]
+              }
+            },
+            "maximum_frame_bytes": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 4194304
+            }
+          }
+        }
+      }
+    },
+    "initializeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "id", "result"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "id": {"$ref": "#/$defs/jsonRpcId"},
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "format",
+            "protocol_version",
+            "request_id",
+            "client_session_id",
+            "service_instance_id",
+            "service_distribution_id",
+            "registry_id",
+            "negotiated_features",
+            "limits",
+            "legacy_v2_gateway"
+          ],
+          "properties": {
+            "format": {"const": "workbench-service-initialize-result-v3"},
+            "protocol_version": {"$ref": "#/$defs/protocolVersion"},
+            "request_id": {"$ref": "#/$defs/requestId"},
+            "client_session_id": {"$ref": "#/$defs/clientSessionId"},
+            "service_instance_id": {
+              "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/serviceInstanceId"
+            },
+            "service_distribution_id": {"$ref": "#/$defs/serviceDistributionId"},
+            "registry_id": {
+              "type": "string",
+              "pattern": "^component-capability-registry:sha256:[0-9a-f]{64}$"
+            },
+            "negotiated_features": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "contexts",
+                  "object-range-reads",
+                  "durable-jobs",
+                  "progress-and-cancellation",
+                  "continuations",
+                  "subscriptions"
+                ]
+              }
+            },
+            "limits": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "maximum_frame_bytes",
+                "maximum_object_range_bytes",
+                "maximum_subscriptions",
+                "subscription_retention_events"
+              ],
+              "properties": {
+                "maximum_frame_bytes": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 4194304
+                },
+                "maximum_object_range_bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1048576
+                },
+                "maximum_subscriptions": {"$ref": "#/$defs/positiveInteger"},
+                "subscription_retention_events": {"$ref": "#/$defs/positiveInteger"}
+              }
+            },
+            "legacy_v2_gateway": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["available", "protocol_major", "disposition"],
+              "properties": {
+                "available": {"type": "boolean"},
+                "protocol_major": {"const": 2},
+                "disposition": {"const": "partial-historical-compatibility-gateway"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "objectReadParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "object_id", "range"],
+      "properties": {
+        "request": {"$ref": "#/$defs/exactRequestBinding"},
+        "object_id": {"$ref": "#/$defs/blobId"},
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["offset", "length"],
+          "properties": {
+            "offset": {"$ref": "#/$defs/nonNegativeInteger"},
+            "length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            }
+          }
+        }
+      }
+    },
+    "objectReadRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "id": {"$ref": "#/$defs/jsonRpcId"},
+        "method": {"const": "object/read"},
+        "params": {"$ref": "#/$defs/objectReadParams"}
+      }
+    },
+    "jobCancelParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request",
+        "job_id",
+        "expected_event_id",
+        "expected_event_ordinal",
+        "requester_id",
+        "reason"
+      ],
+      "properties": {
+        "request": {"$ref": "#/$defs/exactRequestBinding"},
+        "job_id": {"$ref": "#/$defs/jobId"},
+        "expected_event_id": {"$ref": "#/$defs/jobEventId"},
+        "expected_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "requester_id": {
+          "$ref": "workbench://schemas/crucible/crucible-job-v2-common.schema.json#/$defs/actorId"
+        },
+        "reason": {"type": "string", "minLength": 1, "maxLength": 1024}
+      }
+    },
+    "jobCancelRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "id": {"$ref": "#/$defs/jsonRpcId"},
+        "method": {"const": "job/cancel"},
+        "params": {"$ref": "#/$defs/jobCancelParams"}
+      }
+    },
+    "subscriptionPosition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "start"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "subscription_id", "stream_generation", "last_cursor"],
+          "properties": {
+            "kind": {"const": "resume"},
+            "subscription_id": {"$ref": "#/$defs/subscriptionId"},
+            "stream_generation": {"$ref": "#/$defs/streamGeneration"},
+            "last_cursor": {"$ref": "#/$defs/nonNegativeInteger"}
+          }
+        }
+      ]
+    },
+    "eventFamily": {
+      "enum": ["evidence", "graph", "profile", "world", "job", "session"]
+    },
+    "subscriptionScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "graph_revision_ids", "graph_set_revision_ids", "reference_event_ids"],
+          "properties": {
+            "kind": {"const": "graph"},
+            "graph_revision_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/graphRevisionId"}
+            },
+            "graph_set_revision_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/graphSetRevisionId"}
+            },
+            "reference_event_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/referenceEventId"}
+            }
+          },
+          "anyOf": [
+            {"properties": {"graph_revision_ids": {"minItems": 1}}},
+            {"properties": {"graph_set_revision_ids": {"minItems": 1}}},
+            {"properties": {"reference_event_ids": {"minItems": 1}}}
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "job_id", "job_submission_id"],
+          "properties": {
+            "kind": {"const": "job"},
+            "job_id": {"$ref": "#/$defs/jobId"},
+            "job_submission_id": {"$ref": "#/$defs/jobSubmissionId"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "runtime_session_id", "session_id"],
+          "properties": {
+            "kind": {"const": "session"},
+            "runtime_session_id": {"$ref": "#/$defs/runtimeSessionRecordId"},
+            "session_id": {"$ref": "#/$defs/sessionId"}
+          }
+        }
+      ]
+    },
+    "subscriptionParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "scope", "event_families", "delivery", "position"],
+      "properties": {
+        "request": {"$ref": "#/$defs/exactRequestBinding"},
+        "scope": {"$ref": "#/$defs/subscriptionScope"},
+        "event_families": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/eventFamily"}
+        },
+        "delivery": {"enum": ["lossless", "lossy-declared"]},
+        "position": {"$ref": "#/$defs/subscriptionPosition"}
+      }
+    },
+    "subscriptionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "id", "method", "params"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "id": {"$ref": "#/$defs/jsonRpcId"},
+        "method": {"enum": ["graph/subscribe", "job/subscribe", "session/subscribe"]},
+        "params": {"$ref": "#/$defs/subscriptionParams"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"method": {"const": "job/subscribe"}}},
+          "then": {
+            "properties": {
+              "params": {
+                "properties": {
+                  "scope": {"properties": {"kind": {"const": "job"}}},
+                  "event_families": {
+                    "prefixItems": [{"const": "job"}],
+                    "items": false,
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"method": {"const": "session/subscribe"}}},
+          "then": {
+            "properties": {
+              "params": {
+                "properties": {
+                  "scope": {"properties": {"kind": {"const": "session"}}},
+                  "event_families": {
+                    "prefixItems": [{"const": "session"}],
+                    "items": false,
+                    "minItems": 1,
+                    "maxItems": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"method": {"const": "graph/subscribe"}}},
+          "then": {
+            "properties": {
+              "params": {
+                "properties": {
+                  "scope": {"properties": {"kind": {"const": "graph"}}},
+                  "event_families": {
+                    "contains": {"const": "graph"},
+                    "items": {"enum": ["evidence", "graph", "profile", "world"]}
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "severity", "code", "message", "related_records"],
+      "properties": {
+        "ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "severity": {"enum": ["info", "warning", "error", "critical"]},
+        "code": {"$ref": "#/$defs/semanticIdentifier"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "related_records": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/recordRef"}
+        }
+      }
+    },
+    "limitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "code", "detail"],
+      "properties": {
+        "ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "code": {"$ref": "#/$defs/semanticIdentifier"},
+        "detail": {"type": "string", "minLength": 1, "maxLength": 4096}
+      }
+    },
+    "stateProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "context",
+        "inputs",
+        "profile_support",
+        "evidence",
+        "completeness",
+        "action_gate",
+        "action_gate_decision_ids",
+        "freshness",
+        "consent",
+        "continuity",
+        "profile_revision_refs",
+        "support_decision_ids"
+      ],
+      "properties": {
+        "implementation": {"enum": ["available", "degraded", "unavailable", "blocked"]},
+        "context": {"enum": ["available", "stale", "unavailable", "not-applicable"]},
+        "inputs": {"enum": ["available", "stale", "unavailable", "not-applicable"]},
+        "profile_support": {
+          "oneOf": [
+            {"$ref": "#/$defs/supportState"},
+            {"const": "not-applicable"}
+          ]
+        },
+        "evidence": {"enum": ["available", "incomplete", "unavailable", "not-applicable"]},
+        "completeness": {"$ref": "#/$defs/completenessState"},
+        "action_gate": {"enum": ["allowed", "blocked", "unavailable", "not-required"]},
+        "action_gate_decision_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^action-gate-decision:sha256:[0-9a-f]{64}$"
+          }
+        },
+        "freshness": {"enum": ["fresh", "stale", "unavailable", "not-applicable"]},
+        "consent": {"enum": ["granted", "required", "unavailable", "not-applicable"]},
+        "continuity": {"enum": ["available", "gap", "unavailable", "not-applicable"]},
+        "profile_revision_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/profileRevisionRef"}
+        },
+        "support_decision_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^support-decision:sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "responseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "request_id",
+        "request_method",
+        "capability_id",
+        "capability_version",
+        "handler_id",
+        "handler_implementation_id",
+        "context_ref_id",
+        "input_binding_id",
+        "input_revision_refs",
+        "output_revision_refs",
+        "states",
+        "diagnostics",
+        "limitations"
+      ],
+      "properties": {
+        "protocol_version": {"$ref": "#/$defs/protocolVersion"},
+        "request_id": {"$ref": "#/$defs/requestId"},
+        "request_method": {
+          "oneOf": [
+            {"$ref": "#/$defs/genericMethod"},
+            {"enum": ["object/read", "job/cancel", "graph/subscribe", "job/subscribe", "session/subscribe"]}
+          ]
+        },
+        "capability_id": {"$ref": "#/$defs/capabilityId"},
+        "capability_version": {"$ref": "#/$defs/semanticVersion"},
+        "handler_id": {"$ref": "#/$defs/handlerId"},
+        "handler_implementation_id": {"$ref": "#/$defs/implementationId"},
+        "context_ref_id": {"$ref": "#/$defs/nullableContextRefId"},
+        "input_binding_id": {"$ref": "#/$defs/nullableInputBindingId"},
+        "input_revision_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/recordRef"}
+        },
+        "output_revision_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/recordRef"}
+        },
+        "states": {"$ref": "#/$defs/stateProjection"},
+        "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}},
+        "limitations": {"type": "array", "items": {"$ref": "#/$defs/limitation"}}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "request_method": {
+                "enum": [
+                  "service/capabilities",
+                  "service/health",
+                  "service/shutdown",
+                  "context/list"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "context_ref_id": {"type": "null"},
+              "input_binding_id": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "request_method": {"enum": ["context/get", "context/register"]}
+            }
+          },
+          "then": {
+            "properties": {
+              "context_ref_id": {"$ref": "#/$defs/contextRefId"},
+              "input_binding_id": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "request_method": {"const": "context/resolve"}
+            }
+          },
+          "then": {
+            "properties": {
+              "context_ref_id": {"$ref": "#/$defs/contextRefId"},
+              "input_binding_id": {"$ref": "#/$defs/inputBindingId"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "request_method": {
+                "not": {
+                  "enum": [
+                    "service/capabilities",
+                    "service/health",
+                    "service/shutdown",
+                    "context/list",
+                    "context/get",
+                    "context/register"
+                  ]
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "context_ref_id": {"$ref": "#/$defs/contextRefId"},
+              "input_binding_id": {"$ref": "#/$defs/inputBindingId"}
+            }
+          }
+        }
+      ]
+    },
+    "objectReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object_id",
+        "object_descriptor_id",
+        "media_type",
+        "schema_id",
+        "byte_length",
+        "sha256",
+        "privacy_class",
+        "read_capability_id"
+      ],
+      "properties": {
+        "object_id": {"$ref": "#/$defs/blobId"},
+        "object_descriptor_id": {"$ref": "#/$defs/objectDescriptorId"},
+        "media_type": {
+          "type": "string",
+          "pattern": "^[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+$"
+        },
+        "schema_id": {"$ref": "#/$defs/nullableSchemaId"},
+        "byte_length": {"$ref": "#/$defs/nonNegativeInteger"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "privacy_class": {"enum": ["public", "project", "sensitive", "restricted"]},
+        "read_capability_id": {"$ref": "#/$defs/capabilityId"}
+      }
+    },
+    "subscriptionHandle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subscription_id",
+        "stream_generation",
+        "context_ref_id",
+        "scope",
+        "event_families",
+        "delivery",
+        "next_cursor",
+        "minimum_available_cursor",
+        "retained_until"
+      ],
+      "properties": {
+        "subscription_id": {"$ref": "#/$defs/subscriptionId"},
+        "stream_generation": {"$ref": "#/$defs/streamGeneration"},
+        "context_ref_id": {"$ref": "#/$defs/contextRefId"},
+        "scope": {"$ref": "#/$defs/subscriptionScope"},
+        "event_families": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/eventFamily"}
+        },
+        "delivery": {"enum": ["lossless", "lossy-declared"]},
+        "next_cursor": {"$ref": "#/$defs/nonNegativeInteger"},
+        "minimum_available_cursor": {"$ref": "#/$defs/nonNegativeInteger"},
+        "retained_until": {"$ref": "#/$defs/nullableTimestamp"}
+      }
+    },
+    "objectChunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object", "offset", "length", "data_base64", "eof", "next_offset"],
+      "properties": {
+        "object": {"$ref": "#/$defs/objectReference"},
+        "offset": {"$ref": "#/$defs/nonNegativeInteger"},
+        "length": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1048576
+        },
+        "data_base64": {
+          "type": "string",
+          "maxLength": 1398104,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        },
+        "eof": {"type": "boolean"},
+        "next_offset": {"$ref": "#/$defs/nullableNonNegativeInteger"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "eof": {"const": true},
+            "next_offset": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "eof": {"const": false},
+            "length": {"type": "integer", "minimum": 1, "maximum": 1048576},
+            "next_offset": {"$ref": "#/$defs/nonNegativeInteger"}
+          }
+        }
+      ]
+    },
+    "directOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "result_schema_id", "value", "object_references", "continuation_id"],
+      "properties": {
+        "state": {"const": "succeeded"},
+        "result_schema_id": {"$ref": "#/$defs/schemaId"},
+        "value": {
+          "$comment": "Validated again against result_schema_id before transport.",
+          "type": ["object", "array", "string", "integer", "boolean", "null"]
+        },
+        "object_references": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/objectReference"}
+        },
+        "continuation_id": {"$ref": "#/$defs/nullableContinuationId"}
+      }
+    },
+    "jobHandle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "job_submission_id",
+        "latest_event_id",
+        "latest_event_ordinal",
+        "lifecycle_state",
+        "mutation_state",
+        "terminal_seal_id"
+      ],
+      "properties": {
+        "job_id": {"$ref": "#/$defs/jobId"},
+        "job_submission_id": {"$ref": "#/$defs/jobSubmissionId"},
+        "latest_event_id": {"$ref": "#/$defs/nullableJobEventId"},
+        "latest_event_ordinal": {"$ref": "#/$defs/nullableNonNegativeInteger"},
+        "lifecycle_state": {"$ref": "#/$defs/lifecycleState"},
+        "mutation_state": {"$ref": "#/$defs/mutationState"},
+        "terminal_seal_id": {"$ref": "#/$defs/nullableJobTerminalSealId"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "latest_event_id": {"type": "null"},
+            "latest_event_ordinal": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "latest_event_id": {"$ref": "#/$defs/jobEventId"},
+            "latest_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"}
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {"properties": {"lifecycle_state": {"const": "terminal"}}},
+          "then": {
+            "properties": {
+              "latest_event_id": {"$ref": "#/$defs/jobEventId"},
+              "latest_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+              "terminal_seal_id": {"$ref": "#/$defs/jobTerminalSealId"}
+            }
+          },
+          "else": {"properties": {"terminal_seal_id": {"type": "null"}}}
+        }
+      ]
+    },
+    "jobOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "job"],
+      "properties": {
+        "state": {"const": "accepted"},
+        "job": {"$ref": "#/$defs/jobHandle"}
+      }
+    },
+    "failureKind": {
+      "enum": [
+        "invalid-request",
+        "unsupported-version",
+        "unavailable-capability",
+        "degraded-capability",
+        "unknown-context",
+        "stale-context",
+        "incompatible-scope",
+        "unsupported-profile",
+        "gate-blocked",
+        "consent-required",
+        "stale-plan",
+        "freshness-failed",
+        "identity-mismatch",
+        "validation-failed",
+        "quarantined",
+        "admission-rejected",
+        "writer-busy",
+        "lease-uncertain",
+        "compare-and-swap-lost",
+        "budget-exceeded",
+        "backpressure",
+        "deadline-exceeded",
+        "cancel-requested",
+        "cancelled-before-mutation",
+        "cancelled-after-mutation",
+        "indeterminate-mutation",
+        "subscription-gap",
+        "continuation-invalid",
+        "corrupt-object",
+        "stale-index",
+        "missing-input",
+        "internal-failure"
+      ]
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "kind",
+        "retryability",
+        "mutation_possible",
+        "mutation_state",
+        "diagnostics",
+        "remediation_actions",
+        "job_id",
+        "job_terminal_seal_id",
+        "residue_object_ids",
+        "minimum_available_cursor",
+        "resynchronization_action"
+      ],
+      "properties": {
+        "disposition": {"enum": ["unavailable", "blocked", "failed"]},
+        "kind": {"$ref": "#/$defs/failureKind"},
+        "retryability": {"enum": ["never", "immediate", "after-change", "with-new-request"]},
+        "mutation_possible": {"type": "boolean"},
+        "mutation_state": {
+          "oneOf": [
+            {"$ref": "#/$defs/mutationState"},
+            {"type": "null"}
+          ]
+        },
+        "diagnostics": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/diagnostic"}},
+        "remediation_actions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/semanticIdentifier"}
+        },
+        "job_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/jobId"},
+            {"type": "null"}
+          ]
+        },
+        "job_terminal_seal_id": {"$ref": "#/$defs/nullableJobTerminalSealId"},
+        "residue_object_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/blobId"}
+        },
+        "minimum_available_cursor": {"$ref": "#/$defs/nullableNonNegativeInteger"},
+        "resynchronization_action": {
+          "oneOf": [
+            {"$ref": "#/$defs/semanticIdentifier"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "enum": ["unavailable-capability", "degraded-capability", "quarantined", "stale-index"]
+            },
+            "disposition": {"const": "unavailable"},
+            "retryability": {"const": "after-change"},
+            "mutation_possible": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"enum": ["unknown-context", "incompatible-scope", "missing-input"]},
+            "disposition": {"const": "unavailable"},
+            "retryability": {"const": "with-new-request"},
+            "mutation_possible": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"const": "unsupported-version"},
+            "disposition": {"const": "unavailable"},
+            "retryability": {"const": "never"},
+            "mutation_possible": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"const": "unsupported-profile"},
+            "disposition": {"enum": ["unavailable", "blocked"]},
+            "retryability": {"const": "after-change"},
+            "mutation_possible": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "stale-context",
+                "consent-required",
+                "stale-plan",
+                "freshness-failed",
+                "compare-and-swap-lost",
+                "admission-rejected",
+                "continuation-invalid",
+                "subscription-gap"
+              ]
+            },
+            "disposition": {"const": "blocked"},
+            "retryability": {"const": "with-new-request"},
+            "mutation_possible": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"enum": ["gate-blocked", "backpressure"]},
+            "disposition": {"const": "blocked"},
+            "retryability": {"const": "after-change"},
+            "mutation_possible": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"const": "writer-busy"},
+            "disposition": {"const": "blocked"},
+            "retryability": {"const": "immediate"},
+            "mutation_possible": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"const": "lease-uncertain"},
+            "disposition": {"const": "blocked"},
+            "retryability": {"const": "after-change"},
+            "mutation_possible": {"const": true},
+            "job_id": {"$ref": "#/$defs/jobId"},
+            "mutation_state": {"const": "external-mutation-indeterminate"}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"const": "cancel-requested"},
+            "disposition": {"const": "blocked"},
+            "retryability": {"const": "after-change"},
+            "job_id": {"$ref": "#/$defs/jobId"},
+            "mutation_state": {"$ref": "#/$defs/mutationState"}
+          }
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": ["invalid-request", "identity-mismatch", "validation-failed"]
+            },
+            "disposition": {"const": "failed"},
+            "retryability": {"const": "never"},
+            "mutation_possible": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"const": "cancelled-before-mutation"},
+            "disposition": {"const": "failed"},
+            "retryability": {"const": "never"},
+            "mutation_possible": {"const": false},
+            "job_id": {"$ref": "#/$defs/jobId"},
+            "job_terminal_seal_id": {"$ref": "#/$defs/jobTerminalSealId"},
+            "mutation_state": {"enum": ["not-started", "temporary-residue"]}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"enum": ["cancelled-after-mutation", "indeterminate-mutation"]},
+            "disposition": {"const": "failed"},
+            "retryability": {"const": "never"},
+            "mutation_possible": {"const": true},
+            "job_id": {"$ref": "#/$defs/jobId"},
+            "job_terminal_seal_id": {"$ref": "#/$defs/jobTerminalSealId"},
+            "mutation_state": {"$ref": "#/$defs/mutationState"}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"enum": ["budget-exceeded", "deadline-exceeded", "internal-failure"]},
+            "disposition": {"const": "failed"},
+            "retryability": {"const": "after-change"}
+          }
+        },
+        {
+          "properties": {
+            "kind": {"const": "corrupt-object"},
+            "disposition": {"const": "failed"},
+            "retryability": {"const": "after-change"},
+            "mutation_possible": {"const": false}
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {"properties": {"job_id": {"type": "null"}}},
+          "then": {
+            "properties": {
+              "mutation_possible": {"const": false},
+              "mutation_state": {"type": "null"},
+              "job_terminal_seal_id": {"type": "null"}
+            }
+          },
+          "else": {
+            "properties": {
+              "mutation_state": {"$ref": "#/$defs/mutationState"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mutation_state": {"enum": [null, "not-started", "temporary-residue"]}
+            }
+          },
+          "then": {"properties": {"mutation_possible": {"const": false}}},
+          "else": {"properties": {"mutation_possible": {"const": true}}}
+        },
+        {
+          "if": {"properties": {"job_terminal_seal_id": {"$ref": "#/$defs/jobTerminalSealId"}}},
+          "then": {
+            "properties": {
+              "job_id": {"$ref": "#/$defs/jobId"},
+              "mutation_state": {"$ref": "#/$defs/mutationState"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {"const": "failed"},
+              "job_id": {"$ref": "#/$defs/jobId"}
+            },
+            "required": ["disposition", "job_id"]
+          },
+          "then": {
+            "properties": {
+              "job_terminal_seal_id": {"$ref": "#/$defs/jobTerminalSealId"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "indeterminate-mutation"}}},
+          "then": {
+            "properties": {
+              "mutation_state": {"const": "external-mutation-indeterminate"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "subscription-gap"}}},
+          "then": {
+            "properties": {
+              "disposition": {"const": "blocked"},
+              "mutation_possible": {"const": false},
+              "minimum_available_cursor": {"$ref": "#/$defs/nonNegativeInteger"},
+              "resynchronization_action": {"$ref": "#/$defs/semanticIdentifier"}
+            }
+          },
+          "else": {
+            "properties": {
+              "minimum_available_cursor": {"type": "null"},
+              "resynchronization_action": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {"enum": ["gate-blocked", "consent-required", "stale-plan"]}
+            }
+          },
+          "then": {
+            "properties": {
+              "disposition": {"const": "blocked"},
+              "mutation_possible": {"const": false}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"kind": {"const": "cancelled-before-mutation"}}},
+          "then": {
+            "properties": {
+              "disposition": {"const": "failed"},
+              "mutation_possible": {"const": false}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {"enum": ["cancelled-after-mutation", "indeterminate-mutation"]}
+            }
+          },
+          "then": {
+            "properties": {
+              "disposition": {"const": "failed"},
+              "mutation_possible": {"const": true}
+            }
+          }
+        }
+      ]
+    },
+    "failureOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "failure"],
+      "properties": {
+        "state": {"enum": ["unavailable", "blocked", "failed"]},
+        "failure": {"$ref": "#/$defs/failure"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "state": {"const": "unavailable"},
+            "failure": {"properties": {"disposition": {"const": "unavailable"}}}
+          }
+        },
+        {
+          "properties": {
+            "state": {"const": "blocked"},
+            "failure": {"properties": {"disposition": {"const": "blocked"}}}
+          }
+        },
+        {
+          "properties": {
+            "state": {"const": "failed"},
+            "failure": {"properties": {"disposition": {"const": "failed"}}}
+          }
+        }
+      ]
+    },
+    "domainResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "binding", "outcome"],
+      "properties": {
+        "format": {"const": "workbench-service-result-v3"},
+        "binding": {"$ref": "#/$defs/responseBinding"},
+        "outcome": {
+          "oneOf": [
+            {"$ref": "#/$defs/directOutcome"},
+            {"$ref": "#/$defs/jobOutcome"},
+            {"$ref": "#/$defs/failureOutcome"}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {"properties": {"state": {"enum": ["succeeded", "accepted"]}}}
+            }
+          },
+          "then": {
+            "properties": {
+              "binding": {
+                "properties": {
+                  "states": {
+                    "properties": {
+                      "implementation": {"enum": ["available", "degraded"]},
+                      "context": {"enum": ["available", "not-applicable"]},
+                      "inputs": {"enum": ["available", "not-applicable"]},
+                      "profile_support": {
+                        "enum": ["experimental", "provisional", "tested-supported", "not-applicable"]
+                      },
+                      "evidence": {"enum": ["available", "incomplete", "not-applicable"]},
+                      "completeness": {
+                        "enum": [
+                          "complete",
+                          "partial",
+                          "bounded",
+                          "truncated",
+                          "unresolved",
+                          "conflicted",
+                          "inapplicable"
+                        ]
+                      },
+                      "action_gate": {"enum": ["allowed", "not-required"]},
+                      "freshness": {"enum": ["fresh", "not-applicable"]},
+                      "consent": {"enum": ["granted", "not-applicable"]},
+                      "continuity": {"enum": ["available", "not-applicable"]}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"outcome": {"properties": {"state": {"const": "unavailable"}}}}},
+          "then": {
+            "properties": {
+              "binding": {
+                "properties": {
+                  "states": {
+                    "anyOf": [
+                      {"properties": {"implementation": {"const": "unavailable"}}},
+                      {"properties": {"context": {"const": "unavailable"}}},
+                      {"properties": {"inputs": {"const": "unavailable"}}},
+                      {"properties": {"profile_support": {"const": "unsupported"}}},
+                      {"properties": {"evidence": {"const": "unavailable"}}},
+                      {"properties": {"completeness": {"const": "unavailable"}}},
+                      {"properties": {"action_gate": {"const": "unavailable"}}},
+                      {"properties": {"freshness": {"const": "unavailable"}}},
+                      {"properties": {"consent": {"const": "unavailable"}}},
+                      {"properties": {"continuity": {"const": "unavailable"}}}
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"outcome": {"properties": {"state": {"const": "blocked"}}}}},
+          "then": {
+            "properties": {
+              "binding": {
+                "properties": {
+                  "states": {
+                    "anyOf": [
+                      {"properties": {"implementation": {"const": "blocked"}}},
+                      {"properties": {"context": {"const": "stale"}}},
+                      {"properties": {"inputs": {"const": "stale"}}},
+                      {"properties": {"profile_support": {"const": "unsupported"}}},
+                      {"properties": {"action_gate": {"const": "blocked"}}},
+                      {"properties": {"freshness": {"const": "stale"}}},
+                      {"properties": {"consent": {"const": "required"}}},
+                      {"properties": {"continuity": {"const": "gap"}}}
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "binding": {"properties": {"request_method": {"const": "object/read"}}}
+            }
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "oneOf": [
+                  {
+                    "allOf": [
+                      {"$ref": "#/$defs/directOutcome"},
+                      {"properties": {"value": {"$ref": "#/$defs/objectChunk"}}}
+                    ]
+                  },
+                  {"$ref": "#/$defs/failureOutcome"}
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "binding": {
+                "properties": {
+                  "request_method": {"enum": ["graph/subscribe", "job/subscribe", "session/subscribe"]}
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "oneOf": [
+                  {
+                    "allOf": [
+                      {"$ref": "#/$defs/directOutcome"},
+                      {"properties": {"value": {"$ref": "#/$defs/subscriptionHandle"}}}
+                    ]
+                  },
+                  {"$ref": "#/$defs/failureOutcome"}
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "domainResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "id", "result"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "id": {"$ref": "#/$defs/jsonRpcId"},
+        "result": {"$ref": "#/$defs/domainResult"}
+      }
+    },
+    "progressParams": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "job_id",
+            "job_event_id",
+            "event_ordinal",
+            "phase_id",
+            "completed",
+            "total",
+            "unit",
+            "mutation_state",
+            "mutation_started"
+          ],
+          "properties": {
+            "job_id": {"$ref": "#/$defs/jobId"},
+            "job_event_id": {"$ref": "#/$defs/jobEventId"},
+            "event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+            "phase_id": {"$ref": "#/$defs/semanticIdentifier"},
+            "completed": {"$ref": "#/$defs/nonNegativeInteger"},
+            "total": {"$ref": "#/$defs/nullableNonNegativeInteger"},
+            "unit": {"enum": ["bytes", "records", "objects", "partitions", "steps", "unknown"]},
+            "mutation_state": {"$ref": "#/$defs/mutationState"},
+            "mutation_started": {"type": "boolean"}
+          },
+          "oneOf": [
+            {
+              "properties": {
+                "mutation_state": {"enum": ["not-started", "temporary-residue"]},
+                "mutation_started": {"const": false}
+              }
+            },
+            {
+              "properties": {
+                "mutation_state": {
+                  "enum": [
+                    "immutable-output-published",
+                    "reference-committed",
+                    "protected-mutation-started",
+                    "protected-mutation-partial",
+                    "protected-mutation-completed",
+                    "external-mutation-started",
+                    "external-mutation-partial",
+                    "external-mutation-completed",
+                    "external-mutation-indeterminate"
+                  ]
+                },
+                "mutation_started": {"const": true}
+              }
+            }
+          ]
+    },
+    "progressNotification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "method", "params"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "method": {"const": "job/progress"},
+        "params": {"$ref": "#/$defs/progressParams"}
+      }
+    },
+    "cursorRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first", "last"],
+      "properties": {
+        "first": {"$ref": "#/$defs/nonNegativeInteger"},
+        "last": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "subscriptionEventNotification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "method", "params"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "method": {"const": "subscription/event"},
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subscription_id",
+            "stream_generation",
+            "scope",
+            "cursor",
+            "event_family",
+            "context_ref_id",
+            "revision_refs",
+            "reference_event_ids",
+            "job_event_ids",
+            "terminal_seal_ids",
+            "runtime_session_ids",
+            "object_references",
+            "dropped_cursor_ranges"
+          ],
+          "properties": {
+            "subscription_id": {"$ref": "#/$defs/subscriptionId"},
+            "stream_generation": {"$ref": "#/$defs/streamGeneration"},
+            "scope": {"$ref": "#/$defs/subscriptionScope"},
+            "cursor": {"$ref": "#/$defs/nonNegativeInteger"},
+            "event_family": {"$ref": "#/$defs/eventFamily"},
+            "context_ref_id": {"$ref": "#/$defs/contextRefId"},
+            "revision_refs": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/recordRef"}
+            },
+            "reference_event_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^reference-event:sha256:[0-9a-f]{64}$"
+              }
+            },
+            "job_event_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/jobEventId"}
+            },
+            "terminal_seal_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/jobTerminalSealId"}
+            },
+            "runtime_session_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/runtimeSessionRecordId"}
+            },
+            "object_references": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/objectReference"}
+            },
+            "dropped_cursor_ranges": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/cursorRange"}
+            }
+          },
+          "anyOf": [
+            {"properties": {"revision_refs": {"minItems": 1}}},
+            {"properties": {"reference_event_ids": {"minItems": 1}}},
+            {"properties": {"job_event_ids": {"minItems": 1}}},
+            {"properties": {"terminal_seal_ids": {"minItems": 1}}},
+            {"properties": {"runtime_session_ids": {"minItems": 1}}},
+            {"properties": {"object_references": {"minItems": 1}}},
+            {"properties": {"dropped_cursor_ranges": {"minItems": 1}}}
+          ]
+        }
+      }
+    },
+    "jsonRpcErrorData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "availability", "retryable"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "parse-error",
+            "invalid-envelope",
+            "unknown-method",
+            "invalid-parameters",
+            "unsupported-version",
+            "frame-limit",
+            "internal-transport-failure"
+          ]
+        },
+        "availability": {"enum": ["available", "unavailable"]},
+        "retryable": {"type": "boolean"}
+      }
+    },
+    "jsonRpcErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jsonrpc", "id", "error"],
+      "properties": {
+        "jsonrpc": {"const": "2.0"},
+        "id": {
+          "oneOf": [
+            {"$ref": "#/$defs/jsonRpcId"},
+            {"type": "null"}
+          ]
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "data"],
+          "properties": {
+            "code": {
+              "enum": [-32700, -32600, -32601, -32602, -32603, -32001, -32004, -32005]
+            },
+            "message": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "data": {"$ref": "#/$defs/jsonRpcErrorData"}
+          }
+        }
+      }
+    }
+  }
+}

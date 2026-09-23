@@ -1,0 +1,636 @@
+{
+  "name": "workbench-vscode",
+  "displayName": "Workbench for Minecraft Development",
+  "description": "Review Minecraft modpack recipe changes and run local development checks from VS Code with the Workbench CLI.",
+  "version": "0.1.5",
+  "publisher": "cleanroom-workbench",
+  "license": "LGPL-3.0-only",
+  "preview": true,
+  "icon": "media/workbench-icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/orthrus-research/workbench.git"
+  },
+  "homepage": "https://github.com/orthrus-research/workbench#readme",
+  "bugs": {
+    "url": "https://github.com/orthrus-research/workbench/issues"
+  },
+  "galleryBanner": {
+    "color": "#0b0b0b",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "minecraft",
+    "cleanroom",
+    "workbench"
+  ],
+  "main": "./extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Running a locally installed Workbench executable requires a trusted workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Workbench actions require one local filesystem workspace."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "workbench.review.local",
+        "title": "Review Saved Local Changes",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.checks.saved",
+        "title": "Run Checks on Saved Changes",
+        "category": "Workbench"
+      },
+      {
+        "command": "workbench.source.navigate",
+        "title": "Navigate Source Declarations",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.core.configureExecutable",
+        "title": "Configure Core Executable",
+        "category": "Workbench"
+      },
+      {
+        "command": "workbench.core.checkInstallation",
+        "title": "Check CLI Installation",
+        "category": "Workbench"
+      },
+      {
+        "command": "workbench.core.openInstallationGuide",
+        "title": "Open CLI Installation Guide",
+        "category": "Workbench"
+      },
+      {
+        "command": "workbench.setup.open",
+        "title": "Set Up or Repair Environment",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.review.pullRequest",
+        "title": "Review Pull Request Recipes",
+        "category": "Workbench",
+        "icon": "$(git-pull-request)",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.review.recipes",
+        "title": "Review Recipe Changes Against Another Baseline",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.pr.openReport",
+        "title": "Open Complete PR Recipe Review Report",
+        "category": "Workbench",
+        "icon": "$(json)",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.pr.openFindingDiff",
+        "title": "Compare Recipe Properties",
+        "category": "Workbench",
+        "icon": "$(diff)",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.pr.openWorkspaceFile",
+        "title": "Open Current Workspace File",
+        "category": "Workbench",
+        "icon": "$(go-to-file)",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.workspaceHome.open",
+        "title": "Open Workspace Home",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.project.qualify",
+        "title": "Qualify This Pack",
+        "category": "Workbench",
+        "icon": "$(checklist)",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.commandCenter.open",
+        "title": "Open Command Center",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.feature.browseExamples",
+        "title": "Browse Blueprint Examples",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.feature.browseRetainedRecords",
+        "title": "Browse Retained Feature Records",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.feature.records.refresh",
+        "title": "Refresh Retained Feature Records",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.feature.records.openRecord",
+        "title": "Open Retained Feature Record",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.feature.records.openDiff",
+        "title": "Open Feature Transaction Diff",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.atlas.searchRecipes",
+        "title": "Search Atlas Recipes",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.atlas.analyzeRecipeImpact",
+        "title": "Analyze Atlas Recipe Impact Candidates",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.atlas.recipeImpact.openReport",
+        "title": "Open Complete Atlas Recipe Impact Report",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.feature.reopenJob",
+        "title": "Reopen Feature Studio Job",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.feature.runMaterialFluidRecipe",
+        "title": "Run Reviewed Material/Fluid Recipe in Cleanroom",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "workbench.axiomResults.open",
+        "title": "Open Finding",
+        "category": "Axiom",
+        "icon": "$(go-to-file)",
+        "enablement": "isWorkspaceTrusted && workbench.axiomHasResults"
+      },
+      {
+        "command": "workbench.axiomResults.captured",
+        "title": "Open Captured Source",
+        "category": "Axiom",
+        "icon": "$(history)",
+        "enablement": "isWorkspaceTrusted && workbench.axiomHasResults"
+      },
+      {
+        "command": "workbench.axiomResults.evidence",
+        "title": "Open Original Diagnostic",
+        "category": "Axiom",
+        "icon": "$(json)",
+        "enablement": "isWorkspaceTrusted && workbench.axiomHasResults"
+      },
+      {
+        "command": "workbench.axiomResults.next",
+        "title": "Load More Findings",
+        "category": "Axiom",
+        "icon": "$(arrow-down)",
+        "enablement": "isWorkspaceTrusted && workbench.axiomHasResults"
+      },
+      {
+        "command": "workbench.axiomResults.snapshot",
+        "title": "Browse Recipe Details",
+        "category": "Axiom",
+        "icon": "$(list-tree)",
+        "enablement": "isWorkspaceTrusted && workbench.axiomHasResults && workbench.axiomDetailReady"
+      },
+      {
+        "command": "workbench.axiomResults.actions",
+        "title": "Run Actions",
+        "category": "Axiom",
+        "icon": "$(ellipsis)",
+        "enablement": "isWorkspaceTrusted && workbench.axiomHasResults"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "workbench.workspaceHome",
+          "name": "Workbench Home",
+          "when": "isWorkspaceTrusted",
+          "visibility": "visible"
+        },
+        {
+          "id": "workbench.prRecipeReview",
+          "name": "PR Recipe Review",
+          "when": "isWorkspaceTrusted",
+          "visibility": "visible"
+        },
+        {
+          "id": "workbench.featureRecords",
+          "name": "Workbench Retained Records",
+          "when": "isWorkspaceTrusted",
+          "visibility": "collapsed"
+        },
+        {
+          "id": "workbench.recipeImpact",
+          "name": "Atlas Recipe Impact Candidates",
+          "when": "isWorkspaceTrusted",
+          "visibility": "collapsed"
+        }
+      ],
+      "workbench-axiom-results": [
+        {
+          "id": "workbench.axiomResults",
+          "name": "Axiom Results",
+          "when": "isWorkspaceTrusted && workbench.axiomHasResults",
+          "visibility": "visible",
+          "icon": "media/axiom-results.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "workbench.workspaceHome",
+        "contents": "Checking for the Workbench CLI\u2026",
+        "when": "!workbench.coreChecked"
+      },
+      {
+        "view": "workbench.workspaceHome",
+        "contents": "The Workbench CLI was not found. Install a reviewed native wheelhouse for your Python version and host, then choose its installed executable.\n[Open Installation Guide](command:workbench.core.openInstallationGuide)\n[Choose Workbench Executable](command:workbench.core.configureExecutable)\n[Check Again](command:workbench.core.checkInstallation)",
+        "when": "workbench.coreChecked && !workbench.coreAvailable"
+      },
+      {
+        "view": "workbench.workspaceHome",
+        "contents": "Workbench is installed, but some setup needs attention. Open your project to inspect context and requirements, or review the setup plan.\n[Open Workspace Home](command:workbench.workspaceHome.open)\n[Set Up or Repair Environment](command:workbench.setup.open)\n[Check Again](command:workbench.core.checkInstallation)\n[Choose Another Executable](command:workbench.core.configureExecutable)",
+        "when": "workbench.coreChecked && workbench.coreAvailable && workbench.setupChecked && !workbench.setupReady"
+      },
+      {
+        "view": "workbench.workspaceHome",
+        "contents": "Workbench is ready. Open your project to see its context and available actions.\n[Open Workspace Home](command:workbench.workspaceHome.open)\n[Review Saved Local Changes](command:workbench.review.local)\nYou can also [search recipe evidence](command:workbench.atlas.searchRecipes), [review a pull request](command:workbench.review.pullRequest), or [modify setup](command:workbench.setup.open). You can [qualify this pack](command:workbench.project.qualify) to check whether it matches the Supersymmetry profile and optionally save that association. This is not approval and does not block other actions.",
+        "when": "workbench.coreChecked && workbench.coreAvailable && workbench.setupChecked && workbench.setupReady"
+      },
+      {
+        "view": "workbench.prRecipeReview",
+        "contents": "Checking whether the Workbench CLI is ready\u2026",
+        "when": "!workbench.coreChecked"
+      },
+      {
+        "view": "workbench.prRecipeReview",
+        "contents": "Install or connect the Workbench CLI before reviewing a pull request.\n[Open Installation Guide](command:workbench.core.openInstallationGuide)\nAlready installed? [Choose its executable](command:workbench.core.configureExecutable) or [check again](command:workbench.core.checkInstallation).",
+        "when": "workbench.coreChecked && !workbench.coreAvailable"
+      },
+      {
+        "view": "workbench.prRecipeReview",
+        "contents": "Workbench setup is incomplete or needs attention.\n[Set Up or Repair Environment](command:workbench.setup.open)\nAfter setup, [check again](command:workbench.core.checkInstallation) or [choose another executable](command:workbench.core.configureExecutable).",
+        "when": "workbench.coreChecked && workbench.coreAvailable && workbench.setupChecked && !workbench.setupReady"
+      },
+      {
+        "view": "workbench.prRecipeReview",
+        "contents": "Review one Supersymmetry pull request through a core-owned plan, explicit consent, and compact decision report.\n[Review Pull Request Recipes](command:workbench.review.pullRequest)\nNeed a folder or local Git baseline? [Review against another baseline](command:workbench.review.recipes).",
+        "when": "workbench.coreChecked && workbench.coreAvailable && workbench.setupChecked && workbench.setupReady"
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "workbench.getStarted",
+        "title": "Get started with Workbench",
+        "description": "Connect the Workbench CLI, open your project, and choose a development workflow.",
+        "steps": [
+          {
+            "id": "workbench.getStarted.chooseCore",
+            "title": "Install or connect the Workbench CLI",
+            "description": "[Open the installation guide](command:workbench.core.openInstallationGuide) for the native wheelhouse installer. Workbench uses `workbench` on PATH by default; if it is installed elsewhere, [choose its executable](command:workbench.core.configureExecutable). Include Workbench Shell for Workspace Home and the command catalog."
+          },
+          {
+            "id": "workbench.getStarted.home",
+            "title": "Open your project in Workbench",
+            "description": "[Open Workbench Home](command:workbench.workspaceHome.open) to see project checks and available next actions."
+          },
+          {
+            "id": "workbench.getStarted.review",
+            "title": "Review your saved changes",
+            "description": "Save your edits, then [Review Saved Local Changes](command:workbench.review.local). Select a developer context and an explicit local Git baseline. You can also [search Atlas recipe evidence](command:workbench.atlas.searchRecipes) or [review a pull request](command:workbench.review.pullRequest)."
+          },
+          {
+            "id": "workbench.getStarted.setup",
+            "title": "Set up or repair your environment",
+            "description": "When a workflow reports missing configuration, [set up or repair the environment](command:workbench.setup.open) in a visible terminal. Workbench shows its plan before changing local state. Source and evidence inspection do not require a game Java runtime."
+          }
+        ]
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "workbench.workspaceHome.open",
+          "when": "view == workbench.workspaceHome && isWorkspaceTrusted",
+          "group": "navigation@1"
+        },
+        {
+          "command": "workbench.project.qualify",
+          "when": "view == workbench.workspaceHome && isWorkspaceTrusted",
+          "group": "navigation@2"
+        },
+        {
+          "command": "workbench.review.pullRequest",
+          "when": "view == workbench.prRecipeReview && isWorkspaceTrusted",
+          "group": "navigation@1"
+        },
+        {
+          "command": "workbench.pr.openReport",
+          "when": "view == workbench.prRecipeReview && isWorkspaceTrusted && workbench.prReviewHasReport",
+          "group": "navigation@2"
+        },
+        {
+          "command": "workbench.feature.records.refresh",
+          "when": "view == workbench.featureRecords && isWorkspaceTrusted",
+          "group": "navigation"
+        },
+        {
+          "command": "workbench.atlas.analyzeRecipeImpact",
+          "when": "view == workbench.recipeImpact && isWorkspaceTrusted",
+          "group": "navigation@1"
+        },
+        {
+          "command": "workbench.atlas.recipeImpact.openReport",
+          "when": "view == workbench.recipeImpact && isWorkspaceTrusted",
+          "group": "navigation@2"
+        },
+        {
+          "command": "workbench.axiomResults.snapshot",
+          "when": "view == workbench.axiomResults",
+          "group": "navigation"
+        },
+        {
+          "command": "workbench.axiomResults.actions",
+          "when": "view == workbench.axiomResults",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "workbench.feature.records.openRecord",
+          "when": "view == workbench.featureRecords && viewItem == workbenchFeatureRecord",
+          "group": "inline"
+        },
+        {
+          "command": "workbench.feature.records.openDiff",
+          "when": "view == workbench.featureRecords && viewItem == workbenchFeatureOperation",
+          "group": "inline"
+        },
+        {
+          "command": "workbench.pr.openFindingDiff",
+          "when": "view == workbench.prRecipeReview && (viewItem == workbenchPrReviewModifiedRecipe || viewItem == workbenchPrReviewModifiedRecipeNoFile) && isWorkspaceTrusted",
+          "group": "inline@1"
+        },
+        {
+          "command": "workbench.pr.openWorkspaceFile",
+          "when": "view == workbench.prRecipeReview && (viewItem == workbenchPrReviewFile || viewItem == workbenchPrReviewRecipe || viewItem == workbenchPrReviewModifiedRecipe) && isWorkspaceTrusted",
+          "group": "inline@2"
+        },
+        {
+          "command": "workbench.setup.open",
+          "when": "view == workbench.prRecipeReview && viewItem == workbenchPrReviewFailure && isWorkspaceTrusted",
+          "group": "inline@1"
+        },
+        {
+          "command": "workbench.axiomResults.next",
+          "when": "view == workbench.axiomResults && (viewItem == axiomGroup)",
+          "group": "inline"
+        },
+        {
+          "command": "workbench.axiomResults.captured",
+          "when": "view == workbench.axiomResults && (viewItem == axiomLocated)",
+          "group": "evidence"
+        },
+        {
+          "command": "workbench.axiomResults.evidence",
+          "when": "view == workbench.axiomResults && (viewItem == axiomLocated || viewItem == axiomUnlocated)",
+          "group": "evidence"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "workbench.feature.records.refresh",
+          "when": "false"
+        },
+        {
+          "command": "workbench.feature.records.openRecord",
+          "when": "false"
+        },
+        {
+          "command": "workbench.feature.records.openDiff",
+          "when": "false"
+        },
+        {
+          "command": "workbench.atlas.recipeImpact.openReport",
+          "when": "false"
+        },
+        {
+          "command": "workbench.pr.openReport",
+          "when": "false"
+        },
+        {
+          "command": "workbench.pr.openFindingDiff",
+          "when": "false"
+        },
+        {
+          "command": "workbench.pr.openWorkspaceFile",
+          "when": "false"
+        },
+        {
+          "command": "workbench.axiomResults.open",
+          "when": "false"
+        },
+        {
+          "command": "workbench.axiomResults.captured",
+          "when": "false"
+        },
+        {
+          "command": "workbench.axiomResults.evidence",
+          "when": "false"
+        },
+        {
+          "command": "workbench.axiomResults.next",
+          "when": "false"
+        },
+        {
+          "command": "workbench.axiomResults.snapshot",
+          "when": "false"
+        },
+        {
+          "command": "workbench.axiomResults.actions",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Workbench",
+      "properties": {
+        "workbench.coreExecutable": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Exact installed Workbench executable. On Windows, a \\\\wsl.localhost\\DISTRO\\... executable uses the bounded no-shell WSL adapter. Leave empty to use WORKBENCH_EXECUTABLE, then workbench on PATH."
+        },
+        "workbench.productSpine.stateRoot": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional exact external state root for Workspace Home, Work Sessions, and pack qualification. Configure this when retained product state must live outside the workspace or installed package."
+        },
+        "workbench.feature.launcher": {
+          "type": "string",
+          "enum": [
+            "prism",
+            "multimc"
+          ],
+          "default": "prism",
+          "scope": "machine",
+          "description": "Launcher used for the disposable developer-feature client."
+        },
+        "workbench.feature.launcherExecutable": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Exact launcher executable path as seen by the installed core. For a Windows-hosted WSL core, use the matching WSL UNC path."
+        },
+        "workbench.feature.launcherRoot": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Disposable-capable launcher data root as seen by the installed core."
+        },
+        "workbench.feature.launcherProfile": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional exact launcher profile name for the disposable client."
+        },
+        "workbench.feature.launcherJava": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional Java candidate path as seen by the installed core."
+        },
+        "workbench.feature.launcherJavaState": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional launcher-side managed Java state root."
+        },
+        "workbench.feature.packwizExecutable": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional Packwiz executable path as seen by the installed core; required when Packwiz is not in the core's PATH."
+        },
+        "workbench.feature.seedRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "machine",
+          "description": "Optional exact-hash download seed roots as seen by the installed core."
+        },
+        "workbench.feature.stateRoot": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional retained developer-feature state root containing the reviewed plan."
+        },
+        "workbench.feature.memoryMiB": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 131072,
+          "default": 8192,
+          "scope": "machine",
+          "description": "Maximum memory assigned to the disposable client in MiB."
+        },
+        "workbench.feature.offlineName": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{3,16}$",
+          "default": "Workbench",
+          "scope": "machine",
+          "description": "Offline player name used by the disposable client."
+        },
+        "workbench.feature.timeoutSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 86400,
+          "default": 600,
+          "scope": "machine",
+          "description": "FML checkpoint timeout in seconds."
+        },
+        "workbench.feature.attachTimeoutSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 600,
+          "default": 120,
+          "scope": "machine",
+          "description": "Exact projected-client process attach timeout in seconds."
+        },
+        "workbench.feature.sessionTimeoutSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 86400,
+          "default": 21600,
+          "scope": "machine",
+          "description": "Maximum disposable client session duration in seconds."
+        }
+      }
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "workbench-axiom-results",
+          "title": "Axiom Results",
+          "icon": "media/axiom-results.svg"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:package": "node test/check-package.js",
+    "test:integration": "node test/run-extension-host.mjs"
+  },
+  "devDependencies": {
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "3.9.2"
+  }
+}

@@ -1,0 +1,1493 @@
+{
+  "schema": "axiom.pack-native-inputs.v1",
+  "profile": "supersymmetry",
+  "context": "supersymmetry:material-authoring-pack",
+  "nativeContext": "supersymmetry:required-early",
+  "side": "server",
+  "packSource": {
+    "repository": "https://github.com/SymmetricDevs/Supersymmetry.git",
+    "revision": "3e83cd7bad57bd4c424de4e6cc707ab02fe32f54"
+  },
+  "nativeContextSha256": "20ffaf020863cdfa3d55f48ff58ad8e6a7eb5c50ed3126975923401d45be5f0b",
+  "artifacts": [
+    {
+      "descriptor": "mods/ae2-extended-life.pw.toml",
+      "descriptorSha256": "b0db116adb0cfd8b765ca88d24db5adfa562259252a34d5446fb63b11c52ea17",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "5cdc64def700aa1554bca3584dc3d278ba608d22",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/ae2-uel-v0.56.6.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5411/78/ae2-uel-v0.56.6.jar",
+      "sha256": "57e68134a5caead143856659aca8d711845ff90b3ffbcf48071f0a409d09f6a7",
+      "size": 4425522,
+      "curseforge": {
+        "file-id": 5411078,
+        "project-id": 570458
+      }
+    },
+    {
+      "descriptor": "mods/alet.pw.toml",
+      "descriptorSha256": "fbcc9647740b3a7774a4daaf30452fc6d30d53737fe757c8660ee0301ccac979",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "cee0be1e7970dcbe4e9ff94b8427d79a975b92ac",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5734412,
+        "project-id": 326330
+      },
+      "path": "mods/A_Little_Extra_Tiles-1.1.0-pre034.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5734/412/A_Little_Extra_Tiles-1.1.0-pre034.jar",
+      "sha256": "2c795faf3564d76c5a6346808a62e1bc98cf57c2d1c553425902b79afd22a260",
+      "size": 8706184
+    },
+    {
+      "descriptor": "mods/architecturecraft-tridev.pw.toml",
+      "descriptorSha256": "502096634acc795253f3ea0752ed01db33b512bc2eb8b252092ba7f345de2a27",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "45a0bff7cdc7d22e7172baeebaf8202c3208bf22",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 4344128,
+        "project-id": 277631
+      },
+      "path": "mods/architecturecraft-1.12-3.108.jar",
+      "url": "https://mediafilez.forgecdn.net/files/4344/128/architecturecraft-1.12-3.108.jar",
+      "sha256": "34a864afeceb60f744b5071ba625de5d294143f7c08740642cb21482b288bd7e",
+      "size": 925535
+    },
+    {
+      "descriptor": "mods/athenaeum.pw.toml",
+      "descriptorSha256": "30120c9b5188449824a201cc681bfb8de70346b8cb1a189e1c717e44c80dd024",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "d2e8821968a8ae5ea1bf5d7dd221b3e8e1b645bd",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 4633750,
+        "project-id": 284350
+      },
+      "path": "mods/athenaeum-1.12.2-1.19.6.jar",
+      "url": "https://mediafilez.forgecdn.net/files/4633/750/athenaeum-1.12.2-1.19.6.jar",
+      "sha256": "2aea9497d5414bfaefa05cc7c0162850f01dbb96b72ee3db36b5924573336271",
+      "size": 332993
+    },
+    {
+      "descriptor": "mods/autoreglib.pw.toml",
+      "descriptorSha256": "45b89fead492935701ce8092eb3920bce39d824629bd87458eae218aba41d258",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "267269ca7f1a71fb3bb35bdb8e61702a4da6263e",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2746011,
+        "project-id": 250363
+      },
+      "path": "mods/AutoRegLib-1.3-32.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2746/11/AutoRegLib-1.3-32.jar",
+      "sha256": "d8610a94da8f30815db4612b3291ecdcfd8204eaf1a4db8c5d0663c7b1191d91",
+      "size": 108306
+    },
+    {
+      "descriptor": "mods/barrels-drums-storage-more.pw.toml",
+      "descriptorSha256": "0125f216d544c5c1a50158e154bacec24669acdf31c4b14cd9907ea78b6d933f",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "743e31ac3ebd76f0f5be1df55915ad64762a8b81",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2708193,
+        "project-id": 319404
+      },
+      "path": "mods/BarrelsDrumsStorageAndMore-0.0.24.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2708/193/BarrelsDrumsStorageAndMore-0.0.24.jar",
+      "sha256": "fed33cfeee31c523b6bb13c9ca79b59e810f0df1055cfc3ce624dca1378ebf61",
+      "size": 424652
+    },
+    {
+      "descriptor": "mods/better-builders-wands.pw.toml",
+      "descriptorSha256": "f7c821287bcb460b7cd51438d4f08c818beb1070d687a0460ce5c5279941bad2",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "3505169dfeea40d726b23072cb695d3c0e5014da",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2691084,
+        "project-id": 238403
+      },
+      "path": "mods/BetterBuildersWands-1.12.2-0.13.2.271+5997513.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2691/84/BetterBuildersWands-1.12.2-0.13.2.271%2B5997513.jar",
+      "sha256": "0bb50f545b87f19087d9dbdb9930d6be2d66ee8c76d2a1982eef9e3d2bb43108",
+      "size": 77866
+    },
+    {
+      "descriptor": "mods/biomes-o-plenty.pw.toml",
+      "descriptorSha256": "a6f2a5c57e847e8a587ca95caf23fff6d91aff86828d764496143a35a30773ed",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "13c1e58ffec2a550b9698e25cda93b8d155007b0",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3558882,
+        "project-id": 220318
+      },
+      "path": "mods/BiomesOPlenty-1.12.2-7.0.1.2445-universal.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3558/882/BiomesOPlenty-1.12.2-7.0.1.2445-universal.jar",
+      "sha256": "1c53d3ee39f557162591f618c58b79dc6861d24522ef785794ee4a815f8a3908",
+      "size": 4746208
+    },
+    {
+      "descriptor": "mods/bubbles-a-baubles-fork.pw.toml",
+      "descriptorSha256": "5c30108907fd9296e534e4d35dcacb7f6450a29a6090c36ae711bd7c7c96de3c",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "3e91a89f9196469c5c195ad8377696a3d6511f8b",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 7736064,
+        "project-id": 995393
+      },
+      "path": "mods/Bubbles-2.4.10.jar",
+      "url": "https://mediafilez.forgecdn.net/files/7736/64/Bubbles-2.4.10.jar",
+      "sha256": "8a54cb9abafb14ce66bbc61fbfe5846fdeb3a4cf6ca6ff3bbd6bfe7b16f595f2",
+      "size": 342223
+    },
+    {
+      "descriptor": "mods/building-gadgets.pw.toml",
+      "descriptorSha256": "c8ee6b8c56dc5011af73660d1063d881376b6d66b7b3686c6ab73edb6f598c14",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "7f33f2343bf0af70d5d853378d465657beea3740",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3005950,
+        "project-id": 298187
+      },
+      "path": "mods/BuildingGadgets-2.8.4.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3005/950/BuildingGadgets-2.8.4.jar",
+      "sha256": "1f130a49dbcdd56ec24df38710d6fe67e95880294f9941c28a4d4a104d1ddec5",
+      "size": 719492
+    },
+    {
+      "descriptor": "mods/catwalks-4.pw.toml",
+      "descriptorSha256": "77a4e4f27f2d3b955227ae656bad978eaa26e73799bf9411f448542cdba16def",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "aa93c38eec189f40d00fd88ec02b3cfd962d539d",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2936858,
+        "project-id": 296851
+      },
+      "path": "mods/catwalks-1.12.2-4.0.45.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2936/858/catwalks-1.12.2-4.0.45.jar",
+      "sha256": "d3d9c814f9d2f052d3c6d37bc0914d26334193ea90efcb66f1a0e09c8357407d",
+      "size": 210199
+    },
+    {
+      "descriptor": "mods/cb-multipart.pw.toml",
+      "descriptorSha256": "8543599cc981cc25fa739c9efad2ffd6ddcbcd10b681e47875bf5e7f87a9262f",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "3306ea22380bc9b6a0170b23fa0251085d5a6e25",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/ForgeMultipart-1.12.2-2.6.2.83-universal.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2755/790/ForgeMultipart-1.12.2-2.6.2.83-universal.jar",
+      "sha256": "25718bd80799a608c45299d13d86e5d67248f07a3c00657c690948b1821835ce",
+      "size": 1304958,
+      "curseforge": {
+        "file-id": 2755790,
+        "project-id": 258426
+      }
+    },
+    {
+      "descriptor": "mods/cd4017be-library.pw.toml",
+      "descriptorSha256": "d989c6febaa5a838bc9e489dc46ac7cd303c37d5aae78c8bde4e8ca0c15797ff",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "b5820b90f0dab4d30d58298d54fda04385b6f674",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3004631,
+        "project-id": 229208
+      },
+      "path": "mods/CD4017BE_lib-1.12.2-6.5.1.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3004/631/CD4017BE_lib-1.12.2-6.5.1.jar",
+      "sha256": "c39bc1469bf210e52aa5353aabe214bb3a93e8a1e9c67981335ebfd8c2da54b9",
+      "size": 669428
+    },
+    {
+      "descriptor": "mods/chameleon.pw.toml",
+      "descriptorSha256": "305815006195c0647af38ea5d8c03cd6c652c77bf975e3e967b754bc3b9ac569",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "5ed3dd5fd1ebded57bfe525b4ece11232bd14e5e",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2450900,
+        "project-id": 230497
+      },
+      "path": "mods/Chameleon-1.12-4.1.3.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2450/900/Chameleon-1.12-4.1.3.jar",
+      "sha256": "238416f801acda67b90fba9e0e572dbd6e7631b7e64c3eb3d6226f45ae536c87",
+      "size": 96859
+    },
+    {
+      "descriptor": "mods/chest-transporter.pw.toml",
+      "descriptorSha256": "96c8e9dedce3abe3214a9aa6fd70649775f6453778fdd9468ef079f675976c73",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "50c48502302193af990ed3c33b6e23e1f240cb1d",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2524058,
+        "project-id": 78778
+      },
+      "path": "mods/ChestTransporter-1.12.2-2.8.8.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2524/58/ChestTransporter-1.12.2-2.8.8.jar",
+      "sha256": "ea8ba7acdfaf7102cad7e3638bffa247bd5cfb634de4c355d47d33a8d2c724a1",
+      "size": 314060
+    },
+    {
+      "descriptor": "mods/chisel.pw.toml",
+      "descriptorSha256": "5a5219bd45d091fa505a4c98e9282fa721f5228af3a91fe56939c6f347abc285",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "d378cee9195841ea78bb9800f543d718ef2c60ef",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2915375,
+        "project-id": 235279
+      },
+      "path": "mods/Chisel-MC1.12.2-1.0.2.45.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2915/375/Chisel-MC1.12.2-1.0.2.45.jar",
+      "sha256": "64c62f20a89939db2c03d47737c7bd371d8bd8c10ae42e2e8c63432ae89db2c7",
+      "size": 4755282
+    },
+    {
+      "descriptor": "mods/codechicken-lib-1-8.pw.toml",
+      "descriptorSha256": "49d0ddb311fa9fe9b193996de176a92e0ab2b26b4030344ae80cff4584fdadc4",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "b6a7e3b889c354216059a3bfad298e30a1e46a2d",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2779848,
+        "project-id": 242818
+      },
+      "path": "mods/CodeChickenLib-1.12.2-3.2.3.358-universal.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2779/848/CodeChickenLib-1.12.2-3.2.3.358-universal.jar",
+      "sha256": "5f8499f7ee2590e45110bbf296b2bf101aec15897e28d5e9759cf8f2387d8a74",
+      "size": 704330
+    },
+    {
+      "descriptor": "mods/commons0815.pw.toml",
+      "descriptorSha256": "aba619ad14a84abdcb9993a7aca90ee7d052f45b2f2825e89e3da0b90c001d7e",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "076ed53a86f503add06c252856a1a8ad7b0d2667",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3248796,
+        "project-id": 346326
+      },
+      "path": "mods/Commons0815-1.12.2-1.4.0.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3248/796/Commons0815-1.12.2-1.4.0.jar",
+      "sha256": "b8302780b2d234fb686c48b149ea8705291dca2a5f4b252a1e1e1ae3759bef5d",
+      "size": 316392
+    },
+    {
+      "descriptor": "mods/creativecore.pw.toml",
+      "descriptorSha256": "f03aa10a2d6435326875419c039558ac254a4e1a9c9c069a09ab33e0a1742351",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "2c60a20ae9c9431a3b215a331c2b2af7fa3a060c",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 4722163,
+        "project-id": 257814
+      },
+      "path": "mods/CreativeCore_v1.10.71_mc1.12.2.jar",
+      "url": "https://mediafilez.forgecdn.net/files/4722/163/CreativeCore_v1.10.71_mc1.12.2.jar",
+      "sha256": "b0ef34ec816fa91451f8d4b62c016c159ab3559d6f75870790d1215943f009d5",
+      "size": 1321137
+    },
+    {
+      "descriptor": "mods/dropt.pw.toml",
+      "descriptorSha256": "0d88899bf3170d49b241f3623d8cd9e02f01abe83756e7100f66846478611de9",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "7e64ac572a30161b42d698aacfd5b842ab99d742",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5405050,
+        "project-id": 284973
+      },
+      "path": "mods/dropt-1.12.2-1.19.4.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5405/50/dropt-1.12.2-1.19.4.jar",
+      "sha256": "21837ce855ad3304fa2aa2cc4d29fe5989cd61f09fa8fc1f9f4e53dedbacfd04",
+      "size": 150794
+    },
+    {
+      "descriptor": "mods/engineers-decor.pw.toml",
+      "descriptorSha256": "e269b797f696ea4a422384260a9ace0318e921b2ab3755310e7e60414ac7cf18",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "ffcb09e3c64e424f0dcd3f2ca8220f5050f90e72",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3783239,
+        "project-id": 313866
+      },
+      "path": "mods/engineersdecor-1.12.2-1.1.5.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3783/239/engineersdecor-1.12.2-1.1.5.jar",
+      "sha256": "be4902e7305cff2510b158c2b795ca69bf6492e5a6874b3c4c79ce7c589cfed6",
+      "size": 1095280
+    },
+    {
+      "descriptor": "mods/forgelin-continuous.pw.toml",
+      "descriptorSha256": "b97953f492075aa0ac16986739c0cb0628446dc8dc5ede6daf2eb328bf09e3c5",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "a131fb6de3995d5ff0ef2ad18e12619cd1baa899",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8746291,
+        "project-id": 456403
+      },
+      "path": "mods/Forgelin-Continuous-2.4.10.0.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8746/291/Forgelin-Continuous-2.4.10.0.jar",
+      "sha256": "e2bb1ca15f228fe9e58d05d4c5d6f571afc320fee4fa693fdb48e935692a74f6",
+      "size": 8037825
+    },
+    {
+      "descriptor": "mods/fugue.pw.toml",
+      "descriptorSha256": "b1121063f29a999fdcfb7c0ba0942f1b22124001fc0428d0d1b1382ac94490df",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "2f0935e476bc218dd4e1b8d9877ad2ae16a66b58",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8629748,
+        "project-id": 1005815
+      },
+      "path": "mods/+Fugue-0.24.3.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8629/748/%2BFugue-0.24.3.jar",
+      "sha256": "00dc2de461b8a9bf0d9b684aa0377713bda85ca63da5ec93028c226ed2119efd",
+      "size": 305146
+    },
+    {
+      "descriptor": "mods/gaspunk-inhaler.pw.toml",
+      "descriptorSha256": "0b6adf586d5744fa09a5b8c48e961b8d3e2b6ff89b946fb7eaf834c1abfaa0dd",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "a06ba64e94c5a5d63612508edff9b65f6cc973c3",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2597275,
+        "project-id": 293583
+      },
+      "path": "mods/Gaspunk-Inhaler-1.12.2-1.0.1.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2597/275/Gaspunk-Inhaler-1.12.2-1.0.1.jar",
+      "sha256": "9a1479b24bb04467e113c2e44fadd59fb165510133cf54e16312823c5af37282",
+      "size": 31961
+    },
+    {
+      "descriptor": "mods/gaspunk.pw.toml",
+      "descriptorSha256": "5e57bf8b06ed3500216ec3df7728d8b258fd03cb7e8483dd29cc1724f7a431c0",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "a66d6c36b0b009b4673d3d22d602c1dfd934fecb",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/gaspunk-1.12.2-1.4.8.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3048/663/gaspunk-1.12.2-1.4.8.jar",
+      "sha256": "6791ece8b88d72304cc8a1deedabe36e1d0b26af0cffe5eeb4fb8f33691e4164",
+      "size": 1362855,
+      "curseforge": {
+        "file-id": 3048663,
+        "project-id": 286505
+      }
+    },
+    {
+      "descriptor": "mods/geckolib.pw.toml",
+      "descriptorSha256": "4e87ea91ac584b6c91dbac23bd05db9be1a848e47dda3524224bb189f4fe5b10",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "abab17e7e19cba9ab575425a32419eb9db9cb876",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 4020277,
+        "project-id": 388172
+      },
+      "path": "mods/geckolib-forge-1.12.2-3.0.31.jar",
+      "url": "https://mediafilez.forgecdn.net/files/4020/277/geckolib-forge-1.12.2-3.0.31.jar",
+      "sha256": "b00bc9de4e3e94cea0455f8d58b295c1464272135e842bdf3170c2c955c871a5",
+      "size": 3702893
+    },
+    {
+      "descriptor": "mods/gregicality-multiblocks.pw.toml",
+      "descriptorSha256": "367a687077a1f51527d1af105e2d67e1cd2ff56ec90f3aeb963cc0537a97dd53",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "87a13e37bccd8c7a55bc4222ae58f5c8f0c84441",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5619513,
+        "project-id": 564858
+      },
+      "path": "mods/GregicalityMultiblocks-1.2.11.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5619/513/GregicalityMultiblocks-1.2.11.jar",
+      "sha256": "dc250750b86c4d95bb68fe1681d48ce912efa1472ec0355c30e625d41a0591da",
+      "size": 445798
+    },
+    {
+      "descriptor": "mods/gregtech-ce-unofficial.pw.toml",
+      "descriptorSha256": "c02a97d59ab1cc726e173bac0c456da17938724fcd124d26329302d8fc2b9b5d",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "0c72d4b7b87092d4068c3cb660c95c2c845174c1",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5519022,
+        "project-id": 557242
+      },
+      "path": "mods/gregtech-1.12.2-2.8.10-beta.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5519/22/gregtech-1.12.2-2.8.10-beta.jar",
+      "sha256": "54744bb11ea4679df4b55846d8073e9bb2ef8c1c53aae8aee41cda3fc22d927e",
+      "size": 14231761
+    },
+    {
+      "descriptor": "mods/gregtech-food-option.pw.toml",
+      "descriptorSha256": "ece3ef9a3d14dd4c87a87da01b679a58d9a32115d8edd39cd6f0e80e76f731a7",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "33b3adf6670ebd2c1c10547e8c28e2651da0ac7d",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8484539,
+        "project-id": 477021
+      },
+      "path": "mods/gregtechfoodoption-1.12.2-1.12.10.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8484/539/gregtechfoodoption-1.12.2-1.12.10.jar",
+      "sha256": "2d57d4313f02bf05ef411f063b5ab93c988cdda2dfef1f0ff6789ae68aaa72ba",
+      "size": 2007406
+    },
+    {
+      "descriptor": "mods/groovyscript.pw.toml",
+      "descriptorSha256": "5a3d4a239e64e44bba1fed8ceaa5c592a81cf8d533db75110afa37a8a7a7dd82",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "48ffe55af9173b3f9ee764f678b6b58d70dab90c",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 7925117,
+        "project-id": 687577
+      },
+      "path": "mods/groovyscript-1.4.3.jar",
+      "url": "https://mediafilez.forgecdn.net/files/7925/117/groovyscript-1.4.3.jar",
+      "sha256": "07617b7ce9170a857199bd61d730a0db3af2685cf83d31734a2d4b628fda7533",
+      "size": 16954096
+    },
+    {
+      "descriptor": "mods/had-enough-items.pw.toml",
+      "descriptorSha256": "d8b3509f5f37d126f296db936248cff5aa0b99c0afdddd6fa28a2460880759ca",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "666d562a804c9e55261bf2e504168138ea07f832",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8405357,
+        "project-id": 557549
+      },
+      "path": "mods/HadEnoughItems_1.12.2-4.32.0.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8405/357/HadEnoughItems_1.12.2-4.32.0.jar",
+      "sha256": "40d01797ebc29ca5ceaadcaa4951af708b708f396d16b1c85c7262afdae849bd",
+      "size": 901366
+    },
+    {
+      "descriptor": "mods/icbm.pw.toml",
+      "descriptorSha256": "3e7bb6fd6b6202b09a04871f011f4fe2b9af99f805954edef77bf8fa28861a0b",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "5b6235f606d537788c364a7ff276ca05b6a849d5",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8177228,
+        "project-id": 244451
+      },
+      "path": "mods/ICBM-classic-1.12.2-6.5.5.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8177/228/ICBM-classic-1.12.2-6.5.5.jar",
+      "sha256": "65533f69c3fe745385f51ff831c6c16adc8c963999093b44743961c8afe8d3d7",
+      "size": 3346719
+    },
+    {
+      "descriptor": "mods/ichunutil.pw.toml",
+      "descriptorSha256": "e84b408fe657d70ce1292d146ebfa510843327453d245d5694de3a434ad482bd",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "2b53b0f9543c98adb0b89caa4da954a477259367",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/iChunUtil-1.12.2-7.2.2.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2801/262/iChunUtil-1.12.2-7.2.2.jar",
+      "sha256": "e0b90727cbe54a11fe568f3d60cd59d64ff3c14f82437e1d1c10b575886ab8a3",
+      "size": 581963,
+      "curseforge": {
+        "file-id": 2801262,
+        "project-id": 229060
+      }
+    },
+    {
+      "descriptor": "mods/immersive-railroading.pw.toml",
+      "descriptorSha256": "70b855508fde6408d710ebe3a697f614f8c7d201d1b04761046925fe9b9736ff",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "68736f0436fb0c23f07c0d5b7954d524e371a0a1",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 4970105,
+        "project-id": 277736
+      },
+      "path": "mods/ImmersiveRailroading-1.12.2-forge-1.10.0.jar",
+      "url": "https://mediafilez.forgecdn.net/files/4970/105/ImmersiveRailroading-1.12.2-forge-1.10.0.jar",
+      "sha256": "de5483f7d06642ca8de38bbb56852559cafe5bcbebe38f680c391fd766d36022",
+      "size": 106346165
+    },
+    {
+      "descriptor": "mods/industrial-renewal.pw.toml",
+      "descriptorSha256": "41bc6b21cfe69d583ee595d9691ac082bf5a8a950777199df2df537e268b33de",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "3d3d77cc3eb341200c81e0c3ef2dec69ffc69521",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3340876,
+        "project-id": 299849
+      },
+      "path": "mods/IndustrialRenewal_1.12.2-0.21.8.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3340/876/IndustrialRenewal_1.12.2-0.21.8.jar",
+      "sha256": "53cd62fac4023c3a1b13b445af5483ec133a108c7a049a4077b118f973d71271",
+      "size": 3871619
+    },
+    {
+      "descriptor": "mods/ivtoolkit.pw.toml",
+      "descriptorSha256": "1ce21898ee51d69f97aa0456f339965c7c6763b34853a25de72b30a1e23f42da",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "522e60b48721b558f6dea1fdfa2b235162366649",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2443253,
+        "project-id": 224535
+      },
+      "path": "mods/IvToolkit-1.3.3-1.12.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2443/253/IvToolkit-1.3.3-1.12.jar",
+      "sha256": "ffb745111790e27cb7810a2e03d5270265dee7ebd3ef98fde897c409d58b1e59",
+      "size": 455763
+    },
+    {
+      "descriptor": "mods/just-enough-calculation.pw.toml",
+      "descriptorSha256": "9659d8f844faa0c1c92e914d7969b6ac1ecf2b6a8155834f8bfebc4193c30d45",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "af07e8e6567e910f679b14f9b67b23da3213eeb2",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3524685,
+        "project-id": 242223
+      },
+      "path": "mods/JustEnoughCalculation-1.12.2-3.2.7.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3524/685/JustEnoughCalculation-1.12.2-3.2.7.jar",
+      "sha256": "5fc2aed14ac29f715af29ea26016e018f2a734fadfe3fc60d52d07206cf054f4",
+      "size": 298222
+    },
+    {
+      "descriptor": "mods/lazy-ae2.pw.toml",
+      "descriptorSha256": "9be747f0d18ed0676d229d70a36d4d44dec9e17adc94a1ed877c958ee4ce6c81",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "731b5f7b0b6071c0f2281a8e79be37b8499f4eb6",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/lazy-ae2-1.12.2-1.1.26.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3254/160/lazy-ae2-1.12.2-1.1.26.jar",
+      "sha256": "adcc880f8e9fe2e80f2a27ff15b27c320f139fd120213c47be29e498839a56f4",
+      "size": 398411,
+      "curseforge": {
+        "file-id": 3254160,
+        "project-id": 322347
+      }
+    },
+    {
+      "descriptor": "mods/libnine.pw.toml",
+      "descriptorSha256": "aeeca03fc512fffed87f449bc8b631d59f4b95857dc3818492d6af0afd4e00c6",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "c99daa72265e227875eea94897a9041faceec79a",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/libnine-1.12.2-1.2.2.jar",
+      "url": "https://mediafilez.forgecdn.net/files/6790/812/libnine-1.12.2-1.2.2.jar",
+      "sha256": "70db06743282be7e028a6ea725e9c4df19603dc66d7971a3d53e8ae61c3b2716",
+      "size": 412371,
+      "curseforge": {
+        "file-id": 6790812,
+        "project-id": 322344
+      }
+    },
+    {
+      "descriptor": "mods/littletiles.pw.toml",
+      "descriptorSha256": "307efe62b434f30f3d71f905620940656cf609da92fc76a594ae14eed965ad63",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "f77d34ddd13caeb4781908443f73e51b9118fe60",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5180387,
+        "project-id": 257818
+      },
+      "path": "mods/LittleTiles_v1.5.87_mc1.12.2.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5180/387/LittleTiles_v1.5.87_mc1.12.2.jar",
+      "sha256": "ceff70615c898883180c34992c4568bd288858227830b10a04d579969c8c8d36",
+      "size": 1994663
+    },
+    {
+      "descriptor": "mods/mcjtylib-refilmed.pw.toml",
+      "descriptorSha256": "e156d64fe4e8c8c7ce4d63916cc72ab6ed513611c451da398a2d794097ca93ea",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "666f8eaa96869a1c9442638506959ed0c76d86cf",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5643297,
+        "project-id": 1086841
+      },
+      "path": "mods/mcjtylib-refilmed-3.5.5.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5643/297/mcjtylib-refilmed-3.5.5.jar",
+      "sha256": "62436cbbe54f5ea2f8d286ade89379fe5b644f8121eccc2c227f2176c8d1a297",
+      "size": 541407
+    },
+    {
+      "descriptor": "mods/modernmarkings.pw.toml",
+      "descriptorSha256": "ab1038aab9b6148238aa80b556a96457477fad2eb1c3552df3d130418362b346",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "e8cff07ee5892fe707ecbc94c03d6f0d863384e5",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 6657304,
+        "project-id": 1267477
+      },
+      "path": "mods/AGS ModernMarkings Mod-0.4.1.jar",
+      "url": "https://mediafilez.forgecdn.net/files/6657/304/AGS%20ModernMarkings%20Mod-0.4.1.jar",
+      "sha256": "858b6d374101d4ba13cb8bf122a784b08ec5d08566ff926361544b9ee6c06809",
+      "size": 241777
+    },
+    {
+      "descriptor": "mods/modularui.pw.toml",
+      "descriptorSha256": "027a9eae197ae58909414605234f08d9131d0d9beb1bbb35a1c6404578f32cff",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "be2d067fe4e8815c5c025416019f9a8037d26be0",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 7929464,
+        "project-id": 624243
+      },
+      "path": "mods/modularui-3.1.6.jar",
+      "url": "https://mediafilez.forgecdn.net/files/7929/464/modularui-3.1.6.jar",
+      "sha256": "4c16829c70b322aab735e73f53608fcabbf1d14956d5365c0c2b911c4d4dca54",
+      "size": 2338491
+    },
+    {
+      "descriptor": "mods/mrtjpcore.pw.toml",
+      "descriptorSha256": "ae849763d546d4fea042e339ec74f8b0373472f76aeda340cd6bced6ac7754bd",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "981382e6c623e8fe68cee07c8ee1f6f2c77b94dd",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2735197,
+        "project-id": 229002
+      },
+      "path": "mods/MrTJPCore-1.12.2-2.1.4.43-universal.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2735/197/MrTJPCore-1.12.2-2.1.4.43-universal.jar",
+      "sha256": "82652f00e513c61c99a791abf2cbc10fdfb0e3a79e4eb02b305cccbc2d2f0087",
+      "size": 803400
+    },
+    {
+      "descriptor": "mods/multistorage.pw.toml",
+      "descriptorSha256": "a98c572071cf97b6744a82b8b02f0c32d8299c40da28a6ec8693be0bd9156ece",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "9889c2ae0d7c2c2f4ce728916206d7e85d0df375",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2710024,
+        "project-id": 244864
+      },
+      "path": "mods/multistorage-1.12.0-1.4.14.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2710/24/multistorage-1.12.0-1.4.14.jar",
+      "sha256": "4f814aa4f98c0c05fddc0fbf4288b14b9e924aab83bad52c642ca272bae04507",
+      "size": 1061238
+    },
+    {
+      "descriptor": "mods/nae2.pw.toml",
+      "descriptorSha256": "108eab3cfbc1a3e6c73bcc27927979a84c58fd435ee929ab53bbc9926e6b5246",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "02018e1e520d478b2b82a63ddb679452957bd415",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5380800,
+        "project-id": 884359
+      },
+      "path": "mods/nae2-1.6.4.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5380/800/nae2-1.6.4.jar",
+      "sha256": "966a050348b4be8ad458541ad549c2bf38cadddcf065d1bb4c7a28ec82a3b229",
+      "size": 546938
+    },
+    {
+      "descriptor": "mods/natures-compass.pw.toml",
+      "descriptorSha256": "59c691bccb11a19c67a0272aae379c20d157d5240e7001b2d92d80bf555b88d0",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "60bcf179cab708f67bbce98d201e82f3e7be9266",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2893527,
+        "project-id": 252848
+      },
+      "path": "mods/NaturesCompass-1.12.2-1.8.5.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2893/527/NaturesCompass-1.12.2-1.8.5.jar",
+      "sha256": "bd4f556b7e5480687dbc09735dca05a1ceb3622dc93422adb5dab4f68cc9f2d1",
+      "size": 196434
+    },
+    {
+      "descriptor": "mods/new-tardis-mod.pw.toml",
+      "descriptorSha256": "e08823d1cf016afd5c34887773842cd6c775609fe099b1273c165eda7e363a8c",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "c134c921faf5b108e94f3998a7f903875f5fb5a1",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/tardis-0.1.4A.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2903/453/tardis-0.1.4A.jar",
+      "sha256": "d096590f1cf06d4f65c553467284cd9450d235a0016b876d8d3a908eb4497aa1",
+      "size": 18696214,
+      "curseforge": {
+        "file-id": 2903453,
+        "project-id": 290247
+      }
+    },
+    {
+      "descriptor": "mods/omlib.pw.toml",
+      "descriptorSha256": "b26dcb762a85ace42d3f3c2917d2eaf0dd759ee5e355bb986b07f723249dd4b1",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "d7b5835de45067e2234cb0b5121bbd14291ef187",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3466259,
+        "project-id": 254334
+      },
+      "path": "mods/omlib-1.12.2-3.1.5-256.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3466/259/omlib-1.12.2-3.1.5-256.jar",
+      "sha256": "f2637d102d778ea317278bc335f9e1d8fdda85d29d022010bc9000cf3a3d900f",
+      "size": 215479
+    },
+    {
+      "descriptor": "mods/ompd.pw.toml",
+      "descriptorSha256": "6bdc7c4acc2300ccf47eb35d7d5a56bac00aa775b4fa95cc2662be8662572db6",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "14c99411e5d85e780774ad3918f2c235d327880e",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3085585,
+        "project-id": 254332
+      },
+      "path": "mods/ompd-1.12.2-3.1.1-76.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3085/585/ompd-1.12.2-3.1.1-76.jar",
+      "sha256": "361e5f39030f4039bea0b4c4f4579a1ee5b07dcd309a92c6b4b7a6415dc1b110",
+      "size": 104655
+    },
+    {
+      "descriptor": "mods/openblocks-elevator.pw.toml",
+      "descriptorSha256": "3431051cce65c011bd7cd75412ad676ada9353851d7383199276faf34b5f3d6f",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "7701eb987d8102a345e46725f4f2c6b9fc83005c",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2845365,
+        "project-id": 250832
+      },
+      "path": "mods/ElevatorMod-1.12.2-1.3.14.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2845/365/ElevatorMod-1.12.2-1.3.14.jar",
+      "sha256": "2f4f60a5a5016f1805fcc085b3f490ff51c7ceb5b3c728619c7572b04c027684",
+      "size": 108444
+    },
+    {
+      "descriptor": "mods/opencomputers.pw.toml",
+      "descriptorSha256": "8dea8c278137b0f42a815734c4b3a338ad18ea76e2ca08623ad3c332e5127eb5",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "a6e7a567d112da7e3316bfe387d0ae48811c6fa5",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 6608365,
+        "project-id": 223008
+      },
+      "path": "mods/OpenComputers-MC1.12.2-1.8.9a+8ca336f.jar",
+      "url": "https://mediafilez.forgecdn.net/files/6608/365/OpenComputers-MC1.12.2-1.8.9a%2B8ca336f.jar",
+      "sha256": "a5d0fc97a809314529b55cac5ef5484b960cb364fc7f944148bcc0ac8694238f",
+      "size": 16630725
+    },
+    {
+      "descriptor": "mods/openglasses2.pw.toml",
+      "descriptorSha256": "be80a6f0e3109bd4a647e05f1953e42ba40ecb537e709416a88d187e1bb8f54d",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "b8fb78b8b7e7486a40966cf283833fa04abc84b6",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3143467,
+        "project-id": 300957
+      },
+      "path": "mods/OpenGlasses-MC1.12.2-2.2-53.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3143/467/OpenGlasses-MC1.12.2-2.2-53.jar",
+      "sha256": "b9b78c5a769c00b4f8bd47d6e0618080068469d4159ee95406d81e1c57b416e3",
+      "size": 410861
+    },
+    {
+      "descriptor": "mods/openmodularturrets.pw.toml",
+      "descriptorSha256": "8bfb0749eb020348649c1c7abf3e5b980ac35a52508a52fb329c19135b55b869",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "0afda8104fb4198fcaae09ef3976b6536ff7dc6d",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3466431,
+        "project-id": 224663
+      },
+      "path": "mods/openmodularturrets-1.12.2-3.1.14-382.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3466/431/openmodularturrets-1.12.2-3.1.14-382.jar",
+      "sha256": "8bc8385b69334a42cee0e5d3ecac7c9b5f220c255de7dbb776e21611703677d6",
+      "size": 967479
+    },
+    {
+      "descriptor": "mods/opensecurity.pw.toml",
+      "descriptorSha256": "9d826dc36c6715349392d6c975da22b6b1cbd82493cbb00a0926b3e67077687f",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "8c708372f9fe90dd5f9b3ae6e5cdd9d404601b48",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 4328814,
+        "project-id": 231687
+      },
+      "path": "mods/OpenSecurity-1.12.2-1.0-93.jar",
+      "url": "https://mediafilez.forgecdn.net/files/4328/814/OpenSecurity-1.12.2-1.0-93.jar",
+      "sha256": "33b4a7bc5d1ab6c8c888fa85e6963fba0d13734b2bc6cf2d63cc6b5274bdbdda",
+      "size": 613750
+    },
+    {
+      "descriptor": "mods/packagedauto.pw.toml",
+      "descriptorSha256": "9571d0bb53d7af02a56a508f392160cdf42d23b7348d70f24ff29565ce1f7db2",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "cdc6f2edeb816d0496a799780118e8c9cdfa0416",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 7329681,
+        "project-id": 308380
+      },
+      "path": "mods/PackagedAuto-1.12.2-1.0.24.73.jar",
+      "url": "https://mediafilez.forgecdn.net/files/7329/681/PackagedAuto-1.12.2-1.0.24.73.jar",
+      "sha256": "96cfdec2d86107f4d89de7f1cc50e65dc50b07fc8a5834198c7c3b5dc52be282",
+      "size": 390433
+    },
+    {
+      "descriptor": "mods/portal-gun.pw.toml",
+      "descriptorSha256": "0b2d90a415533b51a4ca6807ba537993dcca774a83185c6f7f998c4d5d859459",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "2796a6f3723be6fddfdc547a59cc4420a34d823d",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/PortalGun-1.12.2-7.1.0.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2684/33/PortalGun-1.12.2-7.1.0.jar",
+      "sha256": "167888d06f892853cb39890ceeb47f51c5345ea644b342c37a4fefebafcb8300",
+      "size": 1717073,
+      "curseforge": {
+        "file-id": 2684033,
+        "project-id": 229084
+      }
+    },
+    {
+      "descriptor": "mods/project-red-core.pw.toml",
+      "descriptorSha256": "80a1afd5a26156aef0eeaedd9f19e881326bf40c087428b0d75240a63c33dd08",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "11168221284c53b89363e93ab36110a29c26c1a2",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2745545,
+        "project-id": 228702
+      },
+      "path": "mods/ProjectRed-1.12.2-4.9.4.120-Base.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2745/545/ProjectRed-1.12.2-4.9.4.120-Base.jar",
+      "sha256": "8345e86d84cc38e8017fef9b20b1160b4a988637e14b8bcb5b817747d8e63570",
+      "size": 2036136
+    },
+    {
+      "descriptor": "mods/project-red-illumination.pw.toml",
+      "descriptorSha256": "15245f83ee8fdddade8e9172a821d24df3cb955ae3da98f3a5c3eaae9c43a34d",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "41e17cd9ad1a6a27767df0a2366972f181d9ff89",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2745549,
+        "project-id": 229046
+      },
+      "path": "mods/ProjectRed-1.12.2-4.9.4.120-lighting.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2745/549/ProjectRed-1.12.2-4.9.4.120-lighting.jar",
+      "sha256": "65d3a196ff8ca2a1caf119e28ebfb37d0157730d97c9acc0c7e2601f5edbe244",
+      "size": 724477
+    },
+    {
+      "descriptor": "mods/project-red-integration.pw.toml",
+      "descriptorSha256": "bdd671787a660a9442327d14f5efbb63239a78dac60f88afcf93063d97bbd364",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "f05cda479b14d41e02120295b4bcbb0ab25738d2",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2745548,
+        "project-id": 229045
+      },
+      "path": "mods/ProjectRed-1.12.2-4.9.4.120-integration.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2745/548/ProjectRed-1.12.2-4.9.4.120-integration.jar",
+      "sha256": "659623f496dd457dd689c69dbd7a593453f65f78662a4af8dc624bfff33ee2eb",
+      "size": 3923751
+    },
+    {
+      "descriptor": "mods/pyrotech.pw.toml",
+      "descriptorSha256": "6af42b239eae2b46162a2ec88ba65db91a07555aba5101e8296025655b020bd4",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "117ce9f4b28349e39d3d8020d6920f3b66262b0c",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 6253355,
+        "project-id": 306676
+      },
+      "path": "mods/pyrotech-1.12.2-1.6.19.jar",
+      "url": "https://mediafilez.forgecdn.net/files/6253/355/pyrotech-1.12.2-1.6.19.jar",
+      "sha256": "7ed4b889a8ae912e51726d5d20d4893486b8b02fd21cedadd92c204b898ad920",
+      "size": 6184730
+    },
+    {
+      "descriptor": "mods/quark-rotn-edition.pw.toml",
+      "descriptorSha256": "30200bc5dedc14584432a910f77d17e7175a1cef2e1bae83526fd85476289f7d",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "6a7f4bb505a0791817d6a67d4e62713abffe5155",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8223948,
+        "project-id": 417392
+      },
+      "path": "mods/QuarkRotN-r1.6-192.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8223/948/QuarkRotN-r1.6-192.jar",
+      "sha256": "6cab5bd38b428cd9fd014861dfe75788faccc215344b3df5254076cfa0e9b97c",
+      "size": 3999983
+    },
+    {
+      "descriptor": "mods/redstone-control.pw.toml",
+      "descriptorSha256": "81955b3f2398b134273a40c0d0499c4c06816aa01819d5d78ca357f2c5751fe7",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "d50e4072e4f047b657c2f812a0d87dd78c7d3ea6",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3005623,
+        "project-id": 319994
+      },
+      "path": "mods/RedstoneControl-1.12.2-0.3.1.3.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3005/623/RedstoneControl-1.12.2-0.3.1.3.jar",
+      "sha256": "e766bbd7428fb273f7fe2da7f72295581b028b953075880448d578c7f3bee567",
+      "size": 937259
+    },
+    {
+      "descriptor": "mods/redstone-gauges-and-switches.pw.toml",
+      "descriptorSha256": "1d7342509fa93510fda74e6d7fbe2ef1bc5c805a115149f016e11f641997c47a",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "f5af46afabe353f8b27a3acfa8961ca9877ff394",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3907346,
+        "project-id": 296686
+      },
+      "path": "mods/rsgauges-1.12.2-1.2.8.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3907/346/rsgauges-1.12.2-1.2.8.jar",
+      "sha256": "3580bde230456674b64dfea55e1f6d53f9fcdf300076a58697f262c7bf539e3e",
+      "size": 888319
+    },
+    {
+      "descriptor": "mods/refinedtools.pw.toml",
+      "descriptorSha256": "9a93facc6f69c5a44dae5f0fa53014eac7888e0f9cba76c5558ffeff0fdebdbe",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "97d4ca42467876c18e51240d7a7a895f31a11db1",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 6851134,
+        "project-id": 1085014
+      },
+      "path": "mods/refinedtools-7.78.jar",
+      "url": "https://mediafilez.forgecdn.net/files/6851/134/refinedtools-7.78.jar",
+      "sha256": "9e35844dc166c50cc35f893242062c8bdd3c4ea01a7fbf9b775ca89c680ed6cd",
+      "size": 2883055
+    },
+    {
+      "descriptor": "mods/retro-sophisticated-backpacks.pw.toml",
+      "descriptorSha256": "cb1c182e4e9e4b91dad1a324bf08ec8498b882bc0192b92306334f53a72acc2f",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "4022bc5297f16d4277efd9a1ac6c208dfb6435d2",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8311887,
+        "project-id": 1197465
+      },
+      "path": "mods/Retro-Sophisticated-Backpacks-1.1.4.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8311/887/Retro-Sophisticated-Backpacks-1.1.4.jar",
+      "sha256": "2fb43f85b853f2a719a4bb70fa89731d573fbeca5294fb541b5e25604356059e",
+      "size": 833826
+    },
+    {
+      "descriptor": "mods/scalar-legacy.pw.toml",
+      "descriptorSha256": "c1fb189ad08a9630c596e8609f90f2a7f7a19eb6a0bfdbb4841bd7c6a477e4fc",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "5c5998c34798647802e14eab6660ba7afdf1a099",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 6842491,
+        "project-id": 1235372
+      },
+      "path": "mods/Scalar Legacy-1.0.1.jar",
+      "url": "https://mediafilez.forgecdn.net/files/6842/491/Scalar%20Legacy-1.0.1.jar",
+      "sha256": "350d1c378f3b0ac8e7b3df0432482bbb5341c79d07df843c747be1d5fdc23cfe",
+      "size": 25464431
+    },
+    {
+      "descriptor": "mods/scaling-health.pw.toml",
+      "descriptorSha256": "ce611cd223f8163c68e1527d9499de1180c287c3dc9cffa7b0a549b4b4f4ddd8",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "e621a6b6319bd3a854055af2b21826068852f0ea",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2816920,
+        "project-id": 248027
+      },
+      "path": "mods/ScalingHealth-1.12.2-1.3.42+147.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2816/920/ScalingHealth-1.12.2-1.3.42%2B147.jar",
+      "sha256": "03ae1c25de660a2cf6677802892720b0b78df965fcf2af31686bb6c858569466",
+      "size": 369985
+    },
+    {
+      "descriptor": "mods/scape-and-run-parasites.pw.toml",
+      "descriptorSha256": "00f34ddde48f0fe788807b4588418faf2431e6d31d51573aedd359719533890b",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "17225b532334c4652a698be3d41d819af2b0f051",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5370258,
+        "project-id": 348025
+      },
+      "path": "mods/SRParasites-1.12.2v1.9.21.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5370/258/SRParasites-1.12.2v1.9.21.jar",
+      "sha256": "f803ab3882bc8047858a23e2376aaa8fb87d7e54a324b9183b4a033ee076ddea",
+      "size": 27022807
+    },
+    {
+      "descriptor": "mods/shetiphiancore.pw.toml",
+      "descriptorSha256": "ea500953c3b4b9e989f0ea5a33b0ab03e86ee9798510129ba9ea91743e31869c",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "d345402a63b14554e81ca546f1b64285d3ecb7b6",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2661618,
+        "project-id": 71738
+      },
+      "path": "mods/shetiphiancore-1.12.0-3.5.9.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2661/618/shetiphiancore-1.12.0-3.5.9.jar",
+      "sha256": "dc033f623cfc6d7afdaaecf5ef31dda865744f7da2fe85443ae69f204bf50d74",
+      "size": 406772
+    },
+    {
+      "descriptor": "mods/silent-lib.pw.toml",
+      "descriptorSha256": "ba20eb5e1ea5e39e226a71f82801000b03271e5a7f0aff6d7747456b80c93b2d",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "5fca3fcef48502fdb26d020eb1d8427516724cb9",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2851111,
+        "project-id": 242998
+      },
+      "path": "mods/SilentLib-1.12.2-3.0.14+168.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2851/111/SilentLib-1.12.2-3.0.14%2B168.jar",
+      "sha256": "eabb5fc9bdbff1620db5e567663ac2f1bfedc02f7f3004313e7fdde66ec11d16",
+      "size": 369314
+    },
+    {
+      "descriptor": "mods/stargate-network.pw.toml",
+      "descriptorSha256": "5eb4ceb8627e9a020eaa9ad51826240f81d198b8b1c0fe1895604b5a48035a01",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "b4ad825a66379bd8331e3c4e7b6466728e9beec1",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/SGCraft-2.0.5.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3044/648/SGCraft-2.0.5.jar",
+      "sha256": "bf58f4d2508200654eeb89464be573ca3f75b91e58bb430d665b69c70ec53ba1",
+      "size": 7941526,
+      "curseforge": {
+        "file-id": 3044648,
+        "project-id": 289115
+      }
+    },
+    {
+      "descriptor": "mods/storage-drawers.pw.toml",
+      "descriptorSha256": "1976cfb3222e1f141aa56af5824be673771a9db93b49c7e48fa2cca3f58aef02",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "8be312005dc837372bfbe2dfb8db77822d326062",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5981297,
+        "project-id": 223852
+      },
+      "path": "mods/StorageDrawers-1.12.2-5.5.3.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5981/297/StorageDrawers-1.12.2-5.5.3.jar",
+      "sha256": "26337559bad06539175f0a5fe886db816f0f6045d96be4737493a0e669117e2f",
+      "size": 621871
+    },
+    {
+      "descriptor": "mods/supercritical.pw.toml",
+      "descriptorSha256": "bc08d603814be5cd8f3e8d28e3e081c100068494c1b6bc48ead302b1e02d0ce0",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "2d7be2d3719bf6e4d99315dcee774726b4eb017e",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8768402,
+        "project-id": 1185871
+      },
+      "path": "mods/Supercritical-0.2.7.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8768/402/Supercritical-0.2.7.jar",
+      "sha256": "a75383ebb268d561864abc81d5bef8000363ec059fb7d3f348364c4e56fc2559",
+      "size": 449170
+    },
+    {
+      "descriptor": "mods/sussypatches.pw.toml",
+      "descriptorSha256": "e19935d47466f0f5ab6f55aae1844757ed8fe18fbb0c6f66848633652919dea7",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "019891f472d61d76501a28b3c3e707d27eb65ce7",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8762573,
+        "project-id": 1319894
+      },
+      "path": "mods/SussyPatches-1.11.6.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8762/573/SussyPatches-1.11.6.jar",
+      "sha256": "96d2f2865bcffaa0d066304c2340412eafc126e0e9885d680d00ca76190c5153",
+      "size": 731508
+    },
+    {
+      "descriptor": "mods/susycore.pw.toml",
+      "descriptorSha256": "89f841571405e5675041989d12bb3ba319e5beb92510b4d56ce7a83d1b5df27a",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "e52c32cfa9ede6d11b0bedff8dc37e2ab82645a5",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8787221,
+        "project-id": 846224
+      },
+      "path": "mods/Susy-Core-0.1.118.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8787/221/Susy-Core-0.1.118.jar",
+      "sha256": "967d98d318604dd4e5d82277787973d2ee345dd1c088a83ed8e14a502aedbec2",
+      "size": 6832193
+    },
+    {
+      "descriptor": "mods/techguns.pw.toml",
+      "descriptorSha256": "64a89765878169d6f37f8450bedd3a75539987f93a124c8ca183d0fbbda94f31",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "65a5cc41422bc665ec4b7d5e115efc7d95b002d7",
+        "mode": "metadata:curseforge"
+      },
+      "path": "mods/techguns-1.12.2-2.0.2.0_pre3.2.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2958/103/techguns-1.12.2-2.0.2.0_pre3.2.jar",
+      "sha256": "154d3d794cfd74252f2cec979a6e72f5187bb9c21897ed4b42f45771a0e558f7",
+      "size": 28126750,
+      "curseforge": {
+        "file-id": 2958103,
+        "project-id": 244201
+      }
+    },
+    {
+      "descriptor": "mods/tool-belt.pw.toml",
+      "descriptorSha256": "1a483c0d403f54b329e06061fa7b4e7cbc5b33d1506bf9c25a5681851e60d9e7",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "6a9078c5d0f9e92a9f66ded407cba4b48dadbdf8",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3459767,
+        "project-id": 260262
+      },
+      "path": "mods/ToolBelt-1.12.2-1.9.14.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3459/767/ToolBelt-1.12.2-1.9.14.jar",
+      "sha256": "66f4a7c5b894fe2d1c134c1868094709d9eceee36a5ea2ecec70b01ef1f5079c",
+      "size": 161592
+    },
+    {
+      "descriptor": "mods/torchmaster.pw.toml",
+      "descriptorSha256": "a3895abc87b7e4c9650ce4e7938953f22831d1f1e4e0fefc7a8c9dc65c0eb899",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "8bc4bae76967b025746768473462d446ee09f505",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3529742,
+        "project-id": 254268
+      },
+      "path": "mods/torchmaster_1.12.2-1.8.5.0.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3529/742/torchmaster_1.12.2-1.8.5.0.jar",
+      "sha256": "c8e0099dcda96d0d284db19be2998fac0a9dd71f84d90ea2b03b07fdf36eafa1",
+      "size": 156406
+    },
+    {
+      "descriptor": "mods/track-api.pw.toml",
+      "descriptorSha256": "45a91b2fd9cd1424357aab07b60395c23df4f494e943a6489ef89808845b4f27",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "e63bee0992b0a3403d8a95eb19676ce716691c50",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2825260,
+        "project-id": 282613
+      },
+      "path": "mods/TrackAPI-1.2.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2825/260/TrackAPI-1.2.jar",
+      "sha256": "5fd930eb6afb769f3c806a5356fb09f842fd6679a5a04c53d3be934152c482bc",
+      "size": 7374
+    },
+    {
+      "descriptor": "mods/travelers-backpack.pw.toml",
+      "descriptorSha256": "9bd71ae6ab0afca4caa69a4d24897154d1557ea45a41c3673d40f8bf545608ba",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "5c9157582cc081f0d3b4090f3a2dbc5cfbe70cc6",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3150850,
+        "project-id": 321117
+      },
+      "path": "mods/TravelersBackpack-1.12.2-1.0.35.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3150/850/TravelersBackpack-1.12.2-1.0.35.jar",
+      "sha256": "39a7914b5a55b7d5ad5d1192c38a66b926895317e0426a359a529de2f8028581",
+      "size": 397467
+    },
+    {
+      "descriptor": "mods/universal-mod-core.pw.toml",
+      "descriptorSha256": "96899e5360790cf71d292c3c6f0d5407234f13f636135f493a1f45251d145ae0",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "121373e21938874a4cc44dc8057994e27df87ff5",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 7084726,
+        "project-id": 371784
+      },
+      "path": "mods/UniversalModCore-1.12.2-forge-1.2.2-3d12767.jar",
+      "url": "https://mediafilez.forgecdn.net/files/7084/726/UniversalModCore-1.12.2-forge-1.2.2-3d12767.jar",
+      "sha256": "c2f71ad972320457cc37bacc999a46900964597df00ecc922f7649628560d823",
+      "size": 1163104
+    },
+    {
+      "descriptor": "mods/universal-tweaks.pw.toml",
+      "descriptorSha256": "ced0b49bf34de3b86ef05cda61e53ea4eda999eabb5a302e8cfc1a544acb3e7e",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "61ecdb9c053afcd6b032f5fb471b54d534f74489",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 8181251,
+        "project-id": 705000
+      },
+      "path": "mods/UniversalTweaks-1.12.2-1.20.1.jar",
+      "url": "https://mediafilez.forgecdn.net/files/8181/251/UniversalTweaks-1.12.2-1.20.1.jar",
+      "sha256": "fcc64063edb1fa248f0ad691d407a15409eccd9243fe91be78d66d36eb2e7030",
+      "size": 1938309
+    },
+    {
+      "descriptor": "mods/vertically-stacked-dimensions.pw.toml",
+      "descriptorSha256": "6fce53e37a158ca3455b07c000fba72c51ea36ae3c5db8cc5e8698c8ae436fb5",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "91a0696178f1e80b1ed172a57cf50a10cffbb38b",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2937031,
+        "project-id": 310992
+      },
+      "path": "mods/VerticallyStackedDimensions-1.12.2-0.1.9.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2937/31/VerticallyStackedDimensions-1.12.2-0.1.9.jar",
+      "sha256": "008a57fc10c2a5089929aff8511248529ebacfcd395d61d191f3749c2aaae4c2",
+      "size": 240644
+    },
+    {
+      "descriptor": "mods/weeping-angels-mod.pw.toml",
+      "descriptorSha256": "492f583158b7295088a6656dec5b8ab32573bc6a9a634712f9fde7c2f52e5b60",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "a520f8a4b1a90d3d782683e3d9429e92c40b1ab5",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 2928003,
+        "project-id": 291249
+      },
+      "path": "mods/weeping-angels-46.jar",
+      "url": "https://mediafilez.forgecdn.net/files/2928/3/weeping-angels-46.jar",
+      "sha256": "8dc8001a5a91ddf707f133fb945fde2a4c1d007623212b7c2986df36f12c3d6c",
+      "size": 1687776
+    },
+    {
+      "descriptor": "mods/xtones.pw.toml",
+      "descriptorSha256": "6c0516b9ed7436ab1b5a3c79709bb0d508e8586abdc0ef3fbfffb33601b20a96",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "0e4d2c453000370722e384eaca047958f898996f",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 3248033,
+        "project-id": 257573
+      },
+      "path": "mods/Xtones-1.2.2.jar",
+      "url": "https://mediafilez.forgecdn.net/files/3248/33/Xtones-1.2.2.jar",
+      "sha256": "e5ebc5a68d5b7648f255d66c191d577d4b51c06535c81c8fa0df17d281da06fb",
+      "size": 456054
+    },
+    {
+      "descriptor": "mods/ynet-an-xnet-fork.pw.toml",
+      "descriptorSha256": "42d15c95ca45494c5bd7262c42e92e724f19729e63e27f8a5d7a10721c5a1e59",
+      "download": {
+        "hash-format": "sha1",
+        "hash": "d5886bc1e309a5d31fd251fa37c4c622e50dd715",
+        "mode": "metadata:curseforge"
+      },
+      "curseforge": {
+        "file-id": 5665405,
+        "project-id": 999559
+      },
+      "path": "mods/xnet-1.12-1.8.4-ynet.jar",
+      "url": "https://mediafilez.forgecdn.net/files/5665/405/xnet-1.12-1.8.4-ynet.jar",
+      "sha256": "252d73d0cbdcdcf0ded436acdd7489c1cf262e720c8dfc8e65ddbce6f3292d1c",
+      "size": 494967
+    }
+  ]
+}

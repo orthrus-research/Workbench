@@ -1,0 +1,465 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-repair-plan-v1.schema.json",
+  "title": "Workbench host repair plan V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "operation_class",
+    "plan_id",
+    "state",
+    "host",
+    "setup",
+    "requirements",
+    "actions",
+    "blockers",
+    "consent"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-repair-plan-v1"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "operation_class": {
+      "const": "review-before-host-mutation"
+    },
+    "plan_id": {
+      "$ref": "#/$defs/planId"
+    },
+    "state": {
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "host": {
+      "$ref": "https://workbench.invalid/schemas/workbench-repair-check-v1.schema.json#/$defs/host"
+    },
+    "setup": {
+      "$ref": "https://workbench.invalid/schemas/workbench-repair-check-v1.schema.json#/$defs/setup"
+    },
+    "requirements": {
+      "$ref": "https://workbench.invalid/schemas/workbench-repair-check-v1.schema.json#/$defs/requirements"
+    },
+    "actions": {
+      "type": "array",
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "git",
+          "setup-record"
+        ]
+      }
+    },
+    "consent": {
+      "$ref": "#/$defs/consent"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "ready"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blockers": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "blockers": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "actions": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "enum": [
+                    "atomic-setup-record-update",
+                    "host-package-install",
+                    "atomic-recoverable-move"
+                  ]
+                }
+              },
+              "required": [
+                "operation"
+              ]
+            }
+          }
+        },
+        "required": [
+          "actions"
+        ]
+      },
+      "then": {
+        "properties": {
+          "consent": {
+            "properties": {
+              "required": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "consent": {
+            "properties": {
+              "required": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonemptyString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32768
+    },
+    "nullableString": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "planId": {
+      "type": "string",
+      "pattern": "^workbench-repair-plan:sha256:[0-9a-f]{64}$"
+    },
+    "command": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "$ref": "#/$defs/nonemptyString"
+      }
+    },
+    "manager": {
+      "enum": [
+        "apt-get",
+        "dnf",
+        "yum",
+        "zypper",
+        "pacman",
+        "winget",
+        "chocolatey"
+      ]
+    },
+    "emptyIdentities": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "bindExistingGit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "operation",
+        "component",
+        "source",
+        "destination",
+        "command",
+        "executable_identities",
+        "setup_observation",
+        "effect"
+      ],
+      "properties": {
+        "id": {
+          "const": "bind-existing-git"
+        },
+        "operation": {
+          "const": "atomic-setup-record-update"
+        },
+        "component": {
+          "const": "git"
+        },
+        "source": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "destination": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "command": {
+          "type": "null"
+        },
+        "executable_identities": {
+          "$ref": "#/$defs/emptyIdentities"
+        },
+        "setup_observation": {
+          "type": "null"
+        },
+        "effect": {
+          "$ref": "#/$defs/nonemptyString"
+        }
+      }
+    },
+    "verifyExistingGit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "operation",
+        "component",
+        "source",
+        "destination",
+        "command",
+        "executable_identities",
+        "setup_observation",
+        "effect"
+      ],
+      "properties": {
+        "id": {
+          "const": "verify-existing-git"
+        },
+        "operation": {
+          "const": "read-only-verification"
+        },
+        "component": {
+          "const": "git"
+        },
+        "source": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "destination": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "command": {
+          "type": "null"
+        },
+        "executable_identities": {
+          "$ref": "#/$defs/emptyIdentities"
+        },
+        "setup_observation": {
+          "type": "null"
+        },
+        "effect": {
+          "$ref": "#/$defs/nonemptyString"
+        }
+      }
+    },
+    "installGit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "operation",
+        "component",
+        "source",
+        "destination",
+        "command",
+        "executable_identities",
+        "setup_observation",
+        "effect"
+      ],
+      "properties": {
+        "id": {
+          "const": "install-git"
+        },
+        "operation": {
+          "const": "host-package-install"
+        },
+        "component": {
+          "const": "git"
+        },
+        "source": {
+          "$ref": "#/$defs/manager"
+        },
+        "destination": {
+          "const": "host Git installation"
+        },
+        "command": {
+          "$ref": "#/$defs/command"
+        },
+        "executable_identities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "$ref": "https://workbench.invalid/schemas/workbench-repair-check-v1.schema.json#/$defs/executableIdentity"
+          }
+        },
+        "setup_observation": {
+          "type": "null"
+        },
+        "effect": {
+          "$ref": "#/$defs/nonemptyString"
+        }
+      }
+    },
+    "bindInstalledGit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "operation",
+        "component",
+        "source",
+        "destination",
+        "command",
+        "executable_identities",
+        "setup_observation",
+        "effect"
+      ],
+      "properties": {
+        "id": {
+          "const": "bind-installed-git"
+        },
+        "operation": {
+          "const": "atomic-setup-record-update"
+        },
+        "component": {
+          "const": "git"
+        },
+        "source": {
+          "const": "discovered after installation"
+        },
+        "destination": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "command": {
+          "type": "null"
+        },
+        "executable_identities": {
+          "$ref": "#/$defs/emptyIdentities"
+        },
+        "setup_observation": {
+          "type": "null"
+        },
+        "effect": {
+          "$ref": "#/$defs/nonemptyString"
+        }
+      }
+    },
+    "quarantineInvalidSetup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "operation",
+        "component",
+        "source",
+        "destination",
+        "command",
+        "executable_identities",
+        "setup_observation",
+        "effect"
+      ],
+      "properties": {
+        "id": {
+          "const": "quarantine-invalid-setup"
+        },
+        "operation": {
+          "const": "atomic-recoverable-move"
+        },
+        "component": {
+          "const": "workbench-setup"
+        },
+        "source": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "destination": {
+          "$ref": "#/$defs/nonemptyString"
+        },
+        "command": {
+          "type": "null"
+        },
+        "executable_identities": {
+          "$ref": "#/$defs/emptyIdentities"
+        },
+        "setup_observation": {
+          "allOf": [
+            {
+              "$ref": "https://workbench.invalid/schemas/workbench-repair-check-v1.schema.json#/$defs/invalidSetupObservation"
+            },
+            {
+              "properties": {
+                "recoverable": {
+                  "const": true
+                }
+              },
+              "required": [
+                "recoverable"
+              ]
+            }
+          ]
+        },
+        "effect": {
+          "$ref": "#/$defs/nonemptyString"
+        }
+      }
+    },
+    "action": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/bindExistingGit"
+        },
+        {
+          "$ref": "#/$defs/verifyExistingGit"
+        },
+        {
+          "$ref": "#/$defs/installGit"
+        },
+        {
+          "$ref": "#/$defs/bindInstalledGit"
+        },
+        {
+          "$ref": "#/$defs/quarantineInvalidSetup"
+        }
+      ]
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "non_interactive"
+      ],
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "non_interactive": {
+          "const": "Pass this exact plan_id with --apply."
+        }
+      }
+    }
+  }
+}

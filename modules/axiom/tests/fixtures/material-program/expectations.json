@@ -1,0 +1,32 @@
+{
+  "schema": "axiom.material-expectations.v1",
+  "context": "supersymmetry:material-authoring-gt-base",
+  "programScope": "complete-declared-program",
+  "wholePackParity": false,
+  "materials": [
+    {
+      "name": "supersymmetry:developer_aluminosilicate",
+      "storageRegistry": "gregtech",
+      "id": 31000,
+      "properties": ["dust", "ore"],
+      "forms": ["dust", "dustSmall", "dustTiny", "crushed"],
+      "color": 10079419
+    },
+    {
+      "name": "supersymmetry:developer_phosphate",
+      "storageRegistry": "gregtech",
+      "id": 31001,
+      "properties": ["dust"],
+      "forms": ["dust", "dustSmall", "dustTiny"],
+      "formula": "(Li,Na)AlPO₄(F,OH)"
+    },
+    {
+      "name": "supersymmetry:developer_titanate",
+      "storageRegistry": "gregtech",
+      "id": 31002,
+      "properties": ["dust", "gem", "ore"],
+      "forms": ["gem", "dust", "crushed"],
+      "flags": ["no_smelting"]
+    }
+  ]
+}

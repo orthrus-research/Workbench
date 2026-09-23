@@ -1,0 +1,501 @@
+{
+  "format": "workbench-atlas-recipe-browse-v1",
+  "schema_version": 1,
+  "context": {
+    "format": "workbench-atlas-recipe-health-context-v1",
+    "schema_version": 1,
+    "context_type": "categorical-graph-v2",
+    "root": "/graph",
+    "graph_set_id": "workbench-atlas-graph-set-v2:sha256:a3cda4c07f3f34f0ac99b1db6c3980cbdf7281fd214a5ec89df1d8468e98e72f",
+    "scope": {
+      "fixture": "captured-routes",
+      "physical_side": "CLIENT"
+    },
+    "summary": {
+      "edge_count": 38,
+      "node_count": 37,
+      "partition_count": 1
+    },
+    "capabilities": {
+      "recipe_search": true,
+      "duplicate_signatures": true,
+      "producers": true,
+      "consumers": true,
+      "source_mutations": false,
+      "stoichiometry": false,
+      "reachability": false
+    },
+    "recipe_count": 3,
+    "search": {
+      "requires_semantic_key": false,
+      "selection_is_exact_node_id": true
+    }
+  },
+  "selection": {
+    "selection_id": "workbench-atlas-node-v2:gt-recipe:final",
+    "kind": "gt-recipe",
+    "semantic_key": "final",
+    "properties": {
+      "captured_input_counts": {
+        "fluid": 1,
+        "item": 10
+      },
+      "duration": 200,
+      "eut": 120,
+      "lookup_active": true,
+      "properties": {
+        "cleanroom": "CLEANROOM"
+      }
+    },
+    "evidence": [
+      {
+        "fixture": "final",
+        "record_ordinal": 0
+      }
+    ]
+  },
+  "page": {
+    "offset": 0,
+    "limit": 50,
+    "total": 13,
+    "next_offset": null
+  },
+  "links": [
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:c4bc19793ba203f213ee7064c73593c5389ef7b5867a09adeef651fcda8992c0",
+        "relation": "contained-in-recipe-map",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-map:fixture%3Aassembler",
+        "semantic_key": "singleton",
+        "properties": {},
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-map:fixture%3Aassembler",
+        "kind": "gt-recipe-map",
+        "semantic_key": "fixture:assembler",
+        "properties": {
+          "name": "fixture:assembler"
+        },
+        "evidence": []
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:a2ca358c75a95e2f0718e222cdbfe56c05c97e6b79492349ce201eea9de9d51e",
+        "relation": "has-fluid-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C9",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 9
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C9",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|9",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 144,
+          "non_consumable": false,
+          "ordinal": 9
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 9
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:6ff95f4b3feab27822cca070db4c60f5c0dbf34d1af3a07311fbd92437b6bebe",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C0",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 0
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C0",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|0",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 1,
+          "non_consumable": false,
+          "ordinal": 0
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 0
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:a66e87be681f52a6b4752ea78e0ce673d2a969ab1bebca3ddf456c058b486948",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C1",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 1
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C1",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|1",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 1,
+          "non_consumable": false,
+          "ordinal": 1
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 1
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:e40554fe5dc0fe76cf408d1196f14d4bf3bb74794113beedac6d3e66b0a0108a",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C2",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 2
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C2",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|2",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 1,
+          "non_consumable": false,
+          "ordinal": 2
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 2
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:38f29aad20bb0aaa96255fb554c11bff69b5a4c22f34d9d80820b1ed9dcae696",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C3",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 3
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C3",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|3",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 1,
+          "non_consumable": false,
+          "ordinal": 3
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 3
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:a509fb950918e03c4073f87761a11a1b55c9a38160f1d9e5cf2d36e165a11027",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C4",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 4
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C4",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|4",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 1,
+          "non_consumable": false,
+          "ordinal": 4
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 4
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:ae8ecbbc66763a64eedf891ec0eb8b416da7ea3cd585b17d4acee8db3bd35d60",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C5",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 5
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C5",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|5",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 1,
+          "non_consumable": false,
+          "ordinal": 5
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 5
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:560e45cc018035b91650b30c3eb3aadae35af67ffb496b083e705dc92b2417e1",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C6",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 6
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C6",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|6",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 2,
+          "non_consumable": false,
+          "ordinal": 6
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 6
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:a5433bf35e5dfa04e4a4708380d8009fe31d6962ce19e5c689a04c70753aad0e",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C7",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 7
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C7",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|7",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 2,
+          "non_consumable": false,
+          "ordinal": 7
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 7
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:d1d251502d5701c12379e51b130f7c4ecbf51011240dd11b2dd35af45e3df9f9",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C8",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 8
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C8",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|8",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 12,
+          "non_consumable": false,
+          "ordinal": 8
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 8
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:cb8c9ad25de220bb63391a4b44cd6c94a93fe408391184ab03cc6ca52cfc912e",
+        "relation": "has-item-input-selector",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C10",
+        "semantic_key": "singleton",
+        "properties": {
+          "ordinal": 10
+        },
+        "evidence": []
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:gt-recipe-input-selector:final%7C10",
+        "kind": "gt-recipe-input-selector",
+        "semantic_key": "final|10",
+        "properties": {
+          "acceptance_complete": true,
+          "amount": 1,
+          "non_consumable": true,
+          "ordinal": 10
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "selector_ordinal": 10
+          }
+        ]
+      }
+    },
+    {
+      "direction": "outgoing",
+      "relationship": {
+        "format": "workbench-atlas-categorical-edge-v2",
+        "schema_version": 2,
+        "id": "workbench-atlas-edge-v2:sha256:cef0ec74f369f85db257219eb5871c81161c7e8f90c97a0455fc14f1fd173772",
+        "relation": "produces-gt-item",
+        "source": "workbench-atlas-node-v2:gt-recipe:final",
+        "target": "workbench-atlas-node-v2:item-variant:target",
+        "semantic_key": "item_outputs:0",
+        "properties": {
+          "amount": 8,
+          "chanced": false,
+          "ordinal": 0,
+          "output_family": "item_outputs"
+        },
+        "evidence": [
+          {
+            "fixture": "final",
+            "output_ordinal": 0
+          }
+        ]
+      },
+      "node": {
+        "selection_id": "workbench-atlas-node-v2:item-variant:target",
+        "kind": "item-variant",
+        "semantic_key": "target",
+        "properties": {
+          "label": "target",
+          "metadata": 0,
+          "tag": null
+        },
+        "evidence": []
+      }
+    }
+  ],
+  "evidence_gaps": [
+    {
+      "code": "stoichiometry-not-assessed",
+      "message": "This view has no admitted stoichiometric interpretation of recipe quantities."
+    },
+    {
+      "code": "reachability-not-assessed",
+      "message": "Producer and consumer edges do not establish progression reachability."
+    },
+    {
+      "code": "graph-projection-limitations",
+      "message": "Fixture is not a native game observation."
+    }
+  ],
+  "scope": "One observed neighborhood. This is not a complete prerequisite route. Craftability, machine access and starting inventory are unknown."
+}

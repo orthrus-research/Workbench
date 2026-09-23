@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-configuration-v1.schema.json",
+  "title": "Workbench configuration V1 parsed TOML object",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "selection",
+    "bindings"
+  ],
+  "properties": {
+    "schema": {
+      "const": "workbench/config/v1"
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pack_document",
+        "pack_variant",
+        "platform_document"
+      ],
+      "properties": {
+        "pack_document": {
+          "$ref": "#/$defs/profileDocument"
+        },
+        "pack_variant": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "platform_document": {
+          "$ref": "#/$defs/profileDocument"
+        }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "java_candidate_home": {
+          "$ref": "#/$defs/pathBinding"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "profileDocument": {
+      "type": "string",
+      "pattern": "^profiles/(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\\\\\u0000]+\\.ya?ml$"
+    },
+    "absolutePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\/]+[\\\\/][^\\\\/]+(?:[\\\\/]|$))"
+    },
+    "environmentImport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "env"
+      ],
+      "properties": {
+        "env": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        }
+      }
+    },
+    "pathBinding": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/absolutePath"
+        },
+        {
+          "$ref": "#/$defs/environmentImport"
+        }
+      ]
+    }
+  }
+}

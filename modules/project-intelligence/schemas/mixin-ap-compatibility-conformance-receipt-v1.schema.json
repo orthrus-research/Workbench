@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/mixin-ap-compatibility-conformance-receipt-v1.schema.json",
+  "title": "Workbench packaged Mixin AP compatibility conformance receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actual_entries",
+    "artifact",
+    "boundaries",
+    "canonicalization_id",
+    "declarations",
+    "expected_entries",
+    "format",
+    "issues",
+    "limitations",
+    "metadata_resource",
+    "policy",
+    "receipt_id",
+    "schema_version",
+    "summary"
+  ],
+  "properties": {
+    "actual_entries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/actualEntry"}
+    },
+    "artifact": {"$ref": "#/$defs/artifact"},
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotation_processor_execution_proved",
+        "candidate_lock_v1_mutated",
+        "compiler_invocation_reproducible",
+        "packaged_bytecode_metadata_conformance_only",
+        "runtime_resource_selection_proved"
+      ],
+      "properties": {
+        "annotation_processor_execution_proved": {"const": false},
+        "candidate_lock_v1_mutated": {"const": false},
+        "compiler_invocation_reproducible": {"const": false},
+        "packaged_bytecode_metadata_conformance_only": {"const": true},
+        "runtime_resource_selection_proved": {"const": false}
+      }
+    },
+    "canonicalization_id": {"const": "workbench-canonical-json-v1"},
+    "declarations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/declaration"}
+    },
+    "expected_entries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/expectedEntry"}
+    },
+    "format": {
+      "const": "workbench-project-intelligence-mixin-ap-compatibility-conformance-receipt-v1"
+    },
+    "issues": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/issue"}
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "metadata_resource": {"$ref": "#/$defs/metadata"},
+    "policy": {"$ref": "#/$defs/policy"},
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^workbench-mixin-ap-compatibility-conformance-receipt:sha256:[0-9a-f]{64}$"
+    },
+    "schema_version": {"const": 1},
+    "summary": {"$ref": "#/$defs/summary"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "file_name", "sha256", "size_bytes"],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-ap-compatibility-artifact:sha256:[0-9a-f]{64}$"
+        },
+        "file_name": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "memberOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotation_attribute",
+        "declared_version",
+        "descriptor",
+        "effective_version",
+        "key",
+        "kind",
+        "member_name"
+      ],
+      "properties": {
+        "annotation_attribute": {
+          "enum": ["RuntimeInvisibleAnnotations", "RuntimeVisibleAnnotations"]
+        },
+        "declared_version": {"type": "string", "minLength": 1},
+        "descriptor": {"type": "string", "minLength": 1},
+        "effective_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "key": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["field", "method"]},
+        "member_name": {"type": "string", "minLength": 1}
+      }
+    },
+    "declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotation_attribute",
+        "class_name",
+        "class_version_source",
+        "declaration_id",
+        "declared_class_version",
+        "effective_class_version",
+        "entry_path",
+        "entry_sha256",
+        "member_overrides"
+      ],
+      "properties": {
+        "annotation_attribute": {
+          "type": ["string", "null"],
+          "enum": [null, "RuntimeInvisibleAnnotations", "RuntimeVisibleAnnotations"]
+        },
+        "class_name": {"type": "string", "minLength": 1},
+        "class_version_source": {"enum": ["class-annotation", "policy-default"]},
+        "declaration_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-ap-compatibility-declaration:sha256:[0-9a-f]{64}$"
+        },
+        "declared_class_version": {"type": ["string", "null"]},
+        "effective_class_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "entry_path": {"type": "string", "minLength": 1},
+        "entry_sha256": {"$ref": "#/$defs/sha256"},
+        "member_overrides": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/memberOverride"}
+        }
+      }
+    },
+    "expectedEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "key", "source_kind", "source_locator", "version"],
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-ap-compatibility-expected-entry:sha256:[0-9a-f]{64}$"
+        },
+        "key": {"type": "string", "minLength": 1},
+        "source_kind": {"enum": ["class-annotation", "member-annotation", "policy-default"]},
+        "source_locator": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
+      }
+    },
+    "actualEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "key", "version"],
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-ap-compatibility-actual-entry:sha256:[0-9a-f]{64}$"
+        },
+        "key": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
+      }
+    },
+    "invalidEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "observed", "reason"],
+      "properties": {
+        "key": {"type": "string"},
+        "observed": {},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error",
+        "invalid_entries",
+        "parse_state",
+        "path",
+        "present",
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "error": {"type": ["string", "null"]},
+        "invalid_entries": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/invalidEntry"}
+        },
+        "parse_state": {"enum": ["exact", "invalid-json", "invalid-root", "missing"]},
+        "path": {"type": "string", "minLength": 1},
+        "present": {"type": "boolean"},
+        "sha256": {
+          "oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]
+        },
+        "size_bytes": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue_id", "issue_kind", "key", "locator", "observed"],
+      "properties": {
+        "issue_id": {
+          "type": "string",
+          "pattern": "^workbench-mixin-ap-compatibility-issue:sha256:[0-9a-f]{64}$"
+        },
+        "issue_kind": {
+          "enum": [
+            "metadata-entry-invalid",
+            "metadata-json-invalid",
+            "metadata-resource-missing",
+            "metadata-root-invalid",
+            "missing-key",
+            "extra-key",
+            "unexpected-metadata-resource",
+            "version-mismatch"
+          ]
+        },
+        "key": {"type": ["string", "null"]},
+        "locator": {"type": "string", "minLength": 1},
+        "observed": {"type": "object"}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatibility_annotation_descriptor",
+        "default_class_compatibility",
+        "member_key_encoding",
+        "metadata_resource",
+        "mixin_annotation_descriptor",
+        "policy_id",
+        "sha256",
+        "source_revision"
+      ],
+      "properties": {
+        "compatibility_annotation_descriptor": {"type": "string", "minLength": 1},
+        "default_class_compatibility": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "member_key_encoding": {"const": "cleanmix-class-member-v1"},
+        "metadata_resource": {"type": "string", "minLength": 1},
+        "mixin_annotation_descriptor": {"type": "string", "minLength": 1},
+        "policy_id": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "issueCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "extra-key",
+        "metadata-entry-invalid",
+        "metadata-json-invalid",
+        "metadata-resource-missing",
+        "metadata-root-invalid",
+        "missing-key",
+        "unexpected-metadata-resource",
+        "version-mismatch"
+      ],
+      "properties": {
+        "extra-key": {"type": "integer", "minimum": 0},
+        "metadata-entry-invalid": {"type": "integer", "minimum": 0},
+        "metadata-json-invalid": {"type": "integer", "minimum": 0},
+        "metadata-resource-missing": {"type": "integer", "minimum": 0},
+        "metadata-root-invalid": {"type": "integer", "minimum": 0},
+        "missing-key": {"type": "integer", "minimum": 0},
+        "unexpected-metadata-resource": {"type": "integer", "minimum": 0},
+        "version-mismatch": {"type": "integer", "minimum": 0}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actual_entry_count",
+        "conformance_state",
+        "declared_mixin_count",
+        "expected_entry_count",
+        "issue_count",
+        "issue_counts",
+        "member_override_count"
+      ],
+      "properties": {
+        "actual_entry_count": {"type": "integer", "minimum": 0},
+        "conformance_state": {"enum": ["conformant", "nonconformant", "not-applicable"]},
+        "declared_mixin_count": {"type": "integer", "minimum": 0},
+        "expected_entry_count": {"type": "integer", "minimum": 0},
+        "issue_count": {"type": "integer", "minimum": 0},
+        "issue_counts": {"$ref": "#/$defs/issueCounts"},
+        "member_override_count": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

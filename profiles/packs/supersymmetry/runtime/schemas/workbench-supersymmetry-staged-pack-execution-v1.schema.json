@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cleanroommc.org/workbench/schemas/workbench-supersymmetry-staged-pack-execution-v1.schema.json",
+  "title": "Supersymmetry staged Packwiz execution V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cleanup", "execution_id", "format", "limitations", "observation", "outcome", "owner_refs", "plan_id", "request_id", "role", "schema_version", "side", "stage_id", "state"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-staged-pack-execution-v1"},
+    "schema_version": {"const": 1},
+    "execution_id": {"pattern": "^workbench-supersymmetry-staged-pack-execution:sha256:[0-9a-f]{64}$"},
+    "request_id": {"pattern": "^workbench-supersymmetry-staged-pack-execution-request:sha256:[0-9a-f]{64}$"},
+    "plan_id": {"type": "string", "minLength": 1},
+    "stage_id": {"type": "string", "minLength": 1},
+    "role": {"enum": ["baseline", "candidate"]},
+    "side": {"enum": ["client", "server"]},
+    "state": {"enum": ["complete", "failed", "incomplete"]},
+    "outcome": {"enum": ["passed", "failed", "incomplete"]},
+    "observation": {"type": "object"},
+    "cleanup": {"$ref": "#/$defs/cleanup"},
+    "owner_refs": {"type": "array", "items": {"$ref": "#/$defs/ownerRef"}},
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "cleanup": {"type": "object", "additionalProperties": false, "required": ["contained", "owned_processes_running"], "properties": {"contained": {"type": "boolean"}, "owned_processes_running": {"type": "boolean"}}},
+    "ownerRef": {"type": "object", "additionalProperties": false, "required": ["owner_id", "record_id", "record_kind", "uri", "sha256", "size", "outcome"], "properties": {"owner_id": {"type": "string", "minLength": 1}, "record_id": {"type": "string", "minLength": 1}, "record_kind": {"type": "string", "minLength": 1}, "uri": {"type": "string", "pattern": "^file:"}, "sha256": {"pattern": "^sha256:[0-9a-f]{64}$"}, "size": {"type": "integer", "minimum": 0}, "outcome": {"enum": ["passed", "failed", "incomplete"]}}}
+  }
+}

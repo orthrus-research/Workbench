@@ -1,0 +1,70 @@
+{
+  "format": "workbench-check-snapshot-v1",
+  "schema_version": 1,
+  "attempt_id": "fixture-attempt",
+  "request_id": "fixture-request",
+  "result_id": "fixture-result",
+  "producer": {
+    "id": "fixture",
+    "build_sha256": "d1990f97a1f4fe7b8e86da8c03c9dd3f7d536c14aa4a6f9eedab07f34cd961b0"
+  },
+  "bindings": {
+    "source": "41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947d",
+    "configuration": "b7d64a9221007dfd5390f7df6cd5b8f3ea4f82faa1237141e35ebf161f5511a1",
+    "context": "ea7792a26f405e2ae9c6f49ca93bbe6076ceac0a1fc53d83426c7d7f2d9377e4",
+    "engine": "ed9f6f25068608efd412958da4dfc19328ca3511251fa6d5f9c42baf230e32f8",
+    "runtime": "d92c6a81b2ff50096bcda80885427d1f59a25b5f483f7055523504925d16ab23",
+    "jvm": "729d78e34a7c829161d235a841c1cb1ba15aad4e192b20da95734323829fb44f"
+  },
+  "scope_id": "check-snapshot-scope:sha256:ac493ab1ef809e82493552de52314cdc84b07de17acda6b8f5e1f2c44d71702e",
+  "native_outcome": "native-failed",
+  "coverage": "complete",
+  "source_result": {
+    "sha256": "06ef5892a96037b4eaac8d9b3dd5ee8765933a1f199b36cea53d2a163e091ae0",
+    "bytes": 13,
+    "media_type": "application/json"
+  },
+  "retained_inputs": [
+    {
+      "role": "saved-source",
+      "content": {
+        "sha256": "06ef5892a96037b4eaac8d9b3dd5ee8765933a1f199b36cea53d2a163e091ae0",
+        "bytes": 13,
+        "media_type": "application/json"
+      }
+    }
+  ],
+  "sections": [
+    {
+      "id": "recipes",
+      "schema": "fixture-recipes-v1",
+      "required": true,
+      "state": "observed",
+      "count": 1,
+      "content": {
+        "sha256": "06ef5892a96037b4eaac8d9b3dd5ee8765933a1f199b36cea53d2a163e091ae0",
+        "bytes": 13,
+        "media_type": "application/json"
+      },
+      "dependencies": [
+        "values"
+      ],
+      "reason": null
+    },
+    {
+      "id": "values",
+      "schema": "fixture-values-v1",
+      "required": true,
+      "state": "observed",
+      "count": 1,
+      "content": {
+        "sha256": "06ef5892a96037b4eaac8d9b3dd5ee8765933a1f199b36cea53d2a163e091ae0",
+        "bytes": 13,
+        "media_type": "application/json"
+      },
+      "dependencies": [],
+      "reason": null
+    }
+  ],
+  "id": "check-snapshot:sha256:4589642af67eca467b9106778c6bb5ae3ef8620715fa49a6bc824188b6181ab1"
+}

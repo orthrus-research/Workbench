@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8.7",
+  "package": "dev.workbench.dailyloop.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "refmap": "mixins.workbench_daily_loop.refmap.json",
+  "mixins": [
+    "MixinBlock"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-session-v1.schema.json",
+  "title": "Supersymmetry Blueprints resumable interface session v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "configuration",
+    "intake",
+    "target_manifest",
+    "request",
+    "planning_evidence",
+    "choices",
+    "environment_lock",
+    "planning_result",
+    "simulation_result",
+    "lifecycle_context",
+    "run",
+    "last_history_locator"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-session-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "configuration": {
+      "type": "object",
+      "required": [
+        "target_repository",
+        "repository_id",
+        "registry_root",
+        "asset_root",
+        "ledger_path"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "target_repository": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "repository_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "registry_root": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "asset_root": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "ledger_path": {
+          "type": "string",
+          "pattern": "^/"
+        }
+      }
+    },
+    "intake": {
+      "type": "object"
+    },
+    "target_manifest": {
+      "type": "object"
+    },
+    "request": {
+      "type": "object"
+    },
+    "planning_evidence": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "choices": {
+      "type": "object"
+    },
+    "environment_lock": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "planning_result": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "simulation_result": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "lifecycle_context": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "run": {
+      "type": "object"
+    },
+    "last_history_locator": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^local-blueprints-artifact:sha256:[0-9a-f]{64}$"
+        }
+      ]
+    }
+  }
+}

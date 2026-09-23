@@ -1,0 +1,710 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-run-v1.schema.json",
+  "title": "Supersymmetry Blueprints executable run v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "contract_id",
+    "run_id",
+    "request_id",
+    "plan_id",
+    "target_state_id",
+    "output_mode",
+    "state",
+    "candidate",
+    "simulation",
+    "release",
+    "application",
+    "verification",
+    "invalidation",
+    "events",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "susy-blueprints-run-v1"
+    },
+    "contract_id": {
+      "const": "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^blueprints-run:sha256:[0-9a-f]{64}$"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^blueprints-request:sha256:[0-9a-f]{64}$"
+    },
+    "plan_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^blueprints-plan:sha256:[0-9a-f]{64}$"
+        }
+      ]
+    },
+    "target_state_id": {
+      "type": "string",
+      "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+    },
+    "output_mode": {
+      "enum": [
+        "instructions",
+        "patch-bundle",
+        "direct-apply"
+      ]
+    },
+    "state": {
+      "enum": [
+        "initialized",
+        "planned",
+        "simulation-failed",
+        "simulated",
+        "released",
+        "application-rejected",
+        "applied",
+        "verification-failed",
+        "verified",
+        "invalidated"
+      ]
+    },
+    "candidate": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "candidate_id",
+            "plan_id",
+            "target_state_id",
+            "standard_ids",
+            "content_manifest_sha256",
+            "sealed_locator",
+            "edit_generation"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "candidate_id": {
+              "type": "string",
+              "pattern": "^blueprints-candidate:sha256:[0-9a-f]{64}$"
+            },
+            "plan_id": {
+              "type": "string",
+              "pattern": "^blueprints-plan:sha256:[0-9a-f]{64}$"
+            },
+            "target_state_id": {
+              "type": "string",
+              "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+            },
+            "standard_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^blueprints-standard:sha256:[0-9a-f]{64}$"
+              }
+            },
+            "content_manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sealed_locator": {
+              "type": "string",
+              "pattern": "^local-cas:sha256:[0-9a-f]{64}$"
+            },
+            "edit_generation": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "simulation": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "simulation_id",
+            "candidate_id",
+            "status",
+            "environment_lock_sha256",
+            "gates"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "simulation_id": {
+              "type": "string",
+              "pattern": "^blueprints-simulation:sha256:[0-9a-f]{64}$"
+            },
+            "candidate_id": {
+              "type": "string",
+              "pattern": "^blueprints-candidate:sha256:[0-9a-f]{64}$"
+            },
+            "status": {
+              "enum": [
+                "passed",
+                "failed"
+              ]
+            },
+            "environment_lock_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "gates": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "ordinal",
+                  "stage_id",
+                  "status",
+                  "evidence_sha256"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "ordinal": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "stage_id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9._-]*$"
+                  },
+                  "status": {
+                    "enum": [
+                      "passed",
+                      "failed",
+                      "unavailable"
+                    ]
+                  },
+                  "evidence_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "release": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "release_id",
+            "candidate_id",
+            "simulation_id",
+            "operations_sha256",
+            "projections",
+            "released_sequence"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "release_id": {
+              "type": "string",
+              "pattern": "^blueprints-release:sha256:[0-9a-f]{64}$"
+            },
+            "candidate_id": {
+              "type": "string",
+              "pattern": "^blueprints-candidate:sha256:[0-9a-f]{64}$"
+            },
+            "simulation_id": {
+              "type": "string",
+              "pattern": "^blueprints-simulation:sha256:[0-9a-f]{64}$"
+            },
+            "operations_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "projections": {
+              "type": "object",
+              "required": [
+                "instructions",
+                "patch",
+                "direct_diff"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "instructions": {
+                  "type": "object",
+                  "required": [
+                    "manifest_sha256",
+                    "operations_sha256"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "manifest_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "operations_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                "patch": {
+                  "type": "object",
+                  "required": [
+                    "patch_id",
+                    "bundle_sha256",
+                    "operations_sha256"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "patch_id": {
+                      "type": "string",
+                      "pattern": "^blueprints-patch:sha256:[0-9a-f]{64}$"
+                    },
+                    "bundle_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "operations_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                },
+                "direct_diff": {
+                  "type": "object",
+                  "required": [
+                    "diff_sha256",
+                    "operations_sha256"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "diff_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "operations_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              }
+            },
+            "released_sequence": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "application": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "application_id",
+            "release_id",
+            "status",
+            "expected_target_state_id",
+            "observed_target",
+            "post_target",
+            "atomic",
+            "rollback"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "application_id": {
+              "type": "string",
+              "pattern": "^blueprints-application:sha256:[0-9a-f]{64}$"
+            },
+            "release_id": {
+              "type": "string",
+              "pattern": "^blueprints-release:sha256:[0-9a-f]{64}$"
+            },
+            "status": {
+              "enum": [
+                "applied",
+                "rejected"
+              ]
+            },
+            "expected_target_state_id": {
+              "type": "string",
+              "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+            },
+            "observed_target": {
+              "type": "object",
+              "required": [
+                "target_state_id",
+                "repository_id",
+                "revision",
+                "worktree"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "target_state_id": {
+                  "type": "string",
+                  "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+                },
+                "repository_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9._-]*$"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "worktree": {
+                  "type": "object",
+                  "required": [
+                    "dirty",
+                    "manifest_sha256"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "dirty": {
+                      "type": "boolean"
+                    },
+                    "manifest_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  }
+                }
+              }
+            },
+            "post_target": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "target_state_id",
+                    "repository_id",
+                    "revision",
+                    "worktree"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "target_state_id": {
+                      "type": "string",
+                      "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+                    },
+                    "repository_id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9._-]*$"
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{40}$"
+                    },
+                    "worktree": {
+                      "type": "object",
+                      "required": [
+                        "dirty",
+                        "manifest_sha256"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "dirty": {
+                          "type": "boolean"
+                        },
+                        "manifest_sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "atomic": {
+              "type": "boolean"
+            },
+            "rollback": {
+              "enum": [
+                "not-needed",
+                "succeeded",
+                "failed"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "verification": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "verification_id",
+            "application_id",
+            "release_id",
+            "status",
+            "target_state_id",
+            "checks"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "verification_id": {
+              "type": "string",
+              "pattern": "^blueprints-verification:sha256:[0-9a-f]{64}$"
+            },
+            "application_id": {
+              "type": "string",
+              "pattern": "^blueprints-application:sha256:[0-9a-f]{64}$"
+            },
+            "release_id": {
+              "type": "string",
+              "pattern": "^blueprints-release:sha256:[0-9a-f]{64}$"
+            },
+            "status": {
+              "enum": [
+                "passed",
+                "failed"
+              ]
+            },
+            "target_state_id": {
+              "type": "string",
+              "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "check_id",
+                  "status",
+                  "evidence_sha256"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "check_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "status": {
+                    "enum": [
+                      "passed",
+                      "failed"
+                    ]
+                  },
+                  "evidence_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "invalidation": {
+      "type": "object",
+      "required": [
+        "invalidated",
+        "sequence",
+        "cause",
+        "invalidated_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "invalidated": {
+          "type": "boolean"
+        },
+        "sequence": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0
+            }
+          ]
+        },
+        "cause": {
+          "enum": [
+            "none",
+            "request-edit",
+            "plan-edit",
+            "candidate-edit",
+            "target-drift",
+            "standard-drift"
+          ]
+        },
+        "invalidated_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "sequence",
+          "phase",
+          "from_state",
+          "to_state",
+          "result",
+          "record_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "phase": {
+            "enum": [
+              "init",
+              "plan",
+              "simulate",
+              "generate",
+              "apply",
+              "verify",
+              "history",
+              "export-proof",
+              "invalidate"
+            ]
+          },
+          "from_state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "enum": [
+                  "initialized",
+                  "planned",
+                  "simulation-failed",
+                  "simulated",
+                  "released",
+                  "application-rejected",
+                  "applied",
+                  "verification-failed",
+                  "verified",
+                  "invalidated"
+                ]
+              }
+            ]
+          },
+          "to_state": {
+            "enum": [
+              "initialized",
+              "planned",
+              "simulation-failed",
+              "simulated",
+              "released",
+              "application-rejected",
+              "applied",
+              "verification-failed",
+              "verified",
+              "invalidated"
+            ]
+          },
+          "result": {
+            "enum": [
+              "succeeded",
+              "failed",
+              "no-op"
+            ]
+          },
+          "record_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "phase",
+          "summary",
+          "record_ids",
+          "evidence_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "phase": {
+            "enum": [
+              "init",
+              "plan",
+              "simulate",
+              "generate",
+              "apply",
+              "verify",
+              "history",
+              "export-proof",
+              "invalidate"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "record_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

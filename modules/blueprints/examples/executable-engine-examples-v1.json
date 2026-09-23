@@ -1,0 +1,536 @@
+{
+  "schema_version": 1,
+  "format": "susy-blueprints-executable-engine-examples-v1",
+  "contract_id": "BLUEPRINTS-EXECUTABLE-ENGINE-V1",
+  "valid": {
+    "request": {
+      "schema_version": 1,
+      "format": "susy-blueprints-request-v1",
+      "contract_id": "BLUEPRINTS-EXECUTABLE-ENGINE-V1",
+      "request_id": "blueprints-request:sha256:6c1238ada87f7daf88bd6a89d0b2eaec3b589aa604b728d6893d63c5860265ea",
+      "sequence": 0,
+      "feature_family": "synthetic-contract-fixture",
+      "intent": {
+        "operation": "create",
+        "target_key": "susy:contract_fixture",
+        "desired_outcome": "exercise the executable engine contract"
+      },
+      "parameters": [
+        {
+          "name": "registry_name",
+          "value": "contract_fixture"
+        }
+      ],
+      "requested_variants": [
+        "groovy"
+      ],
+      "output_mode": "direct-apply",
+      "target": {
+        "target_state_id": "blueprints-target-state:sha256:a5ea900038fa43a9eec40d7db306c098821cebe5f75e446771e9bc150ec173d1",
+        "repository_id": "synthetic-supersymmetry",
+        "revision": "1111111111111111111111111111111111111111",
+        "worktree": {
+          "dirty": true,
+          "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "consent": {
+        "accept_compliant_revision": false,
+        "allow_direct_apply": true
+      }
+    },
+    "plan": {
+      "schema_version": 1,
+      "format": "susy-blueprints-plan-v1",
+      "contract_id": "BLUEPRINTS-EXECUTABLE-ENGINE-V1",
+      "plan_id": "blueprints-plan:sha256:18036203790d58eb29dbecc2a2e5273566755bc18851d85ca1d38ff8363c4ece",
+      "request_id": "blueprints-request:sha256:6c1238ada87f7daf88bd6a89d0b2eaec3b589aa604b728d6893d63c5860265ea",
+      "target_state_id": "blueprints-target-state:sha256:a5ea900038fa43a9eec40d7db306c098821cebe5f75e446771e9bc150ec173d1",
+      "standards": {
+        "primary": {
+          "standard_id": "blueprints-standard:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "standard_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "version": "1.0.0"
+        },
+        "components": []
+      },
+      "selection": {
+        "variant_ids": [
+          "groovy"
+        ],
+        "rationale_codes": [
+          "explicit-request"
+        ],
+        "developer_choice_required": false
+      },
+      "effective_parameters": [
+        {
+          "name": "registry_name",
+          "class": "required",
+          "value": "contract_fixture",
+          "origin": "request",
+          "accepted": true
+        }
+      ],
+      "atlas": {
+        "baseline_id": "atlas-fixture-baseline-v1",
+        "current_id": "atlas-fixture-current-v1",
+        "relevant_drift": "none",
+        "invariant_results": [
+          {
+            "invariant_id": "fixture-registry-available",
+            "status": "pass",
+            "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        ]
+      },
+      "authorized_paths": [
+        "src/main/groovy/"
+      ],
+      "operations": [
+        {
+          "ordinal": 0,
+          "operation": "create",
+          "path": "src/main/groovy/materials/contract_fixture.groovy",
+          "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ],
+      "validation_stages": [
+        {
+          "ordinal": 0,
+          "stage_id": "universal-static",
+          "kind": "static",
+          "required": true
+        },
+        {
+          "ordinal": 1,
+          "stage_id": "isolated-compile",
+          "kind": "compile",
+          "required": true
+        }
+      ],
+      "status": "ready",
+      "blocked_reasons": []
+    },
+    "run": {
+      "schema_version": 1,
+      "format": "susy-blueprints-run-v1",
+      "contract_id": "BLUEPRINTS-EXECUTABLE-ENGINE-V1",
+      "run_id": "blueprints-run:sha256:d4e3639bc39414d0bdd0cfa9eb96e6ce1d9604d9dbe219aa598753932cda5704",
+      "request_id": "blueprints-request:sha256:6c1238ada87f7daf88bd6a89d0b2eaec3b589aa604b728d6893d63c5860265ea",
+      "plan_id": "blueprints-plan:sha256:18036203790d58eb29dbecc2a2e5273566755bc18851d85ca1d38ff8363c4ece",
+      "target_state_id": "blueprints-target-state:sha256:a5ea900038fa43a9eec40d7db306c098821cebe5f75e446771e9bc150ec173d1",
+      "output_mode": "direct-apply",
+      "state": "verified",
+      "candidate": {
+        "candidate_id": "blueprints-candidate:sha256:0df35df7f01fe63bceaa468b99da648cebab3566b170ede239de58a4f4a6ea84",
+        "plan_id": "blueprints-plan:sha256:18036203790d58eb29dbecc2a2e5273566755bc18851d85ca1d38ff8363c4ece",
+        "target_state_id": "blueprints-target-state:sha256:a5ea900038fa43a9eec40d7db306c098821cebe5f75e446771e9bc150ec173d1",
+        "standard_ids": [
+          "blueprints-standard:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "content_manifest_sha256": "0ed6e04fe009735d9fffba489d60c76b7bb4fb7e9664488ac2905c4e1f505f7e",
+        "sealed_locator": "local-cas:sha256:0ed6e04fe009735d9fffba489d60c76b7bb4fb7e9664488ac2905c4e1f505f7e",
+        "edit_generation": 0
+      },
+      "simulation": {
+        "simulation_id": "blueprints-simulation:sha256:7e211a7e50dd1c5d083c39d1fb329a071735cc9d57bff31489e6bb0b33502989",
+        "candidate_id": "blueprints-candidate:sha256:0df35df7f01fe63bceaa468b99da648cebab3566b170ede239de58a4f4a6ea84",
+        "status": "passed",
+        "environment_lock_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "gates": [
+          {
+            "ordinal": 0,
+            "stage_id": "universal-static",
+            "status": "passed",
+            "evidence_sha256": "1212121212121212121212121212121212121212121212121212121212121212"
+          },
+          {
+            "ordinal": 1,
+            "stage_id": "isolated-compile",
+            "status": "passed",
+            "evidence_sha256": "1313131313131313131313131313131313131313131313131313131313131313"
+          }
+        ]
+      },
+      "release": {
+        "release_id": "blueprints-release:sha256:9ef2936e06bf98677dda7a3a52b73d25ad0682a901140695b78fde9013e99f0e",
+        "candidate_id": "blueprints-candidate:sha256:0df35df7f01fe63bceaa468b99da648cebab3566b170ede239de58a4f4a6ea84",
+        "simulation_id": "blueprints-simulation:sha256:7e211a7e50dd1c5d083c39d1fb329a071735cc9d57bff31489e6bb0b33502989",
+        "operations_sha256": "0ed6e04fe009735d9fffba489d60c76b7bb4fb7e9664488ac2905c4e1f505f7e",
+        "projections": {
+          "instructions": {
+            "manifest_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+            "operations_sha256": "0ed6e04fe009735d9fffba489d60c76b7bb4fb7e9664488ac2905c4e1f505f7e"
+          },
+          "patch": {
+            "patch_id": "blueprints-patch:sha256:dc6a8bd403d1e277f0c483a1412db26c96c92c066a1ff848812dfda6a39e6261",
+            "bundle_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+            "operations_sha256": "0ed6e04fe009735d9fffba489d60c76b7bb4fb7e9664488ac2905c4e1f505f7e"
+          },
+          "direct_diff": {
+            "diff_sha256": "1616161616161616161616161616161616161616161616161616161616161616",
+            "operations_sha256": "0ed6e04fe009735d9fffba489d60c76b7bb4fb7e9664488ac2905c4e1f505f7e"
+          }
+        },
+        "released_sequence": 3
+      },
+      "application": {
+        "application_id": "blueprints-application:sha256:081e20be3e0fb16ddf0a6d89e7b7759d83c4378fc19196a736b1cc0b2a3929b0",
+        "release_id": "blueprints-release:sha256:9ef2936e06bf98677dda7a3a52b73d25ad0682a901140695b78fde9013e99f0e",
+        "status": "applied",
+        "expected_target_state_id": "blueprints-target-state:sha256:a5ea900038fa43a9eec40d7db306c098821cebe5f75e446771e9bc150ec173d1",
+        "observed_target": {
+          "target_state_id": "blueprints-target-state:sha256:a5ea900038fa43a9eec40d7db306c098821cebe5f75e446771e9bc150ec173d1",
+          "repository_id": "synthetic-supersymmetry",
+          "revision": "1111111111111111111111111111111111111111",
+          "worktree": {
+            "dirty": true,
+            "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "post_target": {
+          "target_state_id": "blueprints-target-state:sha256:a1c012a1fb60be603e96d0f2a3b4bd126502284fb8b5205aabd5b6b3861652da",
+          "repository_id": "synthetic-supersymmetry",
+          "revision": "1111111111111111111111111111111111111111",
+          "worktree": {
+            "dirty": true,
+            "manifest_sha256": "1717171717171717171717171717171717171717171717171717171717171717"
+          }
+        },
+        "atomic": true,
+        "rollback": "not-needed"
+      },
+      "verification": {
+        "verification_id": "blueprints-verification:sha256:2917f98055e0b5c18b2455591323ac069ea11bfdcb030a82cb77fddbd02a38ec",
+        "application_id": "blueprints-application:sha256:081e20be3e0fb16ddf0a6d89e7b7759d83c4378fc19196a736b1cc0b2a3929b0",
+        "release_id": "blueprints-release:sha256:9ef2936e06bf98677dda7a3a52b73d25ad0682a901140695b78fde9013e99f0e",
+        "status": "passed",
+        "target_state_id": "blueprints-target-state:sha256:a1c012a1fb60be603e96d0f2a3b4bd126502284fb8b5205aabd5b6b3861652da",
+        "checks": [
+          {
+            "check_id": "post-apply-manifest",
+            "status": "passed",
+            "evidence_sha256": "1818181818181818181818181818181818181818181818181818181818181818"
+          }
+        ]
+      },
+      "invalidation": {
+        "invalidated": false,
+        "sequence": null,
+        "cause": "none",
+        "invalidated_ids": []
+      },
+      "events": [
+        {
+          "sequence": 0,
+          "phase": "init",
+          "from_state": null,
+          "to_state": "initialized",
+          "result": "succeeded",
+          "record_ids": [
+            "blueprints-request:sha256:6c1238ada87f7daf88bd6a89d0b2eaec3b589aa604b728d6893d63c5860265ea"
+          ]
+        },
+        {
+          "sequence": 1,
+          "phase": "plan",
+          "from_state": "initialized",
+          "to_state": "planned",
+          "result": "succeeded",
+          "record_ids": [
+            "blueprints-plan:sha256:18036203790d58eb29dbecc2a2e5273566755bc18851d85ca1d38ff8363c4ece",
+            "blueprints-candidate:sha256:0df35df7f01fe63bceaa468b99da648cebab3566b170ede239de58a4f4a6ea84"
+          ]
+        },
+        {
+          "sequence": 2,
+          "phase": "simulate",
+          "from_state": "planned",
+          "to_state": "simulated",
+          "result": "succeeded",
+          "record_ids": [
+            "blueprints-simulation:sha256:7e211a7e50dd1c5d083c39d1fb329a071735cc9d57bff31489e6bb0b33502989"
+          ]
+        },
+        {
+          "sequence": 3,
+          "phase": "generate",
+          "from_state": "simulated",
+          "to_state": "released",
+          "result": "succeeded",
+          "record_ids": [
+            "blueprints-release:sha256:9ef2936e06bf98677dda7a3a52b73d25ad0682a901140695b78fde9013e99f0e",
+            "blueprints-patch:sha256:dc6a8bd403d1e277f0c483a1412db26c96c92c066a1ff848812dfda6a39e6261"
+          ]
+        },
+        {
+          "sequence": 4,
+          "phase": "apply",
+          "from_state": "released",
+          "to_state": "applied",
+          "result": "succeeded",
+          "record_ids": [
+            "blueprints-application:sha256:081e20be3e0fb16ddf0a6d89e7b7759d83c4378fc19196a736b1cc0b2a3929b0"
+          ]
+        },
+        {
+          "sequence": 5,
+          "phase": "verify",
+          "from_state": "applied",
+          "to_state": "verified",
+          "result": "succeeded",
+          "record_ids": [
+            "blueprints-verification:sha256:2917f98055e0b5c18b2455591323ac069ea11bfdcb030a82cb77fddbd02a38ec"
+          ]
+        },
+        {
+          "sequence": 6,
+          "phase": "history",
+          "from_state": "verified",
+          "to_state": "verified",
+          "result": "no-op",
+          "record_ids": []
+        },
+        {
+          "sequence": 7,
+          "phase": "export-proof",
+          "from_state": "verified",
+          "to_state": "verified",
+          "result": "no-op",
+          "record_ids": []
+        }
+      ],
+      "errors": []
+    },
+    "proof": {
+      "schema_version": 1,
+      "format": "susy-blueprints-proof-v1",
+      "contract_id": "BLUEPRINTS-EXECUTABLE-ENGINE-V1",
+      "proof_id": "blueprints-proof:sha256:57a4328ccadbdc33e761a6a945ce96c95330fdbb7011d59259e92bd23f7b6b25",
+      "closure": "target-verified",
+      "run_id": "blueprints-run:sha256:d4e3639bc39414d0bdd0cfa9eb96e6ce1d9604d9dbe219aa598753932cda5704",
+      "request_id": "blueprints-request:sha256:6c1238ada87f7daf88bd6a89d0b2eaec3b589aa604b728d6893d63c5860265ea",
+      "plan_id": "blueprints-plan:sha256:18036203790d58eb29dbecc2a2e5273566755bc18851d85ca1d38ff8363c4ece",
+      "candidate_id": "blueprints-candidate:sha256:0df35df7f01fe63bceaa468b99da648cebab3566b170ede239de58a4f4a6ea84",
+      "simulation_id": "blueprints-simulation:sha256:7e211a7e50dd1c5d083c39d1fb329a071735cc9d57bff31489e6bb0b33502989",
+      "release_id": "blueprints-release:sha256:9ef2936e06bf98677dda7a3a52b73d25ad0682a901140695b78fde9013e99f0e",
+      "patch_id": "blueprints-patch:sha256:dc6a8bd403d1e277f0c483a1412db26c96c92c066a1ff848812dfda6a39e6261",
+      "application_id": "blueprints-application:sha256:081e20be3e0fb16ddf0a6d89e7b7759d83c4378fc19196a736b1cc0b2a3929b0",
+      "verification_id": "blueprints-verification:sha256:2917f98055e0b5c18b2455591323ac069ea11bfdcb030a82cb77fddbd02a38ec",
+      "standard_ids": [
+        "blueprints-standard:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "target": {
+        "baseline_target_state_id": "blueprints-target-state:sha256:a5ea900038fa43a9eec40d7db306c098821cebe5f75e446771e9bc150ec173d1",
+        "applied_target_state_id": "blueprints-target-state:sha256:a1c012a1fb60be603e96d0f2a3b4bd126502284fb8b5205aabd5b6b3861652da",
+        "verified_target_state_id": "blueprints-target-state:sha256:a1c012a1fb60be603e96d0f2a3b4bd126502284fb8b5205aabd5b6b3861652da"
+      },
+      "gate_evidence": [
+        {
+          "stage_id": "universal-static",
+          "status": "passed",
+          "evidence_sha256": "1212121212121212121212121212121212121212121212121212121212121212"
+        },
+        {
+          "stage_id": "isolated-compile",
+          "status": "passed",
+          "evidence_sha256": "1313131313131313131313131313131313131313131313131313131313131313"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "release-manifest",
+          "kind": "manifest",
+          "sha256": "1919191919191919191919191919191919191919191919191919191919191919",
+          "privacy": "exportable",
+          "included_in_export": true
+        },
+        {
+          "artifact_id": "isolated-build-log",
+          "kind": "log",
+          "sha256": "2020202020202020202020202020202020202020202020202020202020202020",
+          "privacy": "local-private",
+          "included_in_export": false
+        }
+      ],
+      "history": {
+        "local_manifest_sha256": "2121212121212121212121212121212121212121212121212121212121212121",
+        "retention_policy_id": "BLUEPRINTS-LOCAL-RETENTION-V1"
+      },
+      "export": {
+        "manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "excludes_private": true,
+        "artifact_ids": [
+          "release-manifest"
+        ]
+      }
+    }
+  },
+  "mutations": [
+    {
+      "id": "invalid-output-mode",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/request/output_mode",
+          "value": "best-effort"
+        }
+      ],
+      "expected_errors": [
+        "schema:request"
+      ]
+    },
+    {
+      "id": "request-identity-drift",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/request/sequence",
+          "value": 1
+        }
+      ],
+      "expected_errors": [
+        "request-id"
+      ]
+    },
+    {
+      "id": "missing-standard-authority",
+      "operations": [
+        {
+          "op": "remove",
+          "path": "/plan/standards/primary"
+        }
+      ],
+      "expected_errors": [
+        "schema:plan",
+        "missing-standard",
+        "release-without-standard"
+      ]
+    },
+    {
+      "id": "unauthorized-path-traversal",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/plan/operations/0/path",
+          "value": "../outside.groovy"
+        }
+      ],
+      "expected_errors": [
+        "operation-path",
+        "plan-id"
+      ]
+    },
+    {
+      "id": "failed-gate-release-leak",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/run/simulation/status",
+          "value": "failed"
+        },
+        {
+          "op": "replace",
+          "path": "/run/simulation/gates/1/status",
+          "value": "failed"
+        }
+      ],
+      "expected_errors": [
+        "release-without-passing-simulation",
+        "simulation-id",
+        "verified-run-closure"
+      ]
+    },
+    {
+      "id": "divergent-output-operations",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/run/release/projections/patch/operations_sha256",
+          "value": "2323232323232323232323232323232323232323232323232323232323232323"
+        }
+      ],
+      "expected_errors": [
+        "output-operation-divergence",
+        "patch-id"
+      ]
+    },
+    {
+      "id": "stale-target-application",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/run/application/observed_target/worktree/manifest_sha256",
+          "value": "2424242424242424242424242424242424242424242424242424242424242424"
+        }
+      ],
+      "expected_errors": [
+        "application-id",
+        "stale-target",
+        "target-state-id"
+      ]
+    },
+    {
+      "id": "candidate-edit-retains-downstream",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/run/candidate/edit_generation",
+          "value": 1
+        }
+      ],
+      "expected_errors": [
+        "candidate-id",
+        "downstream-not-invalidated"
+      ]
+    },
+    {
+      "id": "candidate-code-leak",
+      "operations": [
+        {
+          "op": "add",
+          "path": "/run/candidate/source",
+          "value": "not releasable"
+        }
+      ],
+      "expected_errors": [
+        "schema:run"
+      ]
+    },
+    {
+      "id": "illegal-state-transition",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/run/events/4/from_state",
+          "value": "planned"
+        }
+      ],
+      "expected_errors": [
+        "event-chain",
+        "illegal-transition",
+        "run-id"
+      ]
+    },
+    {
+      "id": "private-artifact-export",
+      "operations": [
+        {
+          "op": "replace",
+          "path": "/proof/artifacts/1/included_in_export",
+          "value": true
+        },
+        {
+          "op": "add",
+          "path": "/proof/export/artifact_ids/-",
+          "value": "isolated-build-log"
+        }
+      ],
+      "expected_errors": [
+        "private-export",
+        "proof-id"
+      ]
+    }
+  ]
+}

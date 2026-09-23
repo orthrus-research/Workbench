@@ -1,0 +1,28 @@
+{
+  "format": "workbench-runtime-diagnostic-guidance-v1",
+  "schema_version": 1,
+  "pattern_id": "workbench-pack:supersymmetry:susy-reccomplex-named-variable-0112-v1",
+  "match": {
+    "category": "mixin-local-variable-discriminator",
+    "project_name": "Supersymmetry",
+    "project_version": "0.1.16.12",
+    "susycore_version": "0.1.112",
+    "mixin_config": "mixins.susy.reccomplex.json",
+    "mixin_class": "supersymmetry.mixins.reccomplex.StructureSpawnContextMixin",
+    "target_class": "ivorius/reccomplex/world/gen/feature/structure/context/StructureSpawnContext",
+    "target_entry_sha256": "3690b5852458c0dac37e5ef4fdb5ab38faee7bbea94351bae41211dea7902be1",
+    "mixin_entry_sha256": "77208fc27f343b1b42a24e0073c68d65e1feab2f6bbc9cdc81af01fd86da1f5d",
+    "requested_names": [
+      "arg3"
+    ]
+  },
+  "interpretation": "The exact Supersymmetry 0.1.16.12 / SusyCore 0.1.112 mixin selects the local name arg3, while the exact Recurrent Complex 1.4.8.6 target exposes that argument as flag under CleanMixin. The retained unmodified managed-server failure proves this exact pair does not start under the provisional Cleanroom profile.",
+  "developer_actions": [
+    "Keep the unmodified failed launch as the control observation.",
+    "Apply only the exact SusyCore 0.1.112 arg3-to-flag experiment to a disposable projection.",
+    "Compare the Packwiz baseline and candidate with identical experiment inputs; do not rewrite the managed template or pack checkout."
+  ],
+  "related_experiments": [
+    "compatibility/susycore-0.1.112-reccomplex-flag-v1.json"
+  ]
+}

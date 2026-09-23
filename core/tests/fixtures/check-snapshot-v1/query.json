@@ -1,0 +1,11 @@
+{
+  "format": "workbench-check-snapshot-query-v1",
+  "snapshot_id": "check-snapshot:sha256:4589642af67eca467b9106778c6bb5ae3ef8620715fa49a6bc824188b6181ab1",
+  "view_id": "view-generation-1",
+  "operation": "records",
+  "section_id": "recipes",
+  "record_key": null,
+  "blob_sha256": null,
+  "preferred_bytes": 65536,
+  "cursor": null
+}

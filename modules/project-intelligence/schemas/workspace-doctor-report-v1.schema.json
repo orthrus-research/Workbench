@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/project-intelligence/workspace-doctor-report-v1.schema.json",
+  "title": "Workbench Project Intelligence workspace doctor report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "format",
+    "read_only",
+    "capability",
+    "target",
+    "summary",
+    "findings",
+    "repair_plan",
+    "next_commands",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "format": {
+      "const": "workbench-project-intelligence-workspace-doctor-report-v1"
+    },
+    "read_only": {
+      "const": true
+    },
+    "capability": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "repair_plan": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/findingId"
+      }
+    },
+    "next_commands": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nextCommand"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "findingId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "state": {
+      "enum": [
+        "observed",
+        "declared",
+        "known-absent",
+        "unresolved",
+        "ambiguous",
+        "unavailable",
+        "bounded"
+      ]
+    },
+    "contextSection": {
+      "type": "object",
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/state"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace",
+        "repository",
+        "profile",
+        "platform",
+        "build",
+        "java_roles",
+        "surfaces",
+        "runtime",
+        "integrations"
+      ],
+      "properties": {
+        "workspace": {
+          "$ref": "#/$defs/contextSection"
+        },
+        "repository": {
+          "$ref": "#/$defs/contextSection"
+        },
+        "profile": {
+          "$ref": "#/$defs/contextSection"
+        },
+        "platform": {
+          "$ref": "#/$defs/contextSection"
+        },
+        "build": {
+          "$ref": "#/$defs/contextSection"
+        },
+        "java_roles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contextSection"
+          }
+        },
+        "surfaces": {
+          "$ref": "#/$defs/surfaceMap"
+        },
+        "runtime": {
+          "$ref": "#/$defs/contextSection"
+        },
+        "integrations": {
+          "$ref": "#/$defs/contextSection"
+        }
+      }
+    },
+    "surfaceMap": {
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {}
+      }
+    },
+    "repair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "command",
+        "mutates"
+      ],
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "command": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "mutates": {
+          "const": false
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "severity",
+        "title",
+        "detail",
+        "evidence",
+        "repair"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/findingId"
+        },
+        "severity": {
+          "enum": [
+            "blocker",
+            "warning",
+            "info"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "detail": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        },
+        "repair": {
+          "$ref": "#/$defs/repair"
+        }
+      }
+    },
+    "nextCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "purpose",
+        "command",
+        "available",
+        "blocked_by"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/findingId"
+        },
+        "purpose": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "command": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "blocked_by": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/findingId"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "blockers",
+        "warnings",
+        "information"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "ready",
+            "attention",
+            "blocked"
+          ]
+        },
+        "blockers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "information": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

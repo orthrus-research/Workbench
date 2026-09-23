@@ -1,0 +1,106 @@
+{
+  "schema": "axiom.material-blocks-source-lock.v1",
+  "revisions": {
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+    "groovyscript": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4"
+  },
+  "references": [
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/block/Block.java.patch",
+      "sha256": "04cbe4bff7412eb32737dd2c7da58c331f802bf955cf00fe692433760bbf1e7e",
+      "gitBlob": "4d314b312eba0c7c10ddb723f165e8cc171c3243"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/block/state/BlockStateContainer.java.patch",
+      "sha256": "cdb8aae6fba51fc81e88e6dda9bf6cf8875b811d62224affced229ca89d13f57",
+      "gitBlob": "1a053209cc573fcbeaa5d27779fd4fa40d224090"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "patches/minecraft/net/minecraft/item/ItemBlock.java.patch",
+      "sha256": "939d87edc49aca5ec5c6a13f72149d136ecd50bc81068b411515acee32c711c1",
+      "gitBlob": "a4ac03a254c06ca5794128daf6244210d2e5fc27"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/event/RegistryEvent.java",
+      "sha256": "14cef3f80ddaff0df0bf91b2416d698b64f7eac7cd5ad0621d7fb34d74cbf91a",
+      "gitBlob": "946981e92c3b653041fd6963a35bef3585b7c355"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/resources/assets/groovyscript/mappings.srg",
+      "sha256": "4305afa2f999e6b3bb0aba8b793052e17f37ebca1c52de313c0cbde633414be4",
+      "gitBlob": "f9e9d06c4b12291cbda20752fb0bf1a4012e367e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/toolitem/ToolClasses.java",
+      "sha256": "85dd7c1bedbb096b1245c444d6d3dd2eb6fa0e25644ebf3516f3ecd46587ed67",
+      "gitBlob": "6d2bd6f295ee76a28d3a1a699ea8246b4ee1429f"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/recipes/ModHandler.java",
+      "sha256": "5910684f5c9325f37c46683abae0d6104346e28a7e9c5c39c24108f4af598e08",
+      "gitBlob": "1fe7ce05f071870c05f6b0db780177750c922f61"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/GTUtility.java",
+      "sha256": "c79e1d4d62dc2246ab456c931aa7a44340c146951e1b14585fa3f471fe6beaed",
+      "gitBlob": "b4e3c75aeb8fef2c531f716bff84875224c46f62"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/CommonProxy.java",
+      "sha256": "9dbb454d86f1c630c006f1a707e2109db2cc53dbc88c59d7ffce1450d2ad1f7f",
+      "gitBlob": "3c474d5edc99ce0422de5412a7fde66b551ddb06"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/BlockCompressed.java",
+      "sha256": "6b7c34b5161c3160f643e3d10920ca2242234ad22d7fd7372b69bca507500004",
+      "gitBlob": "18b71b293d603a128292e74c8eec8d3149e4ddaf"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/BlockFrame.java",
+      "sha256": "1eca05595d9af90ac0bb88fa7a230d0a71d423bf26abd883a9b330cc41ba4399",
+      "gitBlob": "f4bb81f675d4ab6a115310c7474c4c8dde7a057b"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/BlockMaterialBase.java",
+      "sha256": "9237428de5075efe66c6d1fad3be95a207c8f67e59b8df6d8a22a8819424537a",
+      "gitBlob": "24ec73eabfd4f69a9b7f90c9bc4b2fe8df509667"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/MaterialItemBlock.java",
+      "sha256": "27c3c32741a6465ae54af023e56b4af12bcc3c3872681fcb6dfa41e6c310f134",
+      "gitBlob": "e1d7be0e39d601ab14f5408b870aa232fdf5d7cc"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/MetaBlocks.java",
+      "sha256": "a5f2f4527b0baa5f381b83a7a66e73924cde94d999a9fca1cd8ce3a2fe9b4d9a",
+      "gitBlob": "1cacda968e66199325e1c568985e7810678096e7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/properties/PropertyMaterial.java",
+      "sha256": "88e85d40d9e89d3cde845a918e2e2f640bfc59c4e45b2e6939117a2d9af54c7f",
+      "gitBlob": "c204526ef90c91152313223adcd4e0d330f12a8e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/CoreModule.java",
+      "sha256": "419bcda8f1e04e17aeae9cf167a45aa8c31aee3413c1c57ce58aad5756d8700b",
+      "gitBlob": "d103159380f9bcf7b944ca2e25e69b9aa08e5676"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "schema": "axiom.material-items-source-lock.v1",
+  "revisions": {
+    "cleanroom": "fe78db8dc4fcee47df7549230858f4c064208d73",
+    "gtceu": "9fe140febe8747bbe2f06dfd570421331ec06f4b",
+    "groovyscript": "6a3340814ce9527d23c2b88cdfd340b4f146b4c4"
+  },
+  "references": [
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/metaitem/MetaItem.java",
+      "sha256": "13b7269131c14536c139d588194d8ecf4166456c238e7deb4c69d4096d13fddb",
+      "gitBlob": "595e3e0a9fccc29fafb4d0fdd78df25474c0a133"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/metaitem/StandardMetaItem.java",
+      "sha256": "6631fc0cf158bd0b5600c0bad6734fe93afd9588c3ef3dd8e1541b48a25d90e2",
+      "gitBlob": "39aadc1351db3cc82a68f3f34ed657ce7b07f49f"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/materialitem/MetaPrefixItem.java",
+      "sha256": "9018d5081090613591c4737172f3479b9b4374f957f08320d591e4496c0b0ac8",
+      "gitBlob": "35172727adde5afe9b23aa1d352976dd9b86c75f"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/metaitem/stats/IItemComponent.java",
+      "sha256": "50a09e17e829daa9e0a8fca7ee9e5b7c4a1191a87ee14f175d343723dd94870c",
+      "gitBlob": "4517f61853ed218609e77e14bad098068d7a376e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/items/metaitem/stats/IItemCapabilityProvider.java",
+      "sha256": "5e3890907f61da370a8f65ec736bed4b7726ad441bc3bf1d3eb25de9f6c1294d",
+      "gitBlob": "8133dbf2eb6158e11b93aa606d5901311ad5129a"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/capability/impl/CombinedCapabilityProvider.java",
+      "sha256": "c92b8e397a4c205ba4eb87cce12a42c459c5db763d7a49bf6771de5e24afb0fb",
+      "gitBlob": "3f5f7dbf2e955a163e173c18daa5b7cf729bca2e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/util/BaseCreativeTab.java",
+      "sha256": "2360fd5d878779b58f4c821cb765d8754d2f3d97de2fcad14e99cdb293ef02b5",
+      "gitBlob": "0b9fd926651d9cf6a1467422a3b28c19c842f9d5"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/items/MetaItems.java",
+      "sha256": "fb7816cf19d0f35c817fcdd4dec52bd72b8c4d37687257d0dbf7b453ae3011a2",
+      "gitBlob": "303588e6dc85568ab71fc8a74078956d941a519e"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/CommonProxy.java",
+      "sha256": "9dbb454d86f1c630c006f1a707e2109db2cc53dbc88c59d7ffce1450d2ad1f7f",
+      "gitBlob": "3c474d5edc99ce0422de5412a7fde66b551ddb06"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/core/CoreModule.java",
+      "sha256": "419bcda8f1e04e17aeae9cf167a45aa8c31aee3413c1c57ce58aad5756d8700b",
+      "gitBlob": "d103159380f9bcf7b944ca2e25e69b9aa08e5676"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/GregTechAPI.java",
+      "sha256": "455a9afc116496f006073ca104ec7538098f370df32d2e4b6adfa570f9bda987",
+      "gitBlob": "14188ff6bfa7ce2e89eb7602dec38a52c7a871d7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/api/GTValues.java",
+      "sha256": "f2861c31315f5e556705927a63e7649ef0c6ca1c0a420170af38a99146b15675",
+      "gitBlob": "006f9444117742e6caa5eb17237b3f109084ee7c"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/blocks/MetaBlocks.java",
+      "sha256": "a5f2f4527b0baa5f381b83a7a66e73924cde94d999a9fca1cd8ce3a2fe9b4d9a",
+      "gitBlob": "1cacda968e66199325e1c568985e7810678096e7"
+    },
+    {
+      "repository": "gtceu",
+      "path": "src/main/java/gregtech/common/items/ToolItems.java",
+      "sha256": "658ff5d24b4657e6693c72a9b8b5bb812ad6068a3a9a03f91bfeeb5f96eeb45f",
+      "gitBlob": "5545387ef7c5cc3d865687600e47ce536ccfb9ed"
+    },
+    {
+      "repository": "cleanroom",
+      "path": "src/main/java/net/minecraftforge/event/RegistryEvent.java",
+      "sha256": "14cef3f80ddaff0df0bf91b2416d698b64f7eac7cd5ad0621d7fb34d74cbf91a",
+      "gitBlob": "946981e92c3b653041fd6963a35bef3585b7c355"
+    },
+    {
+      "repository": "groovyscript",
+      "path": "src/main/resources/assets/groovyscript/mappings.srg",
+      "sha256": "4305afa2f999e6b3bb0aba8b793052e17f37ebca1c52de313c0cbde633414be4",
+      "gitBlob": "f9e9d06c4b12291cbda20752fb0bf1a4012e367e"
+    }
+  ]
+}

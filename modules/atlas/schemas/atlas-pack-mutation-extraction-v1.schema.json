@@ -1,0 +1,578 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/atlas-pack-mutation-extraction-v1.schema.json",
+  "title": "Supersymmetry Atlas pack mutation extraction v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "extraction_id",
+    "snapshot_id",
+    "source_lock_id",
+    "source_lock_sha256",
+    "pack_commit",
+    "pack_tree",
+    "source_index_id",
+    "referenced_source_span_count",
+    "referenced_source_spans_sha256",
+    "policy_id",
+    "policy_sha256",
+    "configuration_selections",
+    "stages",
+    "declarations",
+    "operations",
+    "unresolved_boundaries",
+    "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "enum": [
+        1
+      ]
+    },
+    "format": {
+      "enum": [
+        "susy-atlas-pack-mutation-extraction-v1"
+      ]
+    },
+    "extraction_id": {
+      "type": "string",
+      "pattern": "^atlas-pack-mutation-extraction:sha256:[0-9a-f]{64}$"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^SNAPSHOT-[A-Z0-9-]+$"
+    },
+    "source_lock_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_lock_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "pack_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "pack_tree": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_index_id": {
+      "type": "string",
+      "pattern": "^atlas-source-span-index:sha256:[0-9a-f]{64}$"
+    },
+    "referenced_source_span_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "referenced_source_spans_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy_id": {
+      "enum": [
+        "ATLAS-PACK-MUTATION-EXTRACTION-V1"
+      ]
+    },
+    "policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "configuration_selections": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "source_span_id",
+          "key_path",
+          "selected_value",
+          "selected_value_sha256",
+          "selection_state",
+          "configuration_selection_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source_span_id": {
+            "type": "string",
+            "pattern": "^atlas-source-span:sha256:[0-9a-f]{64}$"
+          },
+          "key_path": {
+            "type": "string",
+            "pattern": "^/.+$"
+          },
+          "selected_value": {},
+          "selected_value_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "selection_state": {
+            "enum": [
+              "locked-pack-value"
+            ]
+          },
+          "configuration_selection_id": {
+            "type": "string",
+            "pattern": "^atlas-pack-configuration:sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "stage_id",
+          "lifecycle_stage_id",
+          "stage_ordinal",
+          "loader",
+          "configured_roots",
+          "selected_scripts",
+          "execution_state",
+          "stage_selection_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "stage_id": {
+            "enum": [
+              "groovy-pre-init",
+              "groovy-post-init"
+            ]
+          },
+          "lifecycle_stage_id": {
+            "enum": [
+              "groovy-pre-init",
+              "groovy-post-init"
+            ]
+          },
+          "stage_ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "loader": {
+            "enum": [
+              "preInit",
+              "postInit"
+            ]
+          },
+          "configured_roots": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "required": [
+                "root",
+                "root_ordinal",
+                "configuration_source_span_id"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "root": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+/$"
+                },
+                "root_ordinal": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "configuration_source_span_id": {
+                  "type": "string",
+                  "pattern": "^atlas-source-span:sha256:[0-9a-f]{64}$"
+                }
+              }
+            }
+          },
+          "selected_scripts": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "root",
+                "root_ordinal",
+                "file_ordinal",
+                "script_ordinal",
+                "script_source_span_id",
+                "selection_state"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^groovy/.+\\.groovy$"
+                },
+                "root": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+/$"
+                },
+                "root_ordinal": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "file_ordinal": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "script_ordinal": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "script_source_span_id": {
+                  "type": "string",
+                  "pattern": "^atlas-source-span:sha256:[0-9a-f]{64}$"
+                },
+                "selection_state": {
+                  "enum": [
+                    "configured-static-candidate"
+                  ]
+                }
+              }
+            }
+          },
+          "execution_state": {
+            "enum": [
+              "not-observed-static-selection"
+            ]
+          },
+          "stage_selection_id": {
+            "type": "string",
+            "pattern": "^atlas-pack-stage-selection:sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "declarations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "source_span_id",
+          "stage_id",
+          "script_ordinal",
+          "path",
+          "symbol_kind",
+          "symbol_name",
+          "qualified_hint",
+          "extraction_state",
+          "execution_state",
+          "declaration_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source_span_id": {
+            "type": "string",
+            "pattern": "^atlas-source-span:sha256:[0-9a-f]{64}$"
+          },
+          "stage_id": {
+            "enum": [
+              "groovy-pre-init",
+              "groovy-post-init"
+            ]
+          },
+          "script_ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^groovy/.+\\.groovy$"
+          },
+          "symbol_kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "symbol_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "qualified_hint": {
+            "type": "string"
+          },
+          "extraction_state": {
+            "enum": [
+              "lexical-candidate",
+              "lexical-exact"
+            ]
+          },
+          "execution_state": {
+            "enum": [
+              "not-observed-static-declaration"
+            ]
+          },
+          "declaration_id": {
+            "type": "string",
+            "pattern": "^atlas-pack-declaration:sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "source_span_id",
+          "stage_id",
+          "lifecycle_stage_id",
+          "root",
+          "root_ordinal",
+          "script_ordinal",
+          "path",
+          "byte_start",
+          "operation_kind",
+          "callee",
+          "rule_id",
+          "target",
+          "execution_state",
+          "operation_index",
+          "operation_sha256",
+          "operation_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "source_span_id": {
+            "type": "string",
+            "pattern": "^atlas-source-span:sha256:[0-9a-f]{64}$"
+          },
+          "stage_id": {
+            "enum": [
+              "groovy-pre-init",
+              "groovy-post-init"
+            ]
+          },
+          "lifecycle_stage_id": {
+            "enum": [
+              "groovy-pre-init",
+              "groovy-post-init"
+            ]
+          },
+          "root": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+/$"
+          },
+          "root_ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "script_ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^groovy/.+\\.groovy$"
+          },
+          "byte_start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation_kind": {
+            "enum": [
+              "addition",
+              "copy",
+              "property-change",
+              "removal",
+              "replacement"
+            ]
+          },
+          "callee": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rule_id": {
+            "type": "string",
+            "pattern": "^PACK-OP-[A-Z0-9-]+-V1$"
+          },
+          "target": {
+            "type": "object",
+            "required": [
+              "state",
+              "value_state",
+              "normalized_value",
+              "expression_sha256",
+              "expression_preview",
+              "reason"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "enum": [
+                  "exact",
+                  "symbolic",
+                  "unresolved"
+                ]
+              },
+              "value_state": {
+                "enum": [
+                  "complex-expression",
+                  "concatenated-expression",
+                  "exact-literal",
+                  "exact-number",
+                  "exact-symbol",
+                  "identifier-expression",
+                  "interpolated-literal",
+                  "missing-expression",
+                  "qualified-expression"
+                ]
+              },
+              "normalized_value": {
+                "type": "string"
+              },
+              "expression_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "expression_preview": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "execution_state": {
+            "enum": [
+              "not-observed-static-candidate"
+            ]
+          },
+          "operation_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "operation_id": {
+            "type": "string",
+            "pattern": "^atlas-pack-operation:sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "unresolved_boundaries": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "source_span_id",
+          "reason",
+          "boundary_state",
+          "boundary_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "pattern": "^atlas-pack-operation:sha256:[0-9a-f]{64}$"
+          },
+          "source_span_id": {
+            "type": "string",
+            "pattern": "^atlas-source-span:sha256:[0-9a-f]{64}$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "boundary_state": {
+            "enum": [
+              "unresolved"
+            ]
+          },
+          "boundary_id": {
+            "type": "string",
+            "pattern": "^atlas-pack-unresolved-boundary:sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "stage_count",
+        "script_count",
+        "declaration_count",
+        "operation_count",
+        "operation_kind_counts",
+        "unresolved_target_count",
+        "execution_claim"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "stage_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "script_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "declaration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operation_kind_counts": {
+          "type": "object",
+          "required": [
+            "addition",
+            "copy",
+            "property-change",
+            "removal",
+            "replacement"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "addition": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "copy": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "property-change": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "removal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "replacement": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "unresolved_target_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "execution_claim": {
+          "enum": [
+            "none-static-occurrence-only"
+          ]
+        }
+      }
+    }
+  }
+}

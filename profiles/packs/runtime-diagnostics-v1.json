@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "diagnostic_kind": "recipe-invalidations",
+      "pack_profile_id": "workbench-pack:supersymmetry",
+      "spec": "supersymmetry/diagnostics/recipe-invalidation-diagnostic-profile-v2.json"
+    }
+  ],
+  "format": "workbench-pack-runtime-diagnostic-catalog-v1",
+  "schema_version": 1
+}

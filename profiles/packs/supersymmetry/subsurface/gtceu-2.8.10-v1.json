@@ -1,0 +1,89 @@
+{
+  "adapter": {
+    "impact_profile_id": "gtceu-1.12.2-2.8.10-worldgen-impact-v2",
+    "inventory_profile_id": "gtceu-1.12.2-2.8.10-worldgen-v1",
+    "trace_profile_id": "gtceu-1.12.2-2.8.10-subsurface-trace-v1"
+  },
+  "boundaries": {
+    "atlas_remains_causal_authority": true,
+    "bedrock_fluids_are_virtual_cells": true,
+    "profile_is_pack_specific": true,
+    "strata_remains_final_state_authority": true
+  },
+  "defaults": {
+    "impact": ".workbench/evidence/gtceu/supersymmetry-2.8.10/gtceu-worldgen-impact-inventory-v2.json",
+    "inventory": ".workbench/evidence/gtceu/supersymmetry-2.8.10/gtceu-worldgen-inventory-v1.json",
+    "manifest": ".workbench/evidence/strata/gtceu-rtg-micro-region-16x16/package.strataview.d/manifest.json"
+  },
+  "dimension_semantics": [
+    {
+      "aliases": [
+        "is_surface_world",
+        "name:overworld"
+      ],
+      "dimension_id": 0,
+      "surface_world": true
+    },
+    {
+      "aliases": [
+        "dimension_id:-1",
+        "name:the_nether"
+      ],
+      "dimension_id": -1,
+      "surface_world": false
+    },
+    {
+      "aliases": [
+        "dimension_id:10"
+      ],
+      "dimension_id": 10,
+      "surface_world": false
+    }
+  ],
+  "format": "workbench-subsurface-pack-profile-v1",
+  "grid_semantics": {
+    "bedrock_fluid_grid_chunks": 8,
+    "consulted_grid_radius": 1,
+    "ore_grid_chunks": 3
+  },
+  "pack_profile": "supersymmetry",
+  "profile_id": "supersymmetry-gtceu-2.8.10-subsurface-v1",
+  "schema_version": 1,
+  "state_semantics": {
+    "air_states": [
+      "minecraft:air",
+      "minecraft:cave_air",
+      "minecraft:void_air"
+    ],
+    "fluid_prefixes": [
+      "minecraft:flowing_lava",
+      "minecraft:flowing_water",
+      "minecraft:lava",
+      "minecraft:water"
+    ],
+    "host_properties": [
+      "stone_type",
+      "variant"
+    ],
+    "known_host_variants": [
+      "andesite",
+      "anorthosite",
+      "basalt",
+      "diorite",
+      "gabbro",
+      "gneiss",
+      "granite",
+      "kimberlite",
+      "limestone",
+      "phyllite",
+      "quartzite",
+      "sandstone",
+      "shale",
+      "slate",
+      "soapstone",
+      "stone"
+    ],
+    "ore_prefix": "gregtech:ore_",
+    "surface_rock_prefix": "gregtech:meta_block_surface_rock_"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/crucible-fixtures/synthetic-subject-identity-v1.schema.json",
+  "title": "Crucible V2 synthetic subject identity fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "namespace",
+    "name"
+  ],
+  "properties": {
+    "namespace": {"const": "workbench.synthetic"},
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    }
+  }
+}
