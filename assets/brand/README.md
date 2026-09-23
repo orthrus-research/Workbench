@@ -1,8 +1,10 @@
 # Workbench brand assets
 
-The root README displays the canonical Workbench SVG at 64 pixels. The
-[Orthrus Research organization](https://github.com/orthrus-research) is linked
-there as the parent project.
+`orthrus-research-avatar.png` is a 256-pixel copy of the
+[Orthrus Research GitHub organization avatar](https://github.com/orthrus-research),
+retrieved on 2026-09-23. The root README displays it at 64 pixels to identify
+the parent organization. It is a raster reference for the README, not the
+source for generated client icons.
 
 `workbench-brand-v1.json` remains the source for the current Workbench client
 icon set. It is an independently constructed set of declared geometric

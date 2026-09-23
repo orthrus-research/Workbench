@@ -1,4 +1,4 @@
-<img src="assets/brand/workbench-mark.svg" width="64" alt="Workbench mark">
+<img src="assets/brand/orthrus-research-avatar.png" width="64" alt="Orthrus Research mark">
 
 # Workbench
 
