@@ -47,9 +47,9 @@ def _json(value: Any, output: TextIO) -> None:
     output.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
-def _state(root: Path, supplied: Path | None) -> Path:
+def _state(root: Path, supplied: Path | None, default: Path | None = None) -> Path:
     if supplied is None:
-        return default_product_spine_state_root(root)
+        return default if default is not None else default_product_spine_state_root(root)
     candidate = supplied.expanduser()
     if candidate.is_symlink():
         raise GoldenJourneyCliV2Error("state root cannot be a symbolic link")
@@ -192,6 +192,7 @@ def dev_fixture_main(
     root: Path,
     output: TextIO = sys.stdout,
     error: TextIO = sys.stderr,
+    default_state_root: Path | None = None,
 ) -> int:
     args = _fixture_parser().parse_args(list(argv))
     try:
@@ -201,7 +202,7 @@ def dev_fixture_main(
                 root,
                 gradle_cmd=args.gradle_cmd,
                 java_home=args.java_home,
-                state_root=_state(root, args.state_root),
+                state_root=_state(root, args.state_root, default_state_root),
                 sides=sides,
                 debug=args.debug,
             )
@@ -229,7 +230,7 @@ def dev_fixture_main(
                     root,
                     gradle_cmd=args.gradle_cmd,
                     java_home=args.java_home,
-                    state_root=_state(root, args.state_root),
+                    state_root=_state(root, args.state_root, default_state_root),
                     sides=sides,
                     debug=args.debug,
                 )

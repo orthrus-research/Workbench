@@ -71,7 +71,16 @@ def diagnose(argv, *, context):
 def dev_fixture(argv, *, context):
     context.check_cancelled()
     from workbench_shell.golden_journey_cli import dev_fixture_main
-    return dev_fixture_main(list(argv), root=ROOT)
+    fixture_root = context.locations.get("fixture_instances")
+    return dev_fixture_main(
+        list(argv),
+        root=ROOT,
+        default_state_root=(
+            fixture_root / "cleanroom/generic-mod-daily-loop"
+            if fixture_root is not None
+            else None
+        ),
+    )
 
 
 def dev(argv, *, context):
@@ -240,7 +249,7 @@ def blueprint_stage(argv, *, context):
     context.check_cancelled()
     from .cli import main
     arguments = ['blueprint-stage', *argv]
-    return main(arguments)
+    return main(arguments, resolved_locations=context.locations)
 
 
 def material_fluid(argv, *, context):

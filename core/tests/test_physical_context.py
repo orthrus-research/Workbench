@@ -49,6 +49,7 @@ class PhysicalContextTests(unittest.TestCase):
             source.mkdir()
             installed.mkdir()
             environment = {
+                "HOME": str(base / "home"),
                 "XDG_CONFIG_HOME": str(base / "configuration"),
                 "XDG_STATE_HOME": str(base / "state"),
             }
@@ -57,7 +58,7 @@ class PhysicalContextTests(unittest.TestCase):
                 for root in (source, installed)
             ]
             for context in contexts:
-                self.assertEqual(base / "configuration/workbench", context.configuration_home)
+                self.assertEqual(base / "home/.workbench", context.configuration_home)
                 self.assertEqual(project, context.workspace)
                 self.assertEqual(base / "state/workbench/runtime", context.state_root)
                 self.assertIsNone(context.profile_configuration_reference)
@@ -66,6 +67,7 @@ class PhysicalContextTests(unittest.TestCase):
             self.assertEqual(contexts[0], contexts[1])
             self.assertFalse((source / ".workbench").exists())
             self.assertFalse((base / "configuration").exists())
+            self.assertFalse((base / "home").exists())
             self.assertFalse((base / "state").exists())
 
     def test_saved_workspace_and_explicit_state_precedence_do_not_activate_profile(self) -> None:
@@ -133,7 +135,7 @@ class PhysicalContextTests(unittest.TestCase):
                 contexts.append(
                     resolve_physical_context(
                         suite,
-                        environment={"XDG_CONFIG_HOME": str(home / "configuration")},
+                        environment={"HOME": str(home), "XDG_CONFIG_HOME": str(home / "configuration")},
                     )
                 )
             self.assertNotEqual(contexts[0].workspace, contexts[1].workspace)

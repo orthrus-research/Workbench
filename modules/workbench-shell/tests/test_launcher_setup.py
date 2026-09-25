@@ -21,6 +21,19 @@ from workbench_shell import launcher_setup, runtime_launch  # noqa: E402
 
 
 class LauncherSetupTests(unittest.TestCase):
+    def test_launcher_record_falls_back_independently_of_setup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            legacy = home / ".config/workbench/launcher-v1.json"
+            legacy.parent.mkdir(parents=True)
+            legacy.write_text("legacy", encoding="utf-8")
+            environment = {"HOME": str(home)}
+            self.assertEqual(legacy, launcher_setup.default_launcher_record_path(environment=environment))
+            stable = home / ".workbench/launcher-v1.json"
+            stable.parent.mkdir()
+            stable.write_text("stable", encoding="utf-8")
+            self.assertEqual(stable, launcher_setup.default_launcher_record_path(environment=environment))
+
     def _fixture(self, root: Path, *, account: bool = True) -> tuple[Path, Path]:
         executable = root / "launcher-bin/prismlauncher"
         executable.parent.mkdir()

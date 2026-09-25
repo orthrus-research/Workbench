@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-module-log-event-v1.schema.json",
+  "title": "Workbench Module Log Event V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "timestamp", "module_id", "capability_id", "run_id", "kind"
+  ],
+  "properties": {
+    "format": {"const": "workbench-module-log-event-v1"},
+    "schema_version": {"const": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "module_id": {"$ref": "#/$defs/identifier"},
+    "capability_id": {"$ref": "#/$defs/identifier"},
+    "run_id": {"type": "string", "pattern": "^[0-9]{8}T[0-9]{12}Z-[0-9a-f]{12}$"},
+    "kind": {"enum": ["started", "python_text", "finished"]},
+    "workspace": {"type": ["string", "null"]},
+    "stream": {"enum": ["stdout", "stderr"]},
+    "text": {"type": "string"},
+    "outcome": {"enum": ["completed", "failed", "interrupted"]},
+    "exit_code": {"type": ["integer", "null"]},
+    "error_type": {"type": ["string", "null"]},
+    "error_message": {"type": ["string", "null"]},
+    "omitted_bytes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stdout", "stderr"],
+      "properties": {
+        "stdout": {"type": "integer", "minimum": 0},
+        "stderr": {"type": "integer", "minimum": 0}
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["role", "name", "path", "file"],
+        "properties": {
+          "role": {"enum": ["logs", "artifacts", "evidence", "cache", "blueprint_sessions", "fixture_instances"]},
+          "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+          "path": {"type": "string", "minLength": 1},
+          "file": {"anyOf": [{"$ref": "#/$defs/file"}, {"type": "null"}]}
+        }
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"kind": {"const": "started"}}}, "then": {"required": ["workspace"]}},
+    {"if": {"properties": {"kind": {"const": "python_text"}}}, "then": {"required": ["stream", "text"]}},
+    {"if": {"properties": {"kind": {"const": "finished"}}}, "then": {
+      "required": ["outcome", "exit_code", "error_type", "error_message", "omitted_bytes", "outputs"]
+    }}
+  ],
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"},
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "bytes", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "bytes": {"type": "integer", "minimum": 0},
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

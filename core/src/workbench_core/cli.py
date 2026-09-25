@@ -6,11 +6,12 @@ import argparse
 import errno
 from importlib import metadata
 import json
+import os
 from pathlib import Path
 import sys
 from typing import Sequence
 
-from workbench_api import ModuleError
+from workbench_api import ExecutionContext, ModuleError
 from workbench_api.state_paths import default_runtime_state_root
 from .modules import discover, dispatch
 from .physical_context import resolve_physical_context
@@ -27,6 +28,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
     from .host_services import install_local_host_services
     install_local_host_services()
     arguments = list(sys.argv[1:] if argv is None else argv)
+    caller_environment = dict(os.environ)
     root = source_root()
     if (root / "core/pyproject.toml").is_file():
         from .development import enable_source_checkout
@@ -35,6 +37,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
     if not _activate_user_setup(arguments):
         return 2
     try:
+        if arguments[:1] == ["settings"] or arguments[:2] == ["environment", "resolve"]:
+            return _dispatch(arguments, root, caller_environment=caller_environment)
         from .module_cli import disabled_profiles, main as package_main
         from .package_guard import PackageActivity
         from workbench_api.profiles import profile_scope
@@ -42,7 +46,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             if arguments[:1] in (["modules"], ["profiles"]):
                 return package_main(arguments[1:], root=root, kind=arguments[0])
             with PackageActivity():
-                return _dispatch(arguments, root)
+                return _dispatch(arguments, root, caller_environment=caller_environment)
     except BrokenPipeError:
         raise
     except (ModuleError, OSError, ValueError) as exc:
@@ -50,7 +54,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-def _dispatch(arguments: list[str], root: Path) -> int:
+def _dispatch(
+    arguments: list[str], root: Path, *, caller_environment: dict[str, str] | None = None
+) -> int:
     if arguments[:1] in (["version"], ["--version"]):
         version = metadata.version("workbench-core")
         value = {"component_id": "workbench-core", "version": version}
@@ -67,6 +73,11 @@ def _dispatch(arguments: list[str], root: Path) -> int:
     if arguments[:1] == ["tooling"]:
         from .tooling_provision import main as tooling
         return tooling(arguments[1:])
+    if arguments[:1] == ["settings"]:
+        from .settings_cli import main as settings
+        return settings(arguments[1:])
+    if arguments[:2] == ["environment", "resolve"]:
+        return _dispatch_available(arguments, root, (), caller_environment=caller_environment)
     if arguments[:2] == ["sandbox", "recover"]:
         from .axiom_sandbox import recover_axiom
         parser = argparse.ArgumentParser(prog="workbench sandbox recover")
@@ -78,10 +89,12 @@ def _dispatch(arguments: list[str], root: Path) -> int:
         return 0
     from .module_cli import profile_admission_scope
     with profile_admission_scope(default_runtime_state_root(root)) as modules:
-        return _dispatch_available(arguments, root, modules)
+        return _dispatch_available(arguments, root, modules, caller_environment=caller_environment)
 
 
-def _dispatch_available(arguments: list[str], root: Path, modules) -> int:
+def _dispatch_available(
+    arguments: list[str], root: Path, modules, *, caller_environment: dict[str, str] | None = None
+) -> int:
     if arguments[:2] == ["runtime", "preflight"]:
         from .manual_artifacts import main as preflight
         from workbench_api.profiles import profile_resources
@@ -91,15 +104,40 @@ def _dispatch_available(arguments: list[str], root: Path, modules) -> int:
         physical = resolve_physical_context(root)
         return storage(arguments, root=root, workspace_root=physical.state_root)
     if arguments[:1] == ["environment"]:
-        from .environment_status import inspect_environment_status
         parser = argparse.ArgumentParser(prog="workbench environment")
-        parser.add_argument("action", choices=["status", "paths"])
+        parser.add_argument("action", choices=["status", "paths", "resolve"])
+        parser.add_argument("workspace", nargs="?", type=Path)
         parser.add_argument("--json", action="store_true")
         selected = parser.parse_args(arguments[1:])
+        if selected.workspace is not None and selected.action != "resolve":
+            parser.error("a workspace target is accepted only by environment resolve")
         if selected.action == "paths":
             physical = resolve_physical_context(root)
             print(json.dumps(physical.record(), indent=2, sort_keys=True))
             return 0
+        if selected.action == "resolve":
+            from .environment_resolution import resolve_environment
+            resolved = resolve_environment(
+                root,
+                workspace=selected.workspace,
+                environment=caller_environment,
+            )
+            if selected.json:
+                print(json.dumps(resolved.record, indent=2, sort_keys=True))
+            else:
+                print("Workbench environment")
+                print(f"  Configuration: {resolved.configuration_home}")
+                print(f"  Workspace: {resolved.workspace} ({resolved.record['workspace']['source']})")
+                print(f"  State: {resolved.state_root} ({resolved.record['state_root']['source']})")
+                for role, entry in resolved.record["locations"].items():
+                    print(f"  {role.replace('_', ' ').capitalize()}: {entry['path']} ({entry['source']})")
+                print(f"  Settings: {resolved.record['settings']['path']}")
+                profile = resolved.record["profile_configuration_reference"] or "none selected"
+                print(f"  Profile reference: {profile}")
+                for tool, candidate in resolved.record["tool_candidates"].items():
+                    print(f"  {tool.replace('_', ' ').capitalize()} candidate: {candidate or 'none selected'}")
+            return 0
+        from .environment_status import inspect_environment_status
         observation = inspect_environment_status(root)
         observation["native_core"] = {"distribution": "workbench-core", "version": metadata.version("workbench-core"), "state_root": str(default_runtime_state_root(root))}
         print(json.dumps(observation, indent=2, sort_keys=True))
@@ -107,18 +145,25 @@ def _dispatch_available(arguments: list[str], root: Path, modules) -> int:
     if not arguments or arguments[:1] in (["-h"], ["--help"]):
         from workbench_api.profiles import profiles
         admitted_profiles = {profile.id for profile in profiles()}
-        print("Workbench Core: setup, repair, tooling, sandbox recover, environment status, environment paths, storage, runtime, world, modules list, profiles list, version")
+        print("Workbench Core: setup, settings, repair, tooling, sandbox recover, environment status, environment paths, environment resolve, storage, runtime, world, modules list, profiles list, version")
         for module in modules:
             if module.module:
                 for capability in module.module.capabilities:
                     if set(capability.requires_profiles) <= admitted_profiles:
                         print(f"  {' '.join(capability.command)}: {capability.description}")
         return 0
-    physical = resolve_physical_context(
-        root,
-        include_saved_setup="--help" not in arguments and "-h" not in arguments,
-    )
-    return dispatch(arguments, physical.execution_context(), modules)
+    if "--help" in arguments or "-h" in arguments:
+        physical = resolve_physical_context(root, include_saved_setup=False)
+        context = physical.execution_context()
+    else:
+        from .environment_resolution import resolve_environment
+        resolved = resolve_environment(root, environment=caller_environment)
+        context = ExecutionContext(
+            resolved.workspace,
+            resolved.state_root,
+            locations=resolved.locations,
+        )
+    return dispatch(arguments, context, modules)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
 import json
 from hashlib import sha256
 import os
@@ -27,11 +29,15 @@ for source in (
 
 from workbench_shell.blueprint_stage import (  # noqa: E402
     BlueprintStageError,
+    _prepare_stage_parent,
     plan_material_backed_fluid,
     stage_material_backed_fluid,
     validate_retained_blueprint_stage,
 )
 from workbench_shell.runtime_plan import plan_project_runtime  # noqa: E402
+from workbench_shell.cli import main as shell_main  # noqa: E402
+from workbench_api import ExecutionContext  # noqa: E402
+from workbench_shell import commands  # noqa: E402
 
 
 PACK_REVISION = "9d3aa7ae0294bf27f0b8acbb893d61da23a06972"
@@ -174,6 +180,29 @@ def _baseline_queries(_workspace, queries, **_kwargs):
 
 
 class BlueprintStageTest(unittest.TestCase):
+    def test_user_session_root_is_direct_and_passed_through_core_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            workspace = base / "workspace"
+            workspace.mkdir()
+            sessions = base / "saved-blueprint-sessions"
+            self.assertEqual(
+                sessions,
+                _prepare_stage_parent(sessions, workspace, direct=True),
+            )
+            self.assertFalse((sessions / "staging/blueprints").exists())
+            context = ExecutionContext(workspace, base / "state", locations={"blueprint_sessions": sessions})
+            with patch("workbench_shell.cli.main", return_value=0) as main:
+                self.assertEqual(0, commands.blueprint_stage(["--help"], context=context))
+            self.assertEqual(sessions, main.call_args.kwargs["resolved_locations"]["blueprint_sessions"])
+            with patch("workbench_shell.cli.stage_material_backed_fluid", return_value={"format": "test"}) as stage:
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(0, shell_main([
+                        "blueprint-stage", str(workspace), "--suite-root", str(SUITE_ROOT),
+                        "--name", "Test", "--color", "0x123456", "--json",
+                    ], resolved_locations=context.locations))
+            self.assertEqual(sessions, stage.call_args.kwargs["session_root"])
+
 
     @patch(
         "workbench_atlas.material_census.resolve_standard_queries",

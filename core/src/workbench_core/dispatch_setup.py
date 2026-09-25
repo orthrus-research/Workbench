@@ -1,12 +1,14 @@
 """Apply explicitly saved user setup before dispatch."""
 from __future__ import annotations
+import os
 import sys
 
 def _activate_user_setup(arguments: list[str]) -> bool:
     """Load physical user defaults while preserving explicit CLI authority."""
 
     if (
-        arguments[:1] in (["setup"], ["repair"], ["tooling"], ["version"], ["--version"])
+        arguments[:1] in (["setup"], ["settings"], ["repair"], ["tooling"], ["version"], ["--version"])
+        or arguments[:2] == ["environment", "resolve"]
         or "--help" in arguments
         or "-h" in arguments
     ):
@@ -22,6 +24,11 @@ def _activate_user_setup(arguments: list[str]) -> bool:
         record = load_setup_record(default_setup_record_path())
         if record is not None:
             apply_setup_environment_defaults(record)
+        from .user_preferences import load_workspaces, resolve_expression
+        registry = load_workspaces()
+        if registry["default"] is not None:
+            entry = next(row for row in registry["entries"] if row["name"] == registry["default"])
+            os.environ["WORKBENCH_WORKSPACE"] = str(resolve_expression(entry["path"]))
         return True
     except (OSError, SetupError, ValueError) as exc:
         print(
