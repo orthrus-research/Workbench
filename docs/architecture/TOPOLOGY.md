@@ -109,10 +109,10 @@ audits and the public-tree validator reject local-only workflow paths.
 
 ## Release units
 
-There are 20 independently versioned release units: 18 Python distributions
-(API, Core, 14 modules and two profiles), VS Code and IntelliJ Community.
-Python versions come from each native `pyproject.toml`; client versions come
-from their native manifests. The release view is derived, not another version
+There are 23 independently versioned release units: 19 API, Core, module and
+profile Python distributions, the optional Textual TUI wheel, two IDE clients,
+and the Axiom JVM engine. Python versions come from each native `pyproject.toml`;
+IDE and JVM versions come from their native manifests. The release view is derived, not another version
 authority. The root workspace does not build a distribution.
 
 Qualification records bind exact tested tuples without forcing lockstep

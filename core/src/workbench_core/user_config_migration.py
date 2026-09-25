@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 import stat
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 from .host_filesystem import fsync_directory
@@ -18,6 +18,15 @@ from .user_preferences import UserPreferencesError
 
 _FILES = ("setup-v1.json", "recipe-fixtures-v1.json", "launcher-v1.json")
 _MAX_BYTES = 256 * 1024
+FORMAT = "workbench-user-config-migration-v1"
+
+
+def _selected_files(filenames: Sequence[str] | None) -> tuple[str, ...]:
+    if filenames is None:
+        return _FILES
+    if not filenames or any(type(name) is not str or name not in _FILES for name in filenames):
+        raise UserPreferencesError("select one or more known legacy configuration files")
+    return tuple(name for name in _FILES if name in filenames)
 
 
 def _source_bytes(path: Path) -> bytes | None:
@@ -42,8 +51,27 @@ def _source_bytes(path: Path) -> bytes | None:
             raise UserPreferencesError(f"legacy launcher configuration is invalid: {path}") from exc
         if type(value) is not dict or set(value) != {"format", "schema_version", "record_id", "selection"}:
             raise UserPreferencesError(f"legacy launcher configuration has unsupported fields: {path}")
-        if value["format"] != "workbench-launcher-setup-record-v1" or value["schema_version"] != 1:
+        if (
+            value["format"] != "workbench-launcher-setup-record-v1"
+            or type(value["schema_version"]) is not int
+            or value["schema_version"] != 1
+        ):
             raise UserPreferencesError(f"legacy launcher configuration has an unsupported format: {path}")
+        selection = value["selection"]
+        if (
+            type(selection) is not dict
+            or set(selection) != {"family", "executable", "root"}
+            or type(selection["family"]) is not str
+            or selection["family"] not in {"prism", "multimc"}
+            or any(
+                type(selection[field]) is not str
+                or not selection[field]
+                or "\0" in selection[field]
+                or not Path(selection[field]).is_absolute()
+                for field in ("executable", "root")
+            )
+        ):
+            raise UserPreferencesError(f"legacy launcher configuration has an invalid selection: {path}")
         body = {key: value[key] for key in ("format", "schema_version", "selection")}
         expected = "workbench-launcher-setup:sha256:" + sha256(
             json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -54,17 +82,23 @@ def _source_bytes(path: Path) -> bytes | None:
 
 
 def inspect_legacy_config_migration(
-    *, environment: Mapping[str, str] | None = None
+    *, environment: Mapping[str, str] | None = None,
+    filenames: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Report exact file copies without reading or changing generated data."""
 
     values = os.environ if environment is None else environment
+    selected_files = _selected_files(filenames)
     destination = default_user_config_home(environment=values)
     source = legacy_user_config_home(environment=values)
     if values.get("WORKBENCH_CONFIG_HOME") or source == destination:
-        return {"source": str(source), "destination": str(destination), "files": [], "state": "explicit-config-home"}
+        return {
+            "format": FORMAT, "schema_version": 1,
+            "source": str(source), "destination": str(destination),
+            "files": [], "state": "explicit-config-home",
+        }
     files = []
-    for name in _FILES:
+    for name in selected_files:
         origin = source / name
         target = destination / name
         raw = _source_bytes(origin)
@@ -80,13 +114,20 @@ def inspect_legacy_config_migration(
     state = "conflict" if any(row["state"] == "conflict" for row in files) else (
         "ready" if any(row["state"] == "copy" for row in files) else "nothing-to-import"
     )
-    return {"source": str(source), "destination": str(destination), "files": files, "state": state}
+    return {
+        "format": FORMAT, "schema_version": 1,
+        "source": str(source), "destination": str(destination),
+        "files": files, "state": state,
+    }
 
 
-def migrate_legacy_config(*, environment: Mapping[str, str] | None = None) -> dict[str, Any]:
+def migrate_legacy_config(
+    *, environment: Mapping[str, str] | None = None,
+    filenames: Sequence[str] | None = None,
+) -> dict[str, Any]:
     """Copy reviewed legacy records once; never replace the source or a conflict."""
 
-    plan = inspect_legacy_config_migration(environment=environment)
+    plan = inspect_legacy_config_migration(environment=environment, filenames=filenames)
     if plan["state"] == "conflict":
         raise UserPreferencesError("the stable configuration home has conflicting legacy records")
     if plan["state"] != "ready":
@@ -95,7 +136,7 @@ def migrate_legacy_config(*, environment: Mapping[str, str] | None = None) -> di
     _state_root(destination)
     destination.mkdir(parents=True, exist_ok=True, mode=0o700)
     with setup_record_lock(destination / "migration-v1.json"):
-        current = inspect_legacy_config_migration(environment=environment)
+        current = inspect_legacy_config_migration(environment=environment, filenames=filenames)
         if current != plan:
             raise UserPreferencesError("legacy configuration changed before import; review it again")
         for row in current["files"]:
@@ -119,7 +160,7 @@ def migrate_legacy_config(*, environment: Mapping[str, str] | None = None) -> di
                 fsync_directory(destination)
             finally:
                 temporary.unlink(missing_ok=True)
-    observed = inspect_legacy_config_migration(environment=environment)
+    observed = inspect_legacy_config_migration(environment=environment, filenames=filenames)
     copied = {row["name"] for row in plan["files"] if row["state"] == "copy"}
     return {
         **observed,

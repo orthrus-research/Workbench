@@ -97,6 +97,8 @@ def _append_event(path: Path, event: Mapping[str, Any], *, durable: bool = False
             info = os.fstat(descriptor)
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 raise ModuleError(f"module log is not an ordinary file: {path}")
+            if os.name == "posix" and stat.S_IMODE(info.st_mode) != 0o600:
+                os.fchmod(descriptor, 0o600)
             before = info.st_size
             try:
                 remaining = memoryview(payload)
@@ -182,6 +184,8 @@ class OutputInvocation:
         self.saved = {"stdout": 0, "stderr": 0}
         self.omitted = {"stdout": 0, "stderr": 0}
         self._pending = {"stdout": "", "stderr": ""}
+        self._capture_lock = RLock()
+        self._active = False
         self._token: Token | None = None
 
     def _event(self, kind: str, *, durable: bool = False, **fields: Any) -> None:
@@ -202,30 +206,35 @@ class OutputInvocation:
         self._event("started", workspace=str(self.workspace) if self.workspace is not None else None, durable=True)
         _install_streams()
         self._token = _CURRENT_RUN.set(self)
+        self._active = True
         return self
 
     def _capture(self, stream: str, value: str) -> None:
-        raw = value.encode("utf-8", errors="replace")
-        remaining = max(0, MAX_STREAM_BYTES - self.saved[stream])
-        retained = raw[:remaining].decode("utf-8", errors="ignore")
-        retained_bytes = len(retained.encode("utf-8"))
-        self.saved[stream] += retained_bytes
-        self.omitted[stream] += len(raw) - retained_bytes
-        if retained_bytes < len(raw):
-            self.saved[stream] = MAX_STREAM_BYTES
-        self._pending[stream] += retained
-        while self._pending[stream]:
-            newline = self._pending[stream].find("\n")
-            if newline < 0 and len(self._pending[stream]) < 65536:
-                break
-            end = newline + 1 if 0 <= newline < 65536 else 65536
-            self._event("python_text", stream=stream, text=self._pending[stream][:end])
-            self._pending[stream] = self._pending[stream][end:]
+        with self._capture_lock:
+            if not self._active:
+                return
+            raw = value.encode("utf-8", errors="replace")
+            remaining = max(0, MAX_STREAM_BYTES - self.saved[stream])
+            retained = raw[:remaining].decode("utf-8", errors="ignore")
+            retained_bytes = len(retained.encode("utf-8"))
+            self.saved[stream] += retained_bytes
+            self.omitted[stream] += len(raw) - retained_bytes
+            if retained_bytes < len(raw):
+                self.saved[stream] = MAX_STREAM_BYTES
+            self._pending[stream] += retained
+            while self._pending[stream]:
+                newline = self._pending[stream].find("\n")
+                if newline < 0 and len(self._pending[stream]) < 65536:
+                    break
+                end = newline + 1 if 0 <= newline < 65536 else 65536
+                self._event("python_text", stream=stream, text=self._pending[stream][:end])
+                self._pending[stream] = self._pending[stream][end:]
 
     def _flush_text(self, stream: str) -> None:
-        if self._pending[stream]:
-            self._event("python_text", stream=stream, text=self._pending[stream])
-            self._pending[stream] = ""
+        with self._capture_lock:
+            if self._active and self._pending[stream]:
+                self._event("python_text", stream=stream, text=self._pending[stream])
+                self._pending[stream] = ""
 
     def output_path(self, role: str, name: str) -> Path:
         if role not in OUTPUT_ROLES or role not in self.locations:
@@ -251,8 +260,14 @@ class OutputInvocation:
         output_error: Exception | None = None
         outputs = []
         try:
-            self._flush_text("stdout")
-            self._flush_text("stderr")
+            with self._capture_lock:
+                try:
+                    self._flush_text("stdout")
+                    self._flush_text("stderr")
+                finally:
+                    # A child context can outlive this invocation while another
+                    # invocation still has the process streams installed.
+                    self._active = False
             for (role, name), path in sorted(self.allocations.items()):
                 try:
                     observation = _file_observation(path)

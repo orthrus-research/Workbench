@@ -22,7 +22,7 @@ def developer_context(argv, *, context):
 def open(argv, *, context):
     from .workspace_commands import _open_main
     context.check_cancelled()
-    return _open_main(list(argv))
+    return _open_main(list(argv), default_workspace=context.workspace)
 
 
 def capabilities(argv, *, context):
@@ -122,7 +122,7 @@ def review(argv, *, context):
 def doctor(argv, *, context):
     from .inspection_commands import _doctor_main
     context.check_cancelled()
-    return _doctor_main(list(argv))
+    return _doctor_main(list(argv), default_workspace=context.workspace)
 
 
 def run(argv, *, context):

@@ -8,6 +8,10 @@ import sys
 from typing import Mapping
 
 
+class LegacyConfigMigrationRequired(ValueError):
+    """An old user record must be imported before normal use."""
+
+
 def user_home(*, environment: Mapping[str, str] | None = None) -> Path:
     values = os.environ if environment is None else environment
     selected = values.get("USERPROFILE") if os.name == "nt" else values.get("HOME")
@@ -68,7 +72,7 @@ def default_user_logs_root(
 def default_user_record_path(
     name: str, *, environment: Mapping[str, str] | None = None
 ) -> Path:
-    """Select each durable record independently during the legacy transition."""
+    """Use the stable home and require explicit import of an older record."""
 
     if name not in {"setup-v1.json", "recipe-fixtures-v1.json", "launcher-v1.json"}:
         raise ValueError(f"unsupported user configuration record: {name}")
@@ -77,12 +81,17 @@ def default_user_record_path(
     if values.get("WORKBENCH_CONFIG_HOME"):
         return current
     former = legacy_user_config_home(environment=values) / name
-    if current.exists() or current.is_symlink() or not (former.exists() or former.is_symlink()):
-        return current
-    return former
+    if not (current.exists() or current.is_symlink()) and (
+        former.exists() or former.is_symlink()
+    ):
+        raise LegacyConfigMigrationRequired(
+            f"legacy user configuration exists at {former}; run "
+            "'workbench settings migrate --dry-run', then 'workbench settings migrate'"
+        )
+    return current
 
 
 __all__ = [
     "default_user_config_home", "default_user_logs_root", "default_user_record_path",
-    "legacy_user_config_home", "user_home"
+    "legacy_user_config_home", "LegacyConfigMigrationRequired", "user_home"
 ]

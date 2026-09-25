@@ -97,8 +97,8 @@ multiple roles. This supports `logs`, `artifacts`, `evidence`, `cache`,
 `blueprint_sessions`, and `fixture_instances`; a module declares the role and
 filename rather than a physical root. Reusable libraries and durable sessions
 use their resolved roots and owner-specific layouts instead of this file
-allocation convention. Existing owner plans and receipts remain readable at
-their original locations.
+allocation convention. Existing owner plans, receipts, and earlier
+per-invocation logs remain readable at their original locations.
 
 This routing captures current-context Python command text. Binary writes,
 other threads without the execution context, subprocess file logs,
@@ -115,9 +115,14 @@ and publishes a complete record atomically.
 
 ## Earlier setup records
 
-Existing Setup V1 and fixture or launcher records are read from their former OS
-configuration directory until imported. Fresh setup uses the stable home.
-`workbench settings migrate --dry-run` previews known files. The command
+Existing Setup V1 and fixture or launcher records in their former OS
+configuration directory require an explicit import before normal commands use
+them. A command that finds an old record without a stable copy reports the
+migration command instead of silently choosing a different configuration.
+Fresh setup uses the stable home.
+`workbench settings migrate --dry-run` previews known files. Add `--json` for a
+versioned machine record. If an unrelated old file is damaged, repeated
+`--file NAME` options let the user preview and import only intact records.
 `workbench settings migrate` copies validated bytes into the stable home without
 deleting the old files or replacing a conflicting destination. Retained
 operation receipts keep their original location and meaning. Future schema

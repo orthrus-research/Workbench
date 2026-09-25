@@ -97,6 +97,28 @@ class CiValidationTests(unittest.TestCase):
         for tool in ("build_axiom.py", "axiom_sources.py", "build_axiom_target.py", "axiom_target_smoke.py", "axiom_source_conformance.py", "axiom_loader_conformance.py", "axiom_composition_conformance.py"):
             self.assertIn(tool, axiom)
 
+    def test_python_client_candidate_uses_the_native_wheel_job(self):
+        candidate = yaml.load(
+            (ROOT / ".github/workflows/component-release.yml").read_text(),
+            Loader=yaml.BaseLoader,
+        )
+        python_job = candidate["jobs"]["python"]
+        self.assertEqual(
+            "needs.identify.outputs.kind == 'python' || needs.identify.outputs.kind == 'python-client'",
+            python_job["if"],
+        )
+        commands = "\n".join(step.get("run", "") for step in python_job["steps"])
+        self.assertIn('tools/build_native_distribution.py --component "$COMPONENT"', commands)
+        self.assertIn("tools/install_workbench.py", commands)
+        self.assertIn('"$RUNNER_TEMP/workbench-candidate/bin/python" -m unittest discover -s clients/tui/tests -v', commands)
+        tui_test = next(
+            step for step in python_job["steps"]
+            if step.get("name") == "Exercise the installed terminal client"
+        )
+        self.assertEqual("needs.identify.outputs.component == 'workbench-tui'", tui_test["if"])
+        self.assertIn('tools/release.py artifact "$COMPONENT.wheel"', commands)
+        self.assertIn("tools/verify_component_artifacts.py", commands)
+
     @patch("ci_validation._current_source_fingerprint", return_value="source:a")
     def test_required_probe_assertion_rejects_skips_stale_ids_and_missing_rows(self, current_source):
         with tempfile.TemporaryDirectory() as temporary:

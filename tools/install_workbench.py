@@ -101,7 +101,18 @@ def install(wheelhouse: Path, destination: Path, *, command_runner=None):
         executable = destination / ("Scripts/workbench.exe" if os.name == "nt" else "bin/workbench")
         if "workbench-core" in manifest["native_versions"]:
             run_command([str(executable), "version", "--json"], env=environment, check=True)
-        state.update(state="installed", executable=str(executable) if executable.exists() else None)
+        tui_executable = destination / ("Scripts/workbench-tui.exe" if os.name == "nt" else "bin/workbench-tui")
+        if "workbench-tui" in manifest["native_versions"]:
+            if not tui_executable.is_file():
+                raise WheelhouseError("installed Textual client has no workbench-tui launcher")
+            # Argument parsing is noninteractive and does not launch the TUI or
+            # read user settings; it also verifies the installed import closure.
+            run_command([str(tui_executable), "--help"], env=environment, check=True)
+        state.update(
+            state="installed",
+            executable=str(executable) if executable.exists() else None,
+            tui_executable=str(tui_executable) if "workbench-tui" in manifest["native_versions"] else None,
+        )
         receipt.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return state
     except BaseException:

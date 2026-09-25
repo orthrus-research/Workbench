@@ -46,8 +46,13 @@ def _run(argv, *, cwd=None):
 
 def selected_components(components=None, *, suite=False, root=ROOT):
     _, inventory = load_authority(root)
-    native = {name: row for name, row in inventory.items() if row["kind"] == "python"}
-    requested = set(native if suite else components or ["workbench-core"])
+    native = {name: row for name, row in inventory.items() if row["kind"] in {"python", "python-client"}}
+    # Python presentation clients are selected explicitly. `--suite` remains
+    # Core, modules and profiles, with no Textual dependency by default.
+    requested = set(
+        (name for name, row in native.items() if row["kind"] == "python")
+        if suite else components or ["workbench-core"]
+    )
     if not requested or requested - native.keys():
         raise DistributionError("unknown or non-Python component selection: " + ", ".join(sorted(requested - native.keys())))
     selected = set(requested)

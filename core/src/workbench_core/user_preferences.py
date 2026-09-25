@@ -144,7 +144,7 @@ def load_settings(
         return _settings({})
     if type(value) is not dict or set(value) != {"format", "schema_version", "locations", "record_id"}:
         raise UserPreferencesError("unsupported user settings fields")
-    if value["format"] != SETTINGS_FORMAT or value["schema_version"] != 1:
+    if value["format"] != SETTINGS_FORMAT or type(value["schema_version"]) is not int or value["schema_version"] != 1:
         raise UserPreferencesError("this Workbench cannot read the user settings schema")
     locations = value["locations"]
     if type(locations) is not dict or set(locations) - LOCATION_ROLES:
@@ -171,7 +171,7 @@ def load_workspaces(
         "format", "schema_version", "default", "entries", "record_id"
     }:
         raise UserPreferencesError("unsupported user workspace fields")
-    if value["format"] != WORKSPACES_FORMAT or value["schema_version"] != 1:
+    if value["format"] != WORKSPACES_FORMAT or type(value["schema_version"]) is not int or value["schema_version"] != 1:
         raise UserPreferencesError("this Workbench cannot read the user workspaces schema")
     entries = value["entries"]
     if type(entries) is not list or len(entries) > 256:
@@ -186,7 +186,9 @@ def load_workspaces(
         if row["name"] in names:
             raise UserPreferencesError("duplicate user workspace name")
         names.add(row["name"])
-    if value["default"] is not None and value["default"] not in names:
+    if value["default"] is not None and (
+        type(value["default"]) is not str or value["default"] not in names
+    ):
         raise UserPreferencesError("default workspace is not registered")
     if value != _workspaces(entries, value["default"]):
         raise UserPreferencesError("user workspaces identity does not match the saved choices")
@@ -201,10 +203,11 @@ def _write(path: Path, value: Mapping[str, Any]) -> None:
         if not stat.S_ISREG(info.st_mode):
             raise UserPreferencesError("user configuration destination is not a regular file")
     temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    descriptor: int | None = None
     try:
-        with temporary.open("x", encoding="utf-8") as stream:
-            if os.name != "nt":
-                os.fchmod(stream.fileno(), 0o600)
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            descriptor = None
             json.dump(value, stream, ensure_ascii=False, sort_keys=True, indent=2)
             stream.write("\n")
             stream.flush()
@@ -212,6 +215,8 @@ def _write(path: Path, value: Mapping[str, Any]) -> None:
         os.replace(temporary, path)
         fsync_directory(path.parent)
     finally:
+        if descriptor is not None:
+            os.close(descriptor)
         temporary.unlink(missing_ok=True)
 
 

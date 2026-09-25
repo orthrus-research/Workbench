@@ -99,12 +99,15 @@ PRIVATE_KEY_MARKERS = tuple(
 # assets to exact bytes. Text SVG assets must pass the UTF-8 text policy.
 ALLOWED_BINARY_ASSETS: dict[str, bytes] = {
     "assets/brand/orthrus-research-avatar.png": b"\x89PNG\r\n\x1a\n",
+    "clients/tui/assets/workbench-mark.jpg": b"\xff\xd8\xff",
     "clients/vscode/media/workbench-icon.png":
         b"\x89PNG\r\n\x1a\n",
 }
 PINNED_BINARY_DIGESTS = {
     "assets/brand/orthrus-research-avatar.png":
         "bfe270518f8c0cd8da15d6a310eb16c45555d9d9b4640c177d901f996154ab89",
+    "clients/tui/assets/workbench-mark.jpg":
+        "96f5fea5cce1931184c827c6a104d54ac080551f83cd82af270a425b26fd1591",
 }
 
 

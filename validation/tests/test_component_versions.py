@@ -18,9 +18,10 @@ import verify_component_artifacts as artifacts
 class NativeVersionTests(unittest.TestCase):
     def test_native_inventory_and_projections(self):
         authority, components = versions.load_authority()
-        self.assertEqual(22, len(components))
+        self.assertEqual(23, len(components))
         self.assertEqual("jvm", components["workbench-axiom-engine"]["kind"])
         self.assertEqual("python", components["workbench-axiom"]["kind"])
+        self.assertEqual("python-client", components["workbench-tui"]["kind"])
         self.assertEqual([], versions.check_projections(components))
         self.assertEqual("core/pyproject.toml", components["workbench-core"]["manifest"])
         atlas_version = tomllib.loads((ROOT / "modules/atlas/pyproject.toml").read_text())["project"]["version"]

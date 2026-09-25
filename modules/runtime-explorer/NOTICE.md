@@ -14,9 +14,15 @@ Minecraft, Minecraft Forge, CleanroomMC, Supersymmetry, and the names of other
 mods and tools belong to their respective owners. Workbench does not include
 Minecraft game files or third-party mod binaries.
 
-## Workbench mark
+## Workbench marks
 
-The current Workbench mark is constructed from repository-native geometric
-primitives declared in `assets/brand/workbench-brand-v1.json`. It does not
-incorporate the earlier user-supplied woven mark or another third-party visual
-input and is distributed under `LGPL-3.0-only` with the repository.
+The geometric Workbench mark is constructed from repository-native primitives
+declared in `assets/brand/workbench-brand-v1.json`. It does not incorporate
+another visual input and is distributed under `LGPL-3.0-only` with the
+repository.
+
+The woven mark in `clients/tui/assets/workbench-mark.jpg` was supplied by
+Orthrus Research for the terminal client. Orthrus Research confirmed its
+ownership and permission to distribute that artwork and its terminal-cell
+rendering in `clients/tui/src/workbench_tui/brand.py` under the repository's
+`LGPL-3.0-only` license.

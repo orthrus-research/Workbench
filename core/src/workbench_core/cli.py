@@ -14,7 +14,7 @@ from typing import Sequence
 from workbench_api import ExecutionContext, ModuleError
 from workbench_api.state_paths import default_runtime_state_root
 from .modules import discover, dispatch
-from .physical_context import resolve_physical_context
+from .environment_resolution import resolve_environment
 
 
 def source_root() -> Path:
@@ -33,25 +33,26 @@ def _main(argv: Sequence[str] | None = None) -> int:
     if (root / "core/pyproject.toml").is_file():
         from .development import enable_source_checkout
         enable_source_checkout(root)
-    from .dispatch_setup import _activate_user_setup
-    if not _activate_user_setup(arguments):
-        return 2
-    try:
-        if arguments[:1] == ["settings"] or arguments[:2] == ["environment", "resolve"]:
-            return _dispatch(arguments, root, caller_environment=caller_environment)
-        from .module_cli import disabled_profiles, main as package_main
-        from .package_guard import PackageActivity
-        from workbench_api.profiles import profile_scope
-        with profile_scope(disabled=disabled_profiles(default_runtime_state_root(root))):
-            if arguments[:1] in (["modules"], ["profiles"]):
-                return package_main(arguments[1:], root=root, kind=arguments[0])
-            with PackageActivity():
+    from .dispatch_setup import user_setup_environment
+    with user_setup_environment(arguments) as activated:
+        if not activated:
+            return 2
+        try:
+            if arguments[:1] == ["settings"] or arguments[:2] == ["environment", "resolve"]:
                 return _dispatch(arguments, root, caller_environment=caller_environment)
-    except BrokenPipeError:
-        raise
-    except (ModuleError, OSError, ValueError) as exc:
-        print(f"Workbench: {exc}", file=sys.stderr)
-        return 2
+            from .module_cli import disabled_profiles, main as package_main
+            from .package_guard import PackageActivity
+            from workbench_api.profiles import profile_scope
+            with profile_scope(disabled=disabled_profiles(default_runtime_state_root(root))):
+                if arguments[:1] in (["modules"], ["profiles"]):
+                    return package_main(arguments[1:], root=root, kind=arguments[0])
+                with PackageActivity():
+                    return _dispatch(arguments, root, caller_environment=caller_environment)
+        except BrokenPipeError:
+            raise
+        except (ModuleError, OSError, ValueError) as exc:
+            print(f"Workbench: {exc}", file=sys.stderr)
+            return 2
 
 
 def _dispatch(
@@ -83,7 +84,9 @@ def _dispatch(
         parser = argparse.ArgumentParser(prog="workbench sandbox recover")
         parser.add_argument("--state-root", type=Path)
         selected = parser.parse_args(arguments[2:])
-        state = selected.state_root or resolve_physical_context(root).state_root
+        state = selected.state_root or resolve_environment(
+            root, environment=caller_environment
+        ).state_root
         print(json.dumps({"schema": "workbench.sandbox-recovery.v1", "recovered_sessions":
                           recover_axiom(state)}, sort_keys=True))
         return 0
@@ -101,22 +104,17 @@ def _dispatch_available(
         return preflight(arguments[2:], profiles=profile_resources("manual-artifacts"))
     if arguments[:1] in (["storage"], ["runtime"], ["world"]):
         from .storage.cli import main as storage
-        physical = resolve_physical_context(root)
-        return storage(arguments, root=root, workspace_root=physical.state_root)
+        resolved = resolve_environment(root, environment=caller_environment)
+        return storage(arguments, root=root, workspace_root=resolved.state_root)
     if arguments[:1] == ["environment"]:
         parser = argparse.ArgumentParser(prog="workbench environment")
-        parser.add_argument("action", choices=["status", "paths", "resolve"])
+        parser.add_argument("action", choices=["status", "resolve"])
         parser.add_argument("workspace", nargs="?", type=Path)
         parser.add_argument("--json", action="store_true")
         selected = parser.parse_args(arguments[1:])
         if selected.workspace is not None and selected.action != "resolve":
             parser.error("a workspace target is accepted only by environment resolve")
-        if selected.action == "paths":
-            physical = resolve_physical_context(root)
-            print(json.dumps(physical.record(), indent=2, sort_keys=True))
-            return 0
         if selected.action == "resolve":
-            from .environment_resolution import resolve_environment
             resolved = resolve_environment(
                 root,
                 workspace=selected.workspace,
@@ -145,7 +143,7 @@ def _dispatch_available(
     if not arguments or arguments[:1] in (["-h"], ["--help"]):
         from workbench_api.profiles import profiles
         admitted_profiles = {profile.id for profile in profiles()}
-        print("Workbench Core: setup, settings, repair, tooling, sandbox recover, environment status, environment paths, environment resolve, storage, runtime, world, modules list, profiles list, version")
+        print("Workbench Core: setup, settings, repair, tooling, sandbox recover, environment status, environment resolve, storage, runtime, world, modules list, profiles list, version")
         for module in modules:
             if module.module:
                 for capability in module.module.capabilities:
@@ -153,10 +151,17 @@ def _dispatch_available(
                         print(f"  {' '.join(capability.command)}: {capability.description}")
         return 0
     if "--help" in arguments or "-h" in arguments:
-        physical = resolve_physical_context(root, include_saved_setup=False)
-        context = physical.execution_context()
+        from .setup_cli import _state_root, _workspace
+
+        values = os.environ if caller_environment is None else caller_environment
+        context = ExecutionContext(
+            _workspace(values.get("WORKBENCH_WORKSPACE") or Path.cwd()),
+            _state_root(
+                values.get("WORKBENCH_STATE_ROOT")
+                or default_runtime_state_root(root, environment=values)
+            ),
+        )
     else:
-        from .environment_resolution import resolve_environment
         resolved = resolve_environment(root, environment=caller_environment)
         context = ExecutionContext(
             resolved.workspace,

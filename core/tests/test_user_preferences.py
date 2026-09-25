@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from hashlib import sha256
 import io
 import json
 import os
 from pathlib import Path
+import stat
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -25,6 +26,7 @@ from workbench_core.user_config_migration import (
 from workbench_core.user_preferences import (
     UserPreferencesError,
     default_settings_path,
+    default_workspaces_path,
     load_settings,
     load_workspaces,
     register_workspace,
@@ -59,12 +61,50 @@ class UserPreferencesTests(unittest.TestCase):
                 "workbench-user-settings-v1": settings,
                 "workbench-user-workspaces-v1": workspaces,
                 "workbench-environment-resolution-v1": resolve_environment(suite, environment=environment).record,
+                "workbench-user-config-migration-v1": inspect_legacy_config_migration(environment=environment),
             }
             schema_home = Path(__file__).resolve().parents[1] / "src/workbench_core/schemas"
             for name, record in records.items():
                 schema = json.loads((schema_home / f"{name}.schema.json").read_text(encoding="utf-8"))
                 Draft202012Validator.check_schema(schema)
                 Draft202012Validator(schema).validate(record)
+
+    def test_resolution_schema_requires_absolute_resolved_paths(self) -> None:
+        schema_path = (
+            Path(__file__).resolve().parents[1]
+            / "src/workbench_core/schemas/workbench-environment-resolution-v1.schema.json"
+        )
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        path_validator = Draft202012Validator(schema["$defs"]["path"])
+        for value in ("/home/user/project", r"C:\Users\User\Project", r"\\server\share\Project"):
+            with self.subTest(absolute=value):
+                self.assertTrue(path_validator.is_valid(value))
+        for value in ("relative/project", r"C:relative", r"\server"):
+            with self.subTest(relative=value):
+                self.assertFalse(path_validator.is_valid(value))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            record = resolve_environment(home, environment={"HOME": str(home)}).record
+        validator = Draft202012Validator(schema)
+        for keys in (
+            ("configuration_home",),
+            ("settings", "path"),
+            ("workspaces", "path"),
+            ("setup", "path"),
+            ("workspace", "path"),
+            ("state_root", "path"),
+            ("locations", "logs", "path"),
+            ("profile_configuration_reference",),
+        ):
+            altered = json.loads(json.dumps(record))
+            field = altered
+            for key in keys[:-1]:
+                field = field[key]
+            field[keys[-1]] = "relative/project"
+            with self.subTest(field=keys):
+                self.assertFalse(validator.is_valid(altered))
 
     def test_new_home_is_stable_and_legacy_setup_import_is_non_destructive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -73,7 +113,8 @@ class UserPreferencesTests(unittest.TestCase):
             source = home / "old-config/workbench/setup-v1.json"
             original = setup_cli._write_setup_record(source, _selection(home))
             target = home / ".workbench/setup-v1.json"
-            self.assertEqual(source, setup_cli.default_setup_record_path(environment=environment))
+            with self.assertRaisesRegex(ValueError, "workbench settings migrate --dry-run"):
+                setup_cli.default_setup_record_path(environment=environment)
             plan = inspect_legacy_config_migration(environment=environment)
             self.assertEqual("ready", plan["state"])
             self.assertFalse(target.exists())
@@ -84,6 +125,21 @@ class UserPreferencesTests(unittest.TestCase):
             self.assertEqual(original, setup_cli.load_setup_record(source))
             self.assertEqual(original, setup_cli.load_setup_record(target))
             self.assertEqual(home / ".workbench", default_user_config_home(environment=environment))
+
+    def test_legacy_record_reports_migration_without_blocking_migrate_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            environment = {"HOME": str(home)}
+            source = home / ".config/workbench/setup-v1.json"
+            setup_cli._write_setup_record(source, _selection(home))
+            errors = io.StringIO()
+            output = io.StringIO()
+            with patch.dict(os.environ, environment, clear=True), redirect_stderr(errors), redirect_stdout(output):
+                self.assertEqual(2, cli._main(["environment", "resolve", "--json"]))
+                self.assertEqual(0, cli._main(["settings", "migrate", "--dry-run"]))
+            self.assertIn("workbench settings migrate --dry-run", errors.getvalue())
+            self.assertIn("State: ready", output.getvalue())
+            self.assertFalse((home / ".workbench/setup-v1.json").exists())
 
     def test_legacy_import_refuses_conflicting_destination(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -136,7 +192,58 @@ class UserPreferencesTests(unittest.TestCase):
             for name in ("setup-v1.json", "recipe-fixtures-v1.json", "launcher-v1.json"):
                 self.assertEqual((legacy / name).read_bytes(), (home / ".workbench" / name).read_bytes())
 
-    def test_each_legacy_record_resolves_independently(self) -> None:
+    def test_legacy_launcher_import_rejects_invalid_selections(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            environment = {"HOME": str(home)}
+            source = home / ".config/workbench/launcher-v1.json"
+            source.parent.mkdir(parents=True)
+            for selection in (
+                {"family": "unknown", "executable": str(home / "Launcher"), "root": str(home / "Root")},
+                {"family": "prism", "executable": "relative-launcher", "root": str(home / "Root")},
+                {"family": [], "executable": str(home / "Launcher"), "root": str(home / "Root")},
+            ):
+                with self.subTest(selection=selection):
+                    body = {
+                        "format": "workbench-launcher-setup-record-v1",
+                        "schema_version": 1,
+                        "selection": selection,
+                    }
+                    record = {
+                        **body,
+                        "record_id": "workbench-launcher-setup:sha256:" + sha256(
+                            json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                        ).hexdigest(),
+                    }
+                    source.write_text(json.dumps(record), encoding="utf-8")
+                    with self.assertRaisesRegex(UserPreferencesError, "invalid selection"):
+                        inspect_legacy_config_migration(environment=environment)
+                    self.assertFalse((home / ".workbench/launcher-v1.json").exists())
+
+    def test_selected_import_recovers_valid_setup_when_other_legacy_file_is_corrupt(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            environment = {"HOME": str(home)}
+            legacy = home / ".config/workbench"
+            setup_cli._write_setup_record(legacy / "setup-v1.json", _selection(home))
+            launcher = legacy / "launcher-v1.json"
+            launcher.write_text("invalid\n", encoding="utf-8")
+            with self.assertRaisesRegex(UserPreferencesError, "legacy launcher configuration"):
+                inspect_legacy_config_migration(environment=environment)
+            with patch.dict(os.environ, environment, clear=True), redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(0, cli._main([
+                    "settings", "migrate", "--dry-run", "--json", "--file", "setup-v1.json",
+                ]))
+                plan = json.loads(output.getvalue())
+            self.assertEqual("workbench-user-config-migration-v1", plan["format"])
+            self.assertEqual("ready", plan["state"])
+            self.assertEqual(["setup-v1.json"], [row["name"] for row in plan["files"]])
+            result = migrate_legacy_config(environment=environment, filenames=("setup-v1.json",))
+            self.assertEqual("imported", result["state"])
+            self.assertEqual((legacy / "setup-v1.json").read_bytes(), (home / ".workbench/setup-v1.json").read_bytes())
+            self.assertEqual("invalid\n", launcher.read_text(encoding="utf-8"))
+
+    def test_each_legacy_record_requires_explicit_import(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
             environment = {"HOME": str(home)}
@@ -148,10 +255,12 @@ class UserPreferencesTests(unittest.TestCase):
             (legacy / "launcher-v1.json").write_text("legacy", encoding="utf-8")
             (stable / "setup-v1.json").write_text("stable", encoding="utf-8")
             self.assertEqual(stable / "setup-v1.json", default_user_record_path("setup-v1.json", environment=environment))
-            self.assertEqual(legacy / "recipe-fixtures-v1.json", default_user_record_path("recipe-fixtures-v1.json", environment=environment))
-            self.assertEqual(legacy / "launcher-v1.json", default_user_record_path("launcher-v1.json", environment=environment))
+            for name in ("recipe-fixtures-v1.json", "launcher-v1.json"):
+                with self.assertRaisesRegex(ValueError, "workbench settings migrate --dry-run"):
+                    default_user_record_path(name, environment=environment)
             with patch.dict(os.environ, environment, clear=True):
-                self.assertEqual(legacy / "recipe-fixtures-v1.json", default_fixture_registry_path())
+                with self.assertRaisesRegex(ValueError, "workbench settings migrate --dry-run"):
+                    default_fixture_registry_path()
 
     def test_resolver_uses_saved_roles_and_named_workspace_without_writing_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -231,13 +340,15 @@ class UserPreferencesTests(unittest.TestCase):
             suite.mkdir()
             environment = {"HOME": str(home)}
             with (
-                patch("workbench_core.physical_context.load_setup_record", side_effect=AssertionError("setup reloaded")),
-                patch("workbench_core.physical_context.load_workspaces", side_effect=AssertionError("workspaces reloaded")),
+                patch("workbench_core.environment_resolution.load_setup_record", wraps=setup_cli.load_setup_record) as setup_reader,
+                patch("workbench_core.environment_resolution.load_workspaces", wraps=load_workspaces) as workspace_reader,
             ):
                 self.assertEqual(
                     home / ".workbench",
                     resolve_environment(suite, environment=environment).configuration_home,
                 )
+            self.assertEqual(1, setup_reader.call_count)
+            self.assertEqual(1, workspace_reader.call_count)
 
     def test_newer_or_changed_settings_fail_without_replacement(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -252,6 +363,48 @@ class UserPreferencesTests(unittest.TestCase):
             with self.assertRaisesRegex(UserPreferencesError, "cannot read"):
                 set_location("artifacts", "~/artifacts", environment=environment)
             self.assertEqual(altered, json.loads(path.read_text(encoding="utf-8")))
+
+    def test_boolean_schema_versions_are_rejected_for_both_user_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            environment = {"HOME": temporary}
+            for loader, path in (
+                (load_settings, default_settings_path(environment=environment)),
+                (load_workspaces, default_workspaces_path(environment=environment)),
+            ):
+                record = loader(environment=environment)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps({**record, "schema_version": True}), encoding="utf-8")
+                with self.assertRaisesRegex(UserPreferencesError, "schema"):
+                    loader(environment=environment)
+
+    def test_malformed_default_workspace_has_a_configuration_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            environment = {"HOME": temporary}
+            path = default_workspaces_path(environment=environment)
+            path.parent.mkdir(parents=True)
+            record = {**load_workspaces(environment=environment), "default": []}
+            path.write_text(json.dumps(record), encoding="utf-8")
+            with self.assertRaisesRegex(UserPreferencesError, "default workspace"):
+                load_workspaces(environment=environment)
+
+    @unittest.skipIf(os.name == "nt", "POSIX file mode check")
+    def test_user_record_is_private_before_atomic_publish(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            environment = {"HOME": temporary}
+            replace = os.replace
+            observed: list[int] = []
+
+            def inspect_temporary(source: Path, destination: Path) -> None:
+                observed.append(stat.S_IMODE(source.stat().st_mode))
+                replace(source, destination)
+
+            old_umask = os.umask(0)
+            try:
+                with patch("workbench_core.user_preferences.os.replace", side_effect=inspect_temporary):
+                    set_location("logs", "~/logs", environment=environment)
+            finally:
+                os.umask(old_umask)
+            self.assertEqual([0o600], observed)
 
     def test_symlinked_location_is_rejected_before_save(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

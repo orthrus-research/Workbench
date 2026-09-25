@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
+from contextvars import copy_context
 import io
 import json
 import os
@@ -176,6 +177,24 @@ class OutputRoutingTests(unittest.TestCase):
             self.assertNotEqual(log_path, artifact_path)
             self.assertEqual("completed", _events(root)[-1]["outcome"])
 
+    @unittest.skipUnless(os.name == "posix", "POSIX file mode check")
+    def test_existing_module_log_is_private_before_appending(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "modules/sample/2026-09-25.jsonl"
+            path.parent.mkdir(parents=True)
+            path.write_text("previous\n", encoding="utf-8")
+            path.chmod(0o644)
+            with patch("workbench_core.output_routing._now", return_value="2026-09-25T12:00:00.000000Z"):
+                with redirect_stdout(io.StringIO()):
+                    with OutputInvocation({"logs": root}, "sample", "sample.run") as run:
+                        print("captured")
+                        run.exit_code = 0
+            self.assertEqual(0o600, path.stat().st_mode & 0o777)
+            lines = path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual("previous", lines[0])
+            self.assertIn("captured", "".join(lines[1:]))
+
     def test_concurrent_runs_keep_text_with_its_run(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -226,6 +245,29 @@ class OutputRoutingTests(unittest.TestCase):
             }
             self.assertEqual("FIRST\n", text_by_run[run_ids["first"]])
             self.assertEqual("SECOND\n", text_by_run[run_ids["second"]])
+            self.assertEqual(2, sum(event["kind"] == "finished" for event in events))
+
+    def test_copied_context_stops_capturing_after_its_run_finishes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            terminal = io.StringIO()
+            with redirect_stdout(terminal):
+                with OutputInvocation({"logs": root}, "sample", "sample.first") as first:
+                    inherited = copy_context()
+                    inherited.run(lambda: print("ACTIVE"))
+                    first.exit_code = 0
+                with OutputInvocation({"logs": root}, "sample", "sample.second") as second:
+                    inherited.run(lambda: print("LATE"))
+                    second.exit_code = 0
+
+            events = _events(root)
+            first_events = [event for event in events if event["run_id"] == first.run_id]
+            self.assertEqual(
+                ["started", "python_text", "finished"],
+                [event["kind"] for event in first_events],
+            )
+            self.assertEqual("ACTIVE\n", first_events[1]["text"])
+            self.assertEqual("ACTIVE\nLATE\n", terminal.getvalue())
             self.assertEqual(2, sum(event["kind"] == "finished" for event in events))
 
     def test_parallel_processes_append_complete_module_day_events(self) -> None:

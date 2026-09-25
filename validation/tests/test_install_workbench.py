@@ -41,6 +41,15 @@ class NativeInstallTests(unittest.TestCase):
         (self.wheelhouse / "wheelhouse.json").write_text(json.dumps(self.manifest))
         (self.wheelhouse / "requirements.lock").write_text("".join(f"{row['name']}=={row['version']} --hash=sha256:{row['sha256']}\n" for row in self.manifest["wheels"]))
 
+    def include_tui(self):
+        wheel = self.wheelhouse / "wheels/workbench_tui-0.0.1-py3-none-any.whl"
+        with zipfile.ZipFile(wheel, "w") as archive:
+            archive.writestr("workbench_tui/__init__.py", "# fixture wheel bytes\n")
+        self.manifest["wheels"].append({"filename": wheel.name, "name": "workbench-tui", "version": "0.0.1", "size": wheel.stat().st_size, "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest()})
+        self.manifest["native_versions"]["workbench-tui"] = "0.0.1"
+        self.manifest["selected_components"].append("workbench-tui")
+        self.save()
+
     def test_verifies_exact_bytes_and_rejects_extra_files(self):
         self.assertEqual(self.manifest, verify(self.wheelhouse))
         extra = self.wheel.parent / "extra.whl"
@@ -155,3 +164,29 @@ class NativeInstallTests(unittest.TestCase):
         self.assertNotIn(str(self.wheelhouse / "wheels"), command)
         self.assertEqual(os.devnull, run.call_args_list[0].kwargs["env"]["PIP_CONFIG_FILE"])
         self.assertEqual("installed", json.loads((destination / "workbench-install.json").read_text())["state"])
+
+    def test_optional_tui_launcher_is_probed_and_reported_without_user_config_write(self):
+        self.include_tui()
+        destination = self.base / "installed-with-tui"
+        config_home = self.base / "retained-user-config"
+        tui = destination / ("Scripts/workbench-tui.exe" if os.name == "nt" else "bin/workbench-tui")
+
+        def create(_destination):
+            tui.parent.mkdir(parents=True)
+            tui.write_text("fixture launcher")
+
+        with patch.object(installer.venv.EnvBuilder, "create", side_effect=create), patch.object(installer.subprocess, "run") as run, patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(config_home)}):
+            result = installer.install(self.wheelhouse, destination)
+        self.assertEqual(str(tui), result["tui_executable"])
+        self.assertEqual(str(tui), json.loads((destination / "workbench-install.json").read_text())["tui_executable"])
+        self.assertTrue(any(call.args[0] == [str(tui), "--help"] for call in run.call_args_list))
+        self.assertFalse(config_home.exists())
+
+    def test_optional_tui_missing_launcher_fails_install(self):
+        self.include_tui()
+        destination = self.base / "missing-tui-launcher"
+        with patch.object(installer.venv.EnvBuilder, "create"), patch.object(installer.subprocess, "run"):
+            with self.assertRaisesRegex(WheelhouseError, "workbench-tui launcher"):
+                installer.install(self.wheelhouse, destination)
+        receipt = json.loads((destination / "workbench-install.json").read_text())
+        self.assertEqual("failed", receipt["state"])

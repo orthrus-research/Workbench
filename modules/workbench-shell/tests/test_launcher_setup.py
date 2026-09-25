@@ -18,21 +18,68 @@ sys.path.insert(0, str(REPOSITORY_ROOT / "modules/project-intelligence/src"))
 sys.path.insert(0, str(MODULE_ROOT / "src"))
 
 from workbench_shell import launcher_setup, runtime_launch  # noqa: E402
+from workbench_core.user_config_migration import migrate_legacy_config  # noqa: E402
 
 
 class LauncherSetupTests(unittest.TestCase):
-    def test_launcher_record_falls_back_independently_of_setup(self) -> None:
+    def test_legacy_launcher_record_requires_explicit_import(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
             legacy = home / ".config/workbench/launcher-v1.json"
-            legacy.parent.mkdir(parents=True)
-            legacy.write_text("legacy", encoding="utf-8")
+            launcher_setup._write_launcher_record(
+                legacy,
+                {
+                    "family": "prism",
+                    "executable": str(home / "bin/prismlauncher"),
+                    "root": str(home / "launcher-data"),
+                },
+            )
             environment = {"HOME": str(home)}
-            self.assertEqual(legacy, launcher_setup.default_launcher_record_path(environment=environment))
+            with self.assertRaisesRegex(
+                ValueError, "workbench settings migrate --dry-run"
+            ):
+                launcher_setup.default_launcher_record_path(environment=environment)
+            error = io.StringIO()
+            self.assertEqual(
+                2,
+                launcher_setup.main(
+                    ["--check"],
+                    root=home,
+                    environment=environment,
+                    output=io.StringIO(),
+                    error=error,
+                ),
+            )
+            self.assertIn("workbench settings migrate --dry-run", error.getvalue())
+            self.assertEqual(
+                "imported", migrate_legacy_config(environment=environment)["state"]
+            )
             stable = home / ".workbench/launcher-v1.json"
-            stable.parent.mkdir()
-            stable.write_text("stable", encoding="utf-8")
-            self.assertEqual(stable, launcher_setup.default_launcher_record_path(environment=environment))
+            self.assertEqual(
+                stable, launcher_setup.default_launcher_record_path(environment=environment)
+            )
+            self.assertEqual(legacy.read_bytes(), stable.read_bytes())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX directory mode check")
+    def test_fresh_launcher_record_creates_private_configuration_home(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            record = launcher_setup.default_launcher_record_path(environment={"HOME": str(home)})
+            self.assertFalse(record.parent.exists())
+            old_umask = os.umask(0o022)
+            try:
+                launcher_setup._write_launcher_record(
+                    record,
+                    {
+                        "family": "prism",
+                        "executable": str(home / "bin/prismlauncher"),
+                        "root": str(home / "launcher-data"),
+                    },
+                )
+            finally:
+                os.umask(old_umask)
+            self.assertEqual(0o700, record.parent.stat().st_mode & 0o777)
+            self.assertEqual(0o600, record.stat().st_mode & 0o777)
 
     def _fixture(self, root: Path, *, account: bool = True) -> tuple[Path, Path]:
         executable = root / "launcher-bin/prismlauncher"
@@ -289,6 +336,24 @@ class LauncherSetupTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 launcher_setup.LauncherSetupError, "identity"
             ):
+                launcher_setup.load_launcher_record(record)
+
+    def test_boolean_schema_version_cannot_pass_as_v1(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            record = root / "launcher-v1.json"
+            launcher_setup._write_launcher_record(
+                record,
+                {
+                    "family": "prism",
+                    "executable": str(root / "bin/prismlauncher"),
+                    "root": str(root / "launcher-data"),
+                },
+            )
+            value = json.loads(record.read_text(encoding="utf-8"))
+            value["schema_version"] = True
+            record.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(launcher_setup.LauncherSetupError, "not V1"):
                 launcher_setup.load_launcher_record(record)
 
 

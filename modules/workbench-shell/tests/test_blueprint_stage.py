@@ -203,6 +203,44 @@ class BlueprintStageTest(unittest.TestCase):
                     ], resolved_locations=context.locations))
             self.assertEqual(sessions, stage.call_args.kwargs["session_root"])
 
+    @patch(
+        "workbench_atlas.material_census.resolve_standard_queries",
+        side_effect=_baseline_queries,
+    )
+    def test_core_session_location_retains_and_reuses_real_stage(self, _resolve) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            sessions = root / "selected-blueprint-sessions"
+            context = ExecutionContext(
+                project,
+                root / "operation-state",
+                locations={"blueprint_sessions": sessions},
+            )
+            arguments = [
+                str(project),
+                "--suite-root", str(SUITE_ROOT),
+                "--name", "Pilot Coolant",
+                "--color", "0x425d73",
+                "--json",
+            ]
+            results = []
+            for _ in range(2):
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(
+                        0, commands.blueprint_stage(arguments, context=context)
+                    )
+                results.append(json.loads(output.getvalue()))
+            self.assertEqual(["staged", "reused"], [row["outcome"] for row in results])
+            self.assertEqual(results[0]["receipt"], results[1]["receipt"])
+            receipt = results[0]["receipt"]
+            receipt_path = Path(receipt["target"]["receipt_uri"].removeprefix("file://"))
+            self.assertEqual(sessions, receipt_path.parent.parent)
+            self.assertEqual(receipt, json.loads(receipt_path.read_text(encoding="utf-8")))
+            self.assertFalse((root / "operation-state/staging/blueprints").exists())
+            self.assertEqual("", _git(project, "status", "--porcelain"))
+
 
     @patch(
         "workbench_atlas.material_census.resolve_standard_queries",

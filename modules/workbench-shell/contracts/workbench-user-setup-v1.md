@@ -43,7 +43,9 @@ Current fresh setup stores this V1-shaped record in the stable user
 configuration home, `~/.workbench/setup-v1.json` (or
 `%USERPROFILE%\.workbench\setup-v1.json` on Windows). This is a compatibility
 record beside the stable-named [user settings](../../../docs/architecture/USER-PREFERENCES.md).
-The paths below remain legacy read locations for existing installations.
+The paths below are import sources for existing installations. Normal commands
+use the stable home and report the migration command when only an old record is
+present.
 `workbench settings migrate` copies their validated records into the stable
 home without deleting the originals.
 

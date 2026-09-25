@@ -10,7 +10,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from .physical_context import resolve_physical_context
+from workbench_api.state_paths import default_runtime_state_root
+
 from .setup_cli import _state_root, _workspace, default_setup_record_path, load_setup_record
 from .user_config_home import default_user_config_home, default_user_logs_root, user_home
 from .user_preferences import (
@@ -80,16 +81,24 @@ def resolve_environment(
         workspace_source = "environment"
     else:
         workspace_source = "current-directory"
-    physical = resolve_physical_context(
-        suite_root,
-        workspace=selected_workspace,
-        environment=values,
-        current_directory=current_directory,
-        _setup_record_path=setup_path,
-        _saved_setup=setup,
-        _workspace_registry=workspaces,
+    selected = _workspace(
+        selected_workspace
+        or selection.get("workspace")
+        or values.get("WORKBENCH_WORKSPACE")
+        or current_directory
+        or Path.cwd()
     )
-    selected = _workspace(physical.workspace)
+    state_root = _state_root(
+        values.get("WORKBENCH_STATE_ROOT")
+        or selection.get("state_root")
+        or default_runtime_state_root(suite_root, environment=values)
+    )
+    profile_reference = selection.get("profile_config")
+    if profile_reference is not None:
+        candidate = Path(profile_reference).expanduser()
+        if not candidate.is_absolute():
+            raise ValueError("saved profile configuration reference must be absolute")
+        profile_reference = candidate.resolve()
     if values.get("WORKBENCH_STATE_ROOT"):
         state_source = "environment"
     elif selection.get("state_root"):
@@ -99,14 +108,14 @@ def resolve_environment(
     home = user_home(environment=values)
     defaults = {
         "workspace_parent": home / "Workspaces",
-        "artifacts": physical.state_root / "artifacts",
+        "artifacts": state_root / "artifacts",
         "logs": default_user_logs_root(environment=values),
         "blueprint_library": config_home / "library/blueprints",
-        "blueprint_sessions": physical.state_root / "blueprints",
+        "blueprint_sessions": state_root / "blueprints",
         "fixture_library": config_home / "library/fixtures",
-        "fixture_instances": physical.state_root / "fixture-instances",
-        "cache": physical.state_root / "cache",
-        "evidence": physical.state_root / "evidence",
+        "fixture_instances": state_root / "fixture-instances",
+        "cache": state_root / "cache",
+        "evidence": state_root / "evidence",
     }
     overrides = {} if location_overrides is None else dict(location_overrides)
     if set(overrides) - LOCATION_ROLES:
@@ -147,11 +156,11 @@ def resolve_environment(
         },
         "setup": {"path": str(setup_path), "record_id": setup["record_id"] if setup else None},
         "workspace": _entry(selected, workspace_source),
-        "state_root": _entry(physical.state_root, state_source),
+        "state_root": _entry(state_root, state_source),
         "locations": location_records,
         "profile_configuration_reference": (
-            str(physical.profile_configuration_reference)
-            if physical.profile_configuration_reference is not None
+            str(profile_reference)
+            if profile_reference is not None
             else None
         ),
         "tool_candidates": {
@@ -172,7 +181,7 @@ def resolve_environment(
     return ResolvedEnvironment(
         configuration_home=config_home,
         workspace=selected,
-        state_root=physical.state_root,
+        state_root=state_root,
         locations=MappingProxyType(dict(locations)),
         record={**body, "resolution_id": identity},
     )

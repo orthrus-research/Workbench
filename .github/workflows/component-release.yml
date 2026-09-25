@@ -68,7 +68,7 @@ jobs:
           retention-days: 14
 
   python:
-    if: needs.identify.outputs.kind == 'python'
+    if: needs.identify.outputs.kind == 'python' || needs.identify.outputs.kind == 'python-client'
     needs: [identify, canonical]
     runs-on: ubuntu-24.04
     steps:
@@ -84,6 +84,9 @@ jobs:
         run: pixi run --locked --no-config -e release python tools/build_native_distribution.py --component "$COMPONENT" --output .workbench/candidate-wheelhouse --diagnostics .workbench/validation/ci/candidate-build
       - name: Install the exact hash-locked closure outside the checkout
         run: pixi run --locked --no-config -e release python tools/install_workbench.py .workbench/candidate-wheelhouse --destination "$RUNNER_TEMP/workbench-candidate" --diagnostics .workbench/validation/ci/candidate-install
+      - name: Exercise the installed terminal client
+        if: needs.identify.outputs.component == 'workbench-tui'
+        run: '"$RUNNER_TEMP/workbench-candidate/bin/python" -m unittest discover -s clients/tui/tests -v'
       - name: Verify wheel contents and retain only selected package
         env:
           COMPONENT: ${{ needs.identify.outputs.component }}

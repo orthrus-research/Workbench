@@ -13,12 +13,14 @@ python tools/component_versions.py check
 | Route | Scope | Entry point |
 | --- | --- | --- |
 | `source` | Frozen repository validation | `validation/validate.py --full` |
-| `native-component` | Selected Python package and declared dependency closure | `tools/build_native_distribution.py --component COMPONENT --output NEW_DIRECTORY` |
+| `native-component` | Selected Python package, including the opt-in Textual client, and declared dependency closure | `tools/build_native_distribution.py --component COMPONENT --output NEW_DIRECTORY` |
 | `native-suite` | All current native modules and profiles | `tools/build_native_distribution.py --suite --output NEW_DIRECTORY` |
 | `client` | One independently versioned IDE client | `tools/build_release_clients.py --component COMPONENT` |
 
 Without a component selector the native builder assembles Core and its
-dependencies only. Building can download dependencies; installing a completed
+dependencies only. `--suite` excludes the optional Textual client; select
+`workbench-tui` explicitly to include its Python wheel and Textual closure.
+Building can download dependencies; installing a completed
 wheelhouse is offline and hash-locked. The assembly records its build-input
 digest and exact package versions, Python minor version, OS and architecture.
 Install it only on that target. It does not include a Python interpreter.

@@ -119,7 +119,7 @@ class PublicRepositoryPlanTests(unittest.TestCase):
     def test_component_authority_owns_distinct_artifacts_and_tags(self) -> None:
         registry = load_release_units(ROOT)
         units = registry["components"]
-        self.assertEqual(22, len(units))
+        self.assertEqual(23, len(units))
         self.assertIn("workbench-axiom-engine", [row["id"] for row in units])
         self.assertIn("workbench-api", [row["id"] for row in units])
         self.assertIn("workbench-profile-supersymmetry", [row["id"] for row in units])
@@ -206,6 +206,14 @@ class PublicRepositoryPlanTests(unittest.TestCase):
 class PublicExportHardeningTests(unittest.TestCase):
     def test_organization_avatar_requires_reviewed_bytes(self) -> None:
         relative = "assets/brand/orthrus-research-avatar.png"
+        content = (ROOT / relative).read_bytes()
+        self.assertEqual("reviewed-binary", PUBLIC_EXPORT._validate_content(relative, content))
+        changed = content[:-1] + bytes([content[-1] ^ 1])
+        with self.assertRaisesRegex(PUBLIC_EXPORT.PublicExportError, "unexpected digest"):
+            PUBLIC_EXPORT._validate_content(relative, changed)
+
+    def test_tui_mark_requires_reviewed_bytes(self) -> None:
+        relative = "clients/tui/assets/workbench-mark.jpg"
         content = (ROOT / relative).read_bytes()
         self.assertEqual("reviewed-binary", PUBLIC_EXPORT._validate_content(relative, content))
         changed = content[:-1] + bytes([content[-1] ^ 1])

@@ -23,6 +23,15 @@ class NativePackageTests(unittest.TestCase):
         self.assertEqual(19, len(requested))
         self.assertIn("workbench-axiom", requested)
         self.assertEqual(1, sum(row["id"] == "workbench-core" for row in selected))
+        self.assertNotIn("workbench-tui", requested)
+
+    def test_textual_client_is_explicit_and_does_not_change_core_closure(self):
+        requested, selected = distribution.selected_components(["workbench-tui"])
+        self.assertEqual(["workbench-tui"], requested)
+        self.assertEqual({"workbench-tui"}, {row["id"] for row in selected})
+        requested, selected = distribution.selected_components(["workbench-core", "workbench-tui"])
+        self.assertEqual(["workbench-core", "workbench-tui"], requested)
+        self.assertEqual({"workbench-api", "workbench-core", "workbench-tui"}, {row["id"] for row in selected})
 
     def test_selected_module_and_profile_close_dependencies(self):
         _, selected = distribution.selected_components(["workbench-profile-supersymmetry"])

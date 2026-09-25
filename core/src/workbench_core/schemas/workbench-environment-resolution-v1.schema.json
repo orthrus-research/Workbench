@@ -41,7 +41,9 @@
         "evidence": {"$ref": "#/$defs/location"}
       }
     },
-    "profile_configuration_reference": {"type": ["string", "null"]},
+    "profile_configuration_reference": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/path"}]
+    },
     "tool_candidates": {
       "type": "object", "additionalProperties": false,
       "required": ["java_home", "git_executable"],
@@ -52,7 +54,11 @@
     }
   },
   "$defs": {
-    "path": {"type": "string", "minLength": 1},
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\/]+[\\\\/][^\\\\/]+(?:[\\\\/]|$))"
+    },
     "location": {
       "type": "object", "additionalProperties": false,
       "required": ["path", "source"],

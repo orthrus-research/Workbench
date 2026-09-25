@@ -38,6 +38,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     workspace.add_argument("--default", action="store_true")
     migration = actions.add_parser("migrate", help="copy earlier user records into the stable home")
     migration.add_argument("--dry-run", action="store_true")
+    migration.add_argument("--json", action="store_true")
+    migration.add_argument(
+        "--file", action="append", choices=("setup-v1.json", "recipe-fixtures-v1.json", "launcher-v1.json"),
+        help="import only a named record; repeat to select multiple files",
+    )
     selected = parser.parse_args(list(argv) if argv is not None else None)
 
     if selected.action in (None, "show"):
@@ -75,12 +80,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Using the default for {selected.role}")
         return 0
     if selected.action == "migrate":
-        result = inspect_legacy_config_migration() if selected.dry_run else migrate_legacy_config()
-        print(f"Legacy configuration: {result['source']}")
-        print(f"Stable configuration: {result['destination']}")
-        for row in result["files"]:
-            print(f"  {row['name']}: {row['state']}")
-        print(f"State: {result['state']}")
+        result = (
+            inspect_legacy_config_migration(filenames=selected.file)
+            if selected.dry_run else migrate_legacy_config(filenames=selected.file)
+        )
+        if selected.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            print(f"Legacy configuration: {result['source']}")
+            print(f"Stable configuration: {result['destination']}")
+            for row in result["files"]:
+                print(f"  {row['name']}: {row['state']}")
+            print(f"State: {result['state']}")
         return 1 if result["state"] == "conflict" else 0
     if selected.operation == "list":
         if selected.name is not None or selected.path is not None or selected.default:
