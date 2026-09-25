@@ -52,6 +52,25 @@ def load_authority(root: Path | None = None):
         for name in ("LICENSE", "NOTICE.md"):
             if (root / row["path"]).parent.joinpath(name).read_bytes() != (root / name).read_bytes():
                 raise ComponentVersionError(f"{identifier}: {name} must match the repository notice")
+    # The terminal client is a Python wheel, but it is not a Core module or a
+    # member of the default native Suite. Keep its version at its own manifest.
+    tui_manifest = "clients/tui/pyproject.toml"
+    tui_project = tomllib.loads((root / tui_manifest).read_text(encoding="utf-8"))["project"]
+    tui_id = tui_project["name"]
+    if tui_id in components:
+        raise ComponentVersionError(f"duplicate native distribution: {tui_id}")
+    if tui_project.get("license") != "LGPL-3.0-only" or tui_project.get("license-files") != ["LICENSE", "NOTICE.md"]:
+        raise ComponentVersionError(f"{tui_id}: license metadata differs")
+    for name in ("LICENSE", "NOTICE.md"):
+        if (root / "clients/tui" / name).read_bytes() != (root / name).read_bytes():
+            raise ComponentVersionError(f"{tui_id}: {name} must match the repository notice")
+    tui_version = tui_project["version"]
+    components[tui_id] = {
+        "id": tui_id, "version": tui_version, "kind": "python-client",
+        "manifest": tui_manifest, "dependencies": tui_project["dependencies"],
+        "python_distribution_version": tui_version,
+        "artifacts": [{"id": tui_id + ".wheel", "filename_template": tui_id.replace("-", "_") + "-{version}-py3-none-any.whl"}],
+    }
     vscode = json.loads((root / "clients/vscode/package.json").read_text())
     gradle = (root / "clients/intellij-community/build.gradle.kts").read_text()
     matches = re.findall(r'^version\s*=\s*"([^"]+)"', gradle, re.MULTILINE)

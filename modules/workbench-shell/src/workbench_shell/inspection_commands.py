@@ -13,10 +13,7 @@ from workbench_api.resources import repository_root
 
 ROOT = repository_root(__file__)
 
-from .command_context import _configured_workspace_default
-
-
-def _doctor_parser() -> argparse.ArgumentParser:
+def _doctor_parser(*, default_workspace: Path | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="workbench doctor",
         description=(
@@ -28,10 +25,10 @@ def _doctor_parser() -> argparse.ArgumentParser:
         "workspace",
         nargs="?",
         type=Path,
-        default=_configured_workspace_default(ROOT),
+        default=ROOT if default_workspace is None else default_workspace,
         help=(
-            "workspace or subproject to inspect (defaults to the saved setup "
-            "workspace, or this Workbench checkout when setup is absent)"
+            "workspace or subproject to inspect (defaults to the "
+            "Core-selected workspace)"
         ),
     )
     parser.add_argument(
@@ -154,14 +151,14 @@ def _write_doctor_report(path: Path, report: dict[str, object]) -> Path:
             Path(temporary_name).unlink(missing_ok=True)
     return destination
 
-def _doctor_main(argv: list[str]) -> int:
+def _doctor_main(argv: list[str], *, default_workspace: Path | None = None) -> int:
     from workbench_project_intelligence.workspace_doctor import (
         WorkspaceDoctorError,
         new_report,
         render_workspace_doctor_report,
     )
 
-    parser = _doctor_parser()
+    parser = _doctor_parser(default_workspace=default_workspace)
     args = parser.parse_args(argv)
     if args.profile and args.profile_file:
         parser.error("--profile and --profile-file are mutually exclusive")

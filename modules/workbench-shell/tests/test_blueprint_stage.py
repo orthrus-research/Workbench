@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
 import json
 from hashlib import sha256
 import os
@@ -27,11 +29,15 @@ for source in (
 
 from workbench_shell.blueprint_stage import (  # noqa: E402
     BlueprintStageError,
+    _prepare_stage_parent,
     plan_material_backed_fluid,
     stage_material_backed_fluid,
     validate_retained_blueprint_stage,
 )
 from workbench_shell.runtime_plan import plan_project_runtime  # noqa: E402
+from workbench_shell.cli import main as shell_main  # noqa: E402
+from workbench_api import ExecutionContext  # noqa: E402
+from workbench_shell import commands  # noqa: E402
 
 
 PACK_REVISION = "9d3aa7ae0294bf27f0b8acbb893d61da23a06972"
@@ -174,6 +180,67 @@ def _baseline_queries(_workspace, queries, **_kwargs):
 
 
 class BlueprintStageTest(unittest.TestCase):
+    def test_user_session_root_is_direct_and_passed_through_core_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            workspace = base / "workspace"
+            workspace.mkdir()
+            sessions = base / "saved-blueprint-sessions"
+            self.assertEqual(
+                sessions,
+                _prepare_stage_parent(sessions, workspace, direct=True),
+            )
+            self.assertFalse((sessions / "staging/blueprints").exists())
+            context = ExecutionContext(workspace, base / "state", locations={"blueprint_sessions": sessions})
+            with patch("workbench_shell.cli.main", return_value=0) as main:
+                self.assertEqual(0, commands.blueprint_stage(["--help"], context=context))
+            self.assertEqual(sessions, main.call_args.kwargs["resolved_locations"]["blueprint_sessions"])
+            with patch("workbench_shell.cli.stage_material_backed_fluid", return_value={"format": "test"}) as stage:
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(0, shell_main([
+                        "blueprint-stage", str(workspace), "--suite-root", str(SUITE_ROOT),
+                        "--name", "Test", "--color", "0x123456", "--json",
+                    ], resolved_locations=context.locations))
+            self.assertEqual(sessions, stage.call_args.kwargs["session_root"])
+
+    @patch(
+        "workbench_atlas.material_census.resolve_standard_queries",
+        side_effect=_baseline_queries,
+    )
+    def test_core_session_location_retains_and_reuses_real_stage(self, _resolve) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            sessions = root / "selected-blueprint-sessions"
+            context = ExecutionContext(
+                project,
+                root / "operation-state",
+                locations={"blueprint_sessions": sessions},
+            )
+            arguments = [
+                str(project),
+                "--suite-root", str(SUITE_ROOT),
+                "--name", "Pilot Coolant",
+                "--color", "0x425d73",
+                "--json",
+            ]
+            results = []
+            for _ in range(2):
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(
+                        0, commands.blueprint_stage(arguments, context=context)
+                    )
+                results.append(json.loads(output.getvalue()))
+            self.assertEqual(["staged", "reused"], [row["outcome"] for row in results])
+            self.assertEqual(results[0]["receipt"], results[1]["receipt"])
+            receipt = results[0]["receipt"]
+            receipt_path = Path(receipt["target"]["receipt_uri"].removeprefix("file://"))
+            self.assertEqual(sessions, receipt_path.parent.parent)
+            self.assertEqual(receipt, json.loads(receipt_path.read_text(encoding="utf-8")))
+            self.assertFalse((root / "operation-state/staging/blueprints").exists())
+            self.assertEqual("", _git(project, "status", "--porcelain"))
+
 
     @patch(
         "workbench_atlas.material_census.resolve_standard_queries",

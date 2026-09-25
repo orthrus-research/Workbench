@@ -8,6 +8,8 @@ import unittest
 from unittest.mock import patch
 
 from workbench_crucible.runtime_pair import FeatureRuntimePairPorts
+from workbench_api import ExecutionContext
+from workbench_shell import commands
 from workbench_shell.golden_journey_cli import (
     _installed_supersymmetry_runtime_ports,
     change_main,
@@ -19,6 +21,31 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class GoldenJourneyCliV2Tests(unittest.TestCase):
+    def test_core_fixture_location_reaches_the_owner_plan(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            fixture_root = Path(temporary) / "chosen-fixture-instances"
+            context = ExecutionContext(
+                Path(temporary),
+                Path(temporary) / "state",
+                locations={"fixture_instances": fixture_root},
+            )
+            with patch("workbench_shell.golden_journey_cli.dev_fixture_main", return_value=0) as run:
+                self.assertEqual(0, commands.dev_fixture(["plan"], context=context))
+            self.assertEqual(
+                fixture_root / "cleanroom/generic-mod-daily-loop",
+                run.call_args.kwargs["default_state_root"],
+            )
+            plan = {"format": "workbench-cleanroom-dev-loop-plan-v1", "plan_id": "plan:test"}
+            with patch("workbench_shell.golden_journey_cli.plan_cleanroom_dev_loop", return_value=plan) as create:
+                self.assertEqual(0, dev_fixture_main(
+                    ["plan", "--gradle-cmd", "/tools/gradle", "--java-home", "/tools/java"],
+                    root=ROOT,
+                    output=StringIO(),
+                    error=StringIO(),
+                    default_state_root=fixture_root,
+                ))
+            self.assertEqual(fixture_root, create.call_args.kwargs["state_root"])
+
     def test_exact_profile_runtime_config_constructs_owner_port(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             base = Path(temporary).resolve()

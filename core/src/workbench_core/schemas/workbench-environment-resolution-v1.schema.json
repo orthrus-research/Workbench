@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-environment-resolution-v1.schema.json",
+  "title": "Workbench Environment Resolution V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "resolution_id", "configuration_home",
+    "settings", "workspaces", "setup", "workspace", "state_root",
+    "locations", "profile_configuration_reference", "tool_candidates"
+  ],
+  "properties": {
+    "format": {"const": "workbench-environment-resolution-v1"},
+    "schema_version": {"const": 1},
+    "resolution_id": {"type": "string", "pattern": "^workbench-environment-resolution:sha256:[0-9a-f]{64}$"},
+    "configuration_home": {"$ref": "#/$defs/path"},
+    "settings": {"$ref": "#/$defs/savedRecord"},
+    "workspaces": {"$ref": "#/$defs/savedRecord"},
+    "setup": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "record_id"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "record_id": {"type": ["string", "null"]}
+      }
+    },
+    "workspace": {"$ref": "#/$defs/location"},
+    "state_root": {"$ref": "#/$defs/location"},
+    "locations": {
+      "type": "object", "additionalProperties": false,
+      "required": ["workspace_parent", "artifacts", "logs", "blueprint_library", "blueprint_sessions", "fixture_library", "fixture_instances", "cache", "evidence"],
+      "properties": {
+        "workspace_parent": {"$ref": "#/$defs/location"},
+        "artifacts": {"$ref": "#/$defs/location"},
+        "logs": {"$ref": "#/$defs/location"},
+        "blueprint_library": {"$ref": "#/$defs/location"},
+        "blueprint_sessions": {"$ref": "#/$defs/location"},
+        "fixture_library": {"$ref": "#/$defs/location"},
+        "fixture_instances": {"$ref": "#/$defs/location"},
+        "cache": {"$ref": "#/$defs/location"},
+        "evidence": {"$ref": "#/$defs/location"}
+      }
+    },
+    "profile_configuration_reference": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/path"}]
+    },
+    "tool_candidates": {
+      "type": "object", "additionalProperties": false,
+      "required": ["java_home", "git_executable"],
+      "properties": {
+        "java_home": {"type": ["string", "null"]},
+        "git_executable": {"type": ["string", "null"]}
+      }
+    }
+  },
+  "$defs": {
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\/]+[\\\\/][^\\\\/]+(?:[\\\\/]|$))"
+    },
+    "location": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "source"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "source": {"type": "string", "minLength": 1}
+      }
+    },
+    "savedRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "record_id", "present"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "record_id": {"type": "string", "minLength": 1},
+        "present": {"type": "boolean"}
+      }
+    }
+  }
+}

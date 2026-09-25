@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-user-workspaces-v1.schema.json",
+  "title": "Workbench User Workspaces V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "default", "entries", "record_id"],
+  "properties": {
+    "format": {"const": "workbench-user-workspaces-v1"},
+    "schema_version": {"const": 1},
+    "record_id": {"type": "string", "pattern": "^workbench-user-workspaces:sha256:[0-9a-f]{64}$"},
+    "default": {"type": ["string", "null"]},
+    "entries": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "path"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "path": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

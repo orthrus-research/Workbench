@@ -39,8 +39,18 @@ the displayed next command.
 
 ## Locations
 
-The setup record is outside the selected project and installed package under
-the platform user configuration directory:
+Current fresh setup stores this V1-shaped record in the stable user
+configuration home, `~/.workbench/setup-v1.json` (or
+`%USERPROFILE%\.workbench\setup-v1.json` on Windows). This is a compatibility
+record beside the stable-named [user settings](../../../docs/architecture/USER-PREFERENCES.md).
+The paths below are import sources for existing installations. Normal commands
+use the stable home and report the migration command when only an old record is
+present.
+`workbench settings migrate` copies their validated records into the stable
+home without deleting the originals.
+
+The older setup record is outside the selected project and installed package
+under the platform user configuration directory:
 
 - Linux: `$XDG_CONFIG_HOME/workbench/setup-v1.json`, defaulting to
   `~/.config/workbench/setup-v1.json`;

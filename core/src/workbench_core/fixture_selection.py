@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from .host_filesystem import file_lease, fsync_directory, secure_private_path
 from .setup_cli import default_setup_record_path, load_setup_record
+from .user_config_home import default_user_record_path
 
 
 FORMAT = "workbench-recipe-fixture-locations-v1"
@@ -28,7 +29,7 @@ class FixtureSelectionError(ValueError):
 
 
 def default_fixture_registry_path() -> Path:
-    return default_setup_record_path().with_name("recipe-fixtures-v1.json")
+    return default_user_record_path("recipe-fixtures-v1.json")
 
 
 def _absolute(value: Path | str, label: str) -> Path:

@@ -22,6 +22,22 @@ class ExecutionContext:
     state_root: Path
     cancelled: Event = field(default_factory=Event)
     emit: Callable[[Mapping[str, object]], None] = field(default=lambda event: None)
+    locations: Mapping[str, Path] = field(default_factory=dict)
+    output_resolver: Callable[[str, str], Path] | None = None
+
+    def location(self, role: str) -> Path:
+        """Return a Core-resolved role path for an opted-in module adapter."""
+
+        if role not in self.locations:
+            raise ModuleError(f"location role is not resolved: {role}")
+        return self.locations[role]
+
+    def output_path(self, role: str, name: str) -> Path:
+        """Allocate one invocation-scoped output through the Core host."""
+
+        if self.output_resolver is None:
+            raise ModuleError("the Core output router is unavailable")
+        return self.output_resolver(role, name)
 
     def check_cancelled(self) -> None:
         if self.cancelled.is_set():

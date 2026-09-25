@@ -41,6 +41,7 @@
       "workbench-runtime-explorer/v",
       "workbench-sentinel/v",
       "workbench-subsurface-studio/v",
+      "workbench-tui/v",
       "workbench-shell/v",
       "workbench-worldgen-cockpit/v",
       "workbench-worldgen-qualifier/v",

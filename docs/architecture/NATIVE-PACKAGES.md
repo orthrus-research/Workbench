@@ -1,7 +1,7 @@
 # Native packages and installation
 
 Workbench uses independently versioned native Python packages for API, Core,
-modules and profiles, plus native IDE-client packages. The repository root is
+modules, profiles and the optional Textual terminal client, plus native IDE-client packages. The repository root is
 not a distribution. There is exactly one `workbench-core` package and one Core
 dispatcher. The old portable Core and bundled-interpreter release paths are
 removed; no forwarding imports or legacy installer adapters are provided.
@@ -44,10 +44,16 @@ python tools/build_native_distribution.py --plan
 python tools/build_native_distribution.py --output .workbench/build/core-wheelhouse
 python tools/build_native_distribution.py --suite --output .workbench/build/suite-wheelhouse
 python tools/build_native_distribution.py --component workbench-atlas --output .workbench/build/atlas-wheelhouse
+python tools/build_native_distribution.py --component workbench-tui --output .workbench/build/tui-wheelhouse
+python tools/build_native_distribution.py --component workbench-shell --component workbench-tui --output .workbench/build/shell-tui-wheelhouse
 ```
 
 Output must be a new directory. Core is the default selection; `--suite`
-selects all native modules and profiles without creating another Python package.
+selects API, Core, modules and profiles without creating another Python package.
+`workbench-tui` is opt-in. Its wheel brings Textual and the setup path picker,
+while the developer inspection tool `textual-dev` is not in the installed closure.
+A TUI-only wheelhouse targets an existing, separately installed Core command;
+the combined example above includes the Shell dependency closure and Core.
 The builder constructs fresh native inputs, resolves dependencies and records
 exact wheel versions, sizes and hashes. Building may use the network. A
 wheelhouse is target-specific; pure-Python Workbench wheels do not make all
@@ -68,6 +74,16 @@ verified inputs, uses offline hash-enforced installation and verifies the
 result. It rejects existing destinations instead of overwriting an environment.
 Failed installations remain available for inspection and are reported as failed.
 It does not install Python, modify global packages or edit shell startup files.
+When the selected closure contains the terminal client, the installer checks
+its noninteractive `workbench-tui --help` path and records `tui_executable` in
+`workbench-install.json`. That executable is a Python console script; no separate
+Textual binary is downloaded. The installer does not write user preferences.
+Reinstallation uses a new environment. The TUI appearance record stays in
+`~/.workbench/tui.json` unless `WORKBENCH_CONFIG_HOME` selects another directory;
+Core reports its own saved setup path through `workbench setup --check --json`.
+Preserve those user records when moving hosts, and supply the same custom
+`WORKBENCH_CONFIG_HOME` to the new launch if one was used. Moving an installed
+virtual environment is not a supported substitute for reinstalling it.
 
 On Windows, source staging and installation can exceed the host's path-length
 limit when long-path support is disabled. Keep the checkout, task-specific

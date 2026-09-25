@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from contextlib import nullcontext
+from dataclasses import dataclass, replace
 from importlib import import_module, metadata
 from typing import Iterable, Sequence
 
 from workbench_api import Capability, ExecutionContext, Module, ModuleError
 from .dependencies import dependency_errors
 
-RESERVED_COMMANDS = frozenset({"setup", "repair", "environment", "modules", "profiles", "version", "storage", "runtime", "world"})
+RESERVED_COMMANDS = frozenset({"setup", "settings", "repair", "environment", "modules", "profiles", "version", "storage", "runtime", "world"})
 
 
 @dataclass(frozen=True)
@@ -86,13 +87,13 @@ def discover(*, entries: Iterable[metadata.EntryPoint] | None = None, disabled: 
 
 
 def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Sequence[InstalledModule]) -> int:
-    matches: list[Capability] = []
+    matches: list[tuple[InstalledModule, Capability]] = []
     for row in modules:
         if row.state == "available" and row.module:
-            matches.extend(c for c in row.module.capabilities if tuple(arguments[:len(c.command)]) == c.command)
+            matches.extend((row, c) for c in row.module.capabilities if tuple(arguments[:len(c.command)]) == c.command)
     if not matches:
         raise ModuleError("no installed module provides this command")
-    capability = max(matches, key=lambda c: len(c.command))
+    owner, capability = max(matches, key=lambda pair: len(pair[1].command))
     if capability.requires_profiles:
         from workbench_api.profiles import profiles
         missing = set(capability.requires_profiles) - {profile.id for profile in profiles()}
@@ -100,15 +101,30 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
             raise ModuleError("command requires enabled, admitted profiles: " + ", ".join(sorted(missing)))
     context.check_cancelled()
     package, name = capability.handler.split(":")
-    try:
-        handler = getattr(import_module(package), name)
-        result = handler(list(arguments[len(capability.command):]), context=context)
-    except SystemExit as exc:
-        if type(exc.code) is int and 0 <= exc.code <= 255:
-            return exc.code
-        raise ModuleError(f"capability {capability.id} exited without a valid status") from exc
-    except Exception as exc:
-        raise ModuleError(f"capability {capability.id} is unavailable: {exc}") from exc
-    if type(result) is not int:
-        raise ModuleError(f"capability {capability.id} returned an invalid exit code")
-    return result
+    if "logs" in context.locations:
+        from .output_routing import OutputInvocation
+        recording = OutputInvocation(
+            context.locations, owner.id, capability.id, workspace=context.workspace
+        )
+    else:
+        recording = nullcontext(None)
+    with recording as invocation:
+        operation_context = (
+            replace(context, output_resolver=invocation.output_path)
+            if invocation is not None else context
+        )
+        try:
+            handler = getattr(import_module(package), name)
+            result = handler(list(arguments[len(capability.command):]), context=operation_context)
+        except SystemExit as exc:
+            if type(exc.code) is int and 0 <= exc.code <= 255:
+                result = exc.code
+            else:
+                raise ModuleError(f"capability {capability.id} exited without a valid status") from exc
+        except Exception as exc:
+            raise ModuleError(f"capability {capability.id} is unavailable: {exc}") from exc
+        if type(result) is not int:
+            raise ModuleError(f"capability {capability.id} returned an invalid exit code")
+        if invocation is not None:
+            invocation.exit_code = result
+        return result

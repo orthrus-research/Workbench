@@ -50,6 +50,7 @@ from workbench_core.runtime_java import (
     plan_managed_java_execution,
 )
 from workbench_api.state_paths import default_runtime_state_root
+from .user_config_home import default_user_record_path
 
 
 CHECK_FORMAT = "workbench-setup-check-v1"
@@ -88,29 +89,9 @@ def _digest(prefix: str, value: Any) -> str:
 def default_setup_record_path(
     *, environment: Mapping[str, str] | None = None
 ) -> Path:
-    """Return the platform user configuration location for setup V1."""
+    """Use the stable home for fresh setup and retain older saved selections."""
 
-    values = os.environ if environment is None else environment
-    explicit = values.get("WORKBENCH_CONFIG_HOME")
-    if explicit:
-        base = Path(explicit).expanduser()
-    elif os.name == "nt":
-        configured = values.get("LOCALAPPDATA") or values.get("APPDATA")
-        base = (
-            Path(configured).expanduser() / "Workbench"
-            if configured
-            else Path.home() / "AppData" / "Local" / "Workbench"
-        )
-    elif sys.platform == "darwin":
-        base = Path.home() / "Library" / "Application Support" / "Workbench"
-    else:
-        configured = values.get("XDG_CONFIG_HOME")
-        base = (
-            Path(configured).expanduser() / "workbench"
-            if configured
-            else Path.home() / ".config" / "workbench"
-        )
-    return Path(os.path.abspath(os.fspath(base / "setup-v1.json")))
+    return default_user_record_path("setup-v1.json", environment=environment)
 
 
 def _record_payload(selection: Mapping[str, Any]) -> dict[str, Any]:
@@ -230,7 +211,7 @@ def setup_record_lock(path: Path | str):
     parent = selected.parent
     if parent.exists() and (parent.is_symlink() or not parent.is_dir()):
         raise SetupError("setup record parent must be a regular directory")
-    parent.mkdir(parents=True, exist_ok=True)
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     lock_path = parent / f".{selected.name}.lock"
     flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -281,7 +262,7 @@ def _write_setup_record_unlocked(
         raise SetupError("setup record destination must be a regular file")
     if parent.exists() and (parent.is_symlink() or not parent.is_dir()):
         raise SetupError("setup record parent must be a regular directory")
-    parent.mkdir(parents=True, exist_ok=True)
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = parent / f".{path.name}.{os.getpid()}.tmp"
     if temporary.exists() or temporary.is_symlink():
         raise SetupError("setup record staging path already exists")

@@ -29,9 +29,9 @@ def atlas_state_root(
     """Locate mutable Atlas data beneath Core's selected user state root."""
 
     if state_root is None:
-        from workbench_core.physical_context import resolve_physical_context
+        from workbench_core.environment_resolution import resolve_environment
 
-        state_root = resolve_physical_context(
+        state_root = resolve_environment(
             WORKBENCH_ROOT, environment=environment
         ).state_root
     return Path(state_root).expanduser().resolve() / "atlas"

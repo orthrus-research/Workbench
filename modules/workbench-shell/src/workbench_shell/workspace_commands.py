@@ -9,10 +9,7 @@ from workbench_api.resources import repository_root
 
 ROOT = repository_root(__file__)
 
-from .command_context import _configured_workspace_default
-
-
-def _open_parser() -> argparse.ArgumentParser:
+def _open_parser(*, default_workspace: Path | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="workbench open",
         description=(
@@ -24,10 +21,10 @@ def _open_parser() -> argparse.ArgumentParser:
         "workspace",
         nargs="?",
         type=Path,
-        default=_configured_workspace_default(Path.cwd()),
+        default=Path.cwd() if default_workspace is None else default_workspace,
         help=(
-            "workspace or path inside it (defaults to the saved setup workspace, "
-            "or the current directory when setup is absent)"
+            "workspace or path inside it (defaults to the Core-selected "
+            "workspace, or the current directory for direct use)"
         ),
     )
     parser.add_argument(
@@ -46,8 +43,8 @@ def _open_parser() -> argparse.ArgumentParser:
     )
     return parser
 
-def _open_main(argv: list[str]) -> int:
-    args = _open_parser().parse_args(argv)
+def _open_main(argv: list[str], *, default_workspace: Path | None = None) -> int:
+    args = _open_parser(default_workspace=default_workspace).parse_args(argv)
     from workbench_shell.product_spine_cli import home_main
 
     forwarded = [str(args.workspace)]

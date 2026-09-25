@@ -1,0 +1,401 @@
+Screen {
+    background: $background;
+    color: $foreground;
+}
+
+Header {
+    background: $surface;
+    color: $primary;
+}
+
+Footer {
+    background: $surface;
+}
+
+#home-scroll {
+    padding: 1 2;
+}
+
+#brand-banner {
+    height: 11;
+    background: $panel;
+}
+
+#brand-logo {
+    width: 20;
+    height: 11;
+    background: #090909;
+    color: #f5f5f5;
+}
+
+#brand-copy {
+    width: 1fr;
+    height: 11;
+    padding: 1 2;
+}
+
+Screen.compact-brand #home-scroll {
+    padding: 0 1;
+}
+
+Screen.compact-brand #brand-banner,
+Screen.compact-brand #brand-copy,
+Screen.compact-brand #brand-logo {
+    height: 8;
+}
+
+Screen.compact-brand #brand-logo {
+    width: 14;
+}
+
+Screen.compact-brand #home-panels {
+    margin-top: 0;
+}
+
+Screen.plain-brand #brand-logo,
+Screen.plain-brand #brand-steps {
+    display: none;
+}
+
+Screen.plain-brand #brand-banner,
+Screen.plain-brand #brand-copy {
+    height: 5;
+}
+
+Screen.narrow-brand #home-panels {
+    layout: vertical;
+    height: auto;
+}
+
+Screen.narrow-brand #home-scroll {
+    padding: 0;
+}
+
+Screen.narrow-brand #environment-panel,
+Screen.narrow-brand #actions-panel {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 1;
+}
+
+#hero {
+    height: 2;
+    color: $primary;
+    text-style: bold;
+}
+
+#tagline {
+    height: 2;
+    color: $foreground;
+}
+
+#brand-steps {
+    height: 2;
+    color: $foreground-muted;
+    text-style: bold;
+}
+
+#home-panels {
+    height: auto;
+    margin-top: 1;
+}
+
+#environment-panel {
+    width: 3fr;
+    height: auto;
+    min-height: 18;
+    background: $panel;
+    border: round $secondary;
+    padding: 1 2;
+    margin-right: 1;
+}
+
+#actions-panel {
+    width: 2fr;
+    height: auto;
+    min-height: 18;
+    background: $panel;
+    border: round $secondary;
+    padding: 1 1;
+}
+
+.panel-title {
+    height: 2;
+    color: $primary;
+    text-style: bold;
+}
+
+#environment-summary,
+#environment-dependencies {
+    height: auto;
+}
+
+#home-actions {
+    height: auto;
+    min-height: 11;
+    border: none;
+    background: $panel;
+}
+
+#home-note {
+    height: auto;
+    min-height: 3;
+    padding: 1 2;
+    color: $foreground-muted;
+}
+
+.screen-heading {
+    height: 3;
+    padding: 1 2;
+    color: $primary;
+    background: $panel;
+    text-style: bold;
+}
+
+.screen-intro {
+    height: auto;
+    min-height: 3;
+    padding: 1 2;
+    color: $foreground-muted;
+}
+
+.field-label {
+    height: 1;
+    margin-top: 1;
+    color: $foreground-muted;
+}
+
+#setup-scroll {
+    padding: 0 2 1 2;
+}
+
+#setup-scroll Input,
+#setup-scroll Select {
+    width: 100%;
+}
+
+.path-row {
+    height: auto;
+}
+
+#setup-scroll .path-row Input {
+    width: 1fr;
+}
+
+.path-row Button {
+    margin-left: 1;
+}
+
+.button-row {
+    height: auto;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+.button-row Button {
+    margin-right: 1;
+}
+
+#setup-status {
+    height: auto;
+    min-height: 2;
+    padding: 0 1;
+}
+
+#setup-dependencies {
+    height: 12;
+    border: round $secondary;
+}
+
+#setup-plan-detail {
+    height: auto;
+    min-height: 4;
+    padding: 1 2;
+    background: $panel;
+    border: round $secondary;
+}
+
+#inventory-tabs {
+    height: 1fr;
+    margin: 0 2;
+}
+
+.inventory-layout {
+    height: 1fr;
+}
+
+.inventory-layout DataTable {
+    width: 2fr;
+    margin-right: 1;
+    border: round $secondary;
+}
+
+.inventory-detail-panel {
+    width: 1fr;
+    background: $panel;
+    border: round $secondary;
+    padding: 1;
+    overflow-x: hidden;
+}
+
+#workflow-search {
+    margin: 0 2 1 2;
+}
+
+#workflow-body {
+    height: 1fr;
+    margin: 0 2;
+}
+
+#workflow-list {
+    width: 3fr;
+    border: round $secondary;
+    margin-right: 1;
+}
+
+#workflow-detail-panel {
+    width: 2fr;
+    background: $panel;
+    border: round $secondary;
+    padding: 1;
+}
+
+#workflow-detail {
+    height: 1fr;
+    overflow-y: auto;
+}
+
+#result-log {
+    height: 1fr;
+    border: round $secondary;
+    margin: 1 2;
+    padding: 1;
+    background: $panel;
+}
+
+ReviewModal {
+    align: center middle;
+    background: $background 65%;
+}
+
+#review-dialog {
+    width: 76;
+    max-width: 95%;
+    height: 75%;
+    background: $panel;
+    border: double $warning;
+    padding: 1 2;
+}
+
+#review-heading {
+    height: 2;
+    color: $warning;
+    text-style: bold;
+}
+
+#review-scroll {
+    height: 1fr;
+}
+
+#review-body {
+    height: auto;
+}
+
+/* A compact terminal needs the controls and their detail views in one column. */
+Screen.-narrow .screen-heading {
+    height: 1;
+    padding: 0 1;
+}
+
+Screen.-narrow .screen-intro {
+    display: none;
+}
+
+Screen.-narrow .button-row {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+Screen.-narrow #setup-scroll {
+    padding: 0 1 1 1;
+}
+
+Screen.-narrow #setup-scroll .field-label {
+    margin-top: 0;
+}
+
+Screen.-narrow #setup-scroll .path-row,
+Screen.-narrow #setup-scroll .button-row {
+    layout: vertical;
+}
+
+Screen.-narrow #setup-scroll .path-row Input,
+Screen.-narrow #setup-scroll .path-row Button,
+Screen.-narrow #setup-scroll .button-row Button {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+Screen.-narrow #inventory-tabs {
+    margin: 0 1;
+}
+
+Screen.-narrow .inventory-layout,
+Screen.-narrow #workflow-body {
+    layout: vertical;
+}
+
+Screen.-narrow .inventory-layout DataTable,
+Screen.-narrow .inventory-detail-panel,
+Screen.-narrow #workflow-list,
+Screen.-narrow #workflow-detail-panel {
+    width: 100%;
+    height: 1fr;
+    margin-right: 0;
+}
+
+Screen.-narrow .inventory-layout DataTable,
+Screen.-narrow #workflow-list {
+    min-height: 4;
+}
+
+Screen.-narrow .inventory-detail-panel,
+Screen.-narrow #workflow-detail-panel {
+    min-height: 4;
+    padding: 0 1;
+}
+
+Screen.-narrow #workflow-search {
+    margin: 0 1;
+}
+
+Screen.-narrow #workflow-body {
+    margin: 0 1;
+}
+
+Screen.-narrow #workflow-detail-panel .button-row {
+    margin: 0;
+}
+
+Screen.-narrow #workflow-detail-panel .button-row Button {
+    width: 1fr;
+    min-width: 0;
+    margin-right: 1;
+}
+
+ReviewModal.-narrow #review-dialog {
+    width: 95%;
+    height: 90%;
+    padding: 0 1;
+}
+
+ReviewModal.-narrow #review-dialog .button-row {
+    layout: vertical;
+    margin: 0;
+}
+
+ReviewModal.-narrow #review-dialog .button-row Button {
+    width: 100%;
+    margin-right: 0;
+}

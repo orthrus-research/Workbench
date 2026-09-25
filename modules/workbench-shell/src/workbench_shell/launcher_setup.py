@@ -17,7 +17,8 @@ import sys
 from typing import Any, TextIO
 
 from .runtime_launch import RuntimeLaunchError, _probe_launcher
-from workbench_core.setup_cli import SetupCancelled, _prompt, default_setup_record_path
+from workbench_core.setup_cli import SetupCancelled, _prompt
+from workbench_core.user_config_home import default_user_record_path
 from workbench_core.tooling_provision import inspect_tools
 from workbench_api.state_paths import default_runtime_state_root
 
@@ -54,9 +55,7 @@ def default_launcher_record_path(
 ) -> Path:
     """Place the additive launcher binding beside User Setup V1."""
 
-    return default_setup_record_path(environment=environment).with_name(
-        "launcher-v1.json"
-    )
+    return default_user_record_path("launcher-v1.json", environment=environment)
 
 
 def _validate_selection(value: Any) -> dict[str, str]:
@@ -98,6 +97,7 @@ def _validate_record(value: Any) -> dict[str, Any]:
         )
     if (
         value.get("format") != RECORD_FORMAT
+        or type(value.get("schema_version")) is not int
         or value.get("schema_version") != SCHEMA_VERSION
     ):
         raise LauncherSetupError("launcher setup record is not V1")
@@ -154,7 +154,7 @@ def _write_launcher_record(
         raise LauncherSetupError(
             "launcher setup parent must be a regular directory"
         )
-    parent.mkdir(parents=True, exist_ok=True)
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = parent / f".{path.name}.{os.getpid()}.tmp"
     if temporary.exists() or temporary.is_symlink():
         raise LauncherSetupError("launcher setup staging path already exists")
@@ -666,12 +666,12 @@ def main(
     stdin = sys.stdin if input_stream is None else input_stream
     stdout = sys.stdout if output is None else output
     stderr = sys.stderr if error is None else error
-    selected_record = _absolute(
-        record_path
-        if record_path is not None
-        else default_launcher_record_path(environment=environment)
-    )
     try:
+        selected_record = _absolute(
+            record_path
+            if record_path is not None
+            else default_launcher_record_path(environment=environment)
+        )
         prior = load_launcher_record(selected_record)
         explicit_operation = args.check or args.plan or args.apply is not None
         interactive = bool(getattr(stdin, "isatty", lambda: False)()) and bool(

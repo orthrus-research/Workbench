@@ -69,12 +69,20 @@ def _paths_overlap(left: Path, right: Path) -> bool:
     )
 
 
-def _prepare_stage_parent(local_state: Path, workspace: Path) -> Path:
-    local_state = local_state.resolve()
+def _prepare_stage_parent(
+    local_state: Path, workspace: Path, *, direct: bool = False
+) -> Path:
+    requested = Path(os.path.abspath(os.fspath(local_state.expanduser())))
+    component = Path(requested.anchor)
+    for part in requested.parts[1:]:
+        component /= part
+        if component.is_symlink():
+            _fail("Blueprint staging root cannot traverse a symbolic link")
+    local_state = requested.resolve()
     if _paths_overlap(local_state, workspace):
         _fail("Blueprint state root cannot overlap the source workspace")
     cursor = local_state
-    for part in ("staging", "blueprints"):
+    for part in (() if direct else ("staging", "blueprints")):
         cursor = cursor / part
         if cursor.is_symlink():
             _fail("Blueprint staging root cannot traverse a symbolic link")
@@ -876,6 +884,7 @@ def stage_material_backed_fluid(
     translation: str | None = None,
     symbol: str | None = None,
     state_root: Path | str | None = None,
+    session_root: Path | str | None = None,
     expected_plan_id: str | None = None,
 ) -> dict[str, Any]:
     """Plan and stage one material-backed fluid without editing its source."""
@@ -923,12 +932,17 @@ def stage_material_backed_fluid(
     material_census, convention_patch, planner = _authority_modules(suite)
     git = _git_executable()
     pattern = convention_patch.load_pattern(suite / EXPERIMENTAL_PATTERN_PATH)
-    local_state = (
-        default_suite_state_root(suite)
-        if state_root is None
-        else Path(state_root).expanduser().resolve()
+    if session_root is not None and state_root is not None:
+        _fail("select either a Blueprint session root or the legacy state root")
+    if session_root is not None:
+        local_state = Path(session_root)
+    elif state_root is not None:
+        local_state = Path(state_root)
+    else:
+        local_state = default_suite_state_root(suite)
+    stage_parent = _prepare_stage_parent(
+        local_state, workspace, direct=session_root is not None
     )
-    stage_parent = _prepare_stage_parent(local_state, workspace)
     temporary = Path(tempfile.mkdtemp(prefix=".plan-", dir=stage_parent))
     try:
         source_census = material_census.census_material_builders(
