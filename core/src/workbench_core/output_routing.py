@@ -97,6 +97,8 @@ def _append_event(path: Path, event: Mapping[str, Any], *, durable: bool = False
             info = os.fstat(descriptor)
             if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                 raise ModuleError(f"module log is not an ordinary file: {path}")
+            if os.name == "posix" and stat.S_IMODE(info.st_mode) != 0o600:
+                os.fchmod(descriptor, 0o600)
             before = info.st_size
             try:
                 remaining = memoryview(payload)

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from workbench_tui.core_client import CoreClient, CoreClientError, SetupInputs
 
@@ -101,6 +103,19 @@ sys.exit(2)
              ["environment", "resolve", explicit, "--json"]],
             self.recorded_calls(),
         )
+
+    async def test_unicode_json_survives_a_legacy_parent_output_encoding(self) -> None:
+        launcher = self.root / "unicode-core.py"
+        launcher.write_text(
+            "import json\n"
+            "print(json.dumps({'format': 'workbench-setup-check-v2', "
+            "'dependencies': [], 'workspace': '/tmp/测试 é'}, ensure_ascii=False))\n",
+            encoding="utf-8",
+        )
+        client = CoreClient((sys.executable, str(launcher)))
+        with patch.dict(os.environ, {"PYTHONIOENCODING": "ascii"}):
+            record = await client.setup_check()
+        self.assertEqual("/tmp/测试 é", record["workspace"])
 
     async def test_migration_is_preflighted_again_before_import(self) -> None:
         preview = await self.client.migration_preview()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import re
 from typing import Any, Mapping, Sequence
@@ -86,11 +87,15 @@ class CoreClient:
         allowed_exit: Sequence[int] = (0,),
         max_output: int = 8 * 1024 * 1024,
     ) -> CommandOutput:
+        # Core's JSON endpoints emit Unicode directly. A redirected Python
+        # stdout may otherwise use the host's legacy code page.
+        environment = {**os.environ, "PYTHONIOENCODING": "utf-8"}
         try:
             process = await asyncio.create_subprocess_exec(
                 *self.command,
                 *arguments,
                 cwd=self.cwd,
+                env=environment,
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

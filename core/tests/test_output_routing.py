@@ -177,6 +177,24 @@ class OutputRoutingTests(unittest.TestCase):
             self.assertNotEqual(log_path, artifact_path)
             self.assertEqual("completed", _events(root)[-1]["outcome"])
 
+    @unittest.skipUnless(os.name == "posix", "POSIX file mode check")
+    def test_existing_module_log_is_private_before_appending(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "modules/sample/2026-09-25.jsonl"
+            path.parent.mkdir(parents=True)
+            path.write_text("previous\n", encoding="utf-8")
+            path.chmod(0o644)
+            with patch("workbench_core.output_routing._now", return_value="2026-09-25T12:00:00.000000Z"):
+                with redirect_stdout(io.StringIO()):
+                    with OutputInvocation({"logs": root}, "sample", "sample.run") as run:
+                        print("captured")
+                        run.exit_code = 0
+            self.assertEqual(0o600, path.stat().st_mode & 0o777)
+            lines = path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual("previous", lines[0])
+            self.assertIn("captured", "".join(lines[1:]))
+
     def test_concurrent_runs_keep_text_with_its_run(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
