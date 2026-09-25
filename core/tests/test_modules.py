@@ -44,7 +44,7 @@ class ModuleAdmissionTests(unittest.TestCase):
         self.assertEqual("unavailable", result[0].state)
 
     def test_core_routes_cannot_be_shadowed(self):
-        for command in ("setup", "storage", "modules", "version"):
+        for command in ("setup", "settings", "storage", "modules", "version"):
             result = discover(entries=[entry(module=Module("sample", "0.1.0", (Capability("sample.run", (command,), "sample:run", "run"),)))])
             self.assertEqual("unavailable", result[0].state)
 

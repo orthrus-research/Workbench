@@ -403,6 +403,10 @@ class ProjectQualificationTests(unittest.TestCase):
             explicit = root / "shared-state"
             environment = os.environ.copy()
             environment["WORKBENCH_STATE_ROOT"] = str(explicit)
+            environment["HOME"] = str(root)
+            environment["USERPROFILE"] = str(root)
+            environment["XDG_STATE_HOME"] = str(root / "user-state")
+            environment["LOCALAPPDATA"] = str(root / "user-state")
 
             completed = subprocess.run(
                 [

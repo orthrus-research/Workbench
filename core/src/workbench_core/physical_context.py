@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 from workbench_api import ExecutionContext
 from workbench_api.state_paths import default_runtime_state_root
@@ -16,9 +16,11 @@ from .setup_cli import (
     default_setup_record_path,
     load_setup_record,
 )
+from .user_preferences import load_workspaces, resolve_expression
 
 
 FORMAT = "workbench-physical-context-v1"
+_UNSET = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +59,9 @@ def resolve_physical_context(
     environment: Mapping[str, str] | None = None,
     current_directory: Path | str | None = None,
     include_saved_setup: bool = True,
+    _setup_record_path: Path | None = None,
+    _saved_setup: Mapping[str, Any] | None | object = _UNSET,
+    _workspace_registry: Mapping[str, Any] | object = _UNSET,
 ) -> PhysicalContext:
     """Derive paths without creating state or activating a selected profile.
 
@@ -66,13 +71,30 @@ def resolve_physical_context(
     """
 
     values = os.environ if environment is None else environment
-    record_path = default_setup_record_path(environment=values)
-    saved = load_setup_record(record_path) if include_saved_setup else None
+    record_path = (
+        default_setup_record_path(environment=values)
+        if _setup_record_path is None
+        else _setup_record_path
+    )
+    saved = None
+    if include_saved_setup:
+        saved = load_setup_record(record_path) if _saved_setup is _UNSET else _saved_setup
     selection = saved["selection"] if saved is not None else {}
+    named_default = None
+    if include_saved_setup and workspace is None:
+        registry = (
+            load_workspaces(environment=values)
+            if _workspace_registry is _UNSET
+            else _workspace_registry
+        )
+        if registry["default"] is not None:
+            entry = next(row for row in registry["entries"] if row["name"] == registry["default"])
+            named_default = resolve_expression(entry["path"], environment=values)
     selected_workspace = (
         workspace
         if workspace is not None
-        else selection.get("workspace")
+        else named_default
+        or selection.get("workspace")
         or values.get("WORKBENCH_WORKSPACE")
         or current_directory
         or Path.cwd()

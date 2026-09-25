@@ -17,7 +17,8 @@ import sys
 from typing import Any, TextIO
 
 from .runtime_launch import RuntimeLaunchError, _probe_launcher
-from workbench_core.setup_cli import SetupCancelled, _prompt, default_setup_record_path
+from workbench_core.setup_cli import SetupCancelled, _prompt
+from workbench_core.user_config_home import default_user_record_path
 from workbench_core.tooling_provision import inspect_tools
 from workbench_api.state_paths import default_runtime_state_root
 
@@ -54,9 +55,7 @@ def default_launcher_record_path(
 ) -> Path:
     """Place the additive launcher binding beside User Setup V1."""
 
-    return default_setup_record_path(environment=environment).with_name(
-        "launcher-v1.json"
-    )
+    return default_user_record_path("launcher-v1.json", environment=environment)
 
 
 def _validate_selection(value: Any) -> dict[str, str]:

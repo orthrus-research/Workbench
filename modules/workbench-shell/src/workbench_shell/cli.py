@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from workbench_project_intelligence import ProjectInspectionError
 
@@ -2703,6 +2703,7 @@ def main(
     argv: Sequence[str] | None = None,
     *,
     feature_program: str | None = None,
+    resolved_locations: Mapping[str, Path] | None = None,
 ) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     from workbench_core.host_services import install_local_host_services
@@ -2950,6 +2951,11 @@ def main(
                 color=args.color,
                 translation=args.translation,
                 symbol=args.symbol,
+                session_root=(
+                    resolved_locations.get("blueprint_sessions")
+                    if resolved_locations is not None
+                    else None
+                ),
             )
         elif args.command == "material-fluid":
             current_plan = plan_material_fluid_trial(
