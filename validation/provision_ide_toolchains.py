@@ -9,13 +9,15 @@ import argparse
 import json
 from pathlib import Path
 import platform
-import shutil
+import re
 import stat
 import sys
 import tarfile
 import tempfile
 from typing import Any
 import zipfile
+
+from core_run_custody import promote_ide_toolchain_directory
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -116,7 +118,18 @@ def provision_entry(
     extractor: Any,
     extracted_root: str | None = None,
 ) -> Path:
-    destination = TOOLCHAIN_ROOT / entry["archive_root"]
+    archive_root = entry["archive_root"]
+    expected_root = extracted_root or archive_root
+    if any(
+        not isinstance(name, str) or name in {"", ".", ".."}
+        or Path(name).name != name or "\\" in name or "\0" in name
+        for name in (archive_root, expected_root)
+    ) or (
+        not isinstance(entry["archive_sha256"], str)
+        or re.fullmatch(r"[0-9a-f]{64}", entry["archive_sha256"]) is None
+    ):
+        raise ProvisionFailure("IDE toolchain lock has an invalid extraction root or archive digest")
+    destination = TOOLCHAIN_ROOT / archive_root
     marker = destination / ".workbench-provisioned-sha256"
     for component in (TOOLCHAIN_ROOT, *TOOLCHAIN_ROOT.parents):
         if component.is_symlink() or getattr(component, "is_junction", lambda: False)():
@@ -136,25 +149,29 @@ def provision_entry(
                 pass
         raise ProvisionFailure(f"existing IDE toolchain differs from its lock; retain for review: {destination}")
 
+    if TOOLCHAIN_ROOT.exists():
+        prefix = archive_root + "."
+        if any(member.name.startswith(prefix) for member in TOOLCHAIN_ROOT.iterdir()):
+            raise ProvisionFailure(f"interrupted IDE toolchain extraction requires review: {destination}")
+
     archive = download(entry, suffix)
     TOOLCHAIN_ROOT.mkdir(parents=True, exist_ok=True)
     temporary = Path(
-        tempfile.mkdtemp(prefix=entry["archive_root"] + ".", dir=TOOLCHAIN_ROOT)
+        tempfile.mkdtemp(prefix=archive_root + ".", dir=TOOLCHAIN_ROOT)
     )
     try:
         extractor(archive, temporary)
-        expected_root = extracted_root or entry["archive_root"]
-        extracted = temporary / expected_root
-        if not extracted.is_dir():
-            raise ProvisionFailure(
-                f"archive lacks expected root {expected_root}"
-            )
-        if destination.exists() or destination.is_symlink():
-            raise ProvisionFailure(f"IDE toolchain destination appeared during extraction; retain for review: {destination}")
-        extracted.replace(destination)
-        marker.write_text(entry["archive_sha256"] + "\n", encoding="ascii")
-    finally:
-        shutil.rmtree(temporary, ignore_errors=True)
+    except Exception as exc:
+        raise ProvisionFailure(f"IDE extraction failed; retain stage for review: {temporary}: {exc}") from exc
+    extracted = temporary / expected_root
+    if not extracted.is_dir():
+        raise ProvisionFailure(f"archive lacks expected root {expected_root}; retain stage for review: {temporary}")
+    try:
+        promote_ide_toolchain_directory(
+            extracted, destination, (entry["archive_sha256"] + "\n").encode("ascii"),
+        )
+    except OSError as exc:
+        raise ProvisionFailure(str(exc)) from exc
     return destination
 
 

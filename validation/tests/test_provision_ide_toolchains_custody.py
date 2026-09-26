@@ -106,8 +106,31 @@ class IdeExtractionPreservationTests(unittest.TestCase):
             again = provision.provision_entry(
                 self.entry, suffix=".zip", extractor=self._extract,
             )
+            interrupted_tail = self.toolchains / "locked-tool.postmove"
+            interrupted_tail.mkdir()
+            after_interruption = provision.provision_entry(
+                self.entry, suffix=".zip", extractor=self._extract,
+            )
         self.assertEqual(published, again)
+        self.assertEqual(published, after_interruption)
+        self.assertTrue(interrupted_tail.is_dir())
         download.assert_called_once()
+
+    def test_invalid_lock_root_refuses_before_download_or_stage(self) -> None:
+        for archive_root, extracted_root in (
+            ("../escape", None), ("locked-tool", "../escape"),
+            ("locked/tool", None),
+        ):
+            with self.subTest(archive_root=archive_root, extracted_root=extracted_root):
+                entry = {**self.entry, "archive_root": archive_root}
+                with patch.object(provision, "download") as download:
+                    with self.assertRaisesRegex(provision.ProvisionFailure, "invalid extraction root"):
+                        provision.provision_entry(
+                            entry, suffix=".zip", extractor=self._extract,
+                            extracted_root=extracted_root,
+                        )
+                    download.assert_not_called()
+        self.assertFalse(self.toolchains.exists())
 
     def test_changed_or_missing_marker_preserves_existing_tree_on_retries(self) -> None:
         for marker_bytes in (b"different\n", b"\xff", None):
@@ -175,12 +198,55 @@ class IdeExtractionPreservationTests(unittest.TestCase):
             (destination / "keep.bin").write_bytes(b"other publisher")
 
         with patch.object(provision, "download", return_value=self.archive):
-            with self.assertRaisesRegex(provision.ProvisionFailure, "appeared during extraction"):
+            with self.assertRaisesRegex(provision.ProvisionFailure, "already exists"):
                 provision.provision_entry(
                     self.entry, suffix=".zip", extractor=competing_extraction,
                 )
         self.assertEqual(b"other publisher", (destination / "keep.bin").read_bytes())
-        self.assertEqual([], list(self.toolchains.glob("locked-tool.*")))
+        stages = list(self.toolchains.glob("locked-tool.*"))
+        self.assertEqual(1, len(stages))
+        self.assertEqual(
+            (self.entry["archive_sha256"] + "\n").encode(),
+            (stages[0] / "locked-tool/.workbench-provisioned-sha256").read_bytes(),
+        )
+        (destination / "keep.bin").unlink()
+        destination.rmdir()
+        with patch.object(provision, "download") as download:
+            with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted IDE toolchain extraction"):
+                provision.provision_entry(
+                    self.entry, suffix=".zip", extractor=self._extract,
+                )
+            download.assert_not_called()
+
+    def test_preexisting_interrupted_stage_refuses_before_download(self) -> None:
+        stage = self.toolchains / "locked-tool.partial123"
+        stage.mkdir(parents=True)
+        (stage / "partial.bin").write_bytes(b"historical residue")
+        with patch.object(provision, "download") as download:
+            with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted IDE toolchain extraction"):
+                provision.provision_entry(
+                    self.entry, suffix=".zip", extractor=self._extract,
+                )
+            download.assert_not_called()
+        self.assertEqual(b"historical residue", (stage / "partial.bin").read_bytes())
+
+    def test_failed_extraction_retains_partial_stage_and_refuses_retry(self) -> None:
+        def broken_extraction(_archive: Path, temporary: Path) -> None:
+            (temporary / "partial.bin").write_bytes(b"unfinished")
+            raise OSError("archive ended early")
+
+        with patch.object(provision, "download", return_value=self.archive) as download:
+            with self.assertRaisesRegex(provision.ProvisionFailure, "retain stage for review"):
+                provision.provision_entry(
+                    self.entry, suffix=".zip", extractor=broken_extraction,
+                )
+            stage, = self.toolchains.glob("locked-tool.*")
+            self.assertEqual(b"unfinished", (stage / "partial.bin").read_bytes())
+            with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted IDE toolchain extraction"):
+                provision.provision_entry(
+                    self.entry, suffix=".zip", extractor=self._extract,
+                )
+            download.assert_called_once()
 
 
 if __name__ == "__main__":

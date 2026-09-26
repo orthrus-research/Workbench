@@ -155,6 +155,34 @@ def open_validation_invocation(
         raise OSError(f"Core invocation store is unavailable: {exc}") from exc
 
 
+def promote_ide_toolchain_directory(payload: Path, target: Path, marker: bytes) -> Path:
+    """Ask Core for an atomic no-replace move of one prepared extraction.
+
+    This bootstrap adapter does not claim exact member admission. A failed
+    promotion retains the prepared stage and every existing destination.
+    """
+
+    if (
+        not isinstance(payload, Path) or not isinstance(target, Path)
+        or payload.parent.parent != target.parent
+        or not payload.parent.name.startswith(target.name + ".")
+        or type(marker) is not bytes or re.fullmatch(rb"[0-9a-f]{64}\n", marker) is None
+    ):
+        raise OSError("IDE toolchain stage or lock marker is invalid")
+    _source_core()
+    from workbench_core.prepared_directory_promotion import (
+        PreparedDirectoryError, promote_prepared_directory,
+    )
+
+    try:
+        return promote_prepared_directory(
+            payload, target, marker_name=".workbench-provisioned-sha256",
+            marker_bytes=marker,
+        )
+    except PreparedDirectoryError as exc:
+        raise OSError(f"Core IDE toolchain promotion needs review: {exc}") from exc
+
+
 def publish_ci_plan(
     root: Path, output: Path, payload: bytes, *,
     configuration_home: Path | None = None,
@@ -212,5 +240,5 @@ def publish_ci_plan(
 
 __all__ = [
     "allocate_validation_run", "allocate_validation_scratch", "publish_ci_plan",
-    "publish_validation_timing", "open_validation_invocation",
+    "publish_validation_timing", "open_validation_invocation", "promote_ide_toolchain_directory",
 ]
