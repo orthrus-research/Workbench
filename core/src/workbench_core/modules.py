@@ -113,12 +113,15 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         durable_resources = None
         record_stores = nullcontext()
         attempt_stores = nullcontext()
+        check_stores = nullcontext()
         tree_stores = nullcontext()
         if context.configuration_home is not None:
             from .storage.registered import CoreDurableResources
             from .storage.record_stores import CoreRecordStores
             from .managed_attempts import CoreManagedAttempts
             from workbench_api.managed_attempts import managed_attempts_scope
+            from .check_attempts import CoreCheckAttempts
+            from workbench_api.check_attempts import check_attempts_scope
             from .managed_trees import CoreManagedTrees
             from workbench_api.managed_trees import managed_trees_scope
             durable_resources = CoreDurableResources(
@@ -135,12 +138,16 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
                 configuration_home=context.configuration_home,
                 owner_id=owner.id,
             ))
-            attempt_stores = managed_attempts_scope(CoreManagedAttempts(
+            managed_attempt_host = CoreManagedAttempts(
                 workspace=context.workspace,
                 configuration_home=context.configuration_home,
                 state_root=context.state_root,
                 locations=context.locations,
                 owner_id=owner.id,
+            )
+            attempt_stores = managed_attempts_scope(managed_attempt_host)
+            check_stores = check_attempts_scope(CoreCheckAttempts(
+                managed_attempt_host, check_cancelled=context.check_cancelled,
             ))
             tree_stores = managed_trees_scope(CoreManagedTrees(
                 workspace=context.workspace,
@@ -167,7 +174,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         try:
             from workbench_api.archive_exchange import archive_exchange_scope
             from .archive_port import CoreArchiveExchange
-            with record_stores, attempt_stores, tree_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
+            with record_stores, attempt_stores, check_stores, tree_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
                 handler = getattr(import_module(package), name)
                 result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:

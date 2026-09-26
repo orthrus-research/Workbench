@@ -14,8 +14,10 @@ import re
 from types import SimpleNamespace
 
 from workbench_api import ExecutionContext
+from workbench_api.check_attempts import check_attempts
 from workbench_api.processes import ProcessError, execute_process
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
+from workbench_api.retained_snapshots import RetainedSnapshotAdmission
 from workbench_core import check_storage as storage
 from workbench_core import check_snapshots as snapshots
 from workbench_core import check_diagnostics
@@ -35,6 +37,8 @@ AUTHORITY = {"source_mutated": False, "minecraft_launched": False,
              "whole_pack_parity": False}
 REQUEST = "workbench-material-check-request-v1"
 RESULT = "workbench-material-check-result-v1"
+ATTEMPT_FAMILY = "material-checks"
+ATTEMPT_PREFIX = "material-check"
 
 
 def _domain():
@@ -62,6 +66,12 @@ def _attempt(root, identity):
     if not isinstance(identity, str) or re.fullmatch(r"material-check-[0-9a-f]{32}", identity) is None:
         raise ValueError("select one exact retained material-check attempt")
     return root / ".workbench/check-attempts" / identity
+
+
+def _checked_attempt(root, identity):
+    return check_attempts().open_attempt(
+        ATTEMPT_FAMILY, ATTEMPT_PREFIX, identity, requested_root=root,
+    )
 
 
 def _reference(path, record):
@@ -103,6 +113,7 @@ def _load(root, identity, selection):
         row = next((row for row in lifecycle.history(root)['checks'] if row['attempt_id'] == identity), None)
         if row is not None:
             raise ValueError('retained check details are ' + row['state'] + '; use workbench storage --checks history for recovery')
+    attempt = _checked_attempt(root, identity).path
     request = _sealed(storage.read_json(attempt / "request.json"), "material-check-request")
     if (request.get("format") != REQUEST or request["workspace_uri"] != selection.pack_uri
             or request["selection_id"] != selection.id or request["attempt_id"] != identity
@@ -251,7 +262,8 @@ def publish_snapshot(root, identity, selection, *, cancelled=lambda: False):
         _verify_record(record, attempt, request, selection)
         domain.verify_references(record)
 
-    manifest = snapshots.publish(attempt, attempt / 'result.json', scope=domain.scope(request), verify=verify,
+    reference = _checked_attempt(root, identity)
+    manifest = check_attempts().publish_snapshot(reference, 'result.json', scope=domain.scope(request), verify=verify,
         describe=lambda record: domain.describe(record, request, retained_inputs=retained, producer_sha256=producer),
         cancelled=cancelled)
     register_snapshot(root, identity, selection)
@@ -267,20 +279,31 @@ def register_snapshot(root, identity, selection):
     if request['baseline'] is not None:
         inputs['saved-baseline-program'] = 'baseline.zip'
         sources.append('baseline-source')
-    return lifecycle.register(root, attempt, inputs=inputs, source_directories=sources,
+    return check_attempts().register_snapshot(_checked_attempt(root, identity),
+        inputs=inputs, source_directories=tuple(sources),
         context={'selection_id': request['selection_id'], 'workspace_uri': request['workspace_uri'],
                  'context_id': request['inputs']['context']['id'], 'owner': 'axiom'},
-        reproduction=[{'role': role, 'path': value} for role, value in request['paths'].items()])
+        reproduction=tuple({'role': role, 'path': value} for role, value in request['paths'].items()))
 
 
 @contextmanager
 def open_snapshot(root, identity, selection, *, cancelled=lambda: False):
     """Owner-authorized read lease with current retained-source verification."""
     from workbench_axiom import retained_snapshots as domain
+    from workbench_axiom.retained_evidence import admit_retained_snapshot
     attempt, request, _ = _load(root, identity, selection)
     expected = {'attempt_id': identity, 'request_id': request['id'], 'bindings': domain.bindings(request)}
-    with snapshots.Snapshot(attempt, scope=lambda manifest: domain.resolve_scope(request, manifest, scope_identity=scope_identity), expected=expected,
-                            supported_schemas=domain.SUPPORTED_SCHEMAS, cancelled=cancelled) as opened:
+    admission = RetainedSnapshotAdmission(
+        scope=lambda manifest: domain.resolve_scope(request, manifest, scope_identity=scope_identity),
+        expected=expected, supported_schemas=domain.SUPPORTED_SCHEMAS,
+    )
+    with check_attempts().read_snapshot(
+        _checked_attempt(root, identity), admission=admission,
+        owner_id='axiom', admit=admit_retained_snapshot,
+        expected_context={'selection_id': selection.id, 'workspace_uri': selection.pack_uri,
+                          'context_id': request['inputs']['context']['id']},
+        cancelled=cancelled,
+    ) as opened:
         yield opened
 
 
@@ -292,8 +315,13 @@ def snapshot_query(root, identity, selection, query, *, cancelled=lambda: False)
 def rebuild_snapshot(root, identity, selection, *, cancelled=lambda: False):
     from workbench_axiom import retained_snapshots as domain
     attempt, request, _ = _load(root, identity, selection)
-    return snapshots.rebuild(attempt, scope=lambda manifest: domain.resolve_scope(request, manifest, scope_identity=scope_identity),
-        expected={'attempt_id': identity, 'request_id': request['id'], 'bindings': domain.bindings(request)}, cancelled=cancelled)
+    admission = RetainedSnapshotAdmission(
+        scope=lambda manifest: domain.resolve_scope(request, manifest, scope_identity=scope_identity),
+        expected={'attempt_id': identity, 'request_id': request['id'], 'bindings': domain.bindings(request)},
+        supported_schemas=domain.SUPPORTED_SCHEMAS,
+    )
+    return check_attempts().rebuild_snapshot(_checked_attempt(root, identity), admission=admission,
+                                             cancelled=cancelled)
 
 
 def _history_record(root, identity, selection):
@@ -534,7 +562,9 @@ def _prepare(selection, root, state, args):
         baseline["expectation_policy"] = "current-request-intent-evaluated-for-both-fresh-workers"
         before_zip = (before_dir / "program.zip").read_bytes()
     operation.require_fresh()
-    attempt = storage.allocate_attempt(root, "material-check")
+    attempt = check_attempts().allocate(
+        ATTEMPT_FAMILY, ATTEMPT_PREFIX, requested_root=root, workspace=selection.workspace,
+    ).path
     candidate = stage_candidate(inputs, attempt / "source")
     storage.write_bytes(attempt / "program.zip", raw)
     storage.write_bytes(attempt / "intent.json", intent)
@@ -562,19 +592,15 @@ class _Cancellation:
     def is_set(self):
         if self.outer():
             return True
-        path = self.attempt / "cancel.json"
-        if not path.exists():
-            return False
-        if storage.read_json(path) != {"request_id": self.request["id"]}:
-            raise ValueError("material cancellation belongs to another request")
-        return True
+        return check_attempts().cancellation_requested(self.attempt, self.request["id"])
 
 
 def _execute(selection, root, state, identity, confirmation, cancelled):
     attempt, request, _ = _load(root, identity, selection)
+    reference = _checked_attempt(root, identity)
     if confirmation != request["id"]:
         raise ValueError("confirm the exact prepared material request ID")
-    with lifecycle.lease(root), storage.execution_lock(attempt):
+    with check_attempts().execution(reference):
         if (attempt / "started.json").exists():
             raise ValueError("material attempt was already started; prepare a new check")
         operation = observe_developer_context(selection)
@@ -586,7 +612,7 @@ def _execute(selection, root, state, identity, confirmation, cancelled):
             raise ValueError("selected Axiom inputs changed; prepare a fresh material check")
         operation.require_fresh()
         storage.write_json(attempt / "started.json", {"request_id": request["id"]})
-        token = _Cancellation(attempt, request, cancelled)
+        token = _Cancellation(reference, request, cancelled)
         native, failure, code = None, None, None
         try:
             from workbench_axiom.cli import invoke
@@ -806,10 +832,11 @@ def _run(selection, argv, *, state_root, cancelled=lambda: False):
             section=args.section, key=args.key, digest=args.sha256, cancelled=cancelled)
     elif args.action == "cancel":
         attempt, request, _ = _load(root, args.attempt, selection)
+        selected = _checked_attempt(root, args.attempt)
         complete = (attempt / snapshots.DIRECTORY / 'publication.json').exists() or (
-            (attempt / "result.json").exists() and not storage.execution_active(attempt))
-        if not complete and not (attempt / "cancel.json").exists():
-            storage.write_json(attempt / "cancel.json", {"request_id": request["id"]})
+            (attempt / "result.json").exists() and not check_attempts().active(selected))
+        if not complete:
+            check_attempts().request_cancel(selected, request["id"])
         result = {"format": "workbench-material-check-cancellation-v1", "attempt_id": args.attempt,
                   "state": "already-completed" if complete else "requested"}
     elif args.action == "source" and (_attempt(root, args.attempt) / snapshots.DIRECTORY).exists():
@@ -844,7 +871,8 @@ def _run(selection, argv, *, state_root, cancelled=lambda: False):
     if args.action in {"show", "execute", "run"}:
         attempt, request, _ = _load(root, args.attempt, selection)
         if args.action != 'show':
-            if (cancelled() or (attempt / 'cancel.json').exists()) and not (
+            if (cancelled() or check_attempts().cancellation_requested(
+                    _checked_attempt(root, args.attempt), request['id'])) and not (
                     attempt / snapshots.DIRECTORY / 'publication.json').exists():
                 result, reference = presentation_api.unpublished(result, request), None
             else:

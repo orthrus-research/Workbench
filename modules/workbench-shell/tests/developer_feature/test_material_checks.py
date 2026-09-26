@@ -18,10 +18,13 @@ from unittest.mock import patch
 import zipfile
 
 from test_developer_feature import ROOT, _checkout
+from workbench_api.check_attempts import check_attempts_scope
 from workbench_api.processes import ProcessError
 from workbench_axiom.material_checks import source_acknowledgement
 from workbench_core import check_storage as storage
 from workbench_core import setup_cli
+from workbench_core.check_attempts import CoreCheckAttempts
+from workbench_core.managed_attempts import CoreManagedAttempts
 from workbench_core.modules import InstalledModule
 from workbench_profile_supersymmetry import axiom as policy
 from workbench_profile_cleanroom import axiom as platform_policy
@@ -165,6 +168,12 @@ class SavedMaterialCheckTests(unittest.TestCase):
         request = self.prepare()
         self.execute(request)
         directory = self.directory(request)
+        # This fixture rewrites the publication to model a pre-custody
+        # historical snapshot. Remove its modern registration so Core selects
+        # the historical owner-admitted reader rather than a false custody ID.
+        (directory / '.workbench-check-custody-v1.json').unlink()
+        (directory.parents[2] / '.workbench/runtime-manager/checks' /
+         (request['attempt_id'] + '.json')).unlink()
         publication_path = directory / 'snapshot/publication.json'
         publication = storage.read_json(publication_path, byte_limit=None)
         publication['summary']['overview']['format'] = 'axiom-check-overview-v1'
@@ -206,6 +215,13 @@ class SavedMaterialCheckTests(unittest.TestCase):
         environment_patch.start()
         self.addCleanup(environment_patch.stop)
         self.selection = DeveloperSelection(self.pack.as_uri(), "supersymmetry", "cleanroom", "cleanroom-provisional")
+        scopes = contextlib.ExitStack()
+        self.addCleanup(scopes.close)
+        scopes.enter_context(check_attempts_scope(CoreCheckAttempts(CoreManagedAttempts(
+            workspace=self.pack, configuration_home=self.base / "core-configuration",
+            state_root=self.state, locations={"evidence": self.base / "evidence"},
+            owner_id="workbench-shell",
+        ))))
         self.program = self.pack / "authoring/groovy"
         (self.program / "material").mkdir(parents=True)
         (self.program / "runConfig.json").write_text('{"packId":"supersymmetry"}')

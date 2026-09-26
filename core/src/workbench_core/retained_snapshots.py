@@ -106,6 +106,7 @@ class _Reader:
         self._opened = opened
         self.request, self.custody = request, custody
         self.manifest = opened.manifest
+        self.publication = opened.publication
         self.scope_supported = opened.scope_supported
         self.unsupported_sections = opened.unsupported_sections
 
@@ -114,6 +115,12 @@ class _Reader:
 
     def query(self, query):
         return self._opened.query(query)
+
+    def export(self, destination):
+        return self._opened.export(destination)
+
+    def export_record(self, section, key, digest, destination):
+        return self._opened.export_record(section, key, digest, destination)
 
 
 def provider():
