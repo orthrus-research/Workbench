@@ -186,11 +186,14 @@ jobs:
           pixi run --environment release --locked --no-config python tools/build_native_distribution.py --from-wheelhouse .workbench/native-suite --output .workbench/core-wheelhouse --diagnostics .workbench/validation/ci/core-closure
           pixi run --environment release --locked --no-config python tools/install_workbench.py .workbench/core-wheelhouse --destination "$RUNNER_TEMP/workbench-native-core" --diagnostics .workbench/validation/ci/core-install
 
+      - name: Resolve the exact Core-registered native upload
+        id: native_upload
+        run: pixi run --environment release --locked --no-config python validation/ci_artifacts.py native-assembly --diagnostics .workbench/validation/ci/native-build --github-output "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: success()
         with:
           name: native-linux-assembly
-          path: .workbench/native-suite/
+          path: ${{ steps.native_upload.outputs.path }}
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
