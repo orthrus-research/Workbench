@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 
-from workbench_core import settings_cli
+from workbench_core import settings_cli, tooling_provision
 from workbench_core.environment_reconstruction import (
     ReconstructionError,
     apply_import,
@@ -26,6 +26,10 @@ from workbench_core.environment_reconstruction import (
     export_share,
     load_share,
     plan_import,
+    validate_share,
+)
+from workbench_core.portable_managed_tools import (
+    PortableToolLockError, build_managed_tool_lock, validate_managed_tool_lock,
 )
 from workbench_core.environment_resolution import resolve_environment
 from workbench_core.runtime_java import (
@@ -725,6 +729,117 @@ class EnvironmentReconstructionTests(TestCase):
         self.assertEqual(source, imported["project_source_lock"])
         self.assertIn("workspace-project-bytes", imported["unresolved_inputs"])
         self.assertEqual(original, build_share(self.source_suite, "pack", environment=self.source_environment))
+
+    def test_v3_share_locks_managed_tool_policy_without_acquiring_bytes(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice()
+        source_bound = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True,
+        )
+        bound = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True, bind_managed_tools=True,
+        )
+        self.assertEqual("workbench-environment-share-v2", source_bound["format"])
+        self.assertEqual("workbench-environment-share-v3", bound["format"])
+        self.assertEqual(source_bound["intent"], bound["intent"])
+        self.assertEqual(source_bound["lock"]["project_source_lock"], bound["lock"]["project_source_lock"])
+        self.assertNotEqual(source_bound["share_id"], bound["share_id"])
+        schema = json.loads((
+            SOURCE_SUITE / "core/src/workbench_core/schemas/workbench-environment-share-v3.schema.json"
+        ).read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(bound)
+        self.assertEqual(bound, validate_share(bound))
+        self.assertEqual(bound["lock"]["managed_tool_lock"], build_managed_tool_lock(bound["lock"]["host_variant"]))
+        with self.assertRaisesRegex(ReconstructionError, "requires an exact project source lock"):
+            build_share(
+                self.source_suite, "pack", environment=self.source_environment,
+                bind_managed_tools=True,
+            )
+        exported = export_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True, bind_managed_tools=True,
+        )
+        self.assertEqual(bound, exported["share"])
+        self.assertEqual(bound, load_share(exported["resource"]["path"]))
+
+        plan = plan_import(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual(("ready", "workbench-environment-import-plan-v4"), (plan["state"], plan["format"]))
+        self.assertEqual(bound["lock"]["managed_tool_lock"], plan["managed_tool_lock"])
+        report = assess_reconstruction_feasibility(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        feasibility_schema = json.loads((
+            SOURCE_SUITE / "core/src/workbench_core/schemas/workbench-environment-feasibility-v2.schema.json"
+        ).read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(feasibility_schema)
+        Draft202012Validator(feasibility_schema).validate(report)
+        self.assertEqual("workbench-environment-feasibility-v2", report["format"])
+        self.assertEqual("bytes-unavailable", report["managed_tools"]["state"])
+        self.assertEqual({"prism": "missing", "packwiz": "missing"}, report["managed_tools"]["tools"])
+        self.assertEqual("missing-profile-fixture-lock", report["profile_fixture_tools"]["state"])
+        self.assertEqual("missing-package-lock", report["optional_module_packages"]["state"])
+        with patch("workbench_core.tooling_provision.prepare_tools", side_effect=AssertionError("tool acquisition forbidden")):
+            imported = apply_import(
+                self.target_suite, bound, expected_plan_id=plan["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                environment=self.target_environment,
+            )
+        self.assertEqual("workbench-environment-import-result-v4", imported["format"])
+        self.assertEqual(bound["lock"]["managed_tool_lock"], imported["managed_tool_lock"])
+        self.assertIn("profile-fixture-and-tool-bytes", imported["unresolved_inputs"])
+        attempt = list((self.target_root / "state/evidence/outputs/workbench-core").glob(
+            "*-environment-import-attempt.json"
+        ))
+        self.assertEqual(1, len(attempt))
+        self.assertEqual("workbench-environment-import-attempt-v4", json.loads(attempt[0].read_text())["format"])
+
+    def test_v3_share_refuses_resealed_invalid_tool_policy_and_local_drift(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice()
+        bound = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True, bind_managed_tools=True,
+        )
+        for field, replacement in (("archive", []), ("url", "http://unsafe.invalid/file"), ("size", True)):
+            with self.subTest(field=field):
+                forged = deepcopy(bound)
+                forged["lock"]["managed_tool_lock"]["assets"]["prism"][field] = replacement
+                _reseal(forged["lock"]["managed_tool_lock"], "workbench-managed-tool-policy", "lock_id")
+                _reseal(forged["lock"], "workbench-environment-lock", "lock_id")
+                _reseal(forged, "workbench-environment-share", "share_id")
+                with self.assertRaisesRegex(ReconstructionError, "managed-tool lock is invalid"):
+                    validate_share(forged)
+        with self.assertRaises(PortableToolLockError):
+            validate_managed_tool_lock({**bound["lock"]["managed_tool_lock"], "host_variant": {"os": "mac", "architecture": "x64"}})
+        boolean_version = deepcopy(bound["lock"]["managed_tool_lock"])
+        boolean_version["schema_version"] = True
+        _reseal(boolean_version, "workbench-managed-tool-policy", "lock_id")
+        with self.assertRaises(PortableToolLockError):
+            validate_managed_tool_lock(boolean_version)
+        host_key = "-".join(bound["lock"]["host_variant"].values())
+        prism_policy = tooling_provision.ASSETS[host_key]["prism"]
+        with patch.dict(prism_policy, {"size": prism_policy["size"] + 1}):
+            plan = plan_import(
+                self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+                environment=self.target_environment,
+            )
+            self.assertEqual("blocked", plan["state"])
+            self.assertIn("target managed-tool policy differs from the exact portable lock", plan["blockers"])
+            self.assertEqual("existing", plan["configuration_manifest_action"])
+            report = assess_reconstruction_feasibility(
+                self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+                environment=self.target_environment,
+            )
+            self.assertEqual("policy-drifted", report["managed_tools"]["state"])
+            self.assertFalse((self.target_root / "config").exists())
+
 
     def test_v2_share_refuses_source_lock_drift_before_workspace_binding(self) -> None:
         self._attach_local_source_lock()

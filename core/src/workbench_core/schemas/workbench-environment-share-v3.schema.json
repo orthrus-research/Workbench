@@ -1,0 +1,485 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Workbench environment share V3 with exact project and managed-tool policy locks",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "intent",
+    "lock",
+    "share_id"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-environment-share-v3"
+    },
+    "schema_version": {
+      "const": 3
+    },
+    "share_id": {
+      "$ref": "#/$defs/shareId"
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "selection",
+        "java",
+        "intent_id"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-environment-intent-v1"
+        },
+        "schema_version": {
+          "const": 1
+        },
+        "intent_id": {
+          "$ref": "#/$defs/intentId"
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "configuration_schema",
+            "pack_document",
+            "pack_variant",
+            "platform_document"
+          ],
+          "properties": {
+            "configuration_schema": {
+              "const": "workbench/config/v1"
+            },
+            "pack_document": {
+              "$ref": "#/$defs/profilePath"
+            },
+            "pack_variant": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            },
+            "platform_document": {
+              "$ref": "#/$defs/profilePath"
+            }
+          }
+        },
+        "java": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "feature_version"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "profile-default",
+                "managed-feature",
+                "local-binding-required"
+              ]
+            },
+            "feature_version": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "enum": [
+                null,
+                8
+              ]
+            }
+          }
+        }
+      }
+    },
+    "lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "schema_version",
+        "intent_id",
+        "selection_digest",
+        "pack_profile",
+        "platform_profile",
+        "java_policy",
+        "host_variant",
+        "unresolved_inputs",
+        "project_source_lock",
+        "managed_tool_lock",
+        "lock_id"
+      ],
+      "properties": {
+        "format": {
+          "const": "workbench-environment-lock-v3"
+        },
+        "schema_version": {
+          "const": 3
+        },
+        "intent_id": {
+          "$ref": "#/$defs/intentId"
+        },
+        "lock_id": {
+          "$ref": "#/$defs/lockId"
+        },
+        "selection_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "pack_profile": {
+          "$ref": "#/$defs/profileLock"
+        },
+        "platform_profile": {
+          "$ref": "#/$defs/profileLock"
+        },
+        "project_source_lock": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relative_path",
+            "sha256",
+            "repository",
+            "revision",
+            "tree"
+          ],
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "pattern": "^profiles/.+\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "repository": {
+              "type": "string",
+              "pattern": "^https://.+\\.git$"
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "tree": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            }
+          }
+        },
+        "java_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profile_policy_sha256",
+            "selected_policy_sha256",
+            "feature_version",
+            "runtime_identity",
+            "release_name"
+          ],
+          "properties": {
+            "profile_policy_sha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "selected_policy_sha256": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/digest"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "feature_version": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "runtime_identity": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "release_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "host_variant": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "os",
+            "architecture"
+          ],
+          "properties": {
+            "os": {
+              "enum": [
+                "linux",
+                "windows",
+                "mac"
+              ]
+            },
+            "architecture": {
+              "enum": [
+                "x64",
+                "aarch64",
+                "ppc64le",
+                "s390x",
+                "riscv64"
+              ]
+            }
+          }
+        },
+        "unresolved_inputs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "managed_tool_lock": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "format",
+            "schema_version",
+            "host_variant",
+            "assets",
+            "prism_version",
+            "go_version",
+            "packwiz_source",
+            "lock_id"
+          ],
+          "properties": {
+            "format": {
+              "const": "workbench-managed-tool-policy-lock-v1"
+            },
+            "schema_version": {
+              "const": 1
+            },
+            "host_variant": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "os",
+                "architecture"
+              ],
+              "properties": {
+                "os": {
+                  "enum": [
+                    "linux",
+                    "windows"
+                  ]
+                },
+                "architecture": {
+                  "const": "x64"
+                }
+              }
+            },
+            "assets": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "prism",
+                "go",
+                "packwiz"
+              ],
+              "properties": {
+                "prism": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "filename",
+                    "url",
+                    "sha256",
+                    "size",
+                    "executable",
+                    "archive"
+                  ],
+                  "properties": {
+                    "filename": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                    },
+                    "url": {
+                      "type": "string",
+                      "pattern": "^https://"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "executable": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+                    },
+                    "archive": {
+                      "enum": [
+                        "tar.gz",
+                        "zip"
+                      ]
+                    }
+                  }
+                },
+                "go": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "filename",
+                    "url",
+                    "sha256",
+                    "size",
+                    "executable",
+                    "archive"
+                  ],
+                  "properties": {
+                    "filename": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                    },
+                    "url": {
+                      "type": "string",
+                      "pattern": "^https://"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "executable": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+                    },
+                    "archive": {
+                      "enum": [
+                        "tar.gz",
+                        "zip"
+                      ]
+                    }
+                  }
+                },
+                "packwiz": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "executable",
+                    "sha256",
+                    "size"
+                  ],
+                  "properties": {
+                    "executable": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            },
+            "prism_version": {
+              "type": "string",
+              "pattern": "^[0-9]+(\\.[0-9]+){1,3}$"
+            },
+            "go_version": {
+              "type": "string",
+              "pattern": "^go[0-9]+(\\.[0-9]+){1,3}$"
+            },
+            "packwiz_source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "commit",
+                "tree",
+                "bundle_sha256",
+                "bundle_size"
+              ],
+              "properties": {
+                "commit": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "tree": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "bundle_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "bundle_size": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "lock_id": {
+              "type": "string",
+              "pattern": "^workbench-managed-tool-policy:sha256:[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^(sha256:)?[0-9a-f]{64}$"
+    },
+    "shareId": {
+      "type": "string",
+      "pattern": "^workbench-environment-share:sha256:[0-9a-f]{64}$"
+    },
+    "intentId": {
+      "type": "string",
+      "pattern": "^workbench-environment-intent:sha256:[0-9a-f]{64}$"
+    },
+    "lockId": {
+      "type": "string",
+      "pattern": "^workbench-environment-lock:sha256:[0-9a-f]{64}$"
+    },
+    "profilePath": {
+      "type": "string",
+      "pattern": "^profiles/.+\\.ya?ml$"
+    },
+    "profileLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "sha256"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}

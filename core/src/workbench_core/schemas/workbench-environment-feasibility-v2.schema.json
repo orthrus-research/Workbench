@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Workbench environment feasibility V2 with read-only managed-tool status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "share_id",
+    "import_plan_id",
+    "import_state",
+    "import_blockers",
+    "state",
+    "project_source",
+    "optional_module_packages",
+    "profile_fixture_tools",
+    "java",
+    "unresolved_inputs",
+    "managed_tools",
+    "feasibility_id"
+  ],
+  "properties": {
+    "format": {
+      "const": "workbench-environment-feasibility-v2"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "share_id": {
+      "type": "string",
+      "pattern": "^workbench-environment-share:sha256:[0-9a-f]{64}$"
+    },
+    "import_plan_id": {
+      "type": "string",
+      "pattern": "^workbench-environment-import-plan:sha256:[0-9a-f]{64}$"
+    },
+    "import_state": {
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "import_blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "state": {
+      "enum": [
+        "local-import-blocked",
+        "exact-inputs-required"
+      ]
+    },
+    "project_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "candidate",
+        "required"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "selected-profile-unavailable",
+            "missing-variant-lock",
+            "invalid-lock-reference",
+            "referenced-lock-unavailable",
+            "referenced-lock-invalid",
+            "local-lock-unbound",
+            "portable-lock-bound",
+            "local-lock-drifted"
+          ]
+        },
+        "candidate": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "relative_path",
+                "sha256",
+                "repository",
+                "revision",
+                "tree"
+              ],
+              "properties": {
+                "relative_path": {
+                  "type": "string",
+                  "pattern": "^profiles/"
+                },
+                "sha256": {
+                  "$ref": "#/$defs/digest"
+                },
+                "repository": {
+                  "type": "string",
+                  "pattern": "^https://.+\\.git$"
+                },
+                "revision": {
+                  "$ref": "#/$defs/gitId"
+                },
+                "tree": {
+                  "$ref": "#/$defs/gitId"
+                }
+              }
+            }
+          ]
+        },
+        "required": {
+          "$ref": "#/$defs/requiredInputs"
+        }
+      }
+    },
+    "optional_module_packages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "required"
+      ],
+      "properties": {
+        "state": {
+          "const": "missing-package-lock"
+        },
+        "required": {
+          "$ref": "#/$defs/requiredInputs"
+        }
+      }
+    },
+    "profile_fixture_tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "required"
+      ],
+      "properties": {
+        "state": {
+          "const": "missing-profile-fixture-lock"
+        },
+        "required": {
+          "$ref": "#/$defs/requiredInputs"
+        }
+      }
+    },
+    "java": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "feature_version",
+        "reviewed_managed_acquisition"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "local-binding-unchecked",
+            "local-binding-missing",
+            "managed-archive-unresolved"
+          ]
+        },
+        "feature_version": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reviewed_managed_acquisition": {
+          "type": "boolean"
+        }
+      }
+    },
+    "unresolved_inputs": {
+      "$ref": "#/$defs/requiredInputs"
+    },
+    "feasibility_id": {
+      "type": "string",
+      "pattern": "^workbench-environment-feasibility:sha256:[0-9a-f]{64}$"
+    },
+    "managed_tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "required"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "ready",
+            "bytes-unavailable",
+            "policy-drifted",
+            "unsupported-platform"
+          ]
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prism",
+            "packwiz"
+          ],
+          "properties": {
+            "prism": {
+              "enum": [
+                "ready",
+                "missing",
+                "invalid"
+              ]
+            },
+            "packwiz": {
+              "enum": [
+                "ready",
+                "missing",
+                "invalid"
+              ]
+            }
+          }
+        },
+        "required": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "gitId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "requiredInputs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    }
+  }
+}
