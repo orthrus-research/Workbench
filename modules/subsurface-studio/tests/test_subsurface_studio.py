@@ -711,6 +711,23 @@ class SubsurfaceStudioTests(unittest.TestCase):
         self.assertEqual(parsed["operation"], "map")
         self.assertEqual(validate_result(parsed), parsed)
 
+    def test_profile_defaults_follow_selected_workspace(self) -> None:
+        suite_root = self.root / "suite"
+        suite_root.mkdir()
+        output = io.StringIO()
+        self.assertEqual(
+            cli_run(
+                ["--profile-file", str(self.paths["profile"]), "--json", "summary"],
+                root=suite_root,
+                workspace=self.root / "base",
+                output=output,
+            ),
+            0,
+        )
+        report = json.loads(output.getvalue())
+        self.assertEqual(1, report["result"]["final_state"]["ore_block_count"])
+        self.assertEqual(validate_result(report), report)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from workbench_api.resources import module_root as _module_resource_root, repository_root as _repository_resource_root
+from workbench_api.resources import repository_root as _repository_resource_root
 
 import argparse
 import json
@@ -261,24 +261,28 @@ def run(
     argv: Sequence[str] | None = None,
     *,
     root: Path,
+    workspace: Path | None = None,
     output: TextIO = sys.stdout,
     error: TextIO = sys.stderr,
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
     try:
-        resolved_root = root.expanduser().resolve(strict=True)
-        profile, profile_binding = _selected_profile(args, resolved_root)
+        suite_root = root.expanduser().resolve(strict=True)
+        selected_workspace = (
+            suite_root if workspace is None else workspace.expanduser().resolve(strict=True)
+        )
+        profile, profile_binding = _selected_profile(args, suite_root)
         dataset = _load_selected_dataset(
             args,
-            root=resolved_root,
+            root=selected_workspace,
             profile=profile,
             profile_binding=profile_binding,
         )
         report = _run_operation(
             args,
             dataset=dataset,
-            root=resolved_root,
+            root=selected_workspace,
             profile=profile,
             profile_binding=profile_binding,
         )
@@ -292,9 +296,12 @@ def run(
         return 2
 
 
-def main(argv: Sequence[str] | None = None, *, root: Path | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None, *,
+    root: Path | None = None, workspace: Path | None = None,
+) -> int:
     selected_root = root or _repository_resource_root(__file__)
-    return run(argv, root=selected_root)
+    return run(argv, root=selected_root, workspace=workspace)
 
 
 __all__ = ["build_parser", "main", "run"]

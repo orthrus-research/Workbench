@@ -22,6 +22,9 @@ The Supersymmetry profile supplies defaults for the retained GTCEu 2.8.10
 inventory, impact inventory, and 16×16 Strata region. Any input can be replaced
 explicitly. Missing profile defaults are reported; they are never downloaded
 or silently substituted.
+Core resolves those default evidence paths from the selected workspace. The
+profile document remains a suite resource, and explicit input paths still select
+exact historical files.
 
 ## Developer questions
 
