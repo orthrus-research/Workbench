@@ -22,8 +22,8 @@ from .host_filesystem import fsync_directory, secure_private_path
 from .output_routing import _WINDOWS_RESERVED
 from .storage.registered import ResourceCatalog
 from .storage.tree_catalog import (
-    COMMIT_KIND, INTENT_KIND, RESERVATION_KIND,
-    _content_sha256, _store_id, inventory_members,
+    COMMIT_KIND, INTENT_KIND, DERIVED_INTENT_KIND, RESERVATION_KIND,
+    _content_sha256, _store_id, inventory_members, atlas_manifest_baseline,
 )
 
 
@@ -144,6 +144,7 @@ class _CoreTreeStage:
     def publish(
         self, *, validate: Callable[[Path], object], domain_id: str | None = None,
         references: tuple[str, ...] = (), derived_members: tuple[str, ...] = (),
+        derived_manifest_rule: str | None = None,
     ) -> ManagedTreeReference:
         if self.committed or self.renamed:
             raise ManagedTreeError("tree.state", "managed tree publication was already attempted")
@@ -151,6 +152,13 @@ class _CoreTreeStage:
             raise ManagedTreeError("tree.validator", "managed tree publication requires an owner validator")
         if domain_id is not None and (type(domain_id) is not str or not 0 < len(domain_id) <= 512):
             raise ManagedTreeError("tree.domain", "managed tree domain identity is invalid")
+        if derived_manifest_rule is not None and (
+            derived_manifest_rule != "atlas-categorical-query-index-v1"
+            or self.host.owner_id != "atlas"
+            or domain_id is None
+            or "query-index.sqlite3" not in derived_members
+        ):
+            raise ManagedTreeError("tree.policy", "derived manifest rule is unsupported")
         self.host.check_cancelled()
         check_storage.ordinary(self.path, directory=True)
         with self.host._references(references):
@@ -172,8 +180,9 @@ class _CoreTreeStage:
             selected = check_storage.ordinary(self.path, directory=True)
             info = selected.stat()
             nonce = self.tree_id.rsplit(":", 1)[-1]
-            intent = self.host.catalog.trees._write("intents", nonce, INTENT_KIND, {
-                "format": INTENT_KIND, "tree_id": self.tree_id,
+            intent_kind = DERIVED_INTENT_KIND if derived_manifest_rule else INTENT_KIND
+            intent_body = {
+                "format": intent_kind, "tree_id": self.tree_id,
                 "reservation_id": self.reservation["id"],
                 "store_id": self.reservation["store_id"],
                 "store_root": self.reservation["store_root"],
@@ -190,7 +199,13 @@ class _CoreTreeStage:
                 "members": before, "content_sha256": _content_sha256(before),
                 "domain_id": domain_id, "references": list(references),
                 "prepared_at": _now(),
-            })
+            }
+            if derived_manifest_rule is not None:
+                intent_body["derived_manifest_rule"] = derived_manifest_rule
+                intent_body["derived_manifest_base_sha256"] = atlas_manifest_baseline(
+                    self.path, members=before, domain_id=domain_id,
+                )
+            intent = self.host.catalog.trees._write("intents", nonce, intent_kind, intent_body)
             self.host.check_cancelled()
             parent_before = check_storage.ordinary(self.target.parent, directory=True).stat()
             expected_parent = (self.reservation["parent_device"], self.reservation["parent_inode"])

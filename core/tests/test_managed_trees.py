@@ -1,5 +1,6 @@
 """Core directory publication, exact inventory, references and recovery."""
 
+import json
 from pathlib import Path
 import os
 import subprocess
@@ -15,7 +16,7 @@ from workbench_api.managed_trees import ManagedTreeError, managed_trees
 from workbench_core.managed_trees import CoreManagedTrees
 from workbench_core.modules import InstalledModule, dispatch
 from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
-from workbench_core.storage.tree_catalog import TreeCatalog
+from workbench_core.storage.tree_catalog import TreeCatalog, DERIVED_INTENT_KIND, INTENT_KIND
 from workbench_core.storage import manager
 
 
@@ -46,6 +47,83 @@ class ManagedTreeTests(unittest.TestCase):
                 derived_members=derived,
             )
         return result
+
+    @staticmethod
+    def _atlas_manifest(graph_set_id: str, *, index: str, scope: str = "fixture") -> bytes:
+        return (json.dumps({
+            "graph_set_id": graph_set_id,
+            "query_index": {"sha256": index},
+            "scope": scope,
+        }, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n")
+
+    def _publish_atlas_manifest(self, *, rule: bool):
+        graph_set_id = "workbench-atlas-graph-set-v3:sha256:" + "a" * 64
+        with self.host.stage("evidence", "graph") as stage:
+            stage.path.mkdir()
+            (stage.path / "source.jsonl").write_bytes(b"source\n")
+            (stage.path / "query-index.sqlite3").write_bytes(b"index\n")
+            (stage.path / "manifest.json").write_bytes(
+                self._atlas_manifest(graph_set_id, index="first")
+            )
+            reference = stage.publish(
+                validate=lambda path: self.assertEqual(b"source\n", (path / "source.jsonl").read_bytes()),
+                domain_id=graph_set_id,
+                derived_members=("query-index.sqlite3",),
+                derived_manifest_rule="atlas-categorical-query-index-v1" if rule else None,
+            )
+        return reference, graph_set_id
+
+    def test_versioned_derived_manifest_rule_keeps_authoritative_bytes_exact(self) -> None:
+        reference, graph_set_id = self._publish_atlas_manifest(rule=True)
+        intent = TreeCatalog(self.config / "resources-v1").intent(reference.tree_id)
+        self.assertEqual(DERIVED_INTENT_KIND, intent["format"])
+        (reference.path / "query-index.sqlite3").write_bytes(b"rebuilt\n")
+        (reference.path / "manifest.json").write_bytes(
+            self._atlas_manifest(graph_set_id, index="rebuilt")
+        )
+        rebuilt = self.host.describe(reference.tree_id)
+        self.assertEqual(reference.content_sha256, rebuilt.content_sha256)
+        self.assertEqual("changed", rebuilt.derived_status)
+        (reference.path / "manifest.json").write_bytes(json.dumps({
+            "graph_set_id": graph_set_id,
+            "query_index": {"sha256": "rebuilt"},
+            "scope": "fixture",
+        }, sort_keys=True).encode("utf-8") + b"\n")
+        with self.assertRaisesRegex(ManagedTreeError, "serialization changed"):
+            self.host.describe(reference.tree_id)
+        (reference.path / "manifest.json").write_bytes(
+            self._atlas_manifest(graph_set_id, index="rebuilt", scope="altered")
+        )
+        with self.assertRaisesRegex(ManagedTreeError, "authoritative manifest changed"):
+            self.host.describe(reference.tree_id)
+
+    def test_old_intent_still_rejects_manifest_byte_changes(self) -> None:
+        reference, graph_set_id = self._publish_atlas_manifest(rule=False)
+        intent = TreeCatalog(self.config / "resources-v1").intent(reference.tree_id)
+        self.assertEqual(INTENT_KIND, intent["format"])
+        (reference.path / "manifest.json").write_bytes(
+            self._atlas_manifest(graph_set_id, index="rebuilt")
+        )
+        with self.assertRaisesRegex(ManagedTreeError, "authoritative members changed"):
+            self.host.describe(reference.tree_id)
+
+    def test_derived_manifest_rule_requires_atlas_owner_and_derived_index(self) -> None:
+        graph_set_id = "workbench-atlas-graph-set-v3:sha256:" + "a" * 64
+        other_host = CoreManagedTrees(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="other",
+        )
+        for host, derived in ((other_host, ("query-index.sqlite3",)), (self.host, ())):
+            with self.subTest(owner=host.owner_id, derived=derived):
+                with self.assertRaisesRegex(ManagedTreeError, "derived manifest rule is unsupported"):
+                    with host.stage("evidence", "graph") as stage:
+                        stage.path.mkdir()
+                        stage.publish(
+                            validate=lambda _: None,
+                            domain_id=graph_set_id,
+                            derived_members=derived,
+                            derived_manifest_rule="atlas-categorical-query-index-v1",
+                        )
 
     def test_stage_has_absent_payload_and_publishes_exact_cataloged_tree(self) -> None:
         reference = self._publish()

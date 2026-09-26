@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import re
@@ -26,14 +27,17 @@ from ..output_routing import _private_directory
 TREE_KIND = "workbench-managed-tree-v1"
 RESERVATION_KIND = "workbench-tree-reservation-v1"
 INTENT_KIND = "workbench-tree-intent-v1"
+DERIVED_INTENT_KIND = "workbench-tree-intent-v2"
 COMMIT_KIND = "workbench-tree-commit-v1"
 ABORT_KIND = "workbench-tree-abort-v1"
 _TREE_ID = re.compile(r"workbench-tree-v1:([0-9a-f]{32})\Z")
 _REFERENCE = re.compile(r"(?:workbench-(?:resource|tree)-v1:[0-9a-f]{32}|workbench-check-v1:[0-9a-f]{64})\Z")
 _OWNER = re.compile(r"[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*\Z")
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
+_ATLAS_GRAPH_ID = re.compile(r"workbench-atlas-graph-set-v[23]:sha256:[0-9a-f]{64}\Z")
 _MAX_RECORD_BYTES = 4 * 1024 * 1024
 _MAX_MEMBERS = 4096
+_MAX_ATLAS_MANIFEST_BYTES = 16 * 1024 * 1024
 
 
 def _nonce(tree_id: str) -> str:
@@ -83,6 +87,68 @@ def inventory_members(
 def _content_sha256(members: list[dict[str, object]]) -> str:
     authoritative = [row for row in members if row["classification"] == "authoritative"]
     return sha256(check_storage.canonical(authoritative)).hexdigest()
+
+
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ManagedTreeError("tree.changed", "Atlas manifest has duplicate fields")
+        result[key] = value
+    return result
+
+
+def atlas_manifest_baseline(
+    root: Path, *, members: list[dict[str, object]], domain_id: str,
+) -> str:
+    """Bind every Atlas manifest byte except the declared derived descriptor."""
+
+    if not isinstance(domain_id, str) or _ATLAS_GRAPH_ID.fullmatch(domain_id) is None:
+        raise ManagedTreeError("tree.policy", "Atlas graph identity is invalid")
+    row = next((item for item in members if item["path"] == "manifest.json"), None)
+    if row is None or row["kind"] != "file" or row["classification"] != "authoritative":
+        raise ManagedTreeError("tree.policy", "Atlas manifest is not an authoritative file")
+    path = root / "manifest.json"
+    descriptor = -1
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_size > _MAX_ATLAS_MANIFEST_BYTES:
+            raise ManagedTreeError("tree.changed", "Atlas manifest is not a bounded independent file")
+        raw = bytearray()
+        while len(raw) <= _MAX_ATLAS_MANIFEST_BYTES:
+            part = os.read(descriptor, min(1024 * 1024, _MAX_ATLAS_MANIFEST_BYTES + 1 - len(raw)))
+            if not part:
+                break
+            raw.extend(part)
+        after = os.fstat(descriptor)
+        visible = path.lstat()
+        if (
+            len(raw) > _MAX_ATLAS_MANIFEST_BYTES
+            or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns, before.st_nlink, before.st_mode)
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns, after.st_nlink, after.st_mode)
+            or stat.S_IMODE(after.st_mode) != row["mode"]
+            or (after.st_dev, after.st_ino) != (visible.st_dev, visible.st_ino)
+            or len(raw) != row["size"]
+            or sha256(raw).hexdigest() != row["sha256"]
+        ):
+            raise ManagedTreeError("tree.changed", "Atlas manifest changed during verification")
+        value = json.loads(raw, object_pairs_hook=_unique_object)
+        if type(value) is not dict or value.get("graph_set_id") != domain_id or "query_index" not in value:
+            raise ManagedTreeError("tree.changed", "Atlas manifest graph binding changed")
+        canonical = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False).encode("utf-8") + b"\n"
+        if canonical != raw:
+            raise ManagedTreeError("tree.changed", "Atlas manifest serialization changed")
+        value["query_index"] = None
+        baseline = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False).encode("utf-8") + b"\n"
+        return sha256(baseline).hexdigest()
+    except ManagedTreeError:
+        raise
+    except (OSError, ValueError, TypeError, RecursionError) as exc:
+        raise ManagedTreeError("tree.changed", "Atlas manifest cannot be verified") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def _validate_members(value: object) -> list[dict[str, object]]:
@@ -221,14 +287,24 @@ class TreeCatalog:
 
     def intent(self, tree_id: str) -> dict:
         nonce = _nonce(tree_id)
-        value = self._read("intents", nonce, INTENT_KIND)
+        try:
+            value = check_storage.read_json(self._path("intents", nonce), byte_limit=_MAX_RECORD_BYTES)
+        except (OSError, ValueError) as exc:
+            raise ManagedTreeError("tree.unavailable", "managed tree intent is unavailable") from exc
+        kind = value.get("format") if isinstance(value, dict) else None
+        if (kind not in {INTENT_KIND, DERIVED_INTENT_KIND}
+                or value != _sealed(kind, {key: item for key, item in value.items() if key != "id"})):
+            raise ManagedTreeError("tree.changed", "managed tree intent changed")
         reservation = self.reservation(tree_id)
-        if (set(value) != {"id", "format", "tree_id", "reservation_id", "store_id",
-                           "store_root", "relative_path", "workspace", "owner_id", "role",
-                           "role_source", "policy_id", "staging", "parent_device", "parent_inode",
-                           "device", "inode",
-                           "members", "content_sha256", "domain_id", "references", "prepared_at"}
-                or value.get("tree_id") != tree_id or value.get("format") != INTENT_KIND
+        fields = {"id", "format", "tree_id", "reservation_id", "store_id",
+                  "store_root", "relative_path", "workspace", "owner_id", "role",
+                  "role_source", "policy_id", "staging", "parent_device", "parent_inode",
+                  "device", "inode", "members", "content_sha256", "domain_id",
+                  "references", "prepared_at"}
+        if kind == DERIVED_INTENT_KIND:
+            fields |= {"derived_manifest_rule", "derived_manifest_base_sha256"}
+        if (set(value) != fields
+                or value.get("tree_id") != tree_id or value.get("format") != kind
                 or value.get("reservation_id") != reservation["id"]
                 or any(value.get(key) != reservation.get(key) for key in (
                     "store_id", "store_root", "relative_path", "workspace", "owner_id",
@@ -248,6 +324,19 @@ class TreeCatalog:
         members = _validate_members(value.get("members"))
         if value["content_sha256"] != _content_sha256(members):
             raise ManagedTreeError("tree.changed", "managed tree authoritative digest changed")
+        if kind == DERIVED_INTENT_KIND:
+            paths = {row["path"]: row for row in members}
+            if (
+                value["owner_id"] != "atlas"
+                or value["derived_manifest_rule"] != "atlas-categorical-query-index-v1"
+                or not isinstance(value["derived_manifest_base_sha256"], str)
+                or _SHA.fullmatch(value["derived_manifest_base_sha256"]) is None
+                or paths.get("manifest.json", {}).get("classification") != "authoritative"
+                or paths.get("query-index.sqlite3", {}).get("classification") != "derived"
+                or not isinstance(value["domain_id"], str)
+                or _ATLAS_GRAPH_ID.fullmatch(value["domain_id"]) is None
+            ):
+                raise ManagedTreeError("tree.changed", "managed tree derived manifest rule changed")
         self._target(value)
         return value
 
@@ -287,9 +376,21 @@ class TreeCatalog:
         after = {row["path"]: row for row in observed}
         if any(path not in before for path in after):
             raise ManagedTreeError("tree.changed", "managed tree gained undeclared members")
+        derived_manifest = intent["format"] == DERIVED_INTENT_KIND
         if any(after.get(path) != row for path, row in before.items()
-               if row["classification"] == "authoritative"):
+               if row["classification"] == "authoritative"
+               and not (derived_manifest and path == "manifest.json")):
             raise ManagedTreeError("tree.changed", "managed tree authoritative members changed")
+        if derived_manifest:
+            original = before["manifest.json"]
+            current = after.get("manifest.json")
+            if (current is None or current["kind"] != "file"
+                    or current["mode"] != original["mode"]
+                    or current["classification"] != "authoritative"
+                    or atlas_manifest_baseline(
+                        target, members=observed, domain_id=str(intent["domain_id"]),
+                    ) != intent["derived_manifest_base_sha256"]):
+                raise ManagedTreeError("tree.changed", "managed tree authoritative manifest changed")
         if any(path not in after for path, row in before.items()
                if row["classification"] == "derived"):
             return "missing"
@@ -422,5 +523,6 @@ class TreeCatalog:
         return result
 
 
-__all__ = ["TreeCatalog", "inventory_members", "_content_sha256", "_store_id",
-           "RESERVATION_KIND", "INTENT_KIND", "COMMIT_KIND"]
+__all__ = ["TreeCatalog", "inventory_members", "atlas_manifest_baseline",
+           "INTENT_KIND", "DERIVED_INTENT_KIND", "COMMIT_KIND", "RESERVATION_KIND",
+           "_content_sha256", "_store_id"]

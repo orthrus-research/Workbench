@@ -46,6 +46,7 @@ class ManagedTreeStage(Protocol):
         domain_id: str | None = None,
         references: tuple[str, ...] = (),
         derived_members: tuple[str, ...] = (),
+        derived_manifest_rule: str | None = None,
     ) -> ManagedTreeReference: ...
 
 
