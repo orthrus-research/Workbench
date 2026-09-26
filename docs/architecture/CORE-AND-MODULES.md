@@ -158,6 +158,14 @@ for review. Core removes only its own staged files and empty directories it
 created. Blueprints keeps its V1 history markers and domain receipts. The
 external source tree remains outside Core's retained-resource cleanup scope.
 
+Blueprints M2 and Cleanroom Fresh Project use the same Core source port for
+file replacement, rollback and token-owned stage cleanup. Blueprints retains
+the V2 attempted-operation journal and decides whether an interrupted plan
+can finish or must restore exact applied bytes. Core can reopen those stages
+after a process exit; it preserves a later source edit instead of replacing
+it during recovery. Existing Cleanroom plans remain bound to their original
+sealed construction owner, while new plans use the current owner record.
+
 ## Source layout
 
 Keep one monorepo for coordinated contract changes and conformance testing:
