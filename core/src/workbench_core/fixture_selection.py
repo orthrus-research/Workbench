@@ -35,10 +35,10 @@ def default_fixture_registry_path() -> Path:
 def _absolute(value: Path | str, label: str) -> Path:
     if not isinstance(value, (Path, str)) or not str(value):
         raise FixtureSelectionError(f"{label} must be an absolute directory")
-    path = Path(value).expanduser().absolute()
+    path = Path(value).expanduser()
     if not path.is_absolute():
         raise FixtureSelectionError(f"{label} must be an absolute directory")
-    return path
+    return path.absolute()
 
 
 def _profile(value: str) -> str:

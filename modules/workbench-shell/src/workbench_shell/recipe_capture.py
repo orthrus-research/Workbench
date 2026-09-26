@@ -12,11 +12,9 @@ from threading import Event
 from workbench_api.processes import capture_process, ProcessError, open_process_output
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
 from workbench_api.managed_attempts import managed_attempts
+from workbench_api.fixture_selections import fixture_selections
 from workbench_core import check_storage as storage, capture_workspace as workspace_storage
 from workbench_core import process_capture
-from workbench_core.fixture_selection import (
-    FixtureSelectionError, register_recipe_fixture, resolve_recipe_fixture,
-)
 from workbench_core.filesystem_paths import native_path
 from workbench_core.runtime_java import probe_java, java_execution_path
 from workbench_project_intelligence.working_tree import capture_source_inputs, observe_source
@@ -112,7 +110,7 @@ def _java(home):
 def inspect_fixture_selection(*, source, profile, runtime=None, java_home=None, cancelled=None):
     """Read Core's selected locations, then let the profile qualify their bytes."""
     try:
-        selection = resolve_recipe_fixture(profile, source, runtime=runtime, java_home=java_home)
+        selection = fixture_selections().resolve(profile, source, runtime=runtime, java_home=java_home)
         owner, _ = _owner(profile)
         descriptor = owner.descriptor()
         selected_runtime, selected_java = Path(selection['runtime']), Path(selection['java_home'])
@@ -123,7 +121,7 @@ def inspect_fixture_selection(*, source, profile, runtime=None, java_home=None, 
         owner.observer_classpath(selected_runtime, files, artifacts)
         java, _ = _java(selected_java)
         if java['major'] != descriptor['platform']['java_major']:
-            raise FixtureSelectionError(
+            raise ValueError(
                 f"selected Java {java['major']} differs from profile Java "
                 f"{descriptor['platform']['java_major']}")
         return {**selection, 'state': 'ready-for-planning', 'artifact_paths': artifacts,
@@ -144,7 +142,7 @@ def plan(root, *, source, runtime=None, java_home=None, profile, heap_mib, cance
     cancel.check()
     source = Path(source).expanduser().absolute()
     selected_root = managed_attempts().default_root(ATTEMPT_FAMILY, workspace=source) if root is None else Path(root).expanduser().absolute()
-    selection = resolve_recipe_fixture(profile, source, runtime=runtime, java_home=java_home)
+    selection = fixture_selections().resolve(profile, source, runtime=runtime, java_home=java_home)
     runtime, java_home = Path(selection['runtime']), Path(selection['java_home'])
     _overlap(selected_root, source, runtime, java_home)
     owner, provider = _owner(profile)
@@ -531,10 +529,10 @@ def main(argv, *, context, output=None, error=None):
         context.check_cancelled()
         if args.action == 'fixtures':
             if args.fixture_action == 'set':
-                registered = register_recipe_fixture(args.pack_profile, args.workspace,
-                                                     args.runtime, args.java_home)
+                registered = fixture_selections().register(args.pack_profile, args.workspace,
+                                                           args.runtime, args.java_home)
                 result = {'state': 'registered-unverified', 'registry_id': registered['id'],
-                          'selection': resolve_recipe_fixture(args.pack_profile, args.workspace)}
+                          'selection': fixture_selections().resolve(args.pack_profile, args.workspace)}
             else:
                 result = inspect_fixture_selection(source=args.workspace, profile=args.pack_profile,
                                                    runtime=args.runtime, java_home=args.java_home,

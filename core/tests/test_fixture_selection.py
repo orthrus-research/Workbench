@@ -61,6 +61,16 @@ class RecipeFixtureSelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(FixtureSelectionError, "identity changed"):
             load_fixture_registry(self.registry)
 
+    def test_relative_location_is_not_reinterpreted_under_current_directory(self):
+        with self.assertRaisesRegex(FixtureSelectionError, "absolute directory"):
+            register_recipe_fixture("supersymmetry", self.workspace, Path("relative-runtime"),
+                                    self.java, path=self.registry)
+        self.assertFalse(self.registry.exists())
+        if os.name != "nt":
+            with self.assertRaisesRegex(FixtureSelectionError, "absolute directory"):
+                resolve_recipe_fixture("supersymmetry", self.workspace,
+                                       runtime=r"C:\\Java\\runtime", java_home=self.java)
+
     def test_exact_library_override_needs_a_matching_profile_digest(self):
         executable = self.java / "bin" / ("java.exe" if os.name == "nt" else "java")
         executable.parent.mkdir(parents=True)

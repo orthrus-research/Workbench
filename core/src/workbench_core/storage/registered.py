@@ -380,6 +380,8 @@ class ResourceCatalog:
         return "committed"
 
     def inventory(self, *, workspace: Path | None = None) -> dict:
+        from ..working_allocations import WorkingAllocationCatalog
+
         rows = []
         if self.root.exists() or self.root.is_symlink():
             check_storage.ordinary(self.root, directory=True)
@@ -435,6 +437,9 @@ class ResourceCatalog:
             "workspace": str(workspace) if workspace is not None else None,
             "resources": rows, "record_stores": self._registered_record_stores(workspace),
             "trees": self.trees.inventory(workspace=workspace),
+            "working_allocations": WorkingAllocationCatalog(self.root.parent).inventory_rows(
+                workspace=workspace,
+            ),
         }
 
     def reconcile(self, resource_id: str) -> ResourceReference:

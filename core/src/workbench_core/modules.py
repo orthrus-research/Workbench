@@ -115,6 +115,8 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         attempt_stores = nullcontext()
         check_stores = nullcontext()
         tree_stores = nullcontext()
+        working_stores = nullcontext()
+        fixture_stores = nullcontext()
         if context.configuration_home is not None:
             from .storage.registered import CoreDurableResources
             from .storage.record_stores import CoreRecordStores
@@ -124,6 +126,10 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
             from workbench_api.check_attempts import check_attempts_scope
             from .managed_trees import CoreManagedTrees
             from workbench_api.managed_trees import managed_trees_scope
+            from .working_allocations import CoreWorkingAllocations
+            from workbench_api.working_allocations import working_allocations_scope
+            from .fixture_selection_port import CoreFixtureSelections
+            from workbench_api.fixture_selections import fixture_selections_scope
             durable_resources = CoreDurableResources(
                 workspace=context.workspace,
                 configuration_home=context.configuration_home,
@@ -158,6 +164,18 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
                 location_sources=context.location_sources,
                 check_cancelled=context.check_cancelled,
             ))
+            working_stores = working_allocations_scope(CoreWorkingAllocations(
+                workspace=context.workspace,
+                configuration_home=context.configuration_home,
+                locations=context.locations,
+                owner_id=owner.id,
+                policy_id=context.environment_resolution_id,
+                location_sources=context.location_sources,
+                check_cancelled=context.check_cancelled,
+            ))
+            fixture_stores = fixture_selections_scope(CoreFixtureSelections(
+                configuration_home=context.configuration_home,
+            ))
         operation_context = replace(
             context,
             output_resolver=invocation.output_path if invocation is not None else None,
@@ -174,7 +192,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         try:
             from workbench_api.archive_exchange import archive_exchange_scope
             from .archive_port import CoreArchiveExchange
-            with record_stores, attempt_stores, check_stores, tree_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
+            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
                 handler = getattr(import_module(package), name)
                 result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:

@@ -7,6 +7,7 @@ saved-source and lifecycle integration; native game admission needs its own run.
 from contextlib import ExitStack
 from copy import deepcopy
 from hashlib import sha256
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -18,10 +19,13 @@ from threading import Event
 import unittest
 from unittest.mock import patch
 
+from workbench_api import ExecutionContext
 from workbench_api.processes import ProcessError
 from workbench_api.managed_attempts import managed_attempts_scope
+from workbench_api.fixture_selections import fixture_selections_scope
 from workbench_atlas_categorical_graph import CategoricalGraphBundleBuilder, edge_record, node_record
-from workbench_core import check_storage, fixture_selection, runtime_java, tool_process
+from workbench_core import check_storage, runtime_java, tool_process
+from workbench_core.fixture_selection_port import CoreFixtureSelections
 from workbench_core.managed_attempts import CoreManagedAttempts
 from workbench_core.storage.registered import ResourceCatalog
 from workbench_shell import recipe_capture as capture
@@ -171,6 +175,9 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             state_root=self.state, locations={'evidence': self.evidence},
             owner_id='workbench-shell',
         )))
+        self.stack.enter_context(fixture_selections_scope(CoreFixtureSelections(
+            configuration_home=self.config,
+        )))
         self.stack.enter_context(patch.object(capture, 'require_profile_extension', side_effect=self.extension))
         self.stack.enter_context(patch.object(capture, 'profile_extension_identity', side_effect=self.provider_identity))
         self.stack.enter_context(patch.object(capture, 'probe_java', return_value={
@@ -197,29 +204,39 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
 
     def test_core_fixture_selection_and_explicit_recovery(self):
         registry = self.root / 'User config' / 'recipe-fixtures-v1.json'
-        setup = self.root / 'User config' / 'missing-setup.json'
-        fixture_selection.register_recipe_fixture('fixture:pack', self.source, self.runtime,
-                                                   self.java, path=registry)
-        resolver = fixture_selection.resolve_recipe_fixture
-        with patch.object(capture, 'resolve_recipe_fixture',
-                          side_effect=lambda profile, source, **options: resolver(
-                              profile, source, registry_path=registry, setup_path=setup, **options)):
-            request = capture.plan(self.state, source=self.source, profile='fixture:pack',
-                                   heap_mib=128, cancelled=self.cancelled)
-            self.assertEqual('user-registry', request['fixture_selection']['runtime_source'])
-            self.assertEqual(str(self.runtime), request['runtime'])
-            selected = capture.inspect_fixture_selection(source=self.source, profile='fixture:pack',
-                                                          cancelled=self.cancelled)
-            self.assertEqual('ready-for-planning', selected['state'])
-            registry.write_text('{"invalid":true}\n')
-            recovery = capture.inspect_fixture_selection(source=self.source, profile='fixture:pack',
-                                                          cancelled=self.cancelled)
-            self.assertEqual('needs-recovery', recovery['state'])
-            self.assertTrue(recovery['recovery'])
-            another = capture.plan(self.state, source=self.source, runtime=self.runtime,
-                                   java_home=self.java, profile='fixture:pack', heap_mib=128,
-                                   cancelled=self.cancelled)
-            self.assertEqual('override', another['fixture_selection']['java_source'])
+        CoreFixtureSelections(configuration_home=self.config).register(
+            'fixture:pack', self.source, self.runtime, self.java,
+        )
+        request = capture.plan(self.state, source=self.source, profile='fixture:pack',
+                               heap_mib=128, cancelled=self.cancelled)
+        self.assertEqual('user-registry', request['fixture_selection']['runtime_source'])
+        self.assertEqual(str(self.runtime), request['runtime'])
+        selected = capture.inspect_fixture_selection(source=self.source, profile='fixture:pack',
+                                                      cancelled=self.cancelled)
+        self.assertEqual('ready-for-planning', selected['state'])
+        registry.write_text('{"invalid":true}\n')
+        recovery = capture.inspect_fixture_selection(source=self.source, profile='fixture:pack',
+                                                      cancelled=self.cancelled)
+        self.assertEqual('needs-recovery', recovery['state'])
+        self.assertTrue(recovery['recovery'])
+        another = capture.plan(self.state, source=self.source, runtime=self.runtime,
+                               java_home=self.java, profile='fixture:pack', heap_mib=128,
+                               cancelled=self.cancelled)
+        self.assertEqual('override', another['fixture_selection']['java_source'])
+
+    def test_fixture_registration_command_uses_bound_core_home(self):
+        output = StringIO()
+        status = capture.main([
+            'fixtures', 'set', '--workspace', str(self.source),
+            '--pack-profile', 'fixture:pack', '--runtime', str(self.runtime),
+            '--java-home', str(self.java), '--json',
+        ], context=ExecutionContext(self.source, self.state,
+                                    configuration_home=self.config), output=output)
+        self.assertEqual(0, status)
+        result = json.loads(output.getvalue())
+        self.assertEqual('registered-unverified', result['state'])
+        self.assertEqual(str(self.java), result['selection']['java_home'])
+        self.assertTrue((self.config / 'recipe-fixtures-v1.json').is_file())
 
     def prepare(self, request=None):
         request = request or self.plan()

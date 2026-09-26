@@ -48,6 +48,11 @@ Generic acquisition belongs in Core. Cleanroom or pack-specific selection and
 materialization policy belongs in the selected profile adapter. Core must not
 silently choose Supersymmetry when no profile is selected.
 
+Recipe capture reads and registers per-user runtime/JDK locations through the
+Core-bound fixture-selection API. The selected profile still validates their
+bytes before planning. An exact command override applies to that operation
+without replacing the user's saved selection.
+
 ## First durable resource slice
 
 `ExecutionContext.publish_bytes` delegates immutable file publication to a

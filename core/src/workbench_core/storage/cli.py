@@ -273,6 +273,9 @@ def run(
                     matches = [
                         *[row for row in inventory['resources'] if row['resource_id'] == args.resource_id],
                         *[row for row in inventory['record_stores'] if row['store_id'] == args.resource_id],
+                        *[row for row in inventory['trees'] if row['tree_id'] == args.resource_id],
+                        *[row for row in inventory['working_allocations']
+                          if row['allocation_id'] == args.resource_id],
                     ]
                     if len(matches) != 1:
                         raise manager.RuntimeManagerError('registered resource is unavailable or ambiguous')
@@ -286,6 +289,10 @@ def run(
                     print(f"{row['status']}  {row['resource_id']}  {row['path']}")
                 for row in result['record_stores']:
                     print(f"{row['status']}  {row['store_id']}  {row['path']}")
+                for row in result['trees']:
+                    print(f"{row['status']}  {row['tree_id']}  {row['path']}")
+                for row in result['working_allocations']:
+                    print(f"{row['status']}  {row['allocation_id']}  {row['path']}")
             else:
                 print(json.dumps(result, indent=2, sort_keys=True))
             return 0
