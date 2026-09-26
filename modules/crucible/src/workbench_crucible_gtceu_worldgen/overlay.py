@@ -175,6 +175,23 @@ def overlay_materialization_bytes(receipt: Mapping[str, Any]) -> bytes:
     return (json.dumps(parse_overlay_materialization(receipt), indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
+def review_overlay_sibling_bytes(
+    *, jar_path: Path, staged_config_root: Path,
+    source_inventory: Mapping[str, Any], plan: Mapping[str, Any],
+) -> tuple[bytes, bytes]:
+    """Read the operated stage and derive V1 sibling bytes without writing it."""
+    source = parse_gtceu_worldgen_inventory(source_inventory)
+    checked = parse_overlay_plan(plan, source)
+    output = build_gtceu_worldgen_inventory(
+        jar_path=jar_path, config_root=staged_config_root,
+    )
+    _require(output["artifact"] == source["artifact"], "selected GTCEu jar drifted before sibling review")
+    receipt = build_overlay_materialization(
+        source_inventory=source, output_inventory=output, plan=checked,
+    )
+    return overlay_inventory_bytes(output), overlay_materialization_bytes(receipt)
+
+
 def materialize_overlay(
     *,
     jar_path: Path,

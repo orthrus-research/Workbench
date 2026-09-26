@@ -28,6 +28,7 @@ from workbench_crucible_gtceu_worldgen import (  # noqa: E402
     build_overlay_materialization,
     overlay_inventory_bytes,
     overlay_materialization_bytes,
+    review_overlay_sibling_bytes,
     parse_gtceu_overlay_copy_inventory,
     verify_gtceu_overlay_copy_source,
 )
@@ -420,8 +421,27 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
                 ))
             self.assertEqual(b"selected sidecar\n", (copied / "worldgen/vein/overworld/notes.txt").read_bytes())
             self.assertEqual(0o600, (copied / "worldgen/vein/overworld/notes.txt").stat().st_mode & 0o7777)
+            attempt.apply_effects(effects)
+
+            def reviewed_siblings(config_root, plan_chunks):
+                return review_overlay_sibling_bytes(
+                    jar_path=self.jar, staged_config_root=config_root,
+                    source_inventory=report, plan=json.loads(b"".join(plan_chunks)),
+                )
+
+            inventory_bytes, materialization_bytes = reviewed_siblings(
+                copied, (canonical_json_bytes(plan),),
+            )
+            sibling_paths = attempt.write_siblings(
+                inventory_bytes=inventory_bytes, materialization_bytes=materialization_bytes,
+                validate_output=reviewed_siblings,
+            )
+            self.assertEqual(inventory_bytes, sibling_paths[0].read_bytes())
+            self.assertEqual(materialization_bytes, sibling_paths[1].read_bytes())
+            self.assertIsNone(json.loads(inventory_bytes)["observation"])
+            self.assertEqual("siblings-complete", host.inventory()[0]["status"])
             self.assertFalse(target.exists())
-        self.assertEqual("copy-complete", host.inventory()[0]["status"])
+        self.assertEqual("siblings-complete", host.inventory()[0]["status"])
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
     def test_v2_copy_inventory_refuses_external_symlink(self) -> None:

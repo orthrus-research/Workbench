@@ -15,6 +15,7 @@ from .overlay import (
     build_overlay_materialization,
     overlay_inventory_bytes,
     overlay_materialization_bytes,
+    review_overlay_sibling_bytes,
     parse_overlay_materialization,
     parse_overlay_plan,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "build_overlay_materialization",
     "overlay_inventory_bytes",
     "overlay_materialization_bytes",
+    "review_overlay_sibling_bytes",
     "parse_overlay_materialization",
     "parse_overlay_plan",
     "build_gtceu_overlay_copy_inventory",

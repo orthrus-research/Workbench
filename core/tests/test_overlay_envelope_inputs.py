@@ -237,6 +237,128 @@ class OverlayEnvelopeInputTests(unittest.TestCase):
                 self.host.inventory()
             self.assertFalse(self.target.exists())
 
+    def test_core_writes_validated_siblings_into_only_the_unpublished_envelope(self) -> None:
+        effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                   "expected_sha256": None, "data": b"{}\n"},)
+        inventory_bytes = b'{"inventory":"reviewed"}\n'
+        materialization_bytes = b'{"materialization":"reviewed"}\n'
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, manifest = self._attempt(stage, effect)
+            content = attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+            attempt.apply_effects(effect)
+
+            def validate_output(selected, plan_chunks):
+                self.assertEqual(content, selected)
+                self.assertEqual([b'{"operations":["replace"]}'], list(plan_chunks))
+                self.assertEqual(b"{}\n", (selected / "worldgen/vein/new.json").read_bytes())
+                return inventory_bytes, materialization_bytes
+
+            siblings = attempt.write_siblings(
+                inventory_bytes=inventory_bytes, materialization_bytes=materialization_bytes,
+                validate_output=validate_output,
+            )
+            self.assertEqual((stage.path / "gtceu-worldgen-inventory-v1.json",
+                              stage.path / "overlay-materialization-v1.json"), siblings)
+            self.assertEqual(inventory_bytes, siblings[0].read_bytes())
+            self.assertEqual(materialization_bytes, siblings[1].read_bytes())
+            self.assertEqual("siblings-complete", self.host.inventory()[0]["status"])
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "already attempted"):
+                attempt.write_siblings(
+                    inventory_bytes=inventory_bytes, materialization_bytes=materialization_bytes,
+                    validate_output=validate_output,
+                )
+            self.assertFalse(self.target.exists())
+        self.assertEqual("siblings-complete", self.host.inventory()[0]["status"])
+
+    def test_changed_or_unvalidated_sibling_bytes_never_become_a_complete_envelope(self) -> None:
+        effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                   "expected_sha256": None, "data": b"{}\n"},)
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, manifest = self._attempt(stage, effect)
+            attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+            attempt.apply_effects(effect)
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "differ from validated output"):
+                attempt.write_siblings(
+                    inventory_bytes=b"different\n", materialization_bytes=b"receipt\n",
+                    validate_output=lambda _content, _chunks: (b"expected\n", b"receipt\n"),
+                )
+            self.assertFalse((attempt.root / "siblings-attempted.json").exists())
+            siblings = attempt.write_siblings(
+                inventory_bytes=b"inventory\n", materialization_bytes=b"receipt\n",
+                validate_output=lambda _content, _chunks: (b"inventory\n", b"receipt\n"),
+            )
+            siblings[1].write_bytes(b"changed\n")
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "sibling file changed"):
+                self.host.inventory()
+            self.assertFalse(self.target.exists())
+
+    def test_output_validator_cannot_change_operated_stage_before_sibling_attempt(self) -> None:
+        effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                   "expected_sha256": None, "data": b"{}\n"},)
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, manifest = self._attempt(stage, effect)
+            content = attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+            attempt.apply_effects(effect)
+
+            def changed_output(_selected, _chunks):
+                (content / "worldgen/vein/sidecar.txt").write_bytes(b"changed\n")
+                return b"inventory\n", b"receipt\n"
+
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "operation completion changed"):
+                attempt.write_siblings(
+                    inventory_bytes=b"inventory\n", materialization_bytes=b"receipt\n",
+                    validate_output=changed_output,
+                )
+            self.assertFalse((attempt.root / "siblings-attempted.json").exists())
+            self.assertFalse(self.target.exists())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_hard_exit_after_either_sibling_write_retains_unpublished_attempt(self) -> None:
+        effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                   "expected_sha256": None, "data": b"{}\n"},)
+        for exit_after in (1, 2):
+            with self.subTest(exit_after=exit_after):
+                target = self.target.parent / f"sibling-{exit_after}" / "config"
+                with self.trees.stage("artifacts", "config", requested_path=target) as stage:
+                    attempt, manifest = self._attempt(stage, effect)
+                    attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+                    attempt.apply_effects(effect)
+                    child = os.fork()
+                    if child == 0:
+                        original = attempt._write_sibling
+                        written = 0
+
+                        def exit_after_write(*args):
+                            nonlocal written
+                            original(*args)
+                            written += 1
+                            if written == exit_after:
+                                os._exit(73)
+
+                        try:
+                            with patch.object(attempt, "_write_sibling", side_effect=exit_after_write):
+                                attempt.write_siblings(
+                                    inventory_bytes=b"inventory\n", materialization_bytes=b"receipt\n",
+                                    validate_output=lambda _content, _chunks: (b"inventory\n", b"receipt\n"),
+                                )
+                        except BaseException:
+                            os._exit(74)
+                        os._exit(75)
+                    _pid, status = os.waitpid(child, 0)
+                    self.assertEqual(73, os.waitstatus_to_exitcode(status))
+                    self.assertTrue((stage.path / "gtceu-worldgen-inventory-v1.json").exists())
+                    self.assertEqual(exit_after == 2,
+                                     (stage.path / "overlay-materialization-v1.json").exists())
+                    row = next(row for row in self.host.inventory()
+                               if row["attempt_id"] == attempt.attempt_id)
+                    self.assertEqual("siblings-incomplete", row["status"])
+                    with self.assertRaisesRegex(OverlayEnvelopeInputError, "already attempted"):
+                        attempt.write_siblings(
+                            inventory_bytes=b"inventory\n", materialization_bytes=b"receipt\n",
+                            validate_output=lambda _content, _chunks: (b"inventory\n", b"receipt\n"),
+                        )
+                    self.assertFalse(target.exists())
+
     def test_changed_effect_record_is_reported_as_changed_attempt(self) -> None:
         with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
             attempt, _manifest = self._attempt(stage)

@@ -1,10 +1,10 @@
 """Core custody for copied inputs and planned writes in a staged overlay envelope.
 
-The owner supplies a validated, chunked inventory and a read-only source
-validator. Core retains those inputs before copying and performs every write
-to the managed-tree payload and applies the owner's sealed effects. The
-resulting stage is deliberately not a publication: sibling receipts and
-whole-envelope publication still need a separate Core transaction.
+The owner supplies a validated, chunked inventory and read-only validators.
+Core retains those inputs before copying, applies sealed effects, and writes
+the two historical sibling JSON files into the private managed-tree stage.
+The resulting stage is deliberately not a publication: whole-envelope
+publication still needs a separate Core transaction.
 """
 
 from __future__ import annotations
@@ -41,6 +41,7 @@ _PLAN_CHUNK_BYTES = 1024 * 1024
 # publication. This is a conservative, opt-in Core profile, not V1 parity.
 _SIBLING_COUNT = 2
 _SIBLING_RESERVE_BYTES = _SIBLING_COUNT * MAX_FILE_BYTES
+_SIBLING_NAMES = ("gtceu-worldgen-inventory-v1.json", "overlay-materialization-v1.json")
 _NONCE = re.compile(r"[0-9a-f]{32}\Z")
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _PART = re.compile(r"[^/\\\0\r\n:]+\Z")
@@ -257,16 +258,45 @@ def _write_all(descriptor: int, data: bytes) -> None:
         view = view[written:]
 
 
-def _stage_inventory(path: Path, *, cancelled: Callable[[], bool] = lambda: False) -> dict[str, object]:
-    rows, root_mode, file_count, directory_count = inventory_exact_members(path, cancelled=cancelled)
+def _inventory_summary(rows: Iterable[Mapping[str, object]], root_mode: int) -> dict[str, object]:
     digest = sha256()
     digest.update(_canonical({"root_mode": root_mode}) + b"\n")
+    file_count = directory_count = 0
     for row in rows:
         digest.update(_canonical(row) + b"\n")
+        if row["kind"] == "file":
+            file_count += 1
+        else:
+            directory_count += 1
     return {
         "sha256": digest.hexdigest(), "root_mode": root_mode,
         "file_count": file_count, "directory_count": directory_count,
     }
+
+
+def _stage_inventory(path: Path, *, cancelled: Callable[[], bool] = lambda: False) -> dict[str, object]:
+    rows, root_mode, _files, _directories = inventory_exact_members(path, cancelled=cancelled)
+    return _inventory_summary(rows, root_mode)
+
+
+def _valid_inventory_summary(value: object) -> bool:
+    return (type(value) is dict
+            and set(value) == {"sha256", "root_mode", "file_count", "directory_count"}
+            and type(value["sha256"]) is str and _DIGEST.fullmatch(value["sha256"]) is not None
+            and type(value["root_mode"]) is int and 0 <= value["root_mode"] <= 0o7777
+            and type(value["file_count"]) is int and 0 <= value["file_count"] <= MAX_FILES
+            and type(value["directory_count"]) is int
+            and 0 <= value["directory_count"] <= MAX_DIRECTORIES)
+
+
+def _sibling_metadata(name: str, data: bytes) -> dict[str, object]:
+    return {"path": name, "size_bytes": len(data), "sha256": sha256(data).hexdigest(), "mode": 0o644}
+
+
+def _sibling_row(record: Mapping[str, object]) -> dict[str, object]:
+    return {"path": record["path"], "kind": "file", "mode": record["mode"],
+            "size": record["size_bytes"], "sha256": record["sha256"],
+            "classification": "authoritative"}
 
 
 class CoreOverlayEnvelopeInputs:
@@ -354,6 +384,7 @@ class CoreOverlayEnvelopeInputs:
                 "plan", "inventory", "reservation.json", "manifest.json",
                 "input.json", "copy-attempted.json", "copy-complete.json",
                 "effects", "effect-seal.json", "operations", "operations-complete.json",
+                "siblings-attempted.json", "siblings-complete.json",
             }
             if any(path.name not in expected_entries for path in root.iterdir()):
                 raise OverlayEnvelopeInputError("overlay.changed", "overlay attempt has an unknown entry")
@@ -538,6 +569,8 @@ class CoreOverlayEnvelopeInputs:
                 self._inventory_operations(root, reservation["attempt_id"], effect_rows,
                                            effect_seal_path.exists(), copy_path.exists(),
                                            Path(stage_text))
+            if (root / "siblings-attempted.json").exists() or (root / "siblings-complete.json").exists():
+                self._inventory_siblings(root, reservation["attempt_id"], Path(stage_text))
             status = ("copy-complete" if (root / "copy-complete.json").is_file()
                       else "copy-incomplete" if (root / "copy-attempted.json").is_file()
                       else "effects-incomplete" if (root / "effects").exists() and not effect_seal_path.exists()
@@ -548,6 +581,10 @@ class CoreOverlayEnvelopeInputs:
                 status = "operations-complete"
             elif (root / "operations").exists():
                 status = "operations-incomplete"
+            if (root / "siblings-complete.json").exists():
+                status = "siblings-complete"
+            elif (root / "siblings-attempted.json").exists():
+                status = "siblings-incomplete"
             rows.append({"attempt_id": reservation["attempt_id"], "status": status,
                          "path": str(root), "stage_path": reservation["stage_path"],
                          "tree_id": reservation["tree_id"],
@@ -558,6 +595,7 @@ class CoreOverlayEnvelopeInputs:
     def _inventory_operations(
         root: Path, attempt_id: str, effects: tuple[dict[str, object], ...],
         sealed: bool, copied: bool, stage_path: Path,
+        *, cancelled: Callable[[], bool] = lambda: False,
     ) -> None:
         directory = root / "operations"
         if not sealed or not copied or not private_path(directory, directory=True):
@@ -589,16 +627,71 @@ class CoreOverlayEnvelopeInputs:
         if completion.exists():
             if attempted != set(range(len(effects))) or completed != attempted:
                 raise OverlayEnvelopeInputError("overlay.changed", "overlay operation completion is premature")
+            if (root / "siblings-attempted.json").exists():
+                retained_stage = _read_record(completion, byte_limit=_MANIFEST_BYTES).get("stage_inventory")
+                if not _valid_inventory_summary(retained_stage):
+                    raise OverlayEnvelopeInputError("overlay.changed", "operation stage inventory changed")
+            else:
+                retained_stage = _stage_inventory(stage_path, cancelled=cancelled)
             expected = {
                 "format": "workbench-overlay-envelope-operations-complete-v1",
                 "attempt_id": attempt_id, "effect_count": len(effects),
                 "effects_sha256": sha256(b"".join(
                     _canonical(effect) + b"\n" for effect in effects
                 )).hexdigest(),
-                "stage_inventory": _stage_inventory(stage_path),
+                "stage_inventory": retained_stage,
             }
             if _read_record(completion, byte_limit=_MANIFEST_BYTES) != expected:
                 raise OverlayEnvelopeInputError("overlay.changed", "overlay operation completion changed")
+
+    @staticmethod
+    def _inventory_siblings(root: Path, attempt_id: str, stage_path: Path) -> None:
+        attempted_path = root / "siblings-attempted.json"
+        complete_path = root / "siblings-complete.json"
+        operation_path = root / "operations-complete.json"
+        if not attempted_path.exists() or not operation_path.exists():
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay siblings lack completed operations")
+        operation_raw = read_private_bytes(operation_path, byte_limit=_MANIFEST_BYTES)
+        operation = _read_record(operation_path, byte_limit=_MANIFEST_BYTES)
+        attempted = _read_record(attempted_path, byte_limit=_MANIFEST_BYTES)
+        siblings = attempted.get("siblings")
+        if (set(attempted) != {"format", "attempt_id", "operations_sha256", "stage_before", "siblings"}
+                or attempted["format"] != "workbench-overlay-envelope-siblings-attempted-v1"
+                or attempted["attempt_id"] != attempt_id
+                or attempted["operations_sha256"] != sha256(operation_raw).hexdigest()
+                or not _valid_inventory_summary(attempted["stage_before"])
+                or attempted["stage_before"] != operation.get("stage_inventory")
+                or type(siblings) is not list or len(siblings) != _SIBLING_COUNT):
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay sibling attempt changed")
+        for index, row in enumerate(siblings):
+            if (type(row) is not dict
+                    or set(row) != {"path", "size_bytes", "sha256", "mode"}
+                    or row["path"] != _SIBLING_NAMES[index]
+                    or type(row["size_bytes"]) is not int
+                    or not 0 <= row["size_bytes"] <= MAX_FILE_BYTES
+                    or type(row["sha256"]) is not str or _DIGEST.fullmatch(row["sha256"]) is None
+                    or type(row["mode"]) is not int or row["mode"] != 0o644):
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay sibling metadata changed")
+        if not complete_path.exists():
+            return
+        rows, root_mode, _files, _directories = inventory_exact_members(stage_path)
+        by_path = {row["path"]: row for row in rows}
+        if any(by_path.get(name) != _sibling_row(siblings[index])
+               for index, name in enumerate(_SIBLING_NAMES)):
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay sibling file changed")
+        before = _inventory_summary(
+            (row for row in rows if row["path"] not in _SIBLING_NAMES), root_mode,
+        )
+        if before != attempted["stage_before"]:
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay operated stage changed after siblings")
+        expected = {
+            "format": "workbench-overlay-envelope-siblings-complete-v1",
+            "attempt_id": attempt_id,
+            "attempt_sha256": sha256(read_private_bytes(attempted_path, byte_limit=_MANIFEST_BYTES)).hexdigest(),
+            "stage_inventory": _inventory_summary(rows, root_mode),
+        }
+        if _read_record(complete_path, byte_limit=_MANIFEST_BYTES) != expected:
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay sibling completion changed")
 
 
 class CoreOverlayEnvelopeInputAttempt:
@@ -1172,6 +1265,99 @@ class CoreOverlayEnvelopeInputAttempt:
         finally:
             os.close(content_fd)
         return self.stage.path / str(self.reservation["content_root"])
+
+    def write_siblings(
+        self, *, inventory_bytes: bytes, materialization_bytes: bytes,
+        validate_output: Callable[[Path, Iterable[bytes]], object],
+    ) -> tuple[Path, Path]:
+        """Write validated V1 JSON siblings once into the unpublished envelope."""
+        if sys.platform != "linux" or not callable(validate_output):
+            raise OverlayEnvelopeInputError("overlay.filesystem", "overlay siblings need Linux handles and a validator")
+        if self.reservation["content_root"] != "gregtech":
+            raise OverlayEnvelopeInputError("overlay.policy", "GTCEu siblings require the gregtech content root")
+        sibling_bytes = (inventory_bytes, materialization_bytes)
+        if any(type(data) is not bytes or not 0 < len(data) <= MAX_FILE_BYTES
+               for data in sibling_bytes):
+            raise OverlayEnvelopeInputError("overlay.unsupported", "overlay sibling bytes exceed the V3 file bound")
+        if (self.root / "siblings-attempted.json").exists() or (self.root / "siblings-complete.json").exists():
+            raise OverlayEnvelopeInputError("overlay.state", "overlay siblings were already attempted")
+        if self.stage.renamed or self.stage.committed or self.stage.target.exists() or self.stage.target.is_symlink():
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay target is no longer reserved")
+        content_fd = self._copied_stage()
+        os.close(content_fd)
+        _seal, effects = self._read_effect_seal()
+        self.host._inventory_operations(
+            self.root, self.attempt_id, effects, True, True, self.stage.path,
+            cancelled=self.stage.host._cancelled,
+        )
+        content_path = self.stage.path / "gregtech"
+        if validate_output(content_path, self._plan_chunks()) != sibling_bytes:
+            raise OverlayEnvelopeInputError("overlay.plan", "sibling bytes differ from validated output")
+        self.host._inventory_operations(
+            self.root, self.attempt_id, effects, True, True, self.stage.path,
+            cancelled=self.stage.host._cancelled,
+        )
+        operation_path = self.root / "operations-complete.json"
+        operation_raw = read_private_bytes(operation_path, byte_limit=_MANIFEST_BYTES)
+        before = _read_record(operation_path, byte_limit=_MANIFEST_BYTES)["stage_inventory"]
+        attempted = {
+            "format": "workbench-overlay-envelope-siblings-attempted-v1",
+            "attempt_id": self.attempt_id,
+            "operations_sha256": sha256(operation_raw).hexdigest(),
+            "stage_before": before,
+            "siblings": [_sibling_metadata(name, data)
+                         for name, data in zip(_SIBLING_NAMES, sibling_bytes)],
+        }
+        attempted_raw = _canonical(attempted) + b"\n"
+        if len(attempted_raw) > _MANIFEST_BYTES:
+            raise OverlayEnvelopeInputError("overlay.unsupported", "overlay sibling intent exceeds its bound")
+        self.stage.host.check_cancelled()
+        publish_immutable_bytes(self.root / "siblings-attempted.json", attempted_raw,
+                                byte_limit=_MANIFEST_BYTES)
+        payload_fd = pinned_directory(self.stage.path, create=False)
+        try:
+            copy = _read_record(self.root / "copy-complete.json", byte_limit=_MANIFEST_BYTES)
+            info = os.fstat(payload_fd)
+            if (info.st_dev, info.st_ino) != (copy["payload_device"], copy["payload_inode"]):
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay sibling stage changed custody")
+            for name, data in zip(_SIBLING_NAMES, sibling_bytes):
+                self.stage.host.check_cancelled()
+                self._write_sibling(payload_fd, name, data)
+        finally:
+            os.close(payload_fd)
+        rows, root_mode, _files, _directories = inventory_exact_members(
+            self.stage.path, cancelled=self.stage.host._cancelled,
+        )
+        by_path = {row["path"]: row for row in rows}
+        if (root_mode != before["root_mode"]
+                or any(by_path.get(name) != _sibling_row(attempted["siblings"][index])
+                       for index, name in enumerate(_SIBLING_NAMES))
+                or _inventory_summary(
+                    (row for row in rows if row["path"] not in _SIBLING_NAMES), root_mode,
+                ) != before):
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay sibling stage differs from validated output")
+        self.stage.host.check_cancelled()
+        publish_immutable_bytes(self.root / "siblings-complete.json", _canonical({
+            "format": "workbench-overlay-envelope-siblings-complete-v1",
+            "attempt_id": self.attempt_id,
+            "attempt_sha256": sha256(attempted_raw).hexdigest(),
+            "stage_inventory": _inventory_summary(rows, root_mode),
+        }) + b"\n", byte_limit=_MANIFEST_BYTES)
+        return tuple(self.stage.path / name for name in _SIBLING_NAMES)
+
+    @staticmethod
+    def _write_sibling(payload_fd: int, name: str, data: bytes) -> None:
+        descriptor = os.open(
+            name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+            0o600, dir_fd=payload_fd,
+        )
+        try:
+            _write_all(descriptor, data)
+            os.fchmod(descriptor, 0o644)
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        os.fsync(payload_fd)
 
     @staticmethod
     def _apply_effect(root_fd: int, mount_id: int, effect: Mapping[str, object]) -> None:
