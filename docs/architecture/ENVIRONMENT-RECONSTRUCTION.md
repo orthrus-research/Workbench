@@ -79,7 +79,7 @@ A fresh configuration home and state root are supported when a compatible
 checked-out suite and workspace directory already exist. The project source
 and external dependency bytes must be obtained separately.
 
-WSL is a Linux managed-Java host. A `/mnt/c/...` path is a local binding and
+WSL is a Linux managed-Java host. A WSL-mounted Windows path is a local binding and
 never enters the share. Windows execution from WSL is a different host variant;
 this V1 import reports that lock as unsupported rather than reusing a Linux
 runtime receipt across the boundary.
