@@ -14,12 +14,20 @@ import re
 import shutil
 import stat
 import subprocess
-import tempfile
 import unicodedata
 from typing import Any, Callable, Iterable, NoReturn
 
 from jsonschema import Draft202012Validator
 
+from workbench_api.durable_resources import DurableResourceError
+from workbench_api.host_filesystem import (
+    DurableRecordError,
+    HostFilesystemError,
+    publish_immutable_bytes,
+    read_private_bytes,
+    secure_private_path,
+)
+from workbench_api.record_stores import open_record_store
 from workbench_blueprints import standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
 
@@ -1202,7 +1210,17 @@ class SealedStore:
         serialized = standards.canonical_json(payload).encode("utf-8")
         digest = _digest_bytes(serialized)
         path = self._path(digest)
-        self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        # Core grants and registers this namespace only after the owning
+        # planner has admitted its target and produced a ready candidate.
+        try:
+            managed = open_record_store("blueprints-sealed-v1", self.root)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPP168_SEALED_ROOT", str(self.root), str(exc))
+        if managed is None or managed.root != self.root:
+            _fail(
+                "BPP168_SEALED_ROOT", str(self.root),
+                "sealed storage requires its admitted Core record store",
+            )
         objects = self.root / "objects"
         if objects.is_symlink():
             _fail(
@@ -1210,46 +1228,27 @@ class SealedStore:
                 str(objects),
                 "sealed object directory cannot be a symlink",
             )
-        objects.mkdir(mode=0o700, exist_ok=True)
         if path.parent.is_symlink():
             _fail(
                 "BPP168_SEALED_ROOT",
                 str(path.parent),
                 "sealed shard directory cannot be a symlink",
             )
-        path.parent.mkdir(mode=0o700, exist_ok=True)
-        os.chmod(self.root, 0o700)
-        os.chmod(objects, 0o700)
-        os.chmod(path.parent, 0o700)
-        if path.exists():
-            if path.is_symlink() or _read_regular_nofollow(
-                path, "BPP160_SEALED_COLLISION"
-            ) != serialized:
-                _fail(
-                    "BPP160_SEALED_COLLISION",
-                    "local-cas:sha256:" + digest,
-                    "sealed object does not match its content identity",
-                )
-        else:
-            temporary_name: str | None = None
-            try:
-                with tempfile.NamedTemporaryFile(
-                    mode="wb",
-                    dir=path.parent,
-                    prefix=".sealed.",
-                    delete=False,
-                ) as handle:
-                    temporary_name = handle.name
-                    os.fchmod(handle.fileno(), 0o600)
-                    handle.write(serialized)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(temporary_name, path)
-                temporary_name = None
-            finally:
-                if temporary_name is not None:
-                    Path(temporary_name).unlink(missing_ok=True)
-        os.chmod(path, 0o600)
+        try:
+            secure_private_path(objects, directory=True)
+            secure_private_path(path.parent, directory=True)
+            publish_immutable_bytes(
+                path, serialized, byte_limit=len(serialized), idempotent=True,
+            )
+        except DurableRecordError as exc:
+            code = (
+                "BPP160_SEALED_COLLISION"
+                if exc.code in {"collision", "changed", "unavailable", "unsafe"}
+                else "BPP168_SEALED_ROOT"
+            )
+            _fail(code, "local-cas:sha256:" + digest, str(exc))
+        except (HostFilesystemError, OSError) as exc:
+            _fail("BPP168_SEALED_ROOT", str(path), str(exc))
         return "local-cas:sha256:" + digest
 
     def read(self, locator: str) -> dict[str, Any]:
@@ -1270,7 +1269,12 @@ class SealedStore:
             )
         if not path.is_file() or path.is_symlink():
             _fail("BPP162_SEALED_MISSING", locator, "sealed object is missing")
-        content = _read_regular_nofollow(path, "BPP162_SEALED_MISSING")
+        try:
+            content = read_private_bytes(path, byte_limit=path.stat().st_size)
+        except DurableRecordError as exc:
+            _fail("BPP162_SEALED_MISSING", locator, str(exc))
+        except (HostFilesystemError, OSError) as exc:
+            _fail("BPP168_SEALED_ROOT", locator, str(exc))
         if _digest_bytes(content) != digest:
             _fail("BPP163_SEALED_DIGEST", locator, "sealed object digest drift")
         try:

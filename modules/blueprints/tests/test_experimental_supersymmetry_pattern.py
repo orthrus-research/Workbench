@@ -12,7 +12,7 @@ import sys
 import tempfile
 import unittest
 
-from _support import LEDGER_PATH, SOURCE_ROOT, WORKBENCH_ROOT
+from _support import LEDGER_PATH, SOURCE_ROOT, WORKBENCH_ROOT, sealed_store_scope
 
 
 if str(SOURCE_ROOT) not in sys.path:
@@ -213,8 +213,9 @@ class ExperimentalSupersymmetryPatternTest(unittest.TestCase):
                 },
             }
 
-            first = engine.execute(intake, target, evidence)
-            second = engine.execute(intake, target, evidence)
+            with sealed_store_scope(repository, root / "configuration"):
+                first = engine.execute(intake, target, evidence)
+                second = engine.execute(intake, target, evidence)
             self.assertEqual(first, second)
             self.assertEqual(first["diagnostics"], [])
             self.assertEqual(first["plan"]["status"], "ready")

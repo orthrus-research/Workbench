@@ -23,13 +23,17 @@ class CoreRecordStores:
         self.catalog = ResourceCatalog(configuration_home)
 
     def open(self, family: str, base: Path) -> RecordStoreReference:
-        if self.owner_id != "workbench-shell" or not isinstance(base, Path):
+        if not isinstance(base, Path):
             raise DurableResourceError("resource.policy", "record store owner or base is unsupported")
         selected = Path(os.path.abspath(base.expanduser()))
-        if family == "work-session-v2":
+        if self.owner_id == "workbench-shell" and family == "work-session-v2":
             root = selected / ".workbench/sessions/work-session-v2"
-        elif family == "feature-change-session-context-v1":
+        elif self.owner_id == "workbench-shell" and family == "feature-change-session-context-v1":
             root = default_product_spine_state_root(selected) / family
+        elif self.owner_id == "blueprints" and family == "blueprints-sealed-v1" and selected.name == "sealed":
+            # Blueprints admits the target and protected session before it
+            # requests this historical CAS namespace. Keep its V1 locators.
+            root = selected
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

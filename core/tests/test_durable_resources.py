@@ -84,6 +84,25 @@ class DurableResourceTests(unittest.TestCase):
         self.assertEqual(1, len(ResourceCatalog(self.config).inventory()["record_stores"]))
         self.assertEqual([], list((self.config / "resources-v1/stores").glob(".*.pending")))
 
+    def test_blueprints_sealed_store_uses_its_existing_namespace_and_owner(self) -> None:
+        provider = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="blueprints",
+        )
+        root = self.home / "blueprints-session/sealed"
+        with self.assertRaises(DurableResourceError):
+            provider.open("work-session-v2", root)
+        self.assertFalse(root.exists())
+        self.assertFalse((self.config / "resources-v1/stores").exists())
+
+        opened = provider.open("blueprints-sealed-v1", root)
+        self.assertEqual(opened.root, root)
+        self.assertEqual(opened, provider.open("blueprints-sealed-v1", root))
+        rows = ResourceCatalog(self.config).inventory(workspace=self.workspace)["record_stores"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["store_id"], opened.store_id)
+        self.assertEqual(rows[0]["owner_id"], "blueprints")
+
     def test_dispatch_binds_core_and_inventory_sees_external_root(self) -> None:
         captured = []
 

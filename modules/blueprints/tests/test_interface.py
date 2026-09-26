@@ -252,6 +252,15 @@ class InterfaceTest(unittest.TestCase):
         self.assertEqual(blocked["status"], "failed")
         self.assertEqual(blocked["exit_code"], 5)
         self.assertEqual(blocked["state"], "initialized")
+        self.assertFalse((self.workspace / "sealed").exists())
+        registrations = (
+            self.fixture.configuration_home / "resources-v1/stores"
+        )
+        self.assertFalse(any(
+            json.loads(path.read_text(encoding="utf-8"))["root"]
+            == str(self.workspace / "sealed")
+            for path in registrations.glob("*.json")
+        ))
         self.assertIsNone(
             interface.SessionStore(self.workspace).load()["run"]["candidate"]
         )

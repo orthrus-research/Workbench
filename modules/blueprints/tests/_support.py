@@ -1,6 +1,13 @@
 """Shared paths for the relocated Blueprints V1 tests."""
 
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
+
+from workbench_api.host_filesystem import bind_host_filesystem
+from workbench_api.record_stores import record_store_scope
+from workbench_core import host_filesystem
+from workbench_core.storage.record_stores import CoreRecordStores
 
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
@@ -14,3 +21,16 @@ LEDGER_PATH = (
     WORKBENCH_ROOT
     / "profiles/packs/supersymmetry/blueprints/allocation/ledger.json"
 )
+
+
+@contextmanager
+def sealed_store_scope(workspace: Path, configuration_home: Path) -> Iterator[None]:
+    """Compose the same Core custody ports used by installed dispatch."""
+
+    bind_host_filesystem(host_filesystem)
+    with record_store_scope(CoreRecordStores(
+        workspace=workspace,
+        configuration_home=configuration_home,
+        owner_id="blueprints",
+    )):
+        yield

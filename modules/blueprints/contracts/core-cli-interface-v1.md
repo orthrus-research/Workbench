@@ -129,6 +129,14 @@ PYTHONPATH=modules/blueprints/src \
   --workspace <session> <command> [arguments]
 ```
 
+The installed Workbench dispatch binds Core's filesystem host and Blueprints
+record-store scope. The direct module invocation above does not yet compose
+those Core ports. A `plan` that would emit a ready sealed candidate fails
+closed with `BPP168_SEALED_ROOT` from that direct invocation; it does not
+create a standalone sealed store. Direct Python callers can compose the Core
+ports explicitly. A Core-hosted standalone CLI entrypoint remains to be
+provided for the documented shell form.
+
 The commands and external inputs are:
 
 | Command | Required external input |

@@ -173,8 +173,12 @@ hashed. No blocked plan retains an operation manifest.
 
 Only a ready plan can be sealed. The private manifest binds plan, target,
 primary-first standard identities, the exact operation-manifest digest, and
-base64 operation bytes. Its canonical bytes are stored in a mode-`0700`
-content-addressed root with mode-`0600` objects and atomic rename.
+base64 operation bytes. Core grants and registers the `blueprints-sealed-v1`
+record store after target admission and only when a ready plan emits a candidate.
+Its canonical bytes retain the historical mode-`0700` content-addressed root,
+mode-`0600` objects, and `local-cas:sha256:<digest>` identity. Core's filesystem
+port publishes immutable bytes without replacing an existing object. A direct
+Python composition must bind the Core filesystem host and record store scope.
 
 The public candidate record contains only lifecycle metadata and a
 `local-cas:sha256:<digest>` locator. It contains no output path, source,

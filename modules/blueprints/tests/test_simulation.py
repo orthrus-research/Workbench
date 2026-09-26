@@ -24,6 +24,7 @@ from _support import (
     SCHEMA_ROOT,
     SOURCE_ROOT,
     WORKBENCH_ROOT,
+    sealed_store_scope,
 )
 
 REPO_ROOT = WORKBENCH_ROOT
@@ -141,6 +142,9 @@ class SimulationTest(unittest.TestCase):
         self.ledger = self.root / "ledger.json"
         shutil.copyfile(CENTRAL_LEDGER, self.ledger)
         self.target = planner.capture_target_state(self.repository, "pack")
+        self.configuration_home = self.root / "configuration"
+        self.core_scope = sealed_store_scope(self.repository, self.configuration_home)
+        self.core_scope.__enter__()
         self.sealed_store = planner.SealedStore(self.sealed_root)
         self.intake = {
             "sequence": 0,
@@ -211,6 +215,7 @@ class SimulationTest(unittest.TestCase):
         self.environment = self._environment()
 
     def tearDown(self) -> None:
+        self.core_scope.__exit__(None, None, None)
         self.temporary.cleanup()
 
     @staticmethod

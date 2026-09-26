@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ import sys
 import tempfile
 from typing import Any
 import unittest
+from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 import yaml
@@ -25,6 +27,7 @@ from _support import (
     SCHEMA_ROOT,
     SOURCE_ROOT,
     WORKBENCH_ROOT,
+    sealed_store_scope,
 )
 
 REPO_ROOT = WORKBENCH_ROOT
@@ -76,8 +79,12 @@ class PlannerTest(unittest.TestCase):
         self.ledger = self.root / "ledger.json"
         shutil.copyfile(CENTRAL_LEDGER, self.ledger)
         self.target = planner.capture_target_state(self.repository, "pack")
+        self.configuration_home = self.root / "configuration"
+        self.core_scope = sealed_store_scope(self.repository, self.configuration_home)
+        self.core_scope.__enter__()
 
     def tearDown(self) -> None:
+        self.core_scope.__exit__(None, None, None)
         self.temporary.cleanup()
 
     def _intake(
@@ -279,6 +286,47 @@ class PlannerTest(unittest.TestCase):
         object_files = list(self.sealed_root.rglob("*.json"))
         self.assertEqual(len(object_files), 1)
         self.assertEqual(stat.S_IMODE(object_files[0].stat().st_mode), 0o600)
+        self.assertEqual(
+            candidate["sealed_locator"],
+            "local-cas:sha256:" + hashlib.sha256(object_files[0].read_bytes()).hexdigest(),
+        )
+        self.assertEqual(
+            planner.SealedStore(self.sealed_root).read(candidate["sealed_locator"]),
+            sealed,
+        )
+        historical_root = self.root / "historical/sealed"
+        historical_path = (
+            historical_root / "objects" / object_files[0].parent.name
+            / object_files[0].name
+        )
+        historical_path.parent.mkdir(mode=0o700, parents=True)
+        historical_path.write_bytes(object_files[0].read_bytes())
+        historical_path.chmod(0o600)
+        self.assertEqual(
+            planner.SealedStore(historical_root).read(candidate["sealed_locator"]),
+            sealed,
+        )
+        registrations = list(
+            (self.configuration_home / "resources-v1/stores").glob("*.json")
+        )
+        self.assertEqual(len(registrations), 1)
+        record = json.loads(registrations[0].read_text(encoding="utf-8"))
+        self.assertEqual(record["family"], "blueprints-sealed-v1")
+        self.assertEqual(record["owner_id"], "blueprints")
+        self.assertEqual(record["root"], str(self.sealed_root))
+
+        unbound = self.root / "unbound/sealed"
+        with patch.object(planner, "open_record_store", return_value=None):
+            with self.assertRaises(planner.PlannerDiagnostic) as context:
+                planner.SealedStore(unbound).put(sealed)
+        self.assertEqual(context.exception.code, "BPP168_SEALED_ROOT")
+        self.assertFalse(unbound.exists())
+
+        object_files[0].write_bytes(b"changed")
+        with self.assertRaises(planner.PlannerDiagnostic) as context:
+            engine.sealed_store.put(sealed)
+        self.assertEqual(context.exception.code, "BPP160_SEALED_COLLISION")
+        self.assertEqual(object_files[0].read_bytes(), b"changed")
 
     def test_component_selection_is_explicit_compatible_and_composed(self) -> None:
         result = self._engine(self._identity_formatter).execute(
