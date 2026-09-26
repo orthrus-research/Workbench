@@ -19,7 +19,7 @@ from jsonschema import Draft202012Validator
 
 from workbench_api.durable_resources import DurableResourceError
 from workbench_api.host_filesystem import (
-    DurableRecordError, HostFilesystemError, read_private_bytes,
+    DurableRecordError, HostFilesystemError, private_exclusive_marker, read_private_bytes,
     replace_private_bytes,
 )
 from workbench_api.record_stores import open_record_store
@@ -361,9 +361,7 @@ class SessionStore:
 
     @contextmanager
     def lock(self, *, create: bool = False) -> Iterator[None]:
-        if create:
-            self.workspace.mkdir(mode=0o700, parents=True, exist_ok=True)
-        elif not self.workspace.is_dir():
+        if not create and not self.workspace.is_dir():
             _fail(
                 "BPI108_SESSION_MISSING",
                 str(self.workspace),
@@ -376,29 +374,27 @@ class SessionStore:
                 str(self.workspace),
                 "workspace is a symlink",
             )
-        os.chmod(self.workspace, 0o700)
         try:
-            descriptor = os.open(
-                self.lock_path,
-                os.O_WRONLY
-                | os.O_CREAT
-                | os.O_EXCL
-                | getattr(os, "O_NOFOLLOW", 0),
-                0o600,
-            )
-        except OSError as exc:
+            managed = open_record_store("blueprints-session-pointer-v1", self.workspace)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPI106_WORKSPACE", str(self.workspace), str(exc))
+        if managed is None or managed.root != self.workspace:
+            _fail("BPI106_WORKSPACE", str(self.workspace), "session lock requires its Core store")
+        # The V1 lock is an exclusive-existence marker. Retain that protocol
+        # so older Blueprints processes and Core-supervised writers exclude
+        # each other at the same historical path.
+        try:
+            lease = private_exclusive_marker(self.lock_path)
+            lease.__enter__()
+        except (DurableRecordError, HostFilesystemError, OSError) as exc:
             _fail("BPI107_SESSION_LOCK", str(self.lock_path), str(exc))
         try:
-            lifecycle._fsync_directory(
-                self.workspace, "BPA109_STORE_COLLISION"
-            )
             yield
         finally:
-            os.close(descriptor)
-            self.lock_path.unlink(missing_ok=True)
-            lifecycle._fsync_directory(
-                self.workspace, "BPA109_STORE_COLLISION"
-            )
+            try:
+                lease.__exit__(None, None, None)
+            except (DurableRecordError, HostFilesystemError, OSError) as exc:
+                _fail("BPI107_SESSION_LOCK", str(self.lock_path), str(exc))
 
     def exists(self) -> bool:
         return self.pointer_path.exists() or self.pointer_path.is_symlink()

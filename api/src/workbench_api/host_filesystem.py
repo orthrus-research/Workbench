@@ -40,6 +40,7 @@ class HostFilesystem(Protocol):
         self, path: Path, *, expected_sha256: str, byte_limit: int,
     ) -> None: ...
     def private_record_lock(self, path: Path, *, wait: bool = False) -> ContextManager[None]: ...
+    def private_exclusive_marker(self, path: Path) -> ContextManager[None]: ...
     def append_private_line(
         self, path: Path, line: bytes, *, expected_size: int, byte_limit: int,
         journal_byte_limit: int | None = None,
@@ -204,6 +205,19 @@ def private_record_lock(path: Path, *, wait: bool = False) -> ContextManager[Non
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide private record locks")
     return operation(path, wait=wait)
+
+
+def private_exclusive_marker(path: Path) -> ContextManager[None]:
+    """Hold a transient Core-owned marker that also excludes legacy writers.
+
+    Existing markers remain visible for owner recovery. This port never
+    adopts or removes a marker that another process created.
+    """
+
+    operation = getattr(_filesystem(), "private_exclusive_marker", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide exclusive markers")
+    return operation(path)
 
 
 def append_private_line(

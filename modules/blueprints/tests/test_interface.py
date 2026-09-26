@@ -214,6 +214,53 @@ class InterfaceTest(unittest.TestCase):
         self.assertEqual(json.loads(completed.stderr)["diagnostics"][0]["code"], "BPI106_WORKSPACE")
         self.assertFalse(configuration_home.exists())
 
+    def test_session_lock_uses_core_exclusive_legacy_marker(self) -> None:
+        store = interface.SessionStore(self.workspace)
+        lock_path = self.workspace / "interface.lock"
+        with store.lock(create=True):
+            self.assertEqual(b"", lock_path.read_bytes())
+            with self.assertRaises(interface.InterfaceDiagnostic) as context:
+                with store.lock():
+                    pass
+            self.assertEqual("BPI107_SESSION_LOCK", context.exception.code)
+        self.assertFalse(lock_path.exists())
+        with store.lock():
+            self.assertTrue(lock_path.is_file())
+        self.assertFalse(lock_path.exists())
+        with self.assertRaisesRegex(RuntimeError, "owner failed"):
+            with store.lock():
+                raise RuntimeError("owner failed")
+        self.assertFalse(lock_path.exists())
+
+    def test_session_lock_preserves_interrupted_legacy_marker(self) -> None:
+        self.workspace.mkdir(mode=0o700, parents=True)
+        lock_path = self.workspace / "interface.lock"
+        lock_path.write_bytes(b"")
+        lock_path.chmod(0o600)
+        store = interface.SessionStore(self.workspace)
+        with self.assertRaises(interface.InterfaceDiagnostic) as context:
+            with store.lock():
+                pass
+        self.assertEqual("BPI107_SESSION_LOCK", context.exception.code)
+        self.assertEqual(b"", lock_path.read_bytes())
+        lock_path.unlink()
+        with store.lock():
+            self.assertEqual(b"", lock_path.read_bytes())
+        self.assertFalse(lock_path.exists())
+
+    def test_session_lock_refuses_redirected_legacy_marker(self) -> None:
+        self.workspace.mkdir(mode=0o700, parents=True)
+        outside = self.fixture.root / "outside-lock"
+        outside.write_bytes(b"outside")
+        lock_path = self.workspace / "interface.lock"
+        lock_path.symlink_to(outside)
+        with self.assertRaises(interface.InterfaceDiagnostic) as context:
+            with interface.SessionStore(self.workspace).lock():
+                pass
+        self.assertEqual("BPI107_SESSION_LOCK", context.exception.code)
+        self.assertEqual(b"outside", outside.read_bytes())
+        self.assertTrue(lock_path.is_symlink())
+
     def test_cli_keeps_an_existing_core_store_scope(self) -> None:
         self._core("instructions")
         with patch(

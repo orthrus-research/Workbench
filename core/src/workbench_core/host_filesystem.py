@@ -414,6 +414,11 @@ def private_record_lock(path: Path, *, wait: bool = False):
     return lock(path, wait=wait)
 
 
+def private_exclusive_marker(path: Path):
+    from .durable_records import private_exclusive_marker as marker
+    return marker(path)
+
+
 def append_private_line(
     path: Path, line: bytes, *, expected_size: int, byte_limit: int,
     journal_byte_limit: int | None = None,

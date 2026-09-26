@@ -330,6 +330,86 @@ def private_record_lock(lock_path: Path, *, wait: bool = False) -> Iterator[None
 
 
 @contextmanager
+def private_exclusive_marker(path: Path) -> Iterator[None]:
+    """Hold a V1-compatible create-exclusive marker in a private store.
+
+    Older writers use the marker's existence for exclusion. An existing file
+    may be a live writer or an interrupted attempt, so Core never adopts it.
+    The marker is removed only if its exact opened inode remains unchanged.
+    """
+
+    _parent(path)
+    descriptor = -1
+    try:
+        try:
+            descriptor = os.open(
+                path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
+                0o600,
+            )
+        except FileExistsError as exc:
+            raise DurableRecordError("busy", "exclusive private marker already exists") from exc
+        except OSError as exc:
+            raise DurableRecordError("write", f"cannot create exclusive private marker: {exc}") from exc
+        try:
+            secure_private_path(path, directory=False)
+            opened = os.fstat(descriptor)
+            visible = path.lstat()
+            if (
+                not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+                or _identity(opened) != _identity(visible)
+                or not private_path(path, directory=False)
+            ):
+                raise DurableRecordError("changed", "exclusive private marker changed during creation")
+            os.fsync(descriptor)
+            fsync_directory(path.parent)
+            created = _identity(os.fstat(descriptor))
+        except DurableRecordError:
+            raise
+        except HostFilesystemError as exc:
+            raise DurableRecordError("unsafe", f"cannot secure exclusive private marker: {exc}") from exc
+        except OSError as exc:
+            raise DurableRecordError("write", f"cannot seal exclusive private marker: {exc}") from exc
+        try:
+            yield
+        finally:
+            try:
+                opened = os.fstat(descriptor)
+                visible = path.lstat()
+                if (
+                    not stat.S_ISREG(visible.st_mode) or visible.st_nlink != 1
+                    or visible.st_size != 0 or _identity(opened) != created
+                    or _identity(visible) != created
+                    or not private_path(path, directory=False)
+                ):
+                    raise DurableRecordError("changed", "exclusive private marker changed while held")
+                # Windows does not permit unlinking the marker with this
+                # writer descriptor open. Recheck the exact visible inode
+                # after close before removing the historical marker path.
+                os.close(descriptor)
+                descriptor = -1
+                visible = path.lstat()
+                if (
+                    not stat.S_ISREG(visible.st_mode) or visible.st_nlink != 1
+                    or visible.st_size != 0 or _identity(visible) != created
+                    or not private_path(path, directory=False)
+                ):
+                    raise DurableRecordError("changed", "exclusive private marker changed before release")
+                path.unlink()
+                fsync_directory(path.parent)
+            except DurableRecordError:
+                raise
+            except HostFilesystemError as exc:
+                raise DurableRecordError("unsafe", f"cannot release exclusive private marker: {exc}") from exc
+            except OSError as exc:
+                raise DurableRecordError("write", f"cannot release exclusive private marker: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+@contextmanager
 def _record_lock(path: Path) -> Iterator[None]:
     # Setup's historical .<name>.lock may already be held while Core saves
     # preferences. Keep this lease distinct until that outer transaction moves.

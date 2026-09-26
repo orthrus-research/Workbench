@@ -15,7 +15,8 @@ from unittest.mock import patch
 
 from workbench_api.host_filesystem import (
     DurableRecordError, append_private_line, count_interrupted_create_once_stages,
-    inspect_private_journal, private_record_lock, publish_create_once_bytes,
+    inspect_private_journal, private_exclusive_marker, private_record_lock,
+    publish_create_once_bytes,
     publish_immutable_bytes, read_bounded_bytes, read_bounded_single_link_bytes,
     read_private_bytes,
     read_private_single_link_bytes, remove_private_bytes, replace_private_bytes,
@@ -242,6 +243,62 @@ class DurableRecordTests(unittest.TestCase):
             thread.join(5)
             self.assertFalse(thread.is_alive())
         self.assertEqual(["busy"], [error.code for error in errors])
+
+    def test_exclusive_marker_excludes_legacy_writer_and_releases_exact_path(self) -> None:
+        marker = self.root / "interface.lock"
+        with private_exclusive_marker(marker):
+            self.assertEqual(b"", marker.read_bytes())
+            with self.assertRaises(DurableRecordError) as busy:
+                with private_exclusive_marker(marker):
+                    pass
+            self.assertEqual("busy", busy.exception.code)
+        self.assertFalse(marker.exists())
+        marker.write_bytes(b"")
+        marker.chmod(0o600)
+        with self.assertRaises(DurableRecordError) as interrupted:
+            with private_exclusive_marker(marker):
+                pass
+        self.assertEqual("busy", interrupted.exception.code)
+        self.assertEqual(b"", marker.read_bytes())
+
+    def test_exclusive_marker_preserves_replaced_path_on_release(self) -> None:
+        marker = self.root / "interface.lock"
+        with self.assertRaises(DurableRecordError) as changed:
+            with private_exclusive_marker(marker):
+                marker.unlink()
+                marker.write_bytes(b"other owner")
+                marker.chmod(0o600)
+        self.assertEqual("changed", changed.exception.code)
+        self.assertEqual(b"other owner", marker.read_bytes())
+
+    def test_exclusive_marker_retains_uncertain_creation_for_recovery(self) -> None:
+        marker = self.root / "interface.lock"
+        with patch.object(durable_records, "fsync_directory", side_effect=OSError("barrier failed")):
+            with self.assertRaises(DurableRecordError) as failed:
+                with private_exclusive_marker(marker):
+                    pass
+        self.assertEqual("write", failed.exception.code)
+        self.assertEqual(b"", marker.read_bytes())
+        with self.assertRaises(DurableRecordError) as busy:
+            with private_exclusive_marker(marker):
+                pass
+        self.assertEqual("busy", busy.exception.code)
+
+    def test_exclusive_marker_refuses_unprivate_parent_without_residue(self) -> None:
+        marker = self.root / "interface.lock"
+        original = durable_records.private_path
+
+        def simulated_mount(path: Path, *, directory: bool) -> bool:
+            if directory and path == self.root:
+                return False
+            return original(path, directory=directory)
+
+        with patch.object(durable_records, "private_path", side_effect=simulated_mount):
+            with self.assertRaises(DurableRecordError) as unsafe:
+                with private_exclusive_marker(marker):
+                    pass
+        self.assertEqual("unsafe", unsafe.exception.code)
+        self.assertFalse(marker.exists())
 
     def test_append_journal_reopens_exact_bytes_and_refuses_stale_or_torn_tail(self) -> None:
         first = b'{"sequence":1}\n'

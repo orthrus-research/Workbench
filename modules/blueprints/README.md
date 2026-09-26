@@ -7,8 +7,10 @@ result through a recoverable transaction.
 Core performs the physical source staging, replacement, deletion, and guarded
 rollback for a consented direct application. Core also secures the retained
 transaction record directories before Blueprints publishes its V1 journal and
-history bytes through the filesystem port. Blueprints retains plan admission
-and source semantics.
+history bytes through the filesystem port. The resumable session holds its
+historical exclusive marker through Core, so older Blueprints processes still
+exclude a concurrent writer. Blueprints retains plan admission and source
+semantics.
 
 For native package development, install `api/` and `modules/blueprints/` in a
 dedicated virtual environment. Dependency declarations in `pyproject.toml`
