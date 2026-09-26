@@ -33,6 +33,13 @@ The Cleanroom owner can now inspect only the elected Java path for a portable
 fixture: it checks the release version and executable, and Core retains and
 reopens the owner's exact preflight answer. This is read-only and does not
 project the retained source or run Gradle.
+Core can separately publish the retained fixture source into a private
+content-addressed projection through its reusable projection service. The
+profile names which generated members a later build may place there. A
+read-only Core command plan then asks the installed Cleanroom owner to compose
+the Gradle command from that projection, the retained cleanup script and
+extracted Gradle launcher, and the preflighted Java 25 path. The command plan
+does not launch Gradle or admit build outputs.
 
 The generic-mod fixture runner accepts `--core-supervised` for a local build.
 Core holds the existing source projection lease while Gradle runs as a child,

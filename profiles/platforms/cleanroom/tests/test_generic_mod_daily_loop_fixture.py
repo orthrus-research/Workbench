@@ -293,6 +293,45 @@ class GenericModDailyLoopFixtureTests(unittest.TestCase):
             with self.assertRaisesRegex(RUNNER.FixtureBuildError, "Java 25"):
                 HOME.inspect_portable_java_home(java_home=home)
 
+    def test_portable_command_uses_explicit_retained_paths_without_launch(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workbench-portable-command-") as temp:
+            root = Path(temp)
+            policy = _load(FIXTURE_EXECUTION_POLICY)
+            digest = policy["fixture"]["tree_digest"].removeprefix("sha256:")
+            project = root / policy["paths"]["project_relative_to_state"].replace(
+                "{fixture_digest_hex}", digest,
+            )
+            project.mkdir(parents=True)
+            gradle = root / "retained-gradle/bin/gradle"
+            gradle.parent.mkdir(parents=True)
+            gradle.write_bytes(b"#!/bin/sh\nexit 0\n")
+            gradle.chmod(0o700)
+            java = root / "elected-java25"
+            (java / "bin").mkdir(parents=True)
+            (java / "release").write_text('JAVA_VERSION="25.0.4"\n', encoding="utf-8")
+            (java / "bin/java").write_bytes(b"#!/bin/sh\nexit 0\n")
+            (java / "bin/java").chmod(0o700)
+            cleanup = root / "retained-fixture/clean.gradle"
+            cleanup.parent.mkdir()
+            cleanup.write_bytes(FIXTURE_CLEANUP_INIT.read_bytes())
+            before = _tree_snapshot(root)
+            command = HOME.build_portable_command(
+                policy=policy, project=project, gradle_cmd=gradle,
+                java_home=java, cleanup_init=cleanup, state_root=root,
+            )
+            self.assertEqual(str(gradle), command["argv"][0])
+            self.assertEqual(str(project), command["cwd"])
+            self.assertEqual(str(java), command["environment_overrides"]["JAVA_HOME"])
+            self.assertEqual("UTC", command["environment_overrides"]["TZ"])
+            self.assertEqual(policy["capture"], command["capture"])
+            self.assertEqual(before, _tree_snapshot(root))
+            cleanup.write_bytes(b"changed")
+            with self.assertRaisesRegex(ValueError, "cleanup init changed"):
+                HOME.build_portable_command(
+                    policy=policy, project=project, gradle_cmd=gradle,
+                    java_home=java, cleanup_init=cleanup, state_root=root,
+                )
+
     def test_build_runner_binds_exact_fixture_and_toolchain_and_rejects_drift(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workbench-fixture-runner-") as temp:
             base = Path(temp)

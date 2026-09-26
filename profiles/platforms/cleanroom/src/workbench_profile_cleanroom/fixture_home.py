@@ -129,5 +129,74 @@ def inspect_portable_java_home(*, java_home: Path) -> dict[str, Any]:
     return fixture_build.inspect_portable_java_home(java_home=java_home)
 
 
+def portable_projection_rules(*, policy: Mapping[str, Any]) -> dict[str, Any]:
+    """Name the generated members tolerated beside exact projected source."""
+
+    if (policy.get("format") != "workbench-cleanroom-fixture-execution-policy-v1"
+            or policy.get("paths", {}).get("generated_root_relative_to_projection_digest")
+            != fixture_build.GENERATED_ROOTS[0].as_posix()):
+        raise ValueError("portable Cleanroom projection has another owner policy")
+    return {
+        "generated_parts": sorted(fixture_build.GENERATED_PARTS),
+        "generated_suffixes": sorted(fixture_build.GENERATED_SUFFIXES),
+        "generated_roots": [fixture_build.GENERATED_ROOTS[0].as_posix()],
+    }
+
+
+def build_portable_command(
+    *, policy: Mapping[str, Any], project: Path, gradle_cmd: Path,
+    java_home: Path, cleanup_init: Path, state_root: Path,
+) -> dict[str, Any]:
+    """Compose a retained fixture command from explicit Core-custodied paths.
+
+    This is a read-only owner command review. Core must reopen every retained
+    input and hold a projection lease before it ever executes the command.
+    """
+
+    portable_projection_rules(policy=policy)
+    paths = policy["paths"]
+    state = state_root.expanduser()
+    if not state.is_absolute() or ".." in state.parts:
+        raise ValueError("portable fixture state root must be absolute and normalized")
+    digest = policy["fixture"]["tree_digest"].removeprefix("sha256:")
+    expected_project = state / paths["project_relative_to_state"].replace(
+        "{fixture_digest_hex}", digest,
+    )
+    if project != expected_project or not project.is_dir():
+        raise ValueError("portable fixture project differs from the owner policy")
+    fixture_build._reject_symlink_components(project, label="portable fixture project")
+    gradle = fixture_build._ordinary_file(
+        gradle_cmd, label="retained Gradle launcher", executable=True,
+    )
+    java = Path(inspect_portable_java_home(java_home=java_home)["resolved_home"])
+    cleanup = fixture_build._ordinary_file(
+        cleanup_init, label="retained fixture cleanup init",
+    )
+    cleanup_bytes = fixture_build._read_ordinary_bytes(
+        cleanup, label="retained fixture cleanup init",
+        limit=fixture_build.MAX_TOOL_RECORD_BYTES,
+    )
+    if (len(cleanup_bytes) != policy["cleanup_init"]["size"]
+            or "sha256:" + sha256(cleanup_bytes).hexdigest()
+            != policy["cleanup_init"]["sha256"]):
+        raise ValueError("retained fixture cleanup init changed")
+    values = {
+        "gradle_bin": str(gradle), "project": str(project),
+        "project_cache": str(state / paths["project_cache_relative_to_state"]),
+        "cleanup_init": str(cleanup), "java_home": str(java),
+        "gradle_home": str(state / paths["gradle_home_relative_to_state"]),
+    }
+    return {
+        "argv": [value.format_map(values) for value in policy["argv_template"]],
+        "cwd": str(project),
+        "environment_overrides": {
+            name: value.format_map(values)
+            for name, value in policy["environment"].items()
+        },
+        "capture": dict(policy["capture"]),
+        "restart": policy["restart"],
+    }
+
+
 def build_input_digest(inputs: dict[str, Any]) -> str:
     return fixture_build.build_input_digest(inputs)
