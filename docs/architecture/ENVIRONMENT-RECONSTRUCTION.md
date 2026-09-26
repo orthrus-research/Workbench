@@ -168,11 +168,22 @@ Linux exact-tree support is checked before acquisition; WSL state on Windows
 mounts still needs native qualification. This operation never invokes pip,
 installs packages or clears the optional-package unresolved marker.
 
-The candidate and wheel import do not copy fixture bytes, prove optional
-package dependency closure, or change V1–V3 share and selection-import
-receipts. A target without the admitted fixture owner cannot recheck its local
-fixture tree. Toolchain and runtime fixture bytes still need their own owner
-locks and reviewed acquisition before a complete rebuild can be claimed.
+`plan_fixture_import` asks the admitted platform owner to validate its live
+source tree, owner lock, schema and preflight tool against the V3 candidate.
+`apply_fixture_import` copies only the lock's declared files and those three
+witnesses into a separate private Core-managed exact tree. It retains a
+prepared attempt and a result bound to the candidate and selected workspace.
+`reopen_fixture_import` verifies the cataloged tree, source lock and result
+without the original profile source. A validated publication intent can be
+reconciled after interruption; an incomplete stage without an intent requires
+review. The source profile must be installed and admitted for first acquisition.
+
+These input receipts do not execute the fixture, install optional packages,
+prove dependency closure, or change V1–V3 share and selection-import receipts.
+They keep the full unresolved input list. Toolchain and runtime fixture bytes
+still need their own owner locks and reviewed acquisition before a complete
+rebuild can be claimed. Linux exact-tree support is required; WSL storage on
+Windows mounts still needs native qualification.
 
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)

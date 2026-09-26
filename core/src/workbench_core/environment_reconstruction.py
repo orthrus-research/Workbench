@@ -1326,10 +1326,32 @@ def reopen_wheel_import(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def plan_fixture_import(*args, **kwargs) -> dict[str, Any]:
+    """Review the admitted profile fixture for separate Core custody."""
+
+    from .environment_fixture_import import plan_fixture_import as operation
+    return operation(*args, **kwargs)
+
+
+def apply_fixture_import(*args, **kwargs) -> dict[str, Any]:
+    """Retain exact owner fixture and preflight tool bytes."""
+
+    from .environment_fixture_import import apply_fixture_import as operation
+    return operation(*args, **kwargs)
+
+
+def reopen_fixture_import(*args, **kwargs) -> dict[str, Any]:
+    """Reopen a retained fixture result and its managed byte tree."""
+
+    from .environment_fixture_import import reopen_fixture_import as operation
+    return operation(*args, **kwargs)
+
+
 __all__ = [
     "ReconstructionError", "apply_import", "assess_reconstruction_feasibility",
     "build_share", "export_share", "load_share", "plan_import", "validate_share",
     "plan_project_import", "apply_project_import", "plan_tool_import", "apply_tool_import",
     "plan_environment_composition", "apply_environment_composition",
     "plan_wheel_import", "apply_wheel_import", "reopen_wheel_import",
+    "plan_fixture_import", "apply_fixture_import", "reopen_fixture_import",
 ]
