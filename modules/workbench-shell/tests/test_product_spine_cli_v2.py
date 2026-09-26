@@ -54,6 +54,12 @@ from workbench_shell.work_session import (  # noqa: E402
     WorkSessionConflictError,
     WorkSessionStore,
 )
+from workbench_api.record_stores import (  # noqa: E402
+    record_store_host_bound, record_store_scope,
+)
+from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
+from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
+from workbench_shell.workspace_dashboard import load_workspace_home_adoption  # noqa: E402
 
 
 def start_bound_fixture_process(
@@ -112,6 +118,74 @@ def _tree(root: Path) -> list[tuple[str, int, str]]:
 
 
 class ProductSpineCliV2Tests(unittest.TestCase):
+    def test_dispatch_adopt_uses_selected_core_catalog(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            base = Path(temporary)
+            workspace = base / "workspace"
+            workspace.mkdir()
+            (workspace / "build.gradle").write_text("plugins {}\n", encoding="utf-8")
+            state = base / "state"
+            selected_config = base / "selected-config"
+            ambient_config = base / "ambient-config"
+            host = CoreRecordStores(
+                workspace=ROOT, configuration_home=selected_config,
+                owner_id="workbench-shell",
+            )
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(ambient_config)}):
+                with record_store_scope(host):
+                    output, error = StringIO(), StringIO()
+                    self.assertEqual(0, adopt_main(
+                        [str(workspace), "--state-root", str(state), "--json"],
+                        root=ROOT, output=output, error=error,
+                    ), error.getvalue())
+            adopted = json.loads(output.getvalue())
+            self.assertEqual("adopted", adopted["adoption"]["state"])
+            self.assertFalse(ambient_config.exists())
+            self.assertEqual(
+                ["workspace-home-adoption-v2"],
+                [row["family"] for row in ResourceCatalog(selected_config).inventory(
+                    workspace=workspace,
+                )["record_stores"]],
+            )
+
+    def test_direct_adopt_catalogs_session_and_target_for_exact_reopen(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            base = Path(temporary)
+            workspace = base / "workspace"
+            workspace.mkdir()
+            (workspace / "build.gradle").write_text("plugins {}\n", encoding="utf-8")
+            before = _tree(workspace)
+            state = base / "state"
+            config = base / "user-config"
+            self.assertFalse(record_store_host_bound())
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(config)}):
+                output, error = StringIO(), StringIO()
+                self.assertEqual(0, adopt_main(
+                    [str(workspace), "--state-root", str(state), "--json"],
+                    root=ROOT, output=output, error=error,
+                ), error.getvalue())
+                adopted = json.loads(output.getvalue())
+                self.assertFalse(record_store_host_bound())
+                reopened_output, reopened_error = StringIO(), StringIO()
+                self.assertEqual(0, reopen_main(
+                    [adopted["adoption"]["binding_id"], "--state-root", str(state), "--json"],
+                    root=ROOT, output=reopened_output, error=reopened_error,
+                ), reopened_error.getvalue())
+            reopened = json.loads(reopened_output.getvalue())
+            self.assertEqual(adopted["workspace"], reopened["workspace"])
+            self.assertEqual(adopted["session"]["session_id"], reopened["session"]["session_id"])
+            binding = load_workspace_home_adoption(
+                ROOT, adopted["adoption"]["binding_id"], state_root=state / ".workbench",
+            )
+            self.assertEqual(adopted["session"]["session_id"], binding["session_id"])
+            suite_stores = ResourceCatalog(config).inventory(workspace=ROOT)["record_stores"]
+            self.assertEqual(["work-session-v2"], [row["family"] for row in suite_stores])
+            self.assertEqual(str(state / ".workbench/sessions/work-session-v2"), suite_stores[0]["path"])
+            target_stores = ResourceCatalog(config).inventory(workspace=workspace)["record_stores"]
+            self.assertEqual(["workspace-home-adoption-v2"], [row["family"] for row in target_stores])
+            self.assertEqual(str(state / ".workbench/workspace-home-v2/adoptions"), target_stores[0]["path"])
+            self.assertEqual(before, _tree(workspace))
+
     def test_json_home_keeps_optional_catalog_diagnostics_off_stderr(self) -> None:
         home = {
             "format": "workbench-workspace-home-v2",

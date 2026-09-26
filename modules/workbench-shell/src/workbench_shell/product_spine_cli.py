@@ -40,6 +40,7 @@ from .product_capability_catalog import (
     load_product_capability_catalog,
 )
 from workbench_api.state_paths import default_product_spine_state_root
+from workbench_api.record_stores import record_store_host_bound
 from .workspace_dashboard import (
     WorkspaceHomeV2Error,
     adopt_workspace_home_v2,
@@ -1198,6 +1199,28 @@ def adopt_main(
     root: Path,
     output: TextIO = sys.stdout,
     error: TextIO = sys.stderr,
+) -> int:
+    """Bind the same Core custody for a direct CLI as for module dispatch."""
+
+    if record_store_host_bound():
+        return _adopt_main_bound(argv, root=root, output=output, error=error)
+    try:
+        from workbench_core.host_services import direct_module_custody_scope
+        with direct_module_custody_scope(
+            workspace=Path(root).resolve(strict=True), owner_id="workbench-shell",
+        ):
+            return _adopt_main_bound(argv, root=root, output=output, error=error)
+    except (OSError, ValueError) as exc:
+        error.write(f"Workbench adopt failed: {exc}\n")
+        return 2
+
+
+def _adopt_main_bound(
+    argv: Sequence[str],
+    *,
+    root: Path,
+    output: TextIO,
+    error: TextIO,
 ) -> int:
     _load_work_session_runtime()
     args = _adopt_parser().parse_args(list(argv))
