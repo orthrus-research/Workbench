@@ -153,6 +153,44 @@ def tree_consumers(root, records):
     return consumers, errors
 
 
+def verify_tree_reference_closure(root, edges, catalog_root):
+    """Read the current check source and its exact tree-consumer anchor."""
+    root = _root(root)
+    catalog_root = Path(catalog_root)
+    edges = tuple(edges)
+    if not catalog_root.is_absolute():
+        raise ValueError('managed tree catalog root must be absolute')
+    for tree_id, reference in edges:
+        if (_TREE_REFERENCE.fullmatch(tree_id) is None
+                or _CHECK_REFERENCE.fullmatch(reference) is None):
+            raise ValueError('select exact managed tree and check references')
+    with lease(root, create=False):
+        records, registration_errors = registrations(root)
+        consumers, consumer_errors = tree_consumers(root, records)
+        if registration_errors or consumer_errors:
+            raise ValueError('check reference accounting is incomplete')
+        by_reference = {}
+        for record in records.values():
+            by_reference.setdefault(reference_id(record), []).append(record)
+        verified = set()
+        for tree_id, reference in edges:
+            matched = by_reference.get(reference, [])
+            if len(matched) != 1:
+                raise ValueError('referenced check is not registered in this workspace')
+            record = matched[0]
+            path, state = locate(root, record)
+            if state != 'retained' or path != root / '.workbench/check-attempts' / record['attempt_id']:
+                raise ValueError('referenced check is not live retained evidence')
+            if reference not in verified:
+                verify_payload(path, record, full=True)
+                verified.add(reference)
+            anchors = [row for row in consumers.get(record['attempt_id'], [])
+                       if (row['tree_id'] == tree_id and row['reference_id'] == reference
+                           and row['catalog_root'] == str(catalog_root))]
+            if len(anchors) != 1:
+                raise ValueError('referenced check lacks its exact tree-consumer anchor')
+
+
 def _sealed(path, kind):
     return _snapshots()._sealed(path, kind)
 
@@ -165,7 +203,7 @@ def _write(path, value):
 
 
 @contextmanager
-def lease(root, *, exclusive=False):
+def lease(root, *, exclusive=False, create=True):
     """Store lease precedes attempt leases and survives retirement's rename.
 
     Shared readers/publishers can coexist. Collection and pin changes require an
@@ -181,10 +219,15 @@ def lease(root, *, exclusive=False):
         return
     directory = root / '.workbench/runtime-manager'
     _manager()._assert_no_symlink_ancestors(directory, root)
-    directory.mkdir(parents=True, exist_ok=True)
+    if create:
+        directory.mkdir(parents=True, exist_ok=True)
     files.ordinary(directory, directory=True)
     path = directory / 'checks.lock'
-    descriptor = os.open(path, os.O_CREAT | os.O_RDWR | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+    flags = (os.O_RDWR | os.O_CREAT) if create else os.O_RDONLY
+    try:
+        descriptor = os.open(path, flags | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+    except FileNotFoundError as exc:
+        raise ValueError('check storage lease is unavailable') from exc
     try:
         files.ordinary(path)
         if os.fstat(descriptor).st_ino != path.stat().st_ino:

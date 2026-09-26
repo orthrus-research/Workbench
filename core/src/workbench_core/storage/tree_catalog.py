@@ -515,7 +515,7 @@ class TreeCatalog:
 
     def inventory(
         self, *, workspace: Path | None = None,
-        validate_references: Callable[[str, tuple[str, ...]], None] | None = None,
+        validate_references: Callable[[str, str, tuple[str, ...]], None] | None = None,
     ) -> list[dict[str, object]]:
         if not self.root.exists() and not self.root.is_symlink():
             return []
@@ -558,7 +558,7 @@ class TreeCatalog:
                 else None
             )
             if intent is not None and validate_references is not None:
-                validate_references(str(reservation["workspace"]), tuple(intent["references"]))
+                validate_references(tree_id, str(reservation["workspace"]), tuple(intent["references"]))
             if not selected:
                 continue
             target = self._target(reservation)

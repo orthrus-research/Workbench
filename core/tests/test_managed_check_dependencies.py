@@ -5,9 +5,11 @@ import os
 import unittest
 from unittest.mock import patch
 
+from workbench_api import DurableResourceError
 from workbench_api.managed_trees import ManagedTreeError
 from workbench_core import check_lifecycle as life
 from workbench_core import check_retention
+from workbench_core.host_filesystem import file_lease
 from workbench_core.managed_trees import CoreManagedTrees
 from workbench_core.storage import manager
 from workbench_core.storage.tree_catalog import TreeCatalog
@@ -66,6 +68,57 @@ class ManagedCheckDependenciesTests(unittest.TestCase):
             with self.assertRaisesRegex(manager.RuntimeManagerError, "no longer eligible"):
                 manager.execute_cleanup(self.workspace, before)
         self.assertTrue(self.source.attempt.exists())
+
+    def test_catalog_inventory_closes_foreign_check_edge_and_exact_anchor(self):
+        tree = self.publish()
+        unrelated = self.source.base / "unrelated-workspace"
+        unrelated.mkdir()
+        catalog = ResourceCatalog(self.config)
+        inventory = catalog.inventory(workspace=unrelated)
+        self.assertEqual("ready-unproven", inventory["root_state"])
+        self.assertEqual([], inventory["trees"])
+
+        anchor = (life._consumer_directory(self.workspace)
+                  / self.reference_id.split(":", 1)[1]
+                  / (tree.tree_id.split(":", 1)[1] + ".json"))
+        held = self.source.base / "held-tree-consumer.json"
+        anchor.rename(held)
+        try:
+            with self.assertRaises(DurableResourceError) as failure:
+                catalog.inventory(workspace=unrelated)
+            self.assertEqual("resource.changed", failure.exception.code)
+            self.assertFalse(anchor.exists())
+        finally:
+            held.rename(anchor)
+        self.assertEqual([tree.tree_id], [row["tree_id"] for row in
+                                          ResourceCatalog(self.config).inventory(workspace=self.workspace)["trees"]])
+
+        saved = self.source.attempt / "input.txt"
+        saved.write_bytes(b"changed saved source")
+        with self.assertRaises(DurableResourceError) as failure:
+            catalog.inventory(workspace=unrelated)
+        self.assertEqual("resource.changed", failure.exception.code)
+
+    def test_catalog_inventory_requires_existing_check_lease(self):
+        self.publish()
+        lock = self.workspace / ".workbench/runtime-manager/checks.lock"
+        lock.unlink()
+        with self.assertRaises(DurableResourceError) as failure:
+            ResourceCatalog(self.config).inventory(workspace=self.workspace)
+        self.assertEqual("resource.changed", failure.exception.code)
+        self.assertFalse(lock.exists())
+
+    def test_catalog_inventory_refuses_busy_check_source(self):
+        self.publish()
+        lock = self.workspace / ".workbench/runtime-manager/checks.lock"
+        descriptor = os.open(lock, os.O_RDWR)
+        try:
+            with file_lease(descriptor, exclusive=True):
+                with self.assertRaises(DurableResourceError) as failure:
+                    ResourceCatalog(self.config).inventory(workspace=self.workspace)
+                self.assertEqual("resource.changed", failure.exception.code)
+        finally:
+            os.close(descriptor)
 
     def test_interrupted_commit_keeps_source_protected(self):
         original = TreeCatalog._write

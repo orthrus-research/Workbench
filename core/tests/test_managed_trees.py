@@ -500,6 +500,66 @@ with host.stage("evidence", "recovered", requested_path=Path(os.environ["W3_OUTP
                 (stage.path / "source.txt").write_bytes(b"not admitted")
                 stage.publish(validate=lambda _: None, references=(source.tree_id,))
 
+    def test_inventory_requires_committed_tree_dependency(self) -> None:
+        source = self._publish()
+        dependent = self._publish(references=(source.tree_id,))
+        catalog = ResourceCatalog(self.config)
+        inventory = catalog.inventory(workspace=self.workspace)
+        self.assertEqual("ready-unproven", inventory["root_state"])
+        self.assertEqual({source.tree_id, dependent.tree_id},
+                         {row["tree_id"] for row in inventory["trees"]})
+
+        nonce = source.tree_id.rsplit(":", 1)[1]
+        commit = self.config / "resources-v1/trees/commits" / f"{nonce}.json"
+        held = self.home / "held-tree-commit.json"
+        commit.rename(held)
+        try:
+            with self.assertRaises(DurableResourceError) as failure:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual("resource.changed", failure.exception.code)
+            self.assertFalse(commit.exists())
+        finally:
+            held.rename(commit)
+        self.assertEqual(2, len(catalog.inventory(workspace=self.workspace)["trees"]))
+        (source.path / "source.jsonl").write_bytes(b"broken\n")
+        with self.assertRaises(DurableResourceError) as failure:
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual("resource.changed", failure.exception.code)
+
+    def test_inventory_refuses_busy_tree_dependency(self) -> None:
+        source = self._publish()
+        self._publish(references=(source.tree_id,))
+        catalog = ResourceCatalog(self.config)
+        with catalog.trees.lease(source.tree_id, exclusive=True):
+            with self.assertRaises(DurableResourceError) as failure:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual("resource.changed", failure.exception.code)
+
+    def test_foreign_tree_dependency_is_checked_before_workspace_filter(self) -> None:
+        own_tree = self._publish()
+        foreign_workspace = self.home / "foreign-workspace"
+        foreign_workspace.mkdir()
+        foreign_host = CoreManagedTrees(
+            workspace=foreign_workspace, configuration_home=self.config,
+            locations={"evidence": self.home / "foreign-evidence"}, owner_id="atlas",
+        )
+
+        def publish_foreign(name: str, references: tuple[str, ...] = ()):
+            with foreign_host.stage("evidence", name) as stage:
+                stage.path.mkdir()
+                (stage.path / "payload.txt").write_bytes(name.encode() + b"\n")
+                return stage.publish(validate=lambda _: None, references=references)
+
+        source = publish_foreign("source")
+        publish_foreign("dependent", references=(source.tree_id,))
+        catalog = ResourceCatalog(self.config)
+        self.assertEqual([own_tree.tree_id], [row["tree_id"] for row in
+                                              catalog.inventory(workspace=self.workspace)["trees"]])
+        (source.path / "payload.txt").write_bytes(b"broken\n")
+        with self.assertRaises(DurableResourceError) as failure:
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual("resource.changed", failure.exception.code)
+
     def test_unproven_catalog_protects_unrelated_sibling_pending_review(self) -> None:
         output = self.workspace / "graphs" / "graph"
         reference = self._publish(output=output)

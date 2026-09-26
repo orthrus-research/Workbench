@@ -19,8 +19,9 @@ from typing import Iterator, Mapping
 from uuid import uuid4
 
 from workbench_api.durable_resources import DurableResourceError, ResourceReference
+from workbench_api.managed_trees import ManagedTreeError
 
-from .. import check_storage
+from .. import check_lifecycle, check_storage
 from ..durable_files import StagedFile, read_verified, unlink_prepared
 from ..durable_records import (
     private_record_lock, publish_immutable_bytes, read_private_bytes,
@@ -754,10 +755,36 @@ class ResourceCatalog:
             for reference in references:
                 require_committed_reference(reference, owner_workspace)
 
-        def verify_tree_resource_references(owner_workspace: str, references: tuple[str, ...]) -> None:
+        tree_catalog = self.trees
+        verified_trees: dict[str, str] = {}
+        check_edges: dict[str, set[tuple[str, str]]] = {}
+
+        def verify_tree_references(
+            tree_id: str, owner_workspace: str, references: tuple[str, ...],
+        ) -> None:
             for reference in references:
                 if reference.startswith("workbench-resource-v1:"):
                     require_committed_reference(reference, owner_workspace)
+                elif reference.startswith("workbench-tree-v1:"):
+                    target_workspace = verified_trees.get(reference)
+                    if target_workspace is None:
+                        try:
+                            with tree_catalog.lease(reference):
+                                intent = tree_catalog.intent(reference)
+                                tree_catalog.commit(reference, intent)
+                                tree_catalog._verify(intent)
+                        except (ManagedTreeError, OSError, ValueError) as exc:
+                            raise DurableResourceError(
+                                "resource.changed", "referenced managed tree is unavailable or changed",
+                            ) from exc
+                        target_workspace = str(intent["workspace"])
+                        verified_trees[reference] = target_workspace
+                    if target_workspace != owner_workspace:
+                        raise DurableResourceError(
+                            "resource.changed", "referenced managed tree belongs to another workspace",
+                        )
+                else:
+                    check_edges.setdefault(owner_workspace, set()).add((tree_id, reference))
 
         record_stores = self._registered_record_stores(workspace)
         overlay_envelopes: list[dict[str, object]] = []
@@ -791,9 +818,18 @@ class ResourceCatalog:
                 if not private_path(path, directory=True):
                     raise DurableResourceError("resource.changed", "unregistered overlay attempt root is unsafe")
                 overlay_envelopes.append({"path": str(path), "status": "unregistered-store"})
-        trees = self.trees.inventory(
-            workspace=workspace, validate_references=verify_tree_resource_references,
+        trees = tree_catalog.inventory(
+            workspace=workspace, validate_references=verify_tree_references,
         )
+        for owner_workspace, edges in sorted(check_edges.items()):
+            try:
+                check_lifecycle.verify_tree_reference_closure(
+                    Path(owner_workspace), sorted(edges), self.root,
+                )
+            except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+                raise DurableResourceError(
+                    "resource.changed", "managed tree check reference is unavailable or changed",
+                ) from exc
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,
