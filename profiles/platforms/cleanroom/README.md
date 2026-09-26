@@ -20,8 +20,10 @@ admission remain separate steps. Older three-witness fixture snapshots remain
 readable but have no portable execution policy.
 For the new policy, Core can retain a caller-supplied ZIP only when its bytes
 match the selected Gradle archive and its bounded members pass integrity and
-path checks. That retained ZIP is an input; extraction and a fixture run still
-need separate reviewed steps.
+path checks. Core can separately extract that retained ZIP into a private,
+exact managed tool tree and reopen its launcher after interruption or restart.
+The extracted tree is still an unqualified input: Java 25 binding, a fixture
+run, and artifact admission need separate reviewed steps.
 
 The generic-mod fixture runner accepts `--core-supervised` for a local build.
 Core holds the existing source projection lease while Gradle runs as a child,
