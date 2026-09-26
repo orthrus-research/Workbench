@@ -365,16 +365,19 @@ class CleanroomModConstructionV2Tests(unittest.TestCase):
                 attempted_ordinals=[0], staged_files=staged_files,
                 expected_receipt_id=None,
             )
-            (state_root / "active-transaction.json").write_bytes(
+            journal_path = state_root / "active-transaction.json"
+            journal_path.write_bytes(
                 application_transaction.canonical_json_bytes(journal) + b"\n"
             )
-            self.assertTrue((state_root / "active-transaction.json").is_file())
+            # The previous writer created this retained record owner-private.
+            journal_path.chmod(0o600)
+            self.assertTrue(journal_path.is_file())
             recovered = construction.recover_cleanroom_mod_construction(
                 ROOT, plan, state_root,
             )
             self.assertEqual("restored", recovered["state"])
             self.assertFalse(target.exists())
-            self.assertFalse((state_root / "active-transaction.json").exists())
+            self.assertFalse(journal_path.exists())
 
     def test_altered_plan_and_result_identities_reject(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:

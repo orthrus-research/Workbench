@@ -16,7 +16,7 @@
   "blueprints_mechanics_refs": [
     {
       "path": "modules/blueprints/src/workbench_blueprints/application_transaction.py",
-      "sha256": "sha256:66808db671896913225564f6968dc365175d7908df09fa43119ee72ba84b6803"
+      "sha256": "sha256:0e3111e813eba49e84841f8dd57e9b769d8fd4b20f6a7a205ae73d0413f99869"
     },
     {
       "path": "modules/blueprints/src/workbench_blueprints/fresh_project.py",
@@ -44,7 +44,7 @@
     }
   },
   "format": "workbench-cleanroom-mod-construction-owner-v2",
-  "id": "workbench-cleanroom-mod-construction-owner:sha256:3532f7b1f11fdfb3242fb9e84eac44b7648ff262991c065b1fadc6ee85928e12",
+  "id": "workbench-cleanroom-mod-construction-owner:sha256:f3ee0ed1c752f957ca8af12a98b5ef963205314436237d7c61ceb80e91ed25cd",
   "kind_id": "workbench-new-project-kind:cleanroom-mod",
   "limitations": [
     "This constructor writes only the exact 19-file generic Cleanroom fixture projection to an absent, empty-directory, or clean unborn Git target.",
