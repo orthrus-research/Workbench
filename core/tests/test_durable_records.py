@@ -16,7 +16,8 @@ from unittest.mock import patch
 from workbench_api.host_filesystem import (
     DurableRecordError, append_private_line, count_interrupted_create_once_stages,
     inspect_private_journal, private_record_lock, publish_create_once_bytes,
-    publish_immutable_bytes, read_bounded_bytes, read_private_bytes,
+    publish_immutable_bytes, read_bounded_bytes, read_bounded_single_link_bytes,
+    read_private_bytes,
     read_private_single_link_bytes, remove_private_bytes, replace_private_bytes,
     update_preference_bytes,
 )
@@ -131,6 +132,20 @@ class DurableRecordTests(unittest.TestCase):
         with self.assertRaises(DurableRecordError) as redirected:
             read_bounded_bytes(link, byte_limit=1024)
         self.assertEqual("unsafe", redirected.exception.code)
+
+    def test_external_single_link_read_preserves_historical_shared_parent(self) -> None:
+        self.path.write_bytes(b'{"plan":1}\n')
+        self.path.chmod(0o644)
+        self.assertEqual(
+            read_bounded_single_link_bytes(self.path, byte_limit=1024),
+            b'{"plan":1}\n',
+        )
+        alternate = self.root / "alternate.json"
+        os.link(self.path, alternate)
+        with self.assertRaises(DurableRecordError) as linked:
+            read_bounded_single_link_bytes(self.path, byte_limit=1024)
+        self.assertEqual(linked.exception.code, "unsafe")
+        self.assertEqual(alternate.read_bytes(), b'{"plan":1}\n')
 
     @unittest.skipUnless(os.name == "posix", "POSIX historical mode fixture")
     def test_preference_update_privately_upgrades_ordinary_legacy_file(self) -> None:

@@ -364,6 +364,11 @@ def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
     return read(path, byte_limit=byte_limit)
 
 
+def read_bounded_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
+    from .durable_records import read_bounded_single_link_bytes as read
+    return read(path, byte_limit=byte_limit)
+
+
 def update_preference_bytes(
     path: Path, transform: Callable[[bytes | None], bytes], *, byte_limit: int,
 ) -> bytes:

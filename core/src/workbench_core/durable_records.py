@@ -140,6 +140,12 @@ def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
     return _read_bytes(path, byte_limit=byte_limit, private=False)
 
 
+def read_bounded_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
+    """Read one ordinary external file without accepting another hard link."""
+
+    return _read_bytes(path, byte_limit=byte_limit, private=False, single_link=True)
+
+
 @contextmanager
 def _prepared(
     path: Path, data: bytes, *, create_once_stage: bool = False,
@@ -507,7 +513,7 @@ def inspect_private_journal(path: Path, *, byte_limit: int) -> dict:
 
 
 __all__ = [
-    "read_private_bytes", "read_bounded_bytes", "publish_immutable_bytes",
+    "read_private_bytes", "read_bounded_bytes", "read_bounded_single_link_bytes", "publish_immutable_bytes",
     "replace_private_bytes", "remove_private_bytes", "private_record_lock", "append_private_line",
     "inspect_private_journal",
 ]

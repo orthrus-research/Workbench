@@ -15,6 +15,7 @@ from unittest.mock import patch
 from workbench_api.state_root_policies import (
     StateRootPolicyError, state_root_policies_scope,
 )
+from workbench_core.durable_records import read_bounded_single_link_bytes
 from workbench_shell.cleanroom_new_project_cli import new_project_main
 
 
@@ -62,7 +63,10 @@ class CleanroomNewProjectStatePolicyTests(unittest.TestCase):
         if action == "apply":
             arguments.extend(("--consent-plan-id", "plan:test"))
         output, error = StringIO(), StringIO()
-        with patch("workbench_shell.cleanroom_new_project_cli._profile", return_value=owner):
+        with patch("workbench_shell.cleanroom_new_project_cli._profile", return_value=owner), patch(
+            "workbench_shell.cleanroom_new_project_cli.read_bounded_single_link_bytes",
+            side_effect=read_bounded_single_link_bytes,
+        ):
             status = new_project_main(
                 arguments, root=self.suite, output=output, error=error,
             )
@@ -115,6 +119,21 @@ class CleanroomNewProjectStatePolicyTests(unittest.TestCase):
             )
         self.assertEqual((status, error), (0, ""))
         self.assertEqual(observed, [override])
+
+    def test_historical_hardlinked_plan_refuses_before_owner_mutation(self) -> None:
+        alternate = self.suite / "another-plan.json"
+        alternate.hardlink_to(self.plan)
+        called: list[bool] = []
+        owner = SimpleNamespace(
+            apply_cleanroom_mod_construction=lambda *_args, **_kwargs: called.append(True),
+        )
+        with state_root_policies_scope(None):
+            status, error = self._run(
+                "apply", owner, extra=("--state-root", str(self.selected)),
+            )
+        self.assertEqual(status, 2)
+        self.assertIn("cannot read Cleanroom construction plan", error)
+        self.assertEqual(called, [])
 
 
 if __name__ == "__main__":

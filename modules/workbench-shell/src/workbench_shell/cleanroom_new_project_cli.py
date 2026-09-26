@@ -13,6 +13,7 @@ import stat
 import sys
 from typing import Any, ContextManager, Mapping, Sequence, TextIO
 
+from workbench_api.host_filesystem import read_bounded_single_link_bytes
 from workbench_api.record_stores import publish_review_artifact
 from workbench_api.state_root_policies import state_root_policies
 
@@ -126,43 +127,15 @@ def validate_cleanroom_mod_construction_owner(
 
 def _read_json(path: Path, label: str) -> dict[str, Any]:
     try:
-        metadata = path.lstat()
-        if (
-            stat.S_ISLNK(metadata.st_mode)
-            or not stat.S_ISREG(metadata.st_mode)
-            or metadata.st_nlink != 1
-            or not 2 <= metadata.st_size <= MAX_RECORD_BYTES
-        ):
-            raise CleanroomNewProjectCliV2Error(
-                f"{label} is not one bounded ordinary file"
-            )
-        descriptor = os.open(
-            path,
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+        raw = read_bounded_single_link_bytes(
+            Path(os.path.abspath(path.expanduser())), byte_limit=MAX_RECORD_BYTES,
         )
-        with os.fdopen(descriptor, "rb") as stream:
-            before = os.fstat(stream.fileno())
-            raw = stream.read(MAX_RECORD_BYTES + 1)
-            after = os.fstat(stream.fileno())
-    except CleanroomNewProjectCliV2Error:
-        raise
     except OSError as exc:
         raise CleanroomNewProjectCliV2Error(f"cannot read {label}") from exc
-    identity = lambda row: (
-        row.st_dev,
-        row.st_ino,
-        row.st_mode,
-        row.st_nlink,
-        row.st_size,
-        row.st_mtime_ns,
-        row.st_ctime_ns,
-    )
-    if (
-        identity(metadata) != identity(before)
-        or identity(before) != identity(after)
-        or len(raw) != before.st_size
-    ):
-        raise CleanroomNewProjectCliV2Error(f"{label} changed while read")
+    if len(raw) < 2:
+        raise CleanroomNewProjectCliV2Error(
+            f"{label} is not one bounded ordinary file"
+        )
     try:
         value = json.loads(raw.decode("utf-8", "strict"))
     except (UnicodeError, json.JSONDecodeError) as exc:

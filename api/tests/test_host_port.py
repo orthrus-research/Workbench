@@ -17,6 +17,8 @@ class HostPortTests(unittest.TestCase):
                 port.append_private_line(Path("unused"), b"event\n", expected_size=0, byte_limit=16)
             with self.assertRaisesRegex(port.HostFilesystemError, "no filesystem host"):
                 port.update_preference_bytes(Path("unused"), lambda _old: b"new", byte_limit=16)
+            with self.assertRaisesRegex(port.HostFilesystemError, "no filesystem host"):
+                port.read_bounded_single_link_bytes(Path("unused"), byte_limit=16)
 
     def test_host_is_explicit_and_cannot_be_replaced(self):
         observed = []
@@ -37,6 +39,17 @@ class HostPortTests(unittest.TestCase):
                 port.inspect_private_journal(Path("unused"), byte_limit=16)
             with self.assertRaisesRegex(port.HostFilesystemError, "does not provide preference updates"):
                 port.update_preference_bytes(Path("unused"), lambda _old: b"new", byte_limit=16)
+            with self.assertRaisesRegex(port.HostFilesystemError, "single-link bounded reads"):
+                port.read_bounded_single_link_bytes(Path("unused"), byte_limit=16)
+
+            host.read_bounded_single_link_bytes = lambda path, *, byte_limit: (
+                observed.append((path, byte_limit)) or b"reviewed\n"
+            )
+            self.assertEqual(
+                port.read_bounded_single_link_bytes(Path("selected"), byte_limit=16),
+                b"reviewed\n",
+            )
+            self.assertEqual(observed[-1], (Path("selected"), 16))
 
             @contextmanager
             def lease(descriptor, *, exclusive):

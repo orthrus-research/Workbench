@@ -24,6 +24,7 @@ class HostFilesystem(Protocol):
     def read_private_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
     def read_private_single_link_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
     def read_bounded_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
+    def read_bounded_single_link_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
     def update_preference_bytes(
         self, path: Path, transform: Callable[[bytes | None], bytes],
         *, byte_limit: int,
@@ -115,6 +116,15 @@ def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
     operation = getattr(_filesystem(), "read_bounded_bytes", None)
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide bounded input reads")
+    return operation(path, byte_limit=byte_limit)
+
+
+def read_bounded_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
+    """Read a historical external input while rejecting linked or changed bytes."""
+
+    operation = getattr(_filesystem(), "read_bounded_single_link_bytes", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide single-link bounded reads")
     return operation(path, byte_limit=byte_limit)
 
 
