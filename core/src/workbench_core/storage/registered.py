@@ -40,6 +40,9 @@ _ROOT_KNOWN = (
     *_ROOT_REQUIRED, "trees", "working-allocations", "temporary-leases",
     "transport-trees", "reusable-projections",
 )
+# This preexisting lock-only directory was introduced after V1 root manifests.
+# Keep those sealed manifest bytes stable while inventorying the auxiliary root.
+_ROOT_AUXILIARY = ("registration-attempt-leases",)
 RECORD_STORE_KIND = "workbench-record-store-v1"
 RESERVATION_KIND = "workbench-resource-reservation-v1"
 INTENT_KIND = "workbench-resource-intent-v1"
@@ -116,6 +119,12 @@ class ResourceCatalog:
                     check_storage.ordinary(path, directory=True)
                     if not private_path(path, directory=True):
                         raise ValueError("resource catalog namespace is not owner-private")
+            for name in _ROOT_AUXILIARY:
+                path = self._directory(name)
+                if path.exists() or path.is_symlink():
+                    check_storage.ordinary(path, directory=True)
+                    if not private_path(path, directory=True):
+                        raise ValueError("resource catalog auxiliary lease root is not owner-private")
         except (OSError, ValueError) as exc:
             raise DurableResourceError("resource.changed", "resource catalog root or namespace is unavailable") from exc
         return root_info
@@ -635,7 +644,7 @@ class ResourceCatalog:
         if self.root.exists() or self.root.is_symlink():
             check_storage.ordinary(self.root, directory=True)
             if any(
-                entry.name not in {*_ROOT_KNOWN, ROOT_ANCHOR_NAME}
+                entry.name not in {*_ROOT_KNOWN, *_ROOT_AUXILIARY, ROOT_ANCHOR_NAME}
                 for entry in self.root.iterdir()
             ):
                 raise DurableResourceError("resource.changed", "resource catalog has an unknown root entry")

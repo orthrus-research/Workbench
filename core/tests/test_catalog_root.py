@@ -347,6 +347,20 @@ class CatalogRootTests(unittest.TestCase):
                 else:
                     unknown.unlink()
 
+    def test_existing_registration_attempt_lease_root_remains_inventory_compatible(self) -> None:
+        self.resources.publish_bytes("evidence", "retained.json", b"retained\n")
+        catalog = ResourceCatalog(self.config)
+        original = catalog._root_manifest().read_bytes()
+        lease_root = catalog.root / "registration-attempt-leases"
+        lease_root.mkdir(mode=0o700)
+        self.assertEqual(1, len(catalog.inventory(workspace=self.workspace)["resources"]))
+        self.assertEqual(original, catalog._root_manifest().read_bytes())
+        lease_root.rmdir()
+        lease_root.symlink_to(catalog.root / "leases", target_is_directory=True)
+        with self.assertRaises(DurableResourceError) as redirected:
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual(redirected.exception.code, "resource.changed")
+
     def test_cleanup_blocks_unregistered_workspace_items_with_unproven_history(self) -> None:
         from workbench_core.storage.manager import inventory_storage
 
