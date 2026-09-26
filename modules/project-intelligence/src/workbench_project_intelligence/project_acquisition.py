@@ -10,12 +10,12 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
-import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 from typing import Any, TextIO
+
+from workbench_api.source_checkouts import SourceCheckoutError, open_source_checkout
 
 from .git_observation import GitObservationError, configured_git_executable
 
@@ -504,44 +504,21 @@ def _verify_workspace(profile: Mapping[str, Any], root: Path) -> list[dict[str, 
     rows: list[dict[str, str]] = []
     for requirement in profile["workspace"]["required_paths"]:
         relative = _safe_relative_path(requirement["path"], "workspace path")
-        selected = root.joinpath(*PurePosixPath(relative).parts)
+        selected = root
+        for part in PurePosixPath(relative).parts:
+            selected = selected / part
+            if selected.is_symlink() or getattr(selected, "is_junction", lambda: False)():
+                raise ProjectAcquisitionError(
+                    f"acquired checkout required path traverses a redirect: {relative}"
+                )
         expected = requirement["kind"]
         matches = selected.is_file() if expected == "file" else selected.is_dir()
-        if not matches or selected.is_symlink():
+        if not matches:
             raise ProjectAcquisitionError(
                 f"acquired checkout is missing required {expected}: {relative}"
             )
         rows.append({"path": relative, "kind": expected})
     return rows
-
-
-def _write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:
-    parent = path.parent
-    if parent.exists() and (parent.is_symlink() or not parent.is_dir()):
-        raise ProjectAcquisitionError("acquisition receipt parent is unsafe")
-    parent.mkdir(parents=True, exist_ok=True)
-    if path.exists() or path.is_symlink():
-        raise ProjectAcquisitionError(
-            "acquisition receipt already exists; refusing to replace retained evidence"
-        )
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=parent
-    )
-    temporary = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-            json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except OSError as exc:
-        raise ProjectAcquisitionError(f"cannot publish acquisition receipt: {exc}") from exc
-    finally:
-        try:
-            temporary.unlink(missing_ok=True)
-        except OSError:
-            pass
 
 
 def apply_acquisition_plan(
@@ -581,7 +558,6 @@ def apply_acquisition_plan(
     destination = Path(plan["destination"])
     parent = destination.parent
     created_parents: list[tuple[Path, int, int]] = []
-    staging: Path | None = None
     published = False
     try:
         if (
@@ -593,92 +569,54 @@ def apply_acquisition_plan(
             raise ProjectAcquisitionError(
                 "acquisition destination parent changed after review"
             )
-        staging = Path(
-            tempfile.mkdtemp(
-                prefix=f".workbench-acquire-{destination.name}-",
-                dir=parent,
+        with open_source_checkout(
+            destination,
+            git_executable=str(plan["git_executable"]),
+            remote_url=str(plan["remote_url"]),
+            checkout_branch=str(plan["checkout_branch"]),
+            expected_commit=str(plan["resolved_commit"]),
+            # V1/V2 plans have no reviewed tree lock. Core observes the tree,
+            # but that observation does not upgrade these plans to W7 import.
+            expected_tree=None,
+            environment=_git_environment(environment),
+            timeout_seconds=clone_timeout,
+        ) as checkout:
+            required_paths = _verify_workspace(profile, checkout.staging_root)
+            receipt_body = {
+                "profile_id": plan["profile_id"],
+                "profile_digest": plan["profile_digest"],
+                "project_id": plan["project_id"],
+                "channel_id": plan["channel_id"],
+                "remote_url": plan["remote_url"],
+                "remote_ref": plan["remote_ref"],
+                "resolved_commit": plan["resolved_commit"],
+                "checkout_branch": plan["checkout_branch"],
+                "destination": plan["destination"],
+                "required_paths": required_paths,
+                "acquired_at": datetime.now(timezone.utc).isoformat(),
+            }
+            receipt = {
+                "format": RECEIPT_FORMAT,
+                "schema_version": SCHEMA_VERSION,
+                "receipt_id": _identity(
+                    "workbench-project-acquisition",
+                    {key: value for key, value in receipt_body.items() if key != "acquired_at"},
+                ),
+                **receipt_body,
+            }
+            receipt_root = Path(state_root).expanduser()
+            if not receipt_root.is_absolute():
+                receipt_root = Path.cwd() / receipt_root
+            receipt_root = Path(os.path.abspath(os.fspath(receipt_root)))
+            receipt_bytes = (
+                json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+            ).encode("utf-8")
+            receipt_path = checkout.publish(
+                state_root=receipt_root,
+                receipt_id=receipt["receipt_id"],
+                receipt_bytes=receipt_bytes,
+                byte_limit=len(receipt_bytes),
             )
-        )
-        completed = _run_git(
-            str(plan["git_executable"]),
-            (
-                "clone",
-                "--no-tags",
-                "--single-branch",
-                "--branch",
-                str(plan["checkout_branch"]),
-                str(plan["remote_url"]),
-                str(staging),
-            ),
-            environment=environment,
-            timeout=clone_timeout,
-        )
-        if completed.returncode:
-            detail = (completed.stderr or completed.stdout).strip()[:4000]
-            raise ProjectAcquisitionError(
-                "Git clone failed"
-                + (f": {detail}" if detail else f" (exit {completed.returncode})")
-            )
-        observed = _run_git(
-            str(plan["git_executable"]),
-            ("-C", str(staging), "rev-parse", "--verify", "HEAD^{commit}"),
-            environment=environment,
-            timeout=30.0,
-        )
-        head = observed.stdout.strip()
-        if observed.returncode or head != plan["resolved_commit"]:
-            raise ProjectAcquisitionError(
-                "remote channel moved during acquisition; review a new exact plan"
-            )
-        required_paths = _verify_workspace(profile, staging)
-        receipt_body = {
-            "profile_id": plan["profile_id"],
-            "profile_digest": plan["profile_digest"],
-            "project_id": plan["project_id"],
-            "channel_id": plan["channel_id"],
-            "remote_url": plan["remote_url"],
-            "remote_ref": plan["remote_ref"],
-            "resolved_commit": plan["resolved_commit"],
-            "checkout_branch": plan["checkout_branch"],
-            "destination": plan["destination"],
-            "required_paths": required_paths,
-            "acquired_at": datetime.now(timezone.utc).isoformat(),
-        }
-        receipt = {
-            "format": RECEIPT_FORMAT,
-            "schema_version": SCHEMA_VERSION,
-            "receipt_id": _identity(
-                "workbench-project-acquisition",
-                {key: value for key, value in receipt_body.items() if key != "acquired_at"},
-            ),
-            **receipt_body,
-        }
-        receipt_root = Path(state_root).expanduser()
-        if not receipt_root.is_absolute():
-            receipt_root = Path.cwd() / receipt_root
-        receipt_root = Path(os.path.abspath(os.fspath(receipt_root)))
-        receipt_path = (
-            receipt_root
-            / "evidence"
-            / "project-acquisition"
-            / f"{receipt['receipt_id'].rsplit(':', 1)[-1]}.json"
-        )
-        # The receipt is a required part of a successful acquisition. Publish it
-        # before exposing the checkout so a receipt failure cannot leave an
-        # apparently failed but usable destination behind. If the checkout's
-        # final atomic rename then fails, remove this operation's exact receipt.
-        _write_json_atomic(receipt_path, receipt)
-        try:
-            os.replace(staging, destination)
-        except OSError as exc:
-            try:
-                receipt_path.unlink()
-            except OSError as rollback_exc:
-                raise ProjectAcquisitionError(
-                    "cannot publish acquired checkout and cannot roll back its "
-                    f"receipt: {rollback_exc}"
-                ) from exc
-            raise
         published = True
         v2 = plan.get("format") == PLAN_FORMAT_V2
         result = {
@@ -701,11 +639,11 @@ def apply_acquisition_plan(
                 "destination_parent_action"
             ]
         return result
+    except SourceCheckoutError as exc:
+        raise ProjectAcquisitionError(str(exc)) from exc
     except OSError as exc:
         raise ProjectAcquisitionError(f"cannot publish acquired checkout: {exc}") from exc
     finally:
-        if not published and staging is not None and staging.exists():
-            shutil.rmtree(staging, ignore_errors=True)
         if not published:
             _remove_created_parent_directories(created_parents)
 

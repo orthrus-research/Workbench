@@ -10,8 +10,10 @@ from workbench_api.sandboxes import bind_sandbox_host
 from workbench_api.verified_artifacts import bind_verified_artifact_host
 from workbench_api.sessions import bind_retained_session_reader
 from workbench_api.source_transactions import bind_source_transactions
+from workbench_api.source_checkouts import bind_source_checkouts
 from . import axiom_sandbox, host_filesystem, live_console_reader, tool_process, verified_artifact_host
 from .source_transactions import CoreSourceTransactions
+from .source_checkouts import CoreSourceCheckouts
 
 
 def install_local_host_services() -> None:
@@ -21,6 +23,7 @@ def install_local_host_services() -> None:
     bind_verified_artifact_host(verified_artifact_host.HOST)
     bind_retained_session_reader(live_console_reader.HOST)
     bind_source_transactions(CoreSourceTransactions(owner_id="local-host"))
+    bind_source_checkouts(CoreSourceCheckouts())
 
 
 def resolve_local_working_allocations(

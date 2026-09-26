@@ -16,14 +16,26 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
 SOURCE = ROOT / "modules/project-intelligence/src"
+for dependency in (ROOT / "api/src", ROOT / "core/src"):
+    if str(dependency) not in sys.path:
+        sys.path.insert(0, str(dependency))
 if str(SOURCE) not in sys.path:
     sys.path.insert(0, str(SOURCE))
 
+from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core import source_checkouts as core_source_checkouts  # noqa: E402
+from workbench_api.source_checkouts import (  # noqa: E402
+    SourceCheckoutError, open_source_checkout, source_checkouts_scope,
+)
 from workbench_project_intelligence import project_acquisition  # noqa: E402
 
 
 @unittest.skipUnless(shutil.which("git"), "Git is required for acquisition tests")
 class ProjectAcquisitionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        install_local_host_services()
+
     def setUp(self) -> None:
         temporary = tempfile.TemporaryDirectory(prefix="workbench-project-acquire-")
         self.addCleanup(temporary.cleanup)
@@ -203,6 +215,20 @@ class ProjectAcquisitionTests(unittest.TestCase):
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
         self.assertEqual(project_acquisition.RECEIPT_FORMAT, receipt["format"])
         self.assertEqual(self.commit, receipt["resolved_commit"])
+        self.assertEqual(
+            project_acquisition._identity(
+                "workbench-project-acquisition",
+                {key: value for key, value in receipt.items()
+                 if key not in {"format", "schema_version", "receipt_id", "acquired_at"}},
+            ),
+            receipt["receipt_id"],
+        )
+        self.assertEqual(
+            state / "evidence/project-acquisition"
+            / f"{receipt['receipt_id'].rsplit(':', 1)[-1]}.json",
+            receipt_path,
+        )
+        self.assertEqual(0, receipt_path.stat().st_mode & 0o077)
         self.assertTrue(receipt_path.is_relative_to(state))
         self.assertFalse(any(self.root.glob(".workbench-acquire-*")))
 
@@ -239,9 +265,9 @@ class ProjectAcquisitionTests(unittest.TestCase):
         plan = self._plan_v2(destination)
 
         with mock.patch.object(
-            project_acquisition,
-            "_write_json_atomic",
-            side_effect=project_acquisition.ProjectAcquisitionError(
+            core_source_checkouts,
+            "publish_immutable_bytes",
+            side_effect=OSError(
                 "simulated receipt failure"
             ),
         ):
@@ -265,9 +291,9 @@ class ProjectAcquisitionTests(unittest.TestCase):
         plan = self._plan(destination)
 
         with mock.patch.object(
-            project_acquisition,
-            "_write_json_atomic",
-            side_effect=project_acquisition.ProjectAcquisitionError(
+            core_source_checkouts,
+            "publish_immutable_bytes",
+            side_effect=OSError(
                 "simulated receipt failure"
             ),
         ):
@@ -291,16 +317,15 @@ class ProjectAcquisitionTests(unittest.TestCase):
         state = self.root / "state"
         profile = project_acquisition.load_acquisition_profile(self.profile_path)
         plan = self._plan(destination)
-        real_replace = os.replace
+        real_rename = core_source_checkouts._rename_noreplace
 
-        def fail_checkout_publish(source: object, target: object) -> None:
-            if Path(target) == destination:
+        def fail_checkout_publish(source: Path, target: Path) -> None:
+            if target == destination:
                 raise OSError("simulated checkout publication failure")
-            real_replace(source, target)
+            real_rename(source, target)
 
-        with mock.patch.object(
-            project_acquisition.os,
-            "replace",
+        with mock.patch(
+            "workbench_core.source_checkouts._rename_noreplace",
             side_effect=fail_checkout_publish,
         ):
             with self.assertRaisesRegex(
@@ -317,6 +342,163 @@ class ProjectAcquisitionTests(unittest.TestCase):
 
         self.assertFalse(destination.exists())
         self.assertFalse(any(state.rglob("*.json")))
+        self.assertFalse(any(self.root.glob(".workbench-acquire-*")))
+
+    def test_checkout_publication_does_not_replace_a_later_destination(self) -> None:
+        destination = self.root / "checkout"
+        state = self.root / "state"
+        plan = self._plan(destination)
+        profile = project_acquisition.load_acquisition_profile(self.profile_path)
+        real_rename = core_source_checkouts._rename_noreplace
+
+        def create_competing_destination(source: Path, target: Path) -> None:
+            if target == destination:
+                destination.mkdir()
+            real_rename(source, target)
+
+        with mock.patch.object(
+            core_source_checkouts, "_rename_noreplace",
+            side_effect=create_competing_destination,
+        ):
+            with self.assertRaisesRegex(
+                project_acquisition.ProjectAcquisitionError,
+                "cannot publish acquired checkout",
+            ):
+                project_acquisition.apply_acquisition_plan(
+                    profile, plan, state_root=state, environment=self.environment,
+                )
+        self.assertTrue(destination.is_dir())
+        self.assertEqual([], list(destination.iterdir()))
+        self.assertFalse(any(state.rglob("*.json")))
+        self.assertFalse(any(self.root.glob(".workbench-acquire-*")))
+
+    def test_receipt_replacement_is_preserved_when_checkout_promotion_fails(self) -> None:
+        destination = self.root / "checkout"
+        state = self.root / "state"
+        plan = self._plan(destination)
+        profile = project_acquisition.load_acquisition_profile(self.profile_path)
+        real_rename = core_source_checkouts._rename_noreplace
+
+        def replace_receipt_then_fail(source: Path, target: Path) -> None:
+            if target == destination:
+                receipt = next((state / "evidence/project-acquisition").glob("*.json"))
+                replacement = receipt.with_suffix(".replacement")
+                replacement.write_bytes(b"later writer\n")
+                replacement.chmod(0o600)
+                os.replace(replacement, receipt)
+                raise OSError("simulated checkout publication failure")
+            real_rename(source, target)
+
+        with mock.patch.object(
+            core_source_checkouts, "_rename_noreplace",
+            side_effect=replace_receipt_then_fail,
+        ):
+            with self.assertRaisesRegex(
+                project_acquisition.ProjectAcquisitionError,
+                "recovery is required",
+            ):
+                project_acquisition.apply_acquisition_plan(
+                    profile, plan, state_root=state, environment=self.environment,
+                )
+        receipt = next((state / "evidence/project-acquisition").glob("*.json"))
+        self.assertEqual(b"later writer\n", receipt.read_bytes())
+        self.assertFalse(destination.exists())
+        self.assertFalse(any(self.root.glob(".workbench-acquire-*")))
+
+    def test_core_tree_precondition_is_distinct_from_commit_only_v1_plan(self) -> None:
+        destination = self.root / "checkout"
+        plan = self._plan(destination)
+        self.assertNotIn("resolved_tree", plan)
+        exact_tree = self._run(self.source, "rev-parse", "HEAD^{tree}").stdout.strip()
+        with open_source_checkout(
+            destination, git_executable=self.git,
+            remote_url=str(self.remote), checkout_branch="master-ceu",
+            expected_commit=self.commit, expected_tree=exact_tree,
+            environment=self.environment, timeout_seconds=60,
+        ) as checkout:
+            self.assertEqual(self.commit, checkout.observed_commit)
+            self.assertEqual(exact_tree, checkout.observed_tree)
+            self.assertTrue((checkout.staging_root / "pack.toml").is_file())
+        self.assertFalse(destination.exists())
+        self.assertFalse(any(self.root.glob(".workbench-acquire-*")))
+        with self.assertRaises(SourceCheckoutError) as mismatch:
+            with open_source_checkout(
+                destination, git_executable=self.git,
+                remote_url=str(self.remote), checkout_branch="master-ceu",
+                expected_commit=self.commit, expected_tree="0" * len(self.commit),
+                environment=self.environment, timeout_seconds=60,
+            ):
+                self.fail("mismatched tree must not be exposed")
+        self.assertEqual("tree", mismatch.exception.code)
+        self.assertFalse(destination.exists())
+        self.assertFalse(any(self.root.glob(".workbench-acquire-*")))
+
+    def test_core_binding_and_redirected_parent_fail_before_clone(self) -> None:
+        destination = self.root / "checkout"
+        profile = project_acquisition.load_acquisition_profile(self.profile_path)
+        plan = self._plan(destination)
+        with source_checkouts_scope(None):
+            with self.assertRaisesRegex(project_acquisition.ProjectAcquisitionError, "Core"):
+                project_acquisition.apply_acquisition_plan(
+                    profile, plan, state_root=self.root / "state",
+                    environment=self.environment,
+                )
+        real = self.root / "real"
+        (real / "developer").mkdir(parents=True)
+        link = self.root / "link"
+        link.symlink_to(real, target_is_directory=True)
+        redirected = link / "developer" / "checkout"
+        redirected_plan = self._plan(redirected)
+        with self.assertRaisesRegex(project_acquisition.ProjectAcquisitionError, "redirect"):
+            project_acquisition.apply_acquisition_plan(
+                profile, redirected_plan, state_root=self.root / "state",
+                environment=self.environment,
+            )
+        self.assertFalse((real / "developer" / "checkout").exists())
+        self.assertFalse(any((real / "developer").glob(".workbench-acquire-*")))
+
+    def test_private_store_unavailable_fails_without_exposing_checkout(self) -> None:
+        destination = self.root / "checkout"
+        state = self.root / "state"
+        profile = project_acquisition.load_acquisition_profile(self.profile_path)
+        plan = self._plan(destination)
+        with mock.patch.object(
+            core_source_checkouts, "secure_private_path",
+            side_effect=OSError("simulated WSL mount without private metadata"),
+        ):
+            with self.assertRaisesRegex(
+                project_acquisition.ProjectAcquisitionError,
+                "cannot secure acquisition receipt store",
+            ):
+                project_acquisition.apply_acquisition_plan(
+                    profile, plan, state_root=state, environment=self.environment,
+                )
+        self.assertFalse(destination.exists())
+        self.assertFalse(any(self.root.glob(".workbench-acquire-*")))
+        self.assertFalse(any(state.rglob("*.json")))
+
+    def test_required_path_cannot_traverse_cloned_symlink(self) -> None:
+        outside = self.root / "outside"
+        outside.mkdir()
+        (outside / ".keep").write_text("not acquired\n", encoding="utf-8")
+        shutil.rmtree(self.source / "config")
+        (self.source / "config").symlink_to(outside, target_is_directory=True)
+        self._run(self.source, "add", "--all")
+        self._run(self.source, "commit", "--quiet", "-m", "symlink")
+        self._run(self.source, "push", "--quiet", str(self.remote), "master-ceu")
+        self.profile["workspace"]["required_paths"][2] = {
+            "path": "config/.keep", "kind": "file",
+        }
+        self.profile_path.write_text(json.dumps(self.profile), encoding="utf-8")
+        profile = project_acquisition.load_acquisition_profile(self.profile_path)
+        destination = self.root / "checkout"
+        plan = self._plan(destination)
+        with self.assertRaisesRegex(project_acquisition.ProjectAcquisitionError, "redirect"):
+            project_acquisition.apply_acquisition_plan(
+                profile, plan, state_root=self.root / "state",
+                environment=self.environment,
+            )
+        self.assertFalse(destination.exists())
         self.assertFalse(any(self.root.glob(".workbench-acquire-*")))
 
     def test_remote_movement_invalidates_reviewed_plan_before_clone(self) -> None:
