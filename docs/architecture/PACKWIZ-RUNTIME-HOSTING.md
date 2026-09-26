@@ -106,6 +106,9 @@ canonical or publishes it.
 
 Packwiz does not provision Cleanroom. Workbench therefore verifies the
 Cleanroom launcher base or server bootstrap before installing a payload.
+The Packwiz Installer archive is acquired through Core's verified-artifact API
+using the selected platform profile's URL, SHA-256 and byte size. Core rechecks
+cached bytes before reuse and keeps the existing state-root cache location.
 
 For Prism Launcher and MultiMC clients, the materializer enforces these
 invariants:

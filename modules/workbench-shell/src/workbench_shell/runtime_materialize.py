@@ -27,12 +27,10 @@ from workbench_project_intelligence.git_observation import (
     require_configured_git_executable,
 )
 
-from workbench_core.artifact_store import (
-    ArtifactStoreError,
-    DOWNLOAD_CHUNK_BYTES,
-    fetch_verified_artifact,
-    sha256_file,
+from workbench_api.verified_artifacts import (
+    VerifiedArtifactError, acquire_verified_artifact,
 )
+from workbench_core.artifact_store import DOWNLOAD_CHUNK_BYTES, sha256_file
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
     ResolvedBindings,
@@ -2378,7 +2376,7 @@ def materialize_project_runtime(
         raise PackwizMaterializationError(str(exc)) from exc
     java_path, java_identity = _selected_java(java_result)
     try:
-        installer_path, artifact_outcome = fetch_verified_artifact(
+        installer_artifact = acquire_verified_artifact(
             url=str(lock["url"]),
             expected_sha256=str(lock["sha256"]),
             expected_size=lock["size"],
@@ -2387,7 +2385,7 @@ def materialize_project_runtime(
             timeout_seconds=60,
             user_agent="Workbench-Packwiz-Materializer/0.1",
         )
-    except ArtifactStoreError as exc:
+    except VerifiedArtifactError as exc:
         raise PackwizMaterializationError(str(exc)) from exc
     packwiz = _resolve_packwiz(workspace, packwiz_executable)
     result = materialize_packwiz_workspace_v2(
@@ -2397,7 +2395,7 @@ def materialize_project_runtime(
         packwiz_executable=packwiz,
         java_executable=java_path,
         java_identity=java_identity,
-        installer_path=installer_path,
+        installer_path=installer_artifact.path,
         installer_lock=lock,
         seed_roots=seed_roots,
         refresh_timeout_seconds=refresh_timeout_seconds,
@@ -2405,5 +2403,5 @@ def materialize_project_runtime(
     )
     result["bootstrap_outcome"] = bootstrap["outcome"]
     result["java_outcome"] = java_result["outcome"]
-    result["installer_artifact_outcome"] = artifact_outcome
+    result["installer_artifact_outcome"] = installer_artifact.outcome
     return result

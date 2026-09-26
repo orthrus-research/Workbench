@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from workbench_api.verified_artifacts import VerifiedArtifact
+
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = MODULE_ROOT.parents[1]
@@ -24,6 +26,7 @@ from workbench_shell.runtime_bootstrap import (  # noqa: E402
 from workbench_core.configuration import (  # noqa: E402
     load_workbench_configuration,
 )
+from workbench_core.host_services import install_local_host_services  # noqa: E402
 from workbench_shell.runtime_launch import (  # noqa: E402
     RuntimeLaunchError,
     launch_project_runtime,
@@ -179,8 +182,8 @@ class RuntimeStateRootTest(unittest.TestCase):
                     return_value=(root / "java", {"runtime_id": "test"}),
                 ),
                 patch(
-                    "workbench_shell.runtime_materialize.fetch_verified_artifact",
-                    return_value=(root / "installer.jar", "reused"),
+                    "workbench_shell.runtime_materialize.acquire_verified_artifact",
+                    return_value=VerifiedArtifact(root / "installer.jar", "3" * 64, 123, "reused"),
                 ) as fetch,
                 patch(
                     "workbench_shell.runtime_materialize._resolve_packwiz",
@@ -218,6 +221,45 @@ class RuntimeStateRootTest(unittest.TestCase):
             )
             self.assertEqual(fetch.call_args.kwargs["state_root"], state)
             self.assertEqual(materialize.call_args.kwargs["state_root"], state)
+
+    def test_materializer_uses_core_installer_cache_for_create_and_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            suite, _profile = _suite(root)
+            workspace = (root / "workspace").resolve()
+            state = (root / "runtime-state").resolve()
+            source = root / "installer.jar"
+            payload = b"synthetic installer input; never executed"
+            source.write_bytes(payload)
+            lock = {
+                "url": source.as_uri(), "sha256": sha256(payload).hexdigest(),
+                "size": len(payload),
+            }
+            plan = {"plan_id": PLAN_ID, "blockers": []}
+            install_local_host_services()
+            with (
+                patch("workbench_shell.runtime_materialize.plan_project_runtime", return_value=plan),
+                patch("workbench_shell.runtime_materialize._installer_lock", return_value=lock),
+                patch("workbench_shell.runtime_materialize.bootstrap_project_runtime",
+                      return_value={"outcome": "reused", "receipt": {"plan_id": PLAN_ID}}),
+                patch("workbench_shell.runtime_materialize.ensure_java_runtime",
+                      return_value={"outcome": "discovered"}),
+                patch("workbench_shell.runtime_materialize._selected_java",
+                      return_value=(root / "java", {"runtime_id": "test"})),
+                patch("workbench_shell.runtime_materialize._resolve_packwiz",
+                      return_value=root / "packwiz"),
+                patch("workbench_shell.runtime_materialize.materialize_packwiz_workspace_v2",
+                      side_effect=lambda *args, **kwargs: {"outcome": "installed"}) as materialize,
+            ):
+                first = materialize_project_runtime(suite, workspace, state_root=state)
+                self.assertEqual("downloaded", first["installer_artifact_outcome"])
+                expected = state / "artifacts/sha256" / lock["sha256"]
+                self.assertEqual(expected, materialize.call_args.kwargs["installer_path"])
+                self.assertEqual(payload, expected.read_bytes())
+                source.unlink()
+                reopened = materialize_project_runtime(suite, workspace, state_root=state)
+                self.assertEqual("reused", reopened["installer_artifact_outcome"])
+                self.assertEqual(expected, materialize.call_args.kwargs["installer_path"])
 
     def test_launcher_keeps_cross_host_jdk_on_launcher_filesystem(
         self,
