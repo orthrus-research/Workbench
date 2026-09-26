@@ -1305,9 +1305,31 @@ def apply_environment_composition(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def plan_wheel_import(*args, **kwargs) -> dict[str, Any]:
+    """Review exact optional wheel bytes for separate Core custody."""
+
+    from .environment_wheel_import import plan_wheel_import as operation
+    return operation(*args, **kwargs)
+
+
+def apply_wheel_import(*args, **kwargs) -> dict[str, Any]:
+    """Retain the reviewed wheel bytes without installing packages."""
+
+    from .environment_wheel_import import apply_wheel_import as operation
+    return operation(*args, **kwargs)
+
+
+def reopen_wheel_import(*args, **kwargs) -> dict[str, Any]:
+    """Reopen a retained wheel import result and its managed byte tree."""
+
+    from .environment_wheel_import import reopen_wheel_import as operation
+    return operation(*args, **kwargs)
+
+
 __all__ = [
     "ReconstructionError", "apply_import", "assess_reconstruction_feasibility",
     "build_share", "export_share", "load_share", "plan_import", "validate_share",
     "plan_project_import", "apply_project_import", "plan_tool_import", "apply_tool_import",
     "plan_environment_composition", "apply_environment_composition",
+    "plan_wheel_import", "apply_wheel_import", "reopen_wheel_import",
 ]

@@ -154,14 +154,25 @@ owner's platform document bytes to the share lock before asking that owner's
 fixture extension to validate its complete source tree. The candidate records
 the fixture tree digest, owner code identity, and hashes of its lock, schema
 and preflight tool. Local paths do not enter the candidate. `recheck_input_candidate`
-reopens those exact local inputs before a later operation may use them.
+reopens all those local inputs when the platform owner is installed and admitted.
 
-This candidate is an identity prerequisite, not an acquisition result. It does
-not install wheels, copy fixture bytes, prove the optional package closure is
-complete, or change V1–V3 share and import receipts. A target without the
-admitted owner, exact wheel bytes or validated fixture tree cannot produce a
-matching candidate. Toolchain and runtime fixture bytes still need their own
-owner locks and reviewed acquisition before a complete rebuild can be claimed.
+`plan_wheel_import` reviews explicit local wheel paths against the candidate
+and classifies a prior Core tree as absent, reusable or recoverable. The
+separate `apply_wheel_import` snapshots those exact wheels into a private
+Core-managed input tree, records a prepared attempt and publishes a result
+after exact readback. `reopen_wheel_import` needs only the V3 share, candidate,
+workspace and result resource ID; the original wheel paths may be gone. A
+validated publication intent interrupted before its tree rename can be
+reconciled. An incomplete stage without that intent remains review-only.
+Linux exact-tree support is checked before acquisition; WSL state on Windows
+mounts still needs native qualification. This operation never invokes pip,
+installs packages or clears the optional-package unresolved marker.
+
+The candidate and wheel import do not copy fixture bytes, prove optional
+package dependency closure, or change V1–V3 share and selection-import
+receipts. A target without the admitted fixture owner cannot recheck its local
+fixture tree. Toolchain and runtime fixture bytes still need their own owner
+locks and reviewed acquisition before a complete rebuild can be claimed.
 
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
@@ -194,8 +205,9 @@ but still repeats its pack-variant/platform binding check. A later Core cleanup
 should expose one pure profile-snapshot parser for both manifest loading and
 intent admission.
 
-Provisioning must connect the exact lock to optional packages and profile
-fixtures, preserving incomplete outcomes and reporting unavailable inputs.
+Provisioning must connect the retained wheel bytes to dependency-complete
+optional package installation and profile fixture acquisition, preserving
+incomplete outcomes and reporting unavailable inputs.
 The Core composition receipt links already imported selection, project and
 tool results but does not perform a combined acquire. Interrupted project and
 tool acquisition still need restart reconciliation; missing package and fixture
