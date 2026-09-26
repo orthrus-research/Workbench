@@ -72,5 +72,116 @@ class IdeArchiveCustodyTests(unittest.TestCase):
         self.assertEqual([], list(real.iterdir()))
 
 
+class IdeExtractionPreservationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.toolchains = self.root / "toolchains"
+        self.archive = self.root / "locked.zip"
+        self.archive.write_bytes(b"locked archive")
+        self.entry = {
+            "archive_root": "locked-tool",
+            "archive_sha256": sha256(self.archive.read_bytes()).hexdigest(),
+        }
+        selected = patch.object(provision, "TOOLCHAIN_ROOT", self.toolchains)
+        selected.start()
+        self.addCleanup(selected.stop)
+
+    def _extract(self, _archive: Path, temporary: Path) -> None:
+        extracted = temporary / self.entry["archive_root"]
+        extracted.mkdir()
+        (extracted / "bin").write_bytes(b"exact installed bytes")
+
+    def test_fresh_target_publishes_then_matching_marker_reuses_same_path(self) -> None:
+        with patch.object(provision, "download", return_value=self.archive) as download:
+            published = provision.provision_entry(
+                self.entry, suffix=".zip", extractor=self._extract,
+            )
+            self.assertEqual(self.toolchains / "locked-tool", published)
+            self.assertEqual(b"exact installed bytes", (published / "bin").read_bytes())
+            self.assertEqual(self.entry["archive_sha256"] + "\n", (
+                published / ".workbench-provisioned-sha256"
+            ).read_text(encoding="ascii"))
+            again = provision.provision_entry(
+                self.entry, suffix=".zip", extractor=self._extract,
+            )
+        self.assertEqual(published, again)
+        download.assert_called_once()
+
+    def test_changed_or_missing_marker_preserves_existing_tree_on_retries(self) -> None:
+        for marker_bytes in (b"different\n", b"\xff", None):
+            with self.subTest(marker_bytes=marker_bytes):
+                destination = self.toolchains / self.entry["archive_root"]
+                destination.mkdir(parents=True, exist_ok=True)
+                sentinel = destination / "keep.bin"
+                sentinel.write_bytes(b"historical installation")
+                marker = destination / ".workbench-provisioned-sha256"
+                if marker_bytes is None:
+                    marker.unlink(missing_ok=True)
+                else:
+                    marker.write_bytes(marker_bytes)
+                with patch.object(provision, "download") as download:
+                    for _ in range(2):
+                        with self.assertRaisesRegex(provision.ProvisionFailure, "retain for review"):
+                            provision.provision_entry(
+                                self.entry, suffix=".zip", extractor=self._extract,
+                            )
+                    download.assert_not_called()
+                self.assertEqual(b"historical installation", sentinel.read_bytes())
+                self.assertEqual(marker_bytes, marker.read_bytes() if marker.exists() else None)
+
+    def test_redirected_destination_or_marker_refuses_without_replacing_tree(self) -> None:
+        destination = self.toolchains / self.entry["archive_root"]
+        real = self.root / "real"
+        real.mkdir()
+        (real / ".workbench-provisioned-sha256").write_text(
+            self.entry["archive_sha256"] + "\n", encoding="ascii",
+        )
+        self.toolchains.mkdir()
+        destination.symlink_to(real, target_is_directory=True)
+        with patch.object(provision, "download") as download:
+            with self.assertRaisesRegex(provision.ProvisionFailure, "redirected"):
+                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+            download.assert_not_called()
+        destination.unlink()
+        destination.mkdir()
+        marker = destination / ".workbench-provisioned-sha256"
+        marker.symlink_to(real / ".workbench-provisioned-sha256")
+        with patch.object(provision, "download") as download:
+            with self.assertRaisesRegex(provision.ProvisionFailure, "retain for review"):
+                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+            download.assert_not_called()
+        self.assertTrue(marker.is_symlink())
+
+        marker.unlink()
+        source_marker = self.root / "shared-marker"
+        source_marker.write_text(self.entry["archive_sha256"] + "\n", encoding="ascii")
+        marker.hardlink_to(source_marker)
+        with patch.object(provision, "download") as download:
+            self.assertEqual(
+                destination,
+                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract),
+            )
+            download.assert_not_called()
+        self.assertEqual(2, marker.stat().st_nlink)
+
+    def test_destination_created_during_extraction_is_retained(self) -> None:
+        destination = self.toolchains / self.entry["archive_root"]
+
+        def competing_extraction(archive: Path, temporary: Path) -> None:
+            self._extract(archive, temporary)
+            destination.mkdir()
+            (destination / "keep.bin").write_bytes(b"other publisher")
+
+        with patch.object(provision, "download", return_value=self.archive):
+            with self.assertRaisesRegex(provision.ProvisionFailure, "appeared during extraction"):
+                provision.provision_entry(
+                    self.entry, suffix=".zip", extractor=competing_extraction,
+                )
+        self.assertEqual(b"other publisher", (destination / "keep.bin").read_bytes())
+        self.assertEqual([], list(self.toolchains.glob("locked-tool.*")))
+
+
 if __name__ == "__main__":
     unittest.main()

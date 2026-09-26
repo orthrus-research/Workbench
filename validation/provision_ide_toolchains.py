@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import platform
 import shutil
+import stat
 import sys
 import tarfile
 import tempfile
@@ -117,10 +118,23 @@ def provision_entry(
 ) -> Path:
     destination = TOOLCHAIN_ROOT / entry["archive_root"]
     marker = destination / ".workbench-provisioned-sha256"
-    if marker.is_file() and marker.read_text(encoding="ascii").strip() == entry[
-        "archive_sha256"
-    ]:
-        return destination
+    for component in (TOOLCHAIN_ROOT, *TOOLCHAIN_ROOT.parents):
+        if component.is_symlink() or getattr(component, "is_junction", lambda: False)():
+            raise ProvisionFailure("IDE toolchain destination traverses a redirect")
+    if destination.is_symlink() or getattr(destination, "is_junction", lambda: False)():
+        raise ProvisionFailure(f"IDE toolchain destination is redirected; retain for review: {destination}")
+    if destination.exists():
+        if destination.is_dir() and not marker.is_symlink() and not getattr(marker, "is_junction", lambda: False)():
+            try:
+                marker_info = marker.lstat()
+                if (
+                    stat.S_ISREG(marker_info.st_mode)
+                    and marker.read_text(encoding="ascii").strip() == entry["archive_sha256"]
+                ):
+                    return destination
+            except (OSError, UnicodeError):
+                pass
+        raise ProvisionFailure(f"existing IDE toolchain differs from its lock; retain for review: {destination}")
 
     archive = download(entry, suffix)
     TOOLCHAIN_ROOT.mkdir(parents=True, exist_ok=True)
@@ -135,8 +149,8 @@ def provision_entry(
             raise ProvisionFailure(
                 f"archive lacks expected root {expected_root}"
             )
-        if destination.exists():
-            shutil.rmtree(destination)
+        if destination.exists() or destination.is_symlink():
+            raise ProvisionFailure(f"IDE toolchain destination appeared during extraction; retain for review: {destination}")
         extracted.replace(destination)
         marker.write_text(entry["archive_sha256"] + "\n", encoding="ascii")
     finally:
