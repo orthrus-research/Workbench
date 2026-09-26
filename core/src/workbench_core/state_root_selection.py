@@ -254,6 +254,16 @@ class CoreStateRootPolicies:
         self.configuration_home = configuration_home
         self.environment = dict(environment)
 
+    def resolve(self, workspace: Path, role: str) -> dict[str, Any]:
+        """Read the effective choice for a Core-hosted owner command."""
+
+        if default_user_config_home(environment=self.environment) != self.configuration_home:
+            raise StateRootPolicyError("state-root policy configuration home changed")
+        return effective_state_root(
+            workspace, role, suite_root=self.suite_root,
+            environment=self.environment,
+        )
+
     @contextmanager
     def hold(
         self, workspace: Path, role: str, state_root: Path, expected_policy_id: str,

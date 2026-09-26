@@ -15,7 +15,8 @@ from unittest.mock import patch
 
 from workbench_core import cli, settings_cli
 from workbench_core.state_root_selection import (
-    clear_stale_state_root, effective_state_root, load_state_root_selections, select_state_root,
+    CoreStateRootPolicies, clear_stale_state_root, effective_state_root,
+    load_state_root_selections, select_state_root,
 )
 from workbench_core.user_preferences import (
     UserPreferencesError, register_workspace, set_workspace_selection,
@@ -23,6 +24,25 @@ from workbench_core.user_preferences import (
 
 
 class StateRootSelectionTests(unittest.TestCase):
+    def test_core_owner_port_resolves_the_saved_feature_choice(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            workspace = home / "project"
+            workspace.mkdir()
+            environment = {"HOME": str(home), "WORKBENCH_CONFIG_HOME": str(home / "config")}
+            original = effective_state_root(
+                workspace, "feature", suite_root=home, environment=environment,
+            )
+            selected = select_state_root(
+                workspace, "feature", str(home / "feature-state"), suite_root=home,
+                expected_policy_id=original["policy_id"], environment=environment,
+            )
+            provider = CoreStateRootPolicies(
+                suite_root=home, configuration_home=home / "config",
+                environment=environment,
+            )
+            self.assertEqual(selected, provider.resolve(workspace, "feature"))
+
     def test_settings_route_runs_with_only_core_and_api_sources(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)

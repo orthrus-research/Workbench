@@ -141,8 +141,10 @@ creating the destination. `state-root select WORKSPACE product-spine PATH
 The same API has a separate `feature` role. A changed workspace identity,
 redirected selected path, or stale policy ID is refused. An explicit
 `WORKBENCH_STATE_ROOT` remains an invocation override. Owner commands still
-accept their documented direct path overrides; clients can resolve the Core
-selection before invoking them. Project qualification can apply with
+accept their documented direct path overrides. Core-dispatched `feature plan`
+resolves the workspace's saved `feature` choice and holds that policy through
+plan retention; direct `--state-root` remains an explicit one-command override.
+Project qualification can apply with
 `--expected-state-root-policy-id ID`; Core rechecks that ID and the destination
 under its selection lock through the owner write. An explicit `--state-root`
 without a policy ID retains the existing one-command override behavior. If a
@@ -158,8 +160,9 @@ For `feature run material-fluid-recipe`, Core holds the selection lock through
 plan retention and runtime-attempt allocation. The attempt then keeps its
 selected path while the long-running observation proceeds; a later selection
 applies to future attempts. An invocation without a policy ID keeps the direct
-`--state-root` override. Other Feature mutations still lack this owner guard,
-and run receipts do not yet retain the Core policy ID. Catalog, presentation
+`--state-root` override. Feature plan retention has the same owner guard;
+compare, apply, rollback and recover still lack it, and run receipts do not
+yet retain the Core policy ID. Catalog, presentation
 and transaction inspection use the selected Feature path.
 
 IntelliJ Community reads the same Core `feature` choice for Retained Records

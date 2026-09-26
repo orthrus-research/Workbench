@@ -5,7 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
-from typing import ContextManager, Iterator, Protocol
+from typing import Any, ContextManager, Iterator, Mapping, Protocol
 
 
 class StateRootPolicyError(ValueError):
@@ -13,6 +13,8 @@ class StateRootPolicyError(ValueError):
 
 
 class StateRootPolicies(Protocol):
+    def resolve(self, workspace: Path, role: str) -> Mapping[str, Any]: ...
+
     def hold(
         self, workspace: Path, role: str, state_root: Path, expected_policy_id: str,
     ) -> ContextManager[None]: ...

@@ -10,7 +10,7 @@ from contextlib import nullcontext
 import json
 from pathlib import Path
 import sys
-from typing import Any, Mapping, Sequence
+from typing import Any, ContextManager, Mapping, Sequence
 
 from .bootstrap import inspect_project
 from .developer_feature import (
@@ -89,6 +89,13 @@ def _add_state_root(parser: argparse.ArgumentParser) -> None:
             "retained developer-feature state (defaults to stable per-user state; "
             "WORKBENCH_STATE_ROOT overrides it)"
         ),
+    )
+
+
+def _add_state_root_policy_id(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--expected-state-root-policy-id",
+        help="Core feature state-root policy ID reviewed before plan retention",
     )
 
 
@@ -256,6 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     material_plan.add_argument("--translation")
     material_plan.add_argument("--symbol")
     _add_state_root(material_plan)
+    _add_state_root_policy_id(material_plan)
     material_plan.add_argument(
         "--show-diff",
         action="store_true",
@@ -302,6 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
     recipe_plan.add_argument("--duration", required=True, type=int)
     recipe_plan.add_argument("--voltage-tier", required=True)
     _add_state_root(recipe_plan)
+    _add_state_root_policy_id(recipe_plan)
     recipe_plan.add_argument(
         "--show-diff",
         action="store_true",
@@ -324,6 +333,7 @@ def build_parser() -> argparse.ArgumentParser:
     quest_plan.add_argument("--title")
     quest_plan.add_argument("--description")
     _add_state_root(quest_plan)
+    _add_state_root_policy_id(quest_plan)
     quest_plan.add_argument(
         "--show-diff",
         action="store_true",
@@ -341,6 +351,7 @@ def build_parser() -> argparse.ArgumentParser:
     example_plan.add_argument("example_key", choices=EXAMPLE_KEYS)
     example_plan.add_argument("workspace", type=Path)
     _add_state_root(example_plan)
+    _add_state_root_policy_id(example_plan)
     example_plan.add_argument(
         "--show-diff",
         action="store_true",
@@ -475,6 +486,26 @@ def _state_root(args: argparse.Namespace, suite_root: Path) -> Path:
         default_feature_state_root(suite_root)
         if args.state_root is None
         else args.state_root.expanduser().resolve()
+    )
+
+
+def _plan_state_root_scope(
+    args: argparse.Namespace, suite_root: Path, *, core_policy_selection: bool,
+) -> tuple[Path, ContextManager[None]]:
+    """Resolve Core's choice and hold it while the owner retains a plan."""
+
+    expected = args.expected_state_root_policy_id
+    if args.state_root is None and core_policy_selection:
+        policy = state_root_policies().resolve(args.workspace, "feature")
+        state_root = Path(policy["state_root"])
+        if expected is None:
+            expected = policy["policy_id"]
+    else:
+        state_root = _state_root(args, suite_root)
+    if expected is None:
+        return state_root, nullcontext()
+    return state_root, state_root_policies().hold(
+        args.workspace.resolve(), "feature", state_root, expected,
     )
 
 
@@ -983,6 +1014,7 @@ def main(
     argv: Sequence[str] | None = None,
     *,
     suite_root: Path | str | None = None,
+    core_policy_selection: bool = False,
 ) -> int:
     args = build_parser().parse_args(
         _normalized_arguments(sys.argv[1:] if argv is None else argv)
@@ -1077,18 +1109,19 @@ def main(
                 )
             retained = None
         elif args.action == "plan":
-            state_root = _state_root(args, suite)
+            state_root, plan_retention_scope = _plan_state_root_scope(
+                args, suite, core_policy_selection=core_policy_selection,
+            )
             if args.family == "example":
                 result, owner_plan = _build_example_plan(
                     suite,
                     args.workspace,
                     example_key=args.example_key,
                 )
-                retained = (
-                    None
-                    if owner_plan is None
-                    else retain_feature_record(state_root, "plans", owner_plan)
-                )
+                retained = None
+                if owner_plan is not None:
+                    with plan_retention_scope:
+                        retained = retain_feature_record(state_root, "plans", owner_plan)
                 if retained is not None:
                     result["retained_plan_uri"] = retained.as_uri()
             elif args.family == FAMILY:
@@ -1132,7 +1165,8 @@ def main(
                     description=args.description,
                 )
             if args.family != "example":
-                retained = retain_feature_record(state_root, "plans", result)
+                with plan_retention_scope:
+                    retained = retain_feature_record(state_root, "plans", result)
             if args.compact_json:
                 compact_family = (
                     result["example"]["family"]

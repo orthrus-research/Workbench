@@ -221,6 +221,14 @@ or use `workbench capabilities`, for exact arguments.
 | `runtime-diagnose`, `runtime-worldgen-audit` | Read retained launch, log, artifact, and profile-selected world-generation evidence. |
 | `runtime-worldgen-fingerprint`, `runtime-worldgen-compare`, `runtime-worldgen-block-delta` | Compare identity-bound observations of stopped Anvil worlds. |
 
+The installed Core route `workbench feature plan FAMILY WORKSPACE` retains its
+plan under that workspace's Core-selected `feature` state root. Supply
+`--expected-state-root-policy-id ID` to bind a reviewed selection through the
+record write; a changed selection or a different destination is refused before
+retention. `--state-root PATH` without a policy ID remains an explicit
+one-command override. Other Feature commands still use their documented state
+root arguments and defaults until their owner policy checks are migrated.
+
 Planning commands do not mutate the source or an installed game instance.
 Commands that write require explicit targets and retain their receipts under
 ignored state. Seed roots are read-only and contribute bytes only when exact

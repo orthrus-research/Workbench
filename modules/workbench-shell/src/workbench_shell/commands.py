@@ -136,7 +136,7 @@ def run(argv, *, context):
 def feature(argv, *, context):
     context.check_cancelled()
     from workbench_shell.developer_feature_cli import main as feature_main
-    return feature_main(list(argv), suite_root=ROOT)
+    return feature_main(list(argv), suite_root=ROOT, core_policy_selection=True)
 
 
 def atlas_recipes(argv, *, context):

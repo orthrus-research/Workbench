@@ -1124,6 +1124,7 @@ class CatalogTests(unittest.TestCase):
                 ],
                 "duration": 60,
                 "voltage_tier": "LV",
+                "expected_state_root_policy_id": "workbench-state-root-policy:sha256:" + "a" * 64,
                 "compact_json": True,
             },
             root=ROOT,
@@ -1140,6 +1141,10 @@ class CatalogTests(unittest.TestCase):
         self.assertNotIn("--consent", plan_argv)
         self.assertIn("--compact-json", plan_argv)
         self.assertNotIn("--json", plan_argv)
+        self.assertEqual(
+            "workbench-state-root-policy:sha256:" + "a" * 64,
+            plan_argv[plan_argv.index("--expected-state-root-policy-id") + 1],
+        )
 
         example = self.catalog.command("developer-features.plan-example")
         example_argv, example_intent = example.build_argv(

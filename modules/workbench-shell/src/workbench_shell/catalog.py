@@ -3291,6 +3291,11 @@ def _developer_feature_commands() -> list[CommandSpec]:
         flags=("--state-root",),
         kind="path",
     )
+    plan_policy_id = _f(
+        "expected_state_root_policy_id",
+        "Optional reviewed Core Feature state-root policy ID; stale choices are refused before retaining a plan.",
+        flags=("--expected-state-root-policy-id",),
+    )
     json_output = _f(
         "json",
         "Emit the complete owner-defined machine-readable result.",
@@ -3347,6 +3352,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
         _f("translation", "English label; defaults to the developer name.", flags=("--translation",)),
         _f("symbol", "Optional exact Groovy static-field symbol.", flags=("--symbol",)),
         state_root,
+        plan_policy_id,
         _f("show_diff", "Show the reviewed unified diff in human output.", flags=("--show-diff",), kind="boolean"),
         plan_json_output,
         compact_plan_output,
@@ -3363,6 +3369,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
         _f("duration", "Recipe duration in ticks.", flags=("--duration",), kind="integer", required=True),
         _f("voltage_tier", "Existing voltage-tier symbol.", flags=("--voltage-tier",), required=True),
         state_root,
+        plan_policy_id,
         _f("show_diff", "Show the reviewed unified diff in human output.", flags=("--show-diff",), kind="boolean"),
         plan_json_output,
         compact_plan_output,
@@ -3375,6 +3382,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
         _f("title", "Replacement text for the quest's existing title key.", flags=("--title",)),
         _f("description", "Replacement text for the quest's existing description key.", flags=("--description",)),
         state_root,
+        plan_policy_id,
         _f("show_diff", "Show the reviewed unified diff in human output.", flags=("--show-diff",), kind="boolean"),
         plan_json_output,
         compact_plan_output,
@@ -3501,6 +3509,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
                 ),
                 workspace,
                 state_root,
+                plan_policy_id,
                 _f("show_diff", "Show the owner-validated unified diff in human output.", flags=("--show-diff",), kind="boolean"),
                 plan_json_output,
                 compact_plan_output,
