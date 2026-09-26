@@ -13,15 +13,17 @@ from unittest.mock import patch
 from workbench_api import ModuleError
 from workbench_api.canonical import content_id
 from workbench_api.service import ServiceHandlerRegistration, ServicePhysicalLeasePorts, ServiceV3Error
-from workbench_core.package_guard import PackageActivity, package_change, guard_root, environment_fingerprint
+from workbench_core.package_guard import PackageActivity, package_change, account_home, guard_root, environment_fingerprint
 from workbench_core.service.runtime import ServiceRuntimeV3
 
 
 class PackageGuardTests(unittest.TestCase):
     def test_client_state_and_cache_environment_cannot_change_exclusion_domain(self):
+        expected_home = account_home()
         expected = guard_root()
         with patch.dict(os.environ, {'WORKBENCH_STATE_ROOT':'/other/state', 'XDG_STATE_HOME':'/other/state2',
                                     'XDG_CACHE_HOME':'/other/cache', 'LOCALAPPDATA':'/other/local', 'HOME':'/other/home'}):
+            self.assertEqual(expected_home, account_home())
             self.assertEqual(expected, guard_root())
 
     @unittest.skipIf(os.name == 'nt', 'POSIX ownership/mode check; Windows uses the account known folder')

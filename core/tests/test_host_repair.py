@@ -738,13 +738,17 @@ class HostRequirementTests(unittest.TestCase):
                 error=applied_error,
                 environment={"PATH": ""},
                 record_path=record_path,
+                operation_root=parent / "repair-operations",
             )
             result = json.loads(applied_output.getvalue())
             repaired = setup_cli.load_setup_record(record_path)
+            retained, = repair_cli.RepairOperationStore(parent / "repair-operations").list()
 
             self.assertEqual(0, applied)
             self.assertEqual("", applied_error.getvalue())
             self.assertEqual("repaired", result["outcome"])
+            self.assertEqual("completed", retained["state"])
+            self.assertEqual(result, retained["result"])
             self.assertEqual(str(git), repaired["selection"]["git_executable"])
             self.assertNotEqual(original["record_id"], repaired["record_id"])
 
@@ -791,13 +795,17 @@ class HostRequirementTests(unittest.TestCase):
                 error=applied_error,
                 environment={"PATH": ""},
                 record_path=record_path,
+                operation_root=parent / "repair-operations",
             )
             result = json.loads(applied_output.getvalue())
             backup = Path(result["recovered_setup_record"])
+            retained, = repair_cli.RepairOperationStore(parent / "repair-operations").list()
 
             self.assertEqual(0, applied)
             self.assertEqual("", applied_error.getvalue())
             self.assertEqual("repaired", result["outcome"])
+            self.assertEqual("completed", retained["state"])
+            self.assertEqual(result, retained["result"])
             self.assertFalse(record_path.exists())
             self.assertEqual(invalid_bytes, backup.read_bytes())
             self.assertEqual([["workbench", "setup"]], result["next_commands"])
@@ -1080,11 +1088,15 @@ class HostRequirementTests(unittest.TestCase):
                     error=error,
                     environment={"PATH": ""},
                     record_path=parent / "setup-v1.json",
+                    operation_root=parent / "repair-operations",
                 )
             result = json.loads(output.getvalue())
+            retained, = repair_cli.RepairOperationStore(parent / "repair-operations").list()
 
             self.assertEqual(2, status)
             self.assertEqual("partial", result["outcome"])
+            self.assertEqual("partial", retained["state"])
+            self.assertEqual(result, retained["result"])
             self.assertEqual("failed-exit-7", result["installed"][0]["outcome"])
             self.assertIn("failed with exit 7", result["failure"])
             self.assertIn("Workbench repair incomplete", error.getvalue())

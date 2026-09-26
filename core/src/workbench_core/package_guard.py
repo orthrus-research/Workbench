@@ -23,21 +23,23 @@ def environment_id() -> str:
     return sha256(str(Path(sys.prefix).resolve()).encode()).hexdigest()
 
 
-def guard_root() -> Path:
-    # The environment is the exclusion domain, even for distinct workspaces.
-    # Resolve the account's fixed home, not caller-selected state/cache or HOME
-    # environment variables: IDE clients and terminals must share exclusion.
-    environment = environment_id()
+def account_home() -> Path:
+    """Resolve the fixed account home without caller-selected output settings."""
     if os.name == "nt":
         import ctypes
         buffer = ctypes.create_unicode_buffer(32768)
         if ctypes.windll.shell32.SHGetFolderPathW(None, 28, None, 0, buffer) != 0:
             raise ModuleError("cannot resolve the account package lease directory")
-        home = Path(buffer.value)
+        return Path(buffer.value)
     else:
         import pwd
-        home = Path(pwd.getpwuid(os.getuid()).pw_dir)
-    return home / ".workbench-package-leases" / environment
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)
+
+
+def guard_root() -> Path:
+    # The environment is the exclusion domain, even for distinct workspaces.
+    # The account home is fixed; state/cache and process HOME cannot redirect it.
+    return account_home() / ".workbench-package-leases" / environment_id()
 
 
 def _require_private(observation, *, directory: bool) -> None:

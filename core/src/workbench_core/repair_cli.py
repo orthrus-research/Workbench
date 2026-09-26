@@ -17,6 +17,7 @@ from typing import Any, TextIO
 
 from workbench_core.host_requirements import inspect_host_requirements, measure_executable
 from workbench_core.human_presentation import HumanPresentation, human_presentation
+from workbench_core.repair_operations import RESULT_FORMAT, RepairOperationStore
 from workbench_core.setup_cli import (
     SetupError,
     default_setup_record_path,
@@ -28,7 +29,6 @@ from workbench_core.setup_cli import (
 
 CHECK_FORMAT = "workbench-repair-check-v1"
 PLAN_FORMAT = "workbench-repair-plan-v1"
-RESULT_FORMAT = "workbench-repair-result-v1"
 SCHEMA_VERSION = 1
 MAX_INVALID_SETUP_BYTES = 1024 * 1024
 MAX_PACKAGE_OUTPUT_BYTES = 64 * 1024
@@ -802,8 +802,10 @@ def _parser() -> argparse.ArgumentParser:
     operation.add_argument("--check", action="store_true", help="inspect the host without changing it")
     operation.add_argument("--plan", action="store_true", help="show the exact repair plan without applying it")
     operation.add_argument("--apply", metavar="PLAN_ID", help="apply one exact reviewed repair plan")
+    operation.add_argument("--history", nargs="?", const="list", metavar="OPERATION_ID",
+                           help="read retained repair apply receipts")
     parser.add_argument("--git-executable", type=Path, help="validate and bind this exact Git executable")
-    parser.add_argument("--json", action="store_true", help="emit structured output (requires --check, --plan, or --apply)")
+    parser.add_argument("--json", action="store_true", help="emit structured output (requires --check, --plan, --apply, or --history)")
     return parser
 
 
@@ -815,6 +817,7 @@ def main(
     error: TextIO | None = None,
     environment: Mapping[str, str] | None = None,
     record_path: Path | str | None = None,
+    operation_root: Path | None = None,
 ) -> int:
     parser = _parser()
     args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
@@ -823,13 +826,18 @@ def main(
     stderr = sys.stderr if error is None else error
     stdout_view = human_presentation(stdout, environment=environment)
     stderr_view = human_presentation(stderr, environment=environment)
-    explicit_operation = args.check or args.plan or args.apply is not None
+    explicit_operation = args.check or args.plan or args.apply is not None or args.history is not None
     interactive = bool(getattr(stdin, "isatty", lambda: False)()) and bool(
         getattr(stdout, "isatty", lambda: False)()
     )
     try:
         if args.json and not explicit_operation:
-            raise RepairError("--json requires --check, --plan, or --apply PLAN_ID")
+            raise RepairError("--json requires --check, --plan, --apply PLAN_ID, or --history")
+        if args.history is not None:
+            store = RepairOperationStore(operation_root)
+            result = store.list() if args.history == "list" else store.inspect(args.history)
+            stdout.write(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+            return 0
         if not explicit_operation and not interactive:
             raise RepairError(
                 "interactive repair requires a TTY; use --check, --plan, or "
@@ -888,13 +896,25 @@ def main(
                     + " Repair cancelled; nothing was changed.\n"
                 )
                 return 0
-        result = _apply_plan(
-            plan,
-            environment=environment,
-            explicit_git=args.git_executable,
-            output=stderr if args.json else stdout,
-            structured_output=args.json,
-        )
+        store = RepairOperationStore(operation_root)
+        with store.apply_scope():
+            operation = store.begin(plan["plan_id"])
+            try:
+                result = _apply_plan(
+                    plan,
+                    environment=environment,
+                    explicit_git=args.git_executable,
+                    output=stderr if args.json else stdout,
+                    structured_output=args.json,
+                )
+            except RepairPartialError as exc:
+                operation.finish(result=exc.result, error=str(exc))
+                raise
+            except BaseException as exc:
+                operation.finish(error=f"{type(exc).__name__}: {exc}")
+                raise
+            else:
+                operation.finish(result=result)
         stdout.write(
             json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
             if args.json
