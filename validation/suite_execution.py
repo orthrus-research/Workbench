@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import json
 import math
 import os
 from pathlib import Path
-import shutil
 import signal
 import subprocess
 import sys
@@ -34,7 +34,10 @@ from orchestration import (
     select_runnable,
     validate_run_id,
 )
-from core_run_custody import allocate_validation_run, publish_validation_timing
+from core_run_custody import (
+    allocate_validation_run, allocate_validation_scratch,
+    publish_validation_timing,
+)
 from suite_measurement import environment_provenance, inventory_digest
 from suite_catalog import (
     SUITES_BY_NAME,
@@ -257,12 +260,27 @@ def _terminate_process(process: subprocess.Popen[bytes]) -> None:
         pass
 
 
+def _process_group_active(group_id: int) -> bool:
+    """Detect POSIX suite descendants that outlive their direct leader."""
+
+    if os.name != "posix":
+        return False
+    try:
+        os.killpg(group_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _run_suite_process(
     request: _SuiteRequest,
     *,
     process_registry: dict[str, subprocess.Popen[bytes]],
     process_lock: threading.Lock,
     interruption_event: threading.Event,
+    launched_groups: set[int] | None = None,
 ) -> _SuiteProcessResult:
     started = time.perf_counter()
     started_at = _utc_timestamp()
@@ -297,6 +315,8 @@ def _run_suite_process(
                 )
             process = subprocess.Popen(list(request.command), **arguments)
             process_registry[request.suite.name] = process
+            if os.name == "posix" and launched_groups is not None:
+                launched_groups.add(process.pid)
         timed_out = False
         admitted_ids = None
         try:
@@ -365,21 +385,26 @@ def _publish_timing_report(document: dict, suite_name: str) -> None:
     publish_validation_timing(ROOT, suite_name, payload)
 
 
-def _cleanup_run_temporary(paths: ValidationRunPaths) -> list[str]:
-    """Remove run-owned scratch trees while retaining reports and logs."""
+def _cleanup_run_temporary(
+    paths: ValidationRunPaths, *, scratch: tuple[Any, tuple[Any, Any]],
+    drained: Callable[[], bool],
+) -> list[str]:
+    """Ask Core to dispose the two exact run scratch leases after drain."""
 
     failures: list[str] = []
+    host, references = scratch
     targets = (
-        (paths.temporary, "isolated suite temporary storage"),
-        (paths.root / "repository-tmp", "repository-scoped suite temporary storage"),
+        (references[0], paths.temporary, "isolated suite temporary storage"),
+        (references[1], paths.root / "repository-tmp", "repository-scoped suite temporary storage"),
     )
-    for path, label in targets:
-        if not path.exists() and not path.is_symlink():
-            continue
+    for reference, expected, label in targets:
         try:
-            shutil.rmtree(path)
-        except OSError as exc:
-            failures.append(f"could not remove {label}: {exc}")
+            if reference.path != expected:
+                raise SuiteExecutionFailure("Core temporary lease path changed")
+            host.dispose(reference, drained=drained)
+        except Exception as exc:
+            detail = exc.__cause__ if exc.__cause__ is not None else exc
+            failures.append(f"could not remove {label}: {detail}")
     return failures
 
 
@@ -440,6 +465,8 @@ def _terminalize_abnormal_run(
     reports: dict[str, SuiteReport],
     failures: list[str],
     started_at: str,
+    scratch: tuple[Any, tuple[Any, Any]],
+    drained: Callable[[], bool],
     details: dict | None = None,
 ) -> None:
     """Best-effort terminalization that preserves the original exception."""
@@ -455,7 +482,7 @@ def _terminalize_abnormal_run(
                 stage["reason"] = description
                 stage["completed_at"] = _utc_timestamp()
     failures.append(description + (f": {error}" if str(error) else ""))
-    failures.extend(_cleanup_run_temporary(paths))
+    failures.extend(_cleanup_run_temporary(paths, scratch=scratch, drained=drained))
     try:
         _write_run_manifest(
             paths,
@@ -490,6 +517,8 @@ def _finish_run(
     failures: list[str],
     started_at: str,
     repository_files: Callable[[], list[Path]],
+    scratch: tuple[Any, tuple[Any, Any]],
+    drained: Callable[[], bool],
     details: dict | None = None,
 ) -> ValidationRunPaths:
     """Verify, clean, and terminalize a normally drained validation run."""
@@ -526,7 +555,7 @@ def _finish_run(
             "Python suite validation ended without complete reports: "
             + ", ".join(missing)
         )
-    failures.extend(_cleanup_run_temporary(paths))
+    failures.extend(_cleanup_run_temporary(paths, scratch=scratch, drained=drained))
     if not failures:
         try:
             for suite in selected_suites:
@@ -587,6 +616,8 @@ def _run_python_suites_at_paths(
     jobs: int,
     source_fingerprint: str,
     repository_files: Callable[[], list[Path]],
+    scratch: tuple[Any, tuple[Any, Any]],
+    launch_state: dict[str, bool],
     selection_plan: dict | None = None,
 ) -> ValidationRunPaths:
     """Run the selected suites within a Core-reserved retained directory."""
@@ -610,6 +641,20 @@ def _run_python_suites_at_paths(
     process_registry: dict[str, subprocess.Popen[bytes]] = {}
     process_lock = threading.Lock()
     interruption_event = threading.Event()
+    launched_groups: set[int] = set()
+
+    def drained() -> bool:
+        # POSIX groups catch descendants that keep the suite's process group.
+        # Windows descendants and processes that create new sessions require
+        # stronger process containment before this is a complete tree proof.
+        with process_lock:
+            leaders_finished = not process_registry
+            groups = tuple(launched_groups)
+        return (
+            leaders_finished
+            and all(future.done() for future in active)
+            and not any(_process_group_active(group) for group in groups)
+        )
     started_at = _utc_timestamp()
     started_clock = time.perf_counter()
     details = {
@@ -683,7 +728,9 @@ def _run_python_suites_at_paths(
                         process_registry=process_registry,
                         process_lock=process_lock,
                         interruption_event=interruption_event,
+                        launched_groups=launched_groups,
                     )
+                    launch_state["admitted"] = True
                     active[future] = request
             if selected_items:
                 _write_run_manifest(
@@ -777,6 +824,8 @@ def _run_python_suites_at_paths(
             reports=reports,
             failures=failures,
             started_at=started_at,
+            scratch=scratch,
+            drained=drained,
             details=details,
         )
         raise
@@ -796,6 +845,8 @@ def _run_python_suites_at_paths(
             started_at=started_at,
             details=details,
             repository_files=repository_files,
+            scratch=scratch,
+            drained=drained,
         )
     except SuiteExecutionFailure:
         raise
@@ -810,6 +861,8 @@ def _run_python_suites_at_paths(
             reports=reports,
             failures=failures,
             started_at=started_at,
+            scratch=scratch,
+            drained=drained,
             details=details,
         )
         raise
@@ -859,21 +912,47 @@ def run_python_suites(
     selected_run_id = validate_run_id(run_id or new_run_id())
     host, allocation = allocate_validation_run(ROOT, selected_run_id)
     with host.execution(allocation):
+        scratch = None
+        paths = None
+        launch_state = {"admitted": False}
         try:
-            paths = create_run_paths(
-                ROOT / ".workbench/validation/runs",
-                selected_run_id,
-                temporary_storage_root=_validation_temporary_storage(),
-                allocated_root=allocation.path,
+            temporary_storage_root = _validation_temporary_storage()
+            scratch = allocate_validation_scratch(
+                ROOT, selected_run_id,
+                temporary_storage_root=temporary_storage_root,
             )
-            result = _run_python_suites_at_paths(
-                run_paths=paths,
-                tier=tier, selected=selected, jobs=jobs,
-                source_fingerprint=source_fingerprint,
-                repository_files=repository_files,
-                selection_plan=selection_plan,
-            )
+            scratch_host, scratch_references = scratch
+            with ExitStack() as scratch_execution:
+                for reference in scratch_references:
+                    scratch_execution.enter_context(scratch_host.execution(reference))
+                paths = create_run_paths(
+                    ROOT / ".workbench/validation/runs",
+                    selected_run_id,
+                    temporary_storage_root=temporary_storage_root,
+                    allocated_root=allocation.path,
+                    allocated_temporary=scratch_references[0].path,
+                )
+                result = _run_python_suites_at_paths(
+                    run_paths=paths,
+                    tier=tier, selected=selected, jobs=jobs,
+                    source_fingerprint=source_fingerprint,
+                    repository_files=repository_files,
+                    scratch=scratch,
+                    launch_state=launch_state,
+                    selection_plan=selection_plan,
+                )
         except BaseException as error:
+            if scratch is not None and not launch_state["admitted"]:
+                # Setup failed before any suite could launch. A restarted Core
+                # host can dispose these exact leases after the execution
+                # contexts have released their locks.
+                for reference in scratch[1]:
+                    try:
+                        scratch[0].reconcile(reference.lease_id, drained=lambda: True)
+                    except Exception as cleanup_error:
+                        error.add_note(
+                            f"Core could not dispose unstarted validation scratch: {cleanup_error}"
+                        )
             try:
                 explanation = f"{type(error).__name__}: {error}" or "validation run failed"
                 _finish_core_run(

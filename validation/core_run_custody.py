@@ -52,6 +52,40 @@ def allocate_validation_run(root: Path, run_id: str):
     return host, allocation
 
 
+def allocate_validation_scratch(
+    root: Path, run_id: str, *, temporary_storage_root: Path,
+):
+    """Lease the historical external and repository suite scratch roots."""
+
+    _source_core()
+    from workbench_core.temporary_leases import CoreTemporaryLeases
+    from workbench_core.user_config_home import default_user_config_home
+
+    selected_root = Path(root).resolve(strict=True)
+    external = Path(temporary_storage_root).absolute()
+    retained_run = selected_root / ".workbench/validation/runs" / run_id
+    if retained_run.is_symlink() or not retained_run.is_dir():
+        raise ValueError("retained validation run must exist before scratch allocation")
+    host = CoreTemporaryLeases(
+        workspace=selected_root,
+        configuration_home=default_user_config_home(),
+        locations={"system": external, "repository": retained_run},
+        owner_id="validation",
+    )
+    external_lease = host.allocate("system", run_id)
+    try:
+        repository_lease = host.allocate("repository", "repository-tmp")
+    except BaseException:
+        # No suite was launched yet. Keep the original failure if disposal
+        # itself fails; Core's reservation remains available for recovery.
+        try:
+            host.reconcile(external_lease.lease_id, drained=lambda: True)
+        except Exception:
+            pass
+        raise
+    return host, (external_lease, repository_lease)
+
+
 def publish_validation_timing(root: Path, suite_name: str, payload: bytes) -> Path:
     """Replace the scheduler's latest report in its registered Core namespace."""
 
@@ -84,4 +118,4 @@ def publish_validation_timing(root: Path, suite_name: str, payload: bytes) -> Pa
     return target
 
 
-__all__ = ["allocate_validation_run", "publish_validation_timing"]
+__all__ = ["allocate_validation_run", "allocate_validation_scratch", "publish_validation_timing"]

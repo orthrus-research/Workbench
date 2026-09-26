@@ -437,6 +437,8 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
             self.assertFalse((root / "external-temp/run-interrupted").exists())
 
     def test_cleanup_failure_fails_closed_and_is_recorded(self) -> None:
+        from workbench_core.temporary_leases import CoreTemporaryLeases
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / "source.py"
@@ -464,8 +466,8 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 patch.object(scheduler, "new_run_id", return_value="run-cleanup"),
                 patch.object(scheduler, "_run_suite_process", side_effect=fake_run),
                 patch.object(
-                    scheduler.shutil,
-                    "rmtree",
+                    CoreTemporaryLeases,
+                    "_remove_owned_tree",
                     side_effect=OSError("busy"),
                 ),
             ):
@@ -493,6 +495,71 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 "could not remove isolated suite temporary storage: busy",
                 manifest["failures"],
             )
+
+    def test_setup_failure_before_launch_disposes_both_core_scratch_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.py"
+            source.write_text("pass\n", encoding="utf-8")
+            fingerprint = fingerprint_paths(root, (source,))
+            with (
+                patch.object(scheduler, "ROOT", root),
+                patch.object(
+                    scheduler, "_validation_temporary_storage",
+                    return_value=root / "external-temp",
+                ),
+                patch.object(scheduler, "new_run_id", return_value="run-setup-error"),
+                patch.object(scheduler, "_suite_requests", side_effect=RuntimeError("planning failed")),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "planning failed"):
+                    scheduler.run_python_suites(
+                        tier="quick", selected=("core-api",), jobs=1,
+                        source_fingerprint=fingerprint,
+                        repository_files=lambda: [source],
+                    )
+            run_root = root / ".workbench/validation/runs/run-setup-error"
+            self.assertFalse((root / "external-temp/run-setup-error").exists())
+            self.assertFalse((run_root / "repository-tmp").exists())
+            self.assertEqual("failed", self._registered_run(root, "run-setup-error")["status"])
+
+    def test_surviving_posix_suite_group_retains_scratch(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX process-group drain policy")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.py"
+            source.write_text("pass\n", encoding="utf-8")
+            fingerprint = fingerprint_paths(root, (source,))
+            suite = self._suite("alpha")
+
+            def fake_run(request, *, launched_groups, **_kwargs):
+                launched_groups.add(12345)
+                self._write_success_report(request)
+                return scheduler._SuiteProcessResult(
+                    request,
+                    ProcessOutcome(request.suite.name, 0, 0.05, 900),
+                    admitted_test_ids=(f"{request.suite.name}.Tests.test_case",),
+                )
+
+            with (
+                patch.object(scheduler, "ROOT", root),
+                patch.object(scheduler, "_validation_temporary_storage", return_value=root / "external-temp"),
+                patch.object(scheduler, "suites_for_tier", return_value=(suite,)),
+                patch.object(scheduler, "new_run_id", return_value="run-descendant"),
+                patch.object(scheduler, "_run_suite_process", side_effect=fake_run),
+                patch.object(scheduler, "_process_group_active", return_value=True),
+            ):
+                with self.assertRaisesRegex(
+                    scheduler.SuiteExecutionFailure, "process tree is not confirmed drained",
+                ):
+                    scheduler.run_python_suites(
+                        tier="quick", selected=(), jobs=1,
+                        source_fingerprint=fingerprint,
+                        repository_files=lambda: [source],
+                    )
+            self.assertTrue((root / "external-temp/run-descendant").is_dir())
+            self.assertTrue((root / ".workbench/validation/runs/run-descendant/repository-tmp").is_dir())
+            self.assertEqual("failed", self._registered_run(root, "run-descendant")["status"])
 
     def test_concurrent_validator_invocations_keep_run_evidence_isolated(
         self,

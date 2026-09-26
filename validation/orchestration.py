@@ -102,6 +102,7 @@ def create_run_paths(
     *,
     temporary_storage_root: Path | None = None,
     allocated_root: Path | None = None,
+    allocated_temporary: Path | None = None,
 ) -> ValidationRunPaths:
     """Prepare a fresh run, including one already reserved and created by Core."""
 
@@ -116,7 +117,11 @@ def create_run_paths(
         if allocated_root is None:
             root.mkdir(parents=True, exist_ok=False)
         elif (Path(allocated_root) != root or root.is_symlink() or not root.is_dir()
-              or {path.name for path in root.iterdir()} != {".workbench-allocation.json"}):
+              or {path.name for path in root.iterdir()} != (
+                  {".workbench-allocation.json", "repository-tmp"}
+                  if allocated_temporary is not None
+                  else {".workbench-allocation.json"}
+              )):
             raise OrchestrationFailure(
                 f"Core allocation is not a fresh validation run tree for {validated}"
             )
@@ -124,8 +129,19 @@ def create_run_paths(
         logs = root / "logs"
         for path in (reports, logs):
             path.mkdir()
-        temporary.mkdir(parents=True, mode=0o700, exist_ok=False)
-        temporary.chmod(0o700)
+        if allocated_temporary is None:
+            temporary.mkdir(parents=True, mode=0o700, exist_ok=False)
+            temporary.chmod(0o700)
+        elif (
+            Path(allocated_temporary) != temporary
+            or temporary.is_symlink()
+            or not temporary.is_dir()
+            or {path.name for path in temporary.iterdir()}
+            != {".workbench-temporary-lease.json"}
+        ):
+            raise OrchestrationFailure(
+                f"Core scratch allocation is not a fresh validation temporary tree for {validated}"
+            )
     except FileExistsError as exc:
         raise OrchestrationFailure(
             f"validation run storage already exists for {validated}"
