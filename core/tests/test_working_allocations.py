@@ -294,7 +294,8 @@ class WorkingAllocationTests(unittest.TestCase):
             blocked = manager.plan_cleanup(self.workspace, selector=first_candidate["item_id"])
         self.assertTrue(all(row["deletion"]["state"] == "protected" for row in items[:-1]))
         self.assertTrue(all("registered-resource" in row["deletion"]["reason_codes"] for row in items[:-1]))
-        self.assertEqual("eligible", items[-1]["deletion"]["state"])
+        self.assertEqual("protected", items[-1]["deletion"]["state"])
+        self.assertIn("registered-catalog-unproven", items[-1]["deletion"]["reason_codes"])
         self.assertEqual("blocked", blocked["status"])
         for allocation, _ in states:
             candidate = next(row for row in report["items"] if row["path"] == str(allocation.path))

@@ -1299,44 +1299,55 @@ def _protect_registered_resources(workspace: Path, items: list[dict[str, Any]]) 
     from .registered import ResourceCatalog
 
     catalog = ResourceCatalog(default_user_config_home())
-    if not catalog.root.exists() and not catalog.root.is_symlink():
-        return None
     try:
         registered = catalog.inventory(workspace=workspace)
         records = registered["resources"]
         record_stores = registered["record_stores"]
         trees = registered["trees"]
         working_allocations = registered["working_allocations"]
+        # A manifest proves this catalog's identity, not that an older
+        # configuration home or workspace never had other registered outputs.
+        # No current root generation carries a complete-history proof.
+        catalog_unproven = registered["root_state"] != "ready-proven"
     except Exception as exc:
         records = None
         record_stores = None
         trees = None
         working_allocations = None
+        catalog_unproven = True
         limitation = f"Core resource catalog is unavailable; workspace cleanup is protected: {type(exc).__name__}"
     else:
-        limitation = None
+        limitation = (
+            "Core resource catalog historical coverage is unproven; workspace cleanup is protected"
+            if catalog_unproven else None
+        )
     for item in items:
         item_path = Path(item["path"])
-        if records is None or any(
-            Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
-            for row in records
-        ) or any(
-            Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
-            for row in record_stores
-        ) or any(
-            selected == item_path or _inside(selected, item_path)
-            for row in trees for selected in (Path(row["path"]), Path(row["staging"]))
-        ) or any(
-            _inside(Path(row["path"]), item_path)
-            or _inside(item_path, Path(row["path"]))
-            for row in working_allocations
-        ):
+        registered_match = records is not None and (
+            any(
+                Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
+                for row in records
+            ) or any(
+                Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
+                for row in record_stores
+            ) or any(
+                selected == item_path or _inside(selected, item_path)
+                for row in trees for selected in (Path(row["path"]), Path(row["staging"]))
+            ) or any(
+                _inside(Path(row["path"]), item_path)
+                or _inside(item_path, Path(row["path"]))
+                for row in working_allocations
+            )
+        )
+        if records is None or catalog_unproven or registered_match:
             deletion = item["deletion"]
             deletion["state"] = "protected"
             deletion["recoverability"] = "none"
             deletion["reason_codes"] = sorted(set([
                 *deletion["reason_codes"],
-                "registered-resource" if records is not None else "registered-catalog-unavailable",
+                *(["registered-resource"] if registered_match else []),
+                *(["registered-catalog-unavailable"] if records is None else []),
+                *(["registered-catalog-unproven"] if catalog_unproven and records is not None else []),
             ]))
     return limitation
 

@@ -1,5 +1,6 @@
 """Managed graph references retain exact registered check evidence."""
 
+from contextlib import contextmanager
 import os
 import unittest
 from unittest.mock import patch
@@ -10,10 +11,25 @@ from workbench_core import check_retention
 from workbench_core.managed_trees import CoreManagedTrees
 from workbench_core.storage import manager
 from workbench_core.storage.tree_catalog import TreeCatalog
+from workbench_core.storage.registered import ResourceCatalog
 import test_check_lifecycle as fixtures
 
 
 class ManagedCheckDependenciesTests(unittest.TestCase):
+    @contextmanager
+    def _attested_catalog_for_reference_test(self):
+        """Exercise dependency rules independently of W0's unproven-history gate."""
+
+        original = ResourceCatalog.inventory
+
+        def attested(catalog, *, workspace=None):
+            result = original(catalog, workspace=workspace)
+            result["root_state"] = "ready-proven"
+            return result
+
+        with patch.object(ResourceCatalog, "inventory", attested):
+            yield
+
     def setUp(self):
         source = fixtures.CheckLifecycleTests()
         source.setUp()
@@ -37,17 +53,18 @@ class ManagedCheckDependenciesTests(unittest.TestCase):
                                  references=(self.reference_id,))
 
     def test_committed_tree_protects_unpinned_source_and_stale_cleanup(self):
-        before = manager.plan_cleanup(self.workspace, selector=self.source.item()["item_id"])
-        self.assertEqual("ready", before["status"])
-        tree = self.publish()
-        self.assertEqual((self.reference_id,), tree.references)
-        self.assertEqual((self.reference_id,), self.host.describe(tree.tree_id).references)
-        row = self.source.item()
-        self.assertEqual("protected", row["deletion"]["state"])
-        self.assertIn("referenced-managed-tree", row["deletion"]["reason_codes"])
-        self.assertEqual([], life.pins(self.workspace, self.source.attempt.name))
-        with self.assertRaisesRegex(manager.RuntimeManagerError, "no longer eligible"):
-            manager.execute_cleanup(self.workspace, before)
+        with self._attested_catalog_for_reference_test():
+            before = manager.plan_cleanup(self.workspace, selector=self.source.item()["item_id"])
+            self.assertEqual("ready", before["status"])
+            tree = self.publish()
+            self.assertEqual((self.reference_id,), tree.references)
+            self.assertEqual((self.reference_id,), self.host.describe(tree.tree_id).references)
+            row = self.source.item()
+            self.assertEqual("protected", row["deletion"]["state"])
+            self.assertIn("referenced-managed-tree", row["deletion"]["reason_codes"])
+            self.assertEqual([], life.pins(self.workspace, self.source.attempt.name))
+            with self.assertRaisesRegex(manager.RuntimeManagerError, "no longer eligible"):
+                manager.execute_cleanup(self.workspace, before)
         self.assertTrue(self.source.attempt.exists())
 
     def test_interrupted_commit_keeps_source_protected(self):
@@ -88,22 +105,23 @@ class ManagedCheckDependenciesTests(unittest.TestCase):
         self.assertIn("referenced-managed-tree", self.source.item()["deletion"]["reason_codes"])
 
     def test_retired_source_and_other_workspace_are_refused(self):
-        alternate = self.source.base / "alternate-workspace"
-        alternate.mkdir()
-        wrong = CoreManagedTrees(workspace=alternate, configuration_home=self.config,
-                                 locations={"evidence": self.evidence}, owner_id="atlas")
-        with wrong.stage("evidence", "wrong") as stage:
-            stage.path.mkdir()
-            (stage.path / "one").write_bytes(b"one")
-            with self.assertRaisesRegex(ManagedTreeError, "not registered"):
-                stage.publish(validate=lambda _: None, references=(self.reference_id,))
-        retired = self.source.retire()
-        self.assertEqual("trash", retired["kind"])
-        with self.assertRaisesRegex(ManagedTreeError, "not live retained"):
-            self.publish()
-        plan = manager.plan_restore_trash(self.workspace, selector=retired["item_id"])
-        manager.execute_restore_trash(self.workspace, plan)
-        self.assertEqual((self.reference_id,), self.publish().references)
+        with self._attested_catalog_for_reference_test():
+            alternate = self.source.base / "alternate-workspace"
+            alternate.mkdir()
+            wrong = CoreManagedTrees(workspace=alternate, configuration_home=self.config,
+                                     locations={"evidence": self.evidence}, owner_id="atlas")
+            with wrong.stage("evidence", "wrong") as stage:
+                stage.path.mkdir()
+                (stage.path / "one").write_bytes(b"one")
+                with self.assertRaisesRegex(ManagedTreeError, "not registered"):
+                    stage.publish(validate=lambda _: None, references=(self.reference_id,))
+            retired = self.source.retire()
+            self.assertEqual("trash", retired["kind"])
+            with self.assertRaisesRegex(ManagedTreeError, "not live retained"):
+                self.publish()
+            plan = manager.plan_restore_trash(self.workspace, selector=retired["item_id"])
+            manager.execute_restore_trash(self.workspace, plan)
+            self.assertEqual((self.reference_id,), self.publish().references)
 
     def test_pin_removal_does_not_clear_graph_dependency(self):
         life.pin(self.workspace, self.source.attempt.name, "review")

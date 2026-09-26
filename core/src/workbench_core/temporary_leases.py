@@ -115,6 +115,7 @@ class CoreTemporaryLeases:
         return self._directory(name) / f"{nonce}.json"
 
     def _ensure_catalog(self) -> None:
+        ResourceCatalog(self.configuration_home)._ensure()
         for path in (self.root, *(self._directory(name) for name in (
             "reservations", "activations", "disposal-intents", "disposals",
             "failures", "leases",

@@ -309,7 +309,7 @@ with host.stage("evidence", "recovered", requested_path=Path(os.environ["W3_OUTP
                 (stage.path / "source.txt").write_bytes(b"not admitted")
                 stage.publish(validate=lambda _: None, references=(source.tree_id,))
 
-    def test_registered_target_and_stage_do_not_protect_unrelated_sibling(self) -> None:
+    def test_unproven_catalog_protects_unrelated_sibling_pending_review(self) -> None:
         output = self.workspace / "graphs" / "graph"
         reference = self._publish(output=output)
         sibling = output.parent / "notes.txt"
@@ -321,8 +321,9 @@ with host.stage("evidence", "recovered", requested_path=Path(os.environ["W3_OUTP
         items = [row(output), row(output.parent), row(sibling)]
         with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(self.config)}):
             manager._protect_registered_resources(self.workspace, items)
-        self.assertEqual(["protected", "protected", "eligible"],
+        self.assertEqual(["protected", "protected", "protected"],
                          [item["deletion"]["state"] for item in items])
+        self.assertIn("registered-catalog-unproven", items[-1]["deletion"]["reason_codes"])
         self.assertEqual(reference.path, output)
 
     def test_dispatch_binds_tree_port_to_admitted_owner(self) -> None:

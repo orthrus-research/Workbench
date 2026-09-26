@@ -22,12 +22,23 @@ from workbench_api.durable_resources import DurableResourceError, ResourceRefere
 
 from .. import check_storage
 from ..durable_files import StagedFile, read_verified, unlink_prepared
-from ..durable_records import private_record_lock, publish_immutable_bytes
+from ..durable_records import (
+    private_record_lock, publish_immutable_bytes, read_private_single_link_bytes,
+)
 from ..host_filesystem import file_lease, private_path, secure_private_path
 from ..output_routing import _WINDOWS_RESERVED, _private_directory
 
 
 CATALOG_FORMAT = "workbench-resource-catalog-v1"
+ROOT_FORMAT = "workbench-resource-catalog-root-v1"
+ROOT_MANIFEST_NAME = "resource-catalog-root-v1.json"
+ROOT_ANCHOR_NAME = ".resource-catalog-root-v1.json"
+ROOT_LOCK_NAME = ".resource-catalog-root-v1.lock"
+_ROOT_REQUIRED = ("reservations", "intents", "commits", "aborts", "leases", "stores")
+_ROOT_KNOWN = (
+    *_ROOT_REQUIRED, "trees", "working-allocations", "temporary-leases",
+    "transport-trees", "reusable-projections",
+)
 RECORD_STORE_KIND = "workbench-record-store-v1"
 RESERVATION_KIND = "workbench-resource-reservation-v1"
 INTENT_KIND = "workbench-resource-intent-v1"
@@ -79,7 +90,98 @@ class ResourceCatalog:
     def __init__(self, configuration_home: Path):
         if not configuration_home.is_absolute():
             raise DurableResourceError("resource.policy", "configuration home must be absolute")
+        self.configuration_home = configuration_home
         self.root = configuration_home / "resources-v1"
+
+    def _root_manifest(self) -> Path:
+        return self.configuration_home / ROOT_MANIFEST_NAME
+
+    def _root_anchor(self) -> Path:
+        return self.root / ROOT_ANCHOR_NAME
+
+    def _check_root_directories(self) -> os.stat_result:
+        try:
+            root_info = check_storage.ordinary(self.root, directory=True).stat()
+            if not private_path(self.root, directory=True):
+                raise ValueError("resource catalog root is not owner-private")
+            for name in _ROOT_REQUIRED:
+                path = self._directory(name)
+                check_storage.ordinary(path, directory=True)
+                if not private_path(path, directory=True):
+                    raise ValueError("resource catalog namespace is not owner-private")
+            for name in _ROOT_KNOWN[len(_ROOT_REQUIRED):]:
+                path = self._directory(name)
+                if path.exists() or path.is_symlink():
+                    check_storage.ordinary(path, directory=True)
+                    if not private_path(path, directory=True):
+                        raise ValueError("resource catalog namespace is not owner-private")
+        except (OSError, ValueError) as exc:
+            raise DurableResourceError("resource.changed", "resource catalog root or namespace is unavailable") from exc
+        return root_info
+
+    def _root_record(self, origin: str, root_info: os.stat_result) -> dict:
+        return _sealed(ROOT_FORMAT, {
+            "format": ROOT_FORMAT, "schema_version": 1,
+            "catalog_format": CATALOG_FORMAT, "generation": 1,
+            "migration_origin": origin,
+            "configuration_home": str(self.configuration_home),
+            "root": str(self.root),
+            "root_device": root_info.st_dev, "root_inode": root_info.st_ino,
+            "required_namespaces": list(_ROOT_REQUIRED),
+            "known_namespaces": list(_ROOT_KNOWN),
+        })
+
+    def verify_root(self) -> str:
+        """Read-only root check; no local state proves historical completeness.
+
+        A preexisting home without a catalog is unproven: new publication can
+        proceed, but cleanup cannot infer that older resources never existed.
+        """
+        home = self.configuration_home
+        if not home.exists() and not home.is_symlink():
+            return "unproven-empty-home"
+        try:
+            check_storage.ordinary(home, directory=True)
+            manifest = self._root_manifest()
+            anchor = self._root_anchor()
+            manifest_exists = manifest.exists() or manifest.is_symlink()
+            root_exists = self.root.exists() or self.root.is_symlink()
+            anchor_exists = anchor.exists() or anchor.is_symlink()
+            if not manifest_exists and not root_exists:
+                if not any(home.iterdir()):
+                    return "unproven-empty-home"
+                return "unproven"
+            if not root_exists:
+                raise DurableResourceError("resource.unavailable", "resource catalog root is missing")
+            root_info = self._check_root_directories()
+            if not manifest_exists and not anchor_exists:
+                return "legacy"
+            if not manifest_exists or not anchor_exists:
+                raise DurableResourceError("resource.unavailable", "resource catalog root binding is incomplete")
+            if not private_path(home, directory=True):
+                raise DurableResourceError("resource.changed", "resource catalog configuration home is not owner-private")
+            outer = read_private_single_link_bytes(manifest, byte_limit=4096)
+            inner = read_private_single_link_bytes(anchor, byte_limit=4096)
+            if outer != inner:
+                raise DurableResourceError("resource.changed", "resource catalog root bindings differ")
+            record = json.loads(outer)
+            origin = record.get("migration_origin") if isinstance(record, dict) else None
+            if (
+                origin not in {"empty-home-first-use", "legacy-v1", "unproven-first-use"}
+                or any(
+                    type(record.get(key)) is not int
+                    for key in ("schema_version", "generation", "root_device", "root_inode")
+                )
+                or record != self._root_record(origin, root_info)
+            ):
+                raise DurableResourceError("resource.changed", "resource catalog root manifest changed")
+            if outer != check_storage.canonical(record) + b"\n":
+                raise DurableResourceError("resource.changed", "resource catalog root manifest is not canonical")
+            return "ready-unproven"
+        except DurableResourceError:
+            raise
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise DurableResourceError("resource.changed", "resource catalog root cannot be verified") from exc
 
     def _directory(self, name: str) -> Path:
         return self.root / name
@@ -91,12 +193,35 @@ class ResourceCatalog:
     def trees(self):
         """Directory resources share this catalog root and workspace scope."""
         from .tree_catalog import TreeCatalog
+        self.verify_root()
         return TreeCatalog(self.root)
 
     def _ensure(self) -> None:
-        for path in (self.root, *(self._directory(name) for name in ("reservations", "intents", "commits", "aborts", "leases", "stores"))):
-            _private_directory(path)
-            secure_private_path(path, directory=True)
+        initial_state = self.verify_root()
+        _private_directory(self.configuration_home)
+        secure_private_path(self.configuration_home, directory=True)
+        with private_record_lock(self.configuration_home / ROOT_LOCK_NAME, wait=True):
+            # The lock itself is the only new home entry during first install.
+            if initial_state in {"unproven-empty-home", "unproven"} and not self.root.exists() and not self.root.is_symlink():
+                if initial_state == "unproven-empty-home" and {path.name for path in self.configuration_home.iterdir()} != {ROOT_LOCK_NAME}:
+                    raise DurableResourceError("resource.unavailable", "resource catalog first install changed")
+                for path in (self.root, *(self._directory(name) for name in _ROOT_REQUIRED)):
+                    _private_directory(path)
+                    secure_private_path(path, directory=True)
+                origin = "empty-home-first-use" if initial_state == "unproven-empty-home" else "unproven-first-use"
+            else:
+                state = self.verify_root()
+                if state == "ready-unproven":
+                    return
+                if state != "legacy":
+                    raise DurableResourceError("resource.unavailable", "resource catalog root cannot be initialized")
+                origin = "legacy-v1"
+            record = self._root_record(origin, self._check_root_directories())
+            raw = check_storage.canonical(record) + b"\n"
+            publish_immutable_bytes(self._root_anchor(), raw, byte_limit=4096)
+            publish_immutable_bytes(self._root_manifest(), raw, byte_limit=4096)
+            if self.verify_root() != "ready-unproven":
+                raise DurableResourceError("resource.changed", "resource catalog root was not durably bound")
 
     def register_record_store(
         self, *, family: str, owner_id: str, workspace: Path, root: Path,
@@ -295,6 +420,8 @@ class ResourceCatalog:
 
     @contextmanager
     def lease(self, resource_id: str, *, exclusive: bool = False, create: bool = False) -> Iterator[None]:
+        if self.verify_root() != "ready-unproven":
+            raise DurableResourceError("resource.unavailable", "resource catalog has no rooted custody")
         nonce = _resource_nonce(resource_id)
         path = self._directory("leases") / f"{nonce}.lock"
         if not path.parent.is_dir():
@@ -382,6 +509,7 @@ class ResourceCatalog:
     def inventory(self, *, workspace: Path | None = None) -> dict:
         from ..working_allocations import WorkingAllocationCatalog
 
+        root_state = self.verify_root()
         rows = []
         if self.root.exists() or self.root.is_symlink():
             check_storage.ordinary(self.root, directory=True)
@@ -434,6 +562,7 @@ class ResourceCatalog:
                 rows.append(row)
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
+            "root_state": root_state,
             "workspace": str(workspace) if workspace is not None else None,
             "resources": rows, "record_stores": self._registered_record_stores(workspace),
             "trees": self.trees.inventory(workspace=workspace),

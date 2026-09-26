@@ -293,6 +293,7 @@ class CoreTransportTrees:
         return self._directory(name) / f"{nonce}.json"
 
     def _ensure(self) -> None:
+        ResourceCatalog(self.configuration_home)._ensure()
         for path in (self.root, *(self._directory(name) for name in (
             "reservations", "intents", "commits", "aborts", "leases",
         ))):
