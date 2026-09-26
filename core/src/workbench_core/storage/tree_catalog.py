@@ -22,12 +22,17 @@ from .. import check_storage
 from ..durable_records import publish_immutable_bytes
 from ..host_filesystem import file_lease, private_path, secure_private_path
 from ..output_routing import _private_directory
+from .exact_tree_inventory import (
+    EXACT_INVENTORY_POLICY, MAX_DIRECTORIES, MAX_FILES,
+    exact_content_sha256, inventory_exact_members,
+)
 
 
 TREE_KIND = "workbench-managed-tree-v1"
 RESERVATION_KIND = "workbench-tree-reservation-v1"
 INTENT_KIND = "workbench-tree-intent-v1"
 DERIVED_INTENT_KIND = "workbench-tree-intent-v2"
+EXACT_INTENT_KIND = "workbench-tree-intent-v3"
 COMMIT_KIND = "workbench-tree-commit-v1"
 ABORT_KIND = "workbench-tree-abort-v1"
 _TREE_ID = re.compile(r"workbench-tree-v1:([0-9a-f]{32})\Z")
@@ -292,7 +297,8 @@ class TreeCatalog:
         except (OSError, ValueError) as exc:
             raise ManagedTreeError("tree.unavailable", "managed tree intent is unavailable") from exc
         kind = value.get("format") if isinstance(value, dict) else None
-        if (kind not in {INTENT_KIND, DERIVED_INTENT_KIND}
+        if (not isinstance(kind, str)
+                or kind not in {INTENT_KIND, DERIVED_INTENT_KIND, EXACT_INTENT_KIND}
                 or value != _sealed(kind, {key: item for key, item in value.items() if key != "id"})):
             raise ManagedTreeError("tree.changed", "managed tree intent changed")
         reservation = self.reservation(tree_id)
@@ -303,6 +309,10 @@ class TreeCatalog:
                   "references", "prepared_at"}
         if kind == DERIVED_INTENT_KIND:
             fields |= {"derived_manifest_rule", "derived_manifest_base_sha256"}
+        elif kind == EXACT_INTENT_KIND:
+            fields = (fields - {"members"}) | {
+                "inventory_policy", "member_count", "file_count", "directory_count", "root_mode",
+            }
         if (set(value) != fields
                 or value.get("tree_id") != tree_id or value.get("format") != kind
                 or value.get("reservation_id") != reservation["id"]
@@ -321,9 +331,21 @@ class TreeCatalog:
                 or not isinstance(value.get("content_sha256"), str)
                 or not _SHA.fullmatch(value["content_sha256"])):
             raise ManagedTreeError("tree.changed", "managed tree intent changed")
-        members = _validate_members(value.get("members"))
-        if value["content_sha256"] != _content_sha256(members):
-            raise ManagedTreeError("tree.changed", "managed tree authoritative digest changed")
+        if kind == EXACT_INTENT_KIND:
+            if (value["inventory_policy"] != EXACT_INVENTORY_POLICY
+                    or type(value["member_count"]) is not int
+                    or type(value["file_count"]) is not int
+                    or type(value["directory_count"]) is not int
+                    or not 0 <= value["file_count"] <= MAX_FILES
+                    or not 0 <= value["directory_count"] <= MAX_DIRECTORIES
+                    or value["member_count"] != value["file_count"] + value["directory_count"]
+                    or type(value["root_mode"]) is not int
+                    or not 0 <= value["root_mode"] <= 0o7777):
+                raise ManagedTreeError("tree.changed", "managed tree exact inventory metadata changed")
+        else:
+            members = _validate_members(value.get("members"))
+            if value["content_sha256"] != _content_sha256(members):
+                raise ManagedTreeError("tree.changed", "managed tree authoritative digest changed")
         if kind == DERIVED_INTENT_KIND:
             paths = {row["path"]: row for row in members}
             if (
@@ -366,6 +388,9 @@ class TreeCatalog:
             raise ManagedTreeError("tree.unavailable", "managed tree target is unavailable") from exc
         if (info.st_dev, info.st_ino) != (intent["device"], intent["inode"]):
             raise ManagedTreeError("tree.changed", "managed tree directory identity changed")
+        if intent["format"] == EXACT_INTENT_KIND:
+            self._verify_exact(intent, target)
+            return "current"
         expected = intent["members"]
         derived = tuple(row["path"] for row in expected if row["classification"] == "derived")
         try:
@@ -396,13 +421,37 @@ class TreeCatalog:
             return "missing"
         return "current" if observed == expected else "changed"
 
-    def _reference(self, intent: Mapping[str, object], *, derived_status: str) -> ManagedTreeReference:
+    def _verify_exact(
+        self, intent: Mapping[str, object], target: Path,
+    ) -> list[dict[str, object]]:
+        try:
+            observed, root_mode, files, directories = inventory_exact_members(target)
+        except ManagedTreeError as exc:
+            raise ManagedTreeError("tree.changed", "managed tree exact members cannot be verified") from exc
+        if (root_mode != intent["root_mode"]
+                or files != intent["file_count"]
+                or directories != intent["directory_count"]
+                or len(observed) != intent["member_count"]
+                or exact_content_sha256(observed) != intent["content_sha256"]):
+            raise ManagedTreeError("tree.changed", "managed tree exact members changed")
+        return observed
+
+    def _reference(
+        self, intent: Mapping[str, object], *, derived_status: str,
+        members: list[dict[str, object]] | None = None,
+    ) -> ManagedTreeReference:
+        if intent["format"] == EXACT_INTENT_KIND:
+            # The compact intent contains only a digest. A reference still
+            # exposes full verified rows to existing API consumers.
+            member_rows = self._verify_exact(intent, self._target(intent)) if members is None else members
+        else:
+            member_rows = intent["members"]
         return ManagedTreeReference(
             tree_id=str(intent["tree_id"]), store_id=str(intent["store_id"]),
             owner_id=str(intent["owner_id"]), workspace=Path(intent["workspace"]),
             role=str(intent["role"]), path=self._target(intent),
             content_sha256="sha256:" + str(intent["content_sha256"]),
-            members=tuple(intent["members"]), derived_status=derived_status,
+            members=tuple(member_rows), derived_status=derived_status,
             references=tuple(intent["references"]),
             policy_id=intent["policy_id"], domain_id=intent["domain_id"],
         )
@@ -441,9 +490,12 @@ class TreeCatalog:
                 info = selected.stat()
                 if (info.st_dev, info.st_ino) != (intent["device"], intent["inode"]):
                     raise ManagedTreeError("tree.changed", "managed tree staging identity changed")
-                derived = tuple(row["path"] for row in intent["members"] if row["classification"] == "derived")
-                if inventory_members(staged, derived_members=derived) != intent["members"]:
-                    raise ManagedTreeError("tree.changed", "managed tree staging members changed")
+                if intent["format"] == EXACT_INTENT_KIND:
+                    self._verify_exact(intent, staged)
+                else:
+                    derived = tuple(row["path"] for row in intent["members"] if row["classification"] == "derived")
+                    if inventory_members(staged, derived_members=derived) != intent["members"]:
+                        raise ManagedTreeError("tree.changed", "managed tree staging members changed")
                 publish_prepared(staged, target, intent)
                 derived_status = self._verify(intent)
             try:
@@ -518,7 +570,8 @@ class TreeCatalog:
                         "unavailable" if exc.code == "tree.unavailable" else "changed"
                     )
                 content_sha256 = "sha256:" + intent["content_sha256"]
-                member_count = len(intent["members"])
+                member_count = (intent["member_count"] if intent["format"] == EXACT_INTENT_KIND
+                                else len(intent["members"]))
                 references = intent["references"]
             else:
                 status = ("failed" if self._path("aborts", path.stem).is_file()
@@ -542,5 +595,5 @@ class TreeCatalog:
 
 
 __all__ = ["TreeCatalog", "inventory_members", "atlas_manifest_baseline",
-           "INTENT_KIND", "DERIVED_INTENT_KIND", "COMMIT_KIND", "RESERVATION_KIND",
+           "INTENT_KIND", "DERIVED_INTENT_KIND", "EXACT_INTENT_KIND", "COMMIT_KIND", "RESERVATION_KIND",
            "_content_sha256", "_store_id"]

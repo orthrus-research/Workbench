@@ -24,8 +24,11 @@ from .host_filesystem import fsync_directory, secure_private_path
 from .output_routing import _WINDOWS_RESERVED
 from .storage.registered import ResourceCatalog
 from .storage.tree_catalog import (
-    COMMIT_KIND, INTENT_KIND, DERIVED_INTENT_KIND, RESERVATION_KIND,
+    COMMIT_KIND, INTENT_KIND, DERIVED_INTENT_KIND, EXACT_INTENT_KIND, RESERVATION_KIND,
     _content_sha256, _store_id, inventory_members, atlas_manifest_baseline,
+)
+from .storage.exact_tree_inventory import (
+    EXACT_INVENTORY_POLICY, exact_content_sha256, inventory_exact_members,
 )
 
 
@@ -147,6 +150,7 @@ class _CoreTreeStage:
         self, *, validate: Callable[[Path], object], domain_id: str | None = None,
         references: tuple[str, ...] = (), derived_members: tuple[str, ...] = (),
         derived_manifest_rule: str | None = None,
+        inventory_policy: str = "portable-v1",
     ) -> ManagedTreeReference:
         if self.committed or self.renamed:
             raise ManagedTreeError("tree.state", "managed tree publication was already attempted")
@@ -161,20 +165,34 @@ class _CoreTreeStage:
             or "query-index.sqlite3" not in derived_members
         ):
             raise ManagedTreeError("tree.policy", "derived manifest rule is unsupported")
+        if type(inventory_policy) is not str or inventory_policy not in {
+            "portable-v1", EXACT_INVENTORY_POLICY,
+        }:
+            raise ManagedTreeError("tree.policy", "managed tree inventory policy is unsupported")
+        if inventory_policy == EXACT_INVENTORY_POLICY and (
+            type(derived_members) is not tuple or derived_members or derived_manifest_rule
+        ):
+            raise ManagedTreeError("tree.policy", "exact POSIX inventory does not support derived members")
         self.host.check_cancelled()
         check_storage.ordinary(self.path, directory=True)
         with self.host._references(references):
-            before = inventory_members(self.path, derived_members=derived_members,
-                                       cancelled=self.host._cancelled)
+            if inventory_policy == EXACT_INVENTORY_POLICY:
+                def inventory():
+                    return inventory_exact_members(self.path, cancelled=self.host._cancelled)
+            else:
+                def inventory():
+                    return inventory_members(self.path, derived_members=derived_members,
+                                             cancelled=self.host._cancelled), None, None, None
+            before, root_mode, files, directories = inventory()
             validate(self.path)
             self.host.check_cancelled()
-            after = inventory_members(self.path, derived_members=derived_members,
-                                      cancelled=self.host._cancelled)
-            if after != before:
+            after, after_mode, after_files, after_directories = inventory()
+            if (after, after_mode, after_files, after_directories) != (
+                before, root_mode, files, directories,
+            ):
                 raise ManagedTreeError("tree.changed", "managed tree changed during owner validation")
             _sync_members(self.path, after)
-            if inventory_members(self.path, derived_members=derived_members,
-                                 cancelled=self.host._cancelled) != after:
+            if inventory() != (after, after_mode, after_files, after_directories):
                 raise ManagedTreeError("tree.changed", "managed tree changed while flushing members")
             # Source-side anchors precede the tree intent. An abrupt exit in
             # between may overretain a check, but cannot orphan published proof.
@@ -182,7 +200,8 @@ class _CoreTreeStage:
             selected = check_storage.ordinary(self.path, directory=True)
             info = selected.stat()
             nonce = self.tree_id.rsplit(":", 1)[-1]
-            intent_kind = DERIVED_INTENT_KIND if derived_manifest_rule else INTENT_KIND
+            intent_kind = (EXACT_INTENT_KIND if inventory_policy == EXACT_INVENTORY_POLICY
+                           else DERIVED_INTENT_KIND if derived_manifest_rule else INTENT_KIND)
             intent_body = {
                 "format": intent_kind, "tree_id": self.tree_id,
                 "reservation_id": self.reservation["id"],
@@ -198,10 +217,19 @@ class _CoreTreeStage:
                 "parent_inode": self.reservation["parent_inode"],
                 "staging": self.reservation["staging"],
                 "device": info.st_dev, "inode": info.st_ino,
-                "members": before, "content_sha256": _content_sha256(before),
+                "content_sha256": (exact_content_sha256(before) if intent_kind == EXACT_INTENT_KIND
+                                   else _content_sha256(before)),
                 "domain_id": domain_id, "references": list(references),
                 "prepared_at": _now(),
             }
+            if intent_kind == EXACT_INTENT_KIND:
+                intent_body.update({
+                    "inventory_policy": EXACT_INVENTORY_POLICY,
+                    "member_count": len(before), "file_count": files,
+                    "directory_count": directories, "root_mode": root_mode,
+                })
+            else:
+                intent_body["members"] = before
             if derived_manifest_rule is not None:
                 intent_body["derived_manifest_rule"] = derived_manifest_rule
                 intent_body["derived_manifest_base_sha256"] = atlas_manifest_baseline(
@@ -232,7 +260,10 @@ class _CoreTreeStage:
                 self.staging_root.rmdir()
             except OSError:
                 pass
-            return self.host.catalog.trees._reference(intent, derived_status=derived_status)
+            return self.host.catalog.trees._reference(
+                intent, derived_status=derived_status,
+                members=before if intent_kind == EXACT_INTENT_KIND else None,
+            )
 
 
 class CoreManagedTrees:

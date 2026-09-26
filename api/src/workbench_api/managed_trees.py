@@ -2,7 +2,10 @@
 
 An owner receives an absent payload path inside a Core-owned private staging
 allocation. Core inventories its members, invokes the owner's validator, and
-publishes the directory without replacing an existing target.
+publishes the directory without replacing an existing target. Publication
+uses the bounded portable-v1 inventory by default. The explicit
+posix-exact-v1 inventory supports large POSIX payloads and attests exact file
+and directory modes; it does not support derived members.
 """
 
 from __future__ import annotations
@@ -57,6 +60,7 @@ class ManagedTreeStage(Protocol):
         references: tuple[str, ...] = (),
         derived_members: tuple[str, ...] = (),
         derived_manifest_rule: str | None = None,
+        inventory_policy: str = "portable-v1",
     ) -> ManagedTreeReference: ...
 
 
