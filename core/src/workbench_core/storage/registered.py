@@ -183,6 +183,54 @@ class ResourceCatalog:
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise DurableResourceError("resource.changed", "resource catalog root cannot be verified") from exc
 
+    def reconcile_interrupted_root_publication(self) -> str:
+        """Finish the one known root-publication gap without adopting lost history.
+
+        ``_ensure`` publishes the inner anchor first. If publication stops
+        before the outer manifest, the sealed anchor still binds the original
+        root inode. No other missing-binding shape has that crash ordering.
+        This restores publication access; historical coverage stays unproven.
+        """
+
+        home = self.configuration_home
+        try:
+            if not home.exists() and not home.is_symlink():
+                raise DurableResourceError("resource.unavailable", "resource catalog has no surviving root anchor")
+            check_storage.ordinary(home, directory=True)
+            if not private_path(home, directory=True):
+                raise ValueError("resource catalog configuration home is not owner-private")
+            with private_record_lock(home / ROOT_LOCK_NAME, wait=True):
+                manifest = self._root_manifest()
+                anchor = self._root_anchor()
+                if manifest.exists() or manifest.is_symlink():
+                    if self.verify_root() == "ready-unproven":
+                        return "ready-unproven"
+                    raise DurableResourceError("resource.unavailable", "resource catalog root has no interrupted publication")
+                if not anchor.exists() and not anchor.is_symlink():
+                    raise DurableResourceError("resource.unavailable", "resource catalog root has no surviving anchor")
+                root_info = self._check_root_directories()
+                raw = read_private_single_link_bytes(anchor, byte_limit=4096)
+                record = json.loads(raw)
+                origin = record.get("migration_origin") if isinstance(record, dict) else None
+                if (
+                    origin not in {"empty-home-first-use", "legacy-v1", "unproven-first-use"}
+                    or any(
+                        type(record.get(key)) is not int
+                        for key in ("schema_version", "generation", "root_device", "root_inode")
+                    )
+                    or record != self._root_record(origin, root_info)
+                    or raw != check_storage.canonical(record) + b"\n"
+                ):
+                    raise DurableResourceError("resource.changed", "resource catalog anchor changed")
+                publish_immutable_bytes(manifest, raw, byte_limit=4096)
+                if self.verify_root() != "ready-unproven":
+                    raise DurableResourceError("resource.changed", "resource catalog root reconciliation failed")
+                return "ready-unproven"
+        except DurableResourceError:
+            raise
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise DurableResourceError("resource.changed", "resource catalog root cannot be reconciled") from exc
+
     def _directory(self, name: str) -> Path:
         return self.root / name
 

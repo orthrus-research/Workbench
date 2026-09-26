@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api import DurableResourceError
+from workbench_core.durable_records import publish_immutable_bytes
 from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
 from workbench_core.temporary_leases import CoreTemporaryLeases
 
@@ -98,6 +99,115 @@ class CatalogRootTests(unittest.TestCase):
         self.assertEqual(split.exception.code, "resource.unavailable")
         with self.assertRaises(DurableResourceError):
             catalog._ensure()
+
+    def test_interrupted_root_publication_recovers_only_from_surviving_anchor(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        store = self.home / "historical-store"
+        store.mkdir(mode=0o700)
+        historical_dirs = ("reservations", "intents", "commits", "aborts", "leases", "stores")
+
+        def old_ensure(selected: ResourceCatalog) -> None:
+            for directory in (selected.root, *(selected.root / name for name in historical_dirs)):
+                directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+
+        with patch.object(ResourceCatalog, "_ensure", old_ensure):
+            store_id = catalog.register_record_store(
+                family="historical", owner_id="sample",
+                workspace=self.workspace, root=store,
+            )
+        registration = next((catalog.root / "stores").glob("*.json"))
+        original = registration.read_bytes()
+        outer = catalog._root_manifest()
+        anchor = catalog._root_anchor()
+
+        def interrupt_outer(path: Path, data: bytes, *, byte_limit: int,
+                            idempotent: bool = False) -> None:
+            if path == outer:
+                raise RuntimeError("simulated interruption after inner anchor")
+            publish_immutable_bytes(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+        with patch("workbench_core.storage.registered.publish_immutable_bytes", side_effect=interrupt_outer):
+            with self.assertRaisesRegex(RuntimeError, "simulated interruption"):
+                catalog._ensure()
+        self.assertTrue(anchor.is_file())
+        self.assertFalse(outer.exists())
+        with self.assertRaises(DurableResourceError):
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual(catalog.reconcile_interrupted_root_publication(), "ready-unproven")
+        self.assertEqual(anchor.read_bytes(), outer.read_bytes())
+        self.assertEqual(registration.read_bytes(), original)
+        self.assertEqual(
+            [row["store_id"] for row in catalog.inventory(workspace=self.workspace)["record_stores"]],
+            [store_id],
+        )
+        self.assertEqual(catalog.reconcile_interrupted_root_publication(), "ready-unproven")
+
+    def test_root_reconcile_refuses_absent_anchor_or_changed_root(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        with self.assertRaises(DurableResourceError) as absent:
+            catalog.reconcile_interrupted_root_publication()
+        self.assertEqual(absent.exception.code, "resource.unavailable")
+        catalog._ensure()
+        anchor = catalog._root_anchor()
+        original = anchor.read_bytes()
+        anchor.unlink()
+        with self.assertRaises(DurableResourceError) as outer_only:
+            catalog.reconcile_interrupted_root_publication()
+        self.assertEqual(outer_only.exception.code, "resource.unavailable")
+        self.assertFalse(anchor.exists())
+
+        # A copied old anchor cannot bless a replacement catalog root.
+        catalog._root_manifest().unlink()
+        renamed = self.config / "old-resources"
+        catalog.root.rename(renamed)
+        catalog.root.mkdir(mode=0o700)
+        for name in ("reservations", "intents", "commits", "aborts", "leases", "stores"):
+            (catalog.root / name).mkdir(mode=0o700)
+        anchor.write_bytes(original)
+        anchor.chmod(0o600)
+        with self.assertRaises(DurableResourceError) as replaced:
+            catalog.reconcile_interrupted_root_publication()
+        self.assertEqual(replaced.exception.code, "resource.changed")
+        self.assertFalse(catalog._root_manifest().exists())
+
+    def test_root_reconcile_refuses_home_without_private_custody(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        outer = catalog._root_manifest()
+
+        def interrupt_outer(path: Path, data: bytes, *, byte_limit: int,
+                            idempotent: bool = False) -> None:
+            if path == outer:
+                raise RuntimeError("simulated interruption")
+            publish_immutable_bytes(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+        with patch("workbench_core.storage.registered.publish_immutable_bytes", side_effect=interrupt_outer):
+            with self.assertRaisesRegex(RuntimeError, "simulated interruption"):
+                catalog._ensure()
+        with patch("workbench_core.storage.registered.private_path", return_value=False):
+            with self.assertRaises(DurableResourceError) as unsafe:
+                catalog.reconcile_interrupted_root_publication()
+        self.assertEqual(unsafe.exception.code, "resource.changed")
+        self.assertFalse(outer.exists())
+
+    def test_root_reconcile_does_not_publish_from_changed_anchor(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        outer = catalog._root_manifest()
+
+        def interrupt_outer(path: Path, data: bytes, *, byte_limit: int,
+                            idempotent: bool = False) -> None:
+            if path == outer:
+                raise RuntimeError("simulated interruption")
+            publish_immutable_bytes(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+        with patch("workbench_core.storage.registered.publish_immutable_bytes", side_effect=interrupt_outer):
+            with self.assertRaisesRegex(RuntimeError, "simulated interruption"):
+                catalog._ensure()
+        anchor = catalog._root_anchor()
+        anchor.write_bytes(b"{}\n")
+        with self.assertRaises(DurableResourceError) as changed:
+            catalog.reconcile_interrupted_root_publication()
+        self.assertEqual(changed.exception.code, "resource.changed")
+        self.assertFalse(outer.exists())
 
     def test_total_root_loss_remains_unproven_if_first_use_must_continue(self) -> None:
         retained = self.resources.publish_bytes("evidence", "retained.json", b"retained\n")
