@@ -44,17 +44,22 @@ from workbench_pack_program_studio.managed_model import (  # noqa: E402
 )
 from workbench_pack_program_studio.managed_session import (  # noqa: E402
     _parse_windows_processes,
+    _replace_if_hash,
     _windows_helper_environment,
     _windows_path_file_uri,
     run_in_core_session_allocation,
 )
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core.source_transactions import CoreSourceTransactions  # noqa: E402
 from workbench_core.working_allocations import CoreWorkingAllocations  # noqa: E402
 from workbench_core.working_allocations import resolve_direct_working_allocations  # noqa: E402
 from workbench_api.host_filesystem import (  # noqa: E402
     inspect_private_journal, private_path, read_private_bytes,
 )
 from workbench_api.modules import ExecutionContext  # noqa: E402
+from workbench_api.source_transactions import (  # noqa: E402
+    SourceTransactionError, source_transactions_scope,
+)
 from workbench_api.working_allocations import (  # noqa: E402
     WorkingAllocationReference, working_allocations_scope,
 )
@@ -197,6 +202,48 @@ class ManagedLanguageSessionTests(unittest.TestCase):
         install_local_host_services()
         cls.pack_profile = load_profile(PACK_PROFILE)
         cls.managed_profile = load_managed_session_profile(MANAGED_PROFILE)
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX mode preservation")
+    def test_overlay_replacement_requires_core_and_preserves_exact_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "instance.cfg"
+            target.write_bytes(b"before\n")
+            target.chmod(0o750)
+            with source_transactions_scope(None), self.assertRaises(SourceTransactionError):
+                _replace_if_hash(target, b"before\n", b"applied\n")
+            self.assertEqual(b"before\n", target.read_bytes())
+            with source_transactions_scope(CoreSourceTransactions(owner_id="pack-program-studio")):
+                _replace_if_hash(target, b"before\n", b"applied\n")
+                self.assertEqual(b"applied\n", target.read_bytes())
+                self.assertEqual(0o750, target.stat().st_mode & 0o777)
+                with self.assertRaises(PackProgramError):
+                    _replace_if_hash(target, b"before\n", b"other\n")
+                _replace_if_hash(target, b"applied\n", b"before\n")
+            self.assertEqual(b"before\n", target.read_bytes())
+
+    def test_overlay_post_replace_failure_restores_only_owned_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "instance.cfg"
+            target.write_bytes(b"before\n")
+            transaction = CoreSourceTransactions(
+                owner_id="pack-program-studio",
+            ).open(target.parent, binding="post-replace-test")
+            committed = transaction.commit
+
+            def fail_after_replace(stage) -> None:
+                committed(stage)
+                raise OSError("post-replace failure")
+
+            with (
+                patch(
+                    "workbench_pack_program_studio.managed_session.open_source_transaction",
+                    return_value=transaction,
+                ),
+                patch.object(transaction, "commit", side_effect=fail_after_replace),
+                self.assertRaisesRegex(OSError, "post-replace failure"),
+            ):
+                _replace_if_hash(target, b"before\n", b"applied\n")
+            self.assertEqual(b"before\n", target.read_bytes())
 
     def _environment(self, directory: str) -> dict[str, Path]:
         root = Path(directory)

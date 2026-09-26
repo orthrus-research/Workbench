@@ -13,9 +13,7 @@ import re
 import shutil
 import signal
 import socket
-import stat
 import subprocess
-import tempfile
 import threading
 import time
 from typing import Any, Callable, Mapping, Sequence
@@ -30,6 +28,7 @@ from workbench_api.host_filesystem import (
     secure_private_path,
 )
 from workbench_api.processes import ProcessError, execute_process
+from workbench_api.source_transactions import SourceImage, open_source_transaction
 from workbench_api.working_allocations import (
     WorkingAllocationReference,
     WorkingAllocations,
@@ -1835,27 +1834,27 @@ def _replace_if_hash(path: Path, expected: bytes, replacement: bytes) -> None:
     current = safe_regular_bytes(path, maximum=_MAX_OVERLAY_BYTES)
     if current != expected:
         raise PackProgramError(f"overlay precondition changed before apply: {path}")
-    _atomic_replace(path, replacement)
-
-
-def _atomic_replace(path: Path, payload: bytes) -> None:
-    metadata = path.stat(follow_symlinks=False)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".partial", dir=path.parent)
-    temporary = Path(temporary_name)
+    if replacement == expected:
+        return
+    transaction = open_source_transaction(
+        path.parent, binding=f"pack-program-studio-overlay:{path.name}",
+    )
+    stage = transaction.prepare(
+        path.name,
+        before=SourceImage("file", expected, executable=None),
+        after=SourceImage("file", replacement, executable=None),
+        preserve_target_mode=True,
+    )
     try:
-        os.fchmod(descriptor, stat.S_IMODE(metadata.st_mode))
-        total = 0
-        while total < len(payload):
-            total += os.write(descriptor, payload[total:])
-        os.fsync(descriptor)
-        os.close(descriptor)
-        descriptor = -1
-        os.replace(temporary, path)
-        _fsync_directory(path.parent)
+        transaction.commit(stage)
+    except BaseException:
+        # A replacement may have completed before a post-write check failed.
+        # Restore only the exact bytes we applied; Core preserves a later edit.
+        if transaction.classify(stage) == "after":
+            transaction.rollback(stage)
+        raise
     finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        temporary.unlink(missing_ok=True)
+        transaction.cleanup()
 
 
 def _create_lock(path: Path, payload: bytes) -> None:
