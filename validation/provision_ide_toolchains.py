@@ -7,14 +7,13 @@ from __future__ import annotations
 import hashlib
 import argparse
 import json
-import os
 from pathlib import Path
 import platform
 import shutil
+import sys
 import tarfile
 import tempfile
 from typing import Any
-from urllib.request import urlopen
 import zipfile
 
 
@@ -43,35 +42,39 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def download(entry: dict[str, str], suffix: str) -> Path:
-    DOWNLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-    destination = DOWNLOAD_ROOT / f"{entry['archive_root']}{suffix}"
-    if destination.is_file() and sha256(destination) == entry["archive_sha256"]:
-        return destination
-    if destination.exists():
-        destination.unlink()
+def download(entry: dict[str, Any], suffix: str) -> Path:
+    """Use Core's bounded artifact cache, adopting only exact legacy bytes."""
 
-    handle, temporary_name = tempfile.mkstemp(
-        prefix=destination.name + ".",
-        suffix=".part",
-        dir=DOWNLOAD_ROOT,
-    )
-    os.close(handle)
-    temporary = Path(temporary_name)
-    try:
-        print(f"Downloading {entry['archive_url']}", flush=True)
-        with urlopen(entry["archive_url"], timeout=60) as response:
-            with temporary.open("wb") as output:
-                shutil.copyfileobj(response, output, length=1024 * 1024)
-        actual = sha256(temporary)
-        if actual != entry["archive_sha256"]:
+    cache_root = DOWNLOAD_ROOT / "artifacts" / "sha256"
+    for component in (cache_root, *cache_root.parents):
+        if component.is_symlink() or getattr(component, "is_junction", lambda: False)():
+            raise ProvisionFailure("IDE archive cache traverses a redirect")
+    legacy = DOWNLOAD_ROOT / f"{entry['archive_root']}{suffix}"
+    source_url = entry["archive_url"]
+    if legacy.exists() or legacy.is_symlink():
+        if (legacy.is_symlink() or not legacy.is_file()
+                or legacy.stat().st_size != entry["archive_size"]
+                or sha256(legacy) != entry["archive_sha256"]):
             raise ProvisionFailure(
-                f"download digest mismatch for {entry['archive_url']}: {actual}"
+                f"existing IDE archive differs from its lock; retain for review: {legacy}"
             )
-        temporary.replace(destination)
-    finally:
-        temporary.unlink(missing_ok=True)
-    return destination
+        source_url = legacy.absolute().as_uri()
+
+    source_root = Path(__file__).resolve().parents[1]
+    for source in (source_root / "api/src", source_root / "core/src"):
+        if str(source) not in sys.path:
+            sys.path.insert(0, str(source))
+    from workbench_core.artifact_store import ArtifactStoreError, fetch_verified_artifact
+
+    try:
+        archive, _status = fetch_verified_artifact(
+            url=source_url, expected_sha256=entry["archive_sha256"],
+            expected_size=entry["archive_size"], state_root=DOWNLOAD_ROOT,
+            label="IDE validation toolchain", timeout_seconds=60,
+        )
+    except ArtifactStoreError as exc:
+        raise ProvisionFailure(f"IDE archive acquisition needs review: {exc}") from exc
+    return archive
 
 
 def validate_member_name(name: str) -> None:

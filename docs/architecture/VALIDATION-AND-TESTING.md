@@ -133,6 +133,9 @@ after provisioning. Each client has separate configuration, cache, temporary
 storage and diagnostic logs. VS Code's minimum/current host sequence remains
 ordered. Use `--jobs 1` (the default) for a sequential comparison. A client failure
 cancels the other client's owned commands and leaves a failed overall result.
+The provisioner acquires each locked IDE archive through Core's verified
+artifact cache using its exact size and SHA-256. An exact earlier archive can
+seed that cache; a changed earlier archive is retained for review.
 
 ## Continuous integration
 
