@@ -224,7 +224,7 @@ path, size and SHA-256, and checks the exact Python, host and virtual
 environment layout. Core derives one stable destination directly beneath its
 selected owner-private evidence root from the closure and base interpreter identities. It
 requires that destination to be absent; an existing file, directory or redirect
-is blocked for explicit recovery review. The future installer must create the
+is blocked for explicit recovery review. The installer creates the
 environment at that final path after a prepared attempt. Renaming a populated
 virtual environment from a temporary path would leave generated scripts bound
 to the old path.
@@ -237,9 +237,9 @@ such as 9p/DrvFS; WSL native execution still needs separate qualification.
 The result is a sealed, read-only review with `state` `reviewed` or `blocked`
 and coverage `read-only-isolated-install-preflight-only`. It creates no
 directory or environment, invokes neither venv nor pip, and preserves every
-unresolved input marker, including `optional-module-packages`. Installation,
+unresolved input marker, including `optional-module-packages`. Install execution,
 restart reconciliation, dependency checks, module/profile and fixture-owner
-admission remain separate work and evidence.
+admission have their own APIs or evidence gates below.
 
 `apply_package_install` requires that exact reviewed preflight ID. It publishes
 a prepared Core evidence resource before asking Core's working-allocation
