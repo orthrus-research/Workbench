@@ -21,7 +21,7 @@ from workbench_core import check_storage
 from workbench_core.durable_files import StagedFile
 from workbench_core.modules import InstalledModule, dispatch
 from workbench_core.storage.registered import (
-    COMMIT_KIND, INTENT_KIND, RESERVATION_KIND, CoreDurableResources, ResourceCatalog,
+    ABORT_KIND, COMMIT_KIND, INTENT_KIND, RESERVATION_KIND, CoreDurableResources, ResourceCatalog,
 )
 from workbench_core.storage.record_stores import CoreRecordStores
 
@@ -481,6 +481,44 @@ provider.publish_bytes('evidence', 'result.json', b'incomplete\\n')
         inventory = catalog.inventory(workspace=self.workspace)
         self.assertEqual("ready-unproven", inventory["root_state"])
         self.assertEqual([own.resource_id], [row["resource_id"] for row in inventory["resources"]])
+
+    def test_foreign_commit_and_pre_intent_abort_contents_are_checked_globally(self) -> None:
+        own = self.resources.publish_bytes("evidence", "own.json", b"own\n")
+        foreign_workspace = self.home / "foreign-workspace"
+        foreign_workspace.mkdir()
+        foreign = CoreDurableResources(
+            workspace=foreign_workspace, configuration_home=self.config,
+            locations={"evidence": self.home / "foreign-evidence"}, owner_id="sample",
+        )
+        published = foreign.publish_bytes("evidence", "published.json", b"foreign\n")
+        with patch("workbench_core.storage.registered.StagedFile", side_effect=OSError("pre-intent exit")):
+            with self.assertRaises(DurableResourceError):
+                foreign.publish_bytes("evidence", "aborted.json", b"new\n")
+        catalog = ResourceCatalog(self.config)
+        aborted = next(path for path in (catalog.root / "aborts").iterdir())
+        aborted_nonce = aborted.stem
+        self.assertFalse((catalog.root / "intents" / f"{aborted_nonce}.json").exists())
+        self.assertEqual([own.resource_id], [row["resource_id"] for row in
+                         catalog.inventory(workspace=self.workspace)["resources"]])
+
+        commit = catalog.root / "commits" / (published.resource_id.rsplit(":", 1)[1] + ".json")
+        cases = (
+            (commit, "intent_id", "different", COMMIT_KIND),
+            (aborted, "resource_id", own.resource_id, ABORT_KIND),
+        )
+        for path, field, replacement, kind in cases:
+            with self.subTest(path=path):
+                original = path.read_bytes()
+                forged = json.loads(original)
+                forged[field] = replacement
+                forged = check_storage.seal(kind, {key: value for key, value in forged.items() if key != "id"})
+                path.write_bytes(check_storage.canonical(forged) + b"\n")
+                try:
+                    with self.assertRaises(DurableResourceError) as failure:
+                        catalog.inventory(workspace=self.workspace)
+                    self.assertEqual("resource.changed", failure.exception.code)
+                finally:
+                    path.write_bytes(original)
 
     def test_inventory_rejects_coherent_cross_workspace_resource_records(self) -> None:
         own = self.resources.publish_bytes("evidence", "own.json", b"own\n")

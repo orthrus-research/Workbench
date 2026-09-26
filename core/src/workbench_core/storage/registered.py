@@ -578,6 +578,16 @@ class ResourceCatalog:
             raise DurableResourceError("resource.changed", "resource commit has invalid fields")
         return record
 
+    def _abort(self, resource_id: str) -> dict:
+        nonce = _resource_nonce(resource_id)
+        record = _read_sealed(self._path("aborts", nonce), ABORT_KIND)
+        if (set(record) != {"id", "format", "resource_id", "reason", "aborted_at"}
+                or record["format"] != ABORT_KIND or record["resource_id"] != resource_id
+                or not isinstance(record["reason"], str)
+                or not isinstance(record["aborted_at"], str)):
+            raise DurableResourceError("resource.changed", "resource abort changed")
+        return record
+
     def _write(self, name: str, nonce: str, kind: str, body: Mapping[str, object]) -> dict:
         record = _sealed(kind, body)
         check_storage.write_json(self._path(name, nonce), record, byte_limit=1024 * 1024)
@@ -705,6 +715,7 @@ class ResourceCatalog:
         rows = []
         resource_states: dict[str, tuple[str, str]] = {}
         resource_references: list[tuple[str, list[str]]] = []
+        children: dict[str, list[Path]] = {}
         if self.root.exists() or self.root.is_symlink():
             check_storage.ordinary(self.root, directory=True)
             if any(
@@ -744,7 +755,8 @@ class ResourceCatalog:
             # A lease can precede its reservation or record-store registration.
             # Do not adopt an orphan lease as proof that a record ever existed.
             for name in ("reservations", "intents", "commits", "aborts"):
-                for path in self._directory(name).iterdir():
+                children[name] = sorted(self._directory(name).iterdir())
+                for path in children[name]:
                     info = path.lstat()
                     if (
                         re.fullmatch(r"[0-9a-f]{32}\.json", path.name) is None
@@ -757,6 +769,20 @@ class ResourceCatalog:
                         raise DurableResourceError("resource.changed", "resource catalog has an orphan record")
                     if name == "commits" and not self._path("intents", path.stem).is_file():
                         raise DurableResourceError("resource.changed", "resource catalog has an orphan record")
+
+        # Validate retained child content globally before a workspace can hide it.
+        # An abort may precede intent, while an absent commit is a valid crash state.
+        intents = {
+            path.stem: self._intent(f"workbench-resource-v1:{path.stem}")
+            for path in children.get("intents", ())
+        }
+        for path in children.get("commits", ()):
+            intent = intents.get(path.stem)
+            if intent is None:
+                raise DurableResourceError("resource.changed", "resource commit lost its intent")
+            self._commit(f"workbench-resource-v1:{path.stem}", intent)
+        for path in children.get("aborts", ()):
+            self._abort(f"workbench-resource-v1:{path.stem}")
         directory = self._directory("reservations")
         if directory.exists():
             check_storage.ordinary(directory, directory=True)
