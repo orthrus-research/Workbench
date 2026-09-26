@@ -15,9 +15,13 @@ It selects the exact Gradle 9.6.1 archive used by the existing IDE toolchain
 lock, Java 25, the cleanup init script, projection/cache locations, command,
 bounded output, and restart rule. Core can retain and reopen this policy with
 the fixture source. The selection is unqualified for a reconstructed fixture;
-Gradle acquisition, Java binding, execution, and artifact admission remain
-separate steps. Older three-witness fixture snapshots remain readable but have
-no portable execution policy.
+Gradle ZIP custody and extraction, Java binding, execution, and artifact
+admission remain separate steps. Older three-witness fixture snapshots remain
+readable but have no portable execution policy.
+For the new policy, Core can retain a caller-supplied ZIP only when its bytes
+match the selected Gradle archive and its bounded members pass integrity and
+path checks. That retained ZIP is an input; extraction and a fixture run still
+need separate reviewed steps.
 
 The generic-mod fixture runner accepts `--core-supervised` for a local build.
 Core holds the existing source projection lease while Gradle runs as a child,
