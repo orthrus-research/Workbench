@@ -24,7 +24,8 @@
         "state": {
           "enum": [
             "selected-profile-unavailable", "missing-variant-lock", "invalid-lock-reference",
-            "referenced-lock-unavailable", "referenced-lock-invalid", "local-lock-unbound"
+            "referenced-lock-unavailable", "referenced-lock-invalid", "local-lock-unbound",
+            "portable-lock-bound", "local-lock-drifted"
           ]
         },
         "candidate": {

@@ -57,6 +57,10 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
     reconstruction.add_argument("--config", help="matching local Configuration V1 manifest")
     reconstruction.add_argument("--java-home", help="local Java path when the share requires one")
     reconstruction.add_argument(
+        "--bind-project-source-lock", action="store_true",
+        help="export a V2 share with the selected pack variant's exact source-lock file",
+    )
+    reconstruction.add_argument(
         "--acquire-managed-java", action="store_true",
         help="acquire the exact managed Java release during import",
     )
@@ -133,7 +137,10 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
             if any((selected.name, selected.workspace, selected.config,
                     selected.java_home, selected.plan_id, selected.acquire_managed_java)):
                 parser.error("environment export takes only a named source workspace")
-            result = export_share(suite, selected.source)
+            result = export_share(
+                suite, selected.source,
+                bind_project_source_lock=selected.bind_project_source_lock,
+            )
             if selected.json:
                 print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
             else:
@@ -142,6 +149,8 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
             return 0
         if selected.name is None or selected.workspace is None:
             parser.error("environment plan/feasibility/import require --name and --workspace")
+        if selected.bind_project_source_lock:
+            parser.error("project source-lock binding is an export choice")
         if selected.operation in {"plan", "feasibility"} and selected.plan_id is not None:
             parser.error(f"environment {selected.operation} does not take --plan-id")
         if selected.operation == "import" and selected.plan_id is None:

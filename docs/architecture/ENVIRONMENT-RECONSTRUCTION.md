@@ -1,8 +1,9 @@
-# Portable environment selections V1
+# Portable environment selections V1 and V2
 
 Status: Core export, read-only plan, local Configuration V1 generation and
 selection import are implemented. Import can also acquire the exact managed
-Java release. Project, fixture and tool bytes remain separate inputs.
+Java release. An explicit V2 export can bind a selected project source-lock
+file. Project, fixture and tool bytes remain separate inputs.
 
 ## Share and local authority
 
@@ -60,6 +61,19 @@ workbench settings environment feasibility SHARE.json --name LOCAL_NAME --worksp
 workbench settings environment import SHARE.json --name LOCAL_NAME --workspace /local/workspace --plan-id PLAN_ID
 ```
 
+Add `--bind-project-source-lock` to export to create a
+[V2 share](../../core/src/workbench_core/schemas/workbench-environment-share-v2.schema.json).
+The selected pack variant must explicitly reference a safe, canonical V3
+source-lock file. Core reads its bounded bytes and binds the file's SHA-256,
+suite-relative path, HTTPS repository, full Git commit and tree into the new
+portable lock. Import verifies the same file and selected variant on the
+receiving suite, including after managed Java acquisition. It uses V3 plan,
+attempt and result records; V1 shares and V1/V2 import records retain their
+existing identities. The current Cleanroom provisional variant has no source
+lock, so this explicit export choice reports the missing prerequisite. V2 does
+not download project source or claim the workspace's project bytes match that
+Git tree.
+
 Add `--acquire-managed-java` to both plan and import to acquire the locked
 managed Java release before binding the workspace choice. The flag is part of
 the reviewed V2 plan identity; selection-only V1 plans and receipts retain their
@@ -97,11 +111,12 @@ Cleanroom provisional pack variant has no
 project source lock. A variant may reference a local source-lock file with Git
 repository, full commit and tree identities, but the V1 portable share hashes
 only the profile document, not that referenced file. The report marks such a
-file as a local, unbound candidate and shows its current SHA-256. Core cannot
-acquire project source from it until a later portable lock binds that file's
-digest. Optional module packages and profile fixture/tool artifacts likewise
-need exact identities and hashes. The report does not inspect or reject a
-user-supplied Java path; managed Java acquisition remains the reviewed import
+file as a local, unbound candidate and shows its current SHA-256. V2 reports
+`portable-lock-bound` only when the target file matches the selected portable
+lock, while project bytes remain unresolved. Optional module packages and
+profile fixture/tool artifacts likewise need exact identities and hashes. The
+report does not inspect or reject a user-supplied Java path; managed Java
+acquisition remains the reviewed import
 operation.
 
 WSL is a Linux managed-Java host. A WSL-mounted Windows path is a local binding and

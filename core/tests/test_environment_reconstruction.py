@@ -668,6 +668,187 @@ class EnvironmentReconstructionTests(TestCase):
         self.assertNotEqual(project["candidate"]["sha256"], changed["project_source"]["candidate"]["sha256"])
         self.assertNotEqual(report["feasibility_id"], changed["feasibility_id"])
 
+    def test_v2_share_binds_selected_source_lock_without_acquiring_project_bytes(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice()
+        original = build_share(self.source_suite, "pack", environment=self.source_environment)
+        bound = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True,
+        )
+        self.assertEqual("workbench-environment-share-v1", original["format"])
+        self.assertEqual("workbench-environment-share-v2", bound["format"])
+        self.assertEqual(original["intent"]["intent_id"], bound["intent"]["intent_id"])
+        self.assertNotEqual(original["lock"]["lock_id"], bound["lock"]["lock_id"])
+        schema = json.loads((
+            SOURCE_SUITE / "core/src/workbench_core/schemas/workbench-environment-share-v2.schema.json"
+        ).read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(bound)
+        with patch.dict(os.environ, self.source_environment, clear=False), redirect_stdout(StringIO()) as stream:
+            self.assertEqual(0, settings_cli.main([
+                "environment", "export", "pack", "--bind-project-source-lock", "--json",
+            ], suite_root=self.source_suite))
+        exported = json.loads(stream.getvalue())
+        self.assertEqual(bound, exported["share"])
+        self.assertEqual(bound, load_share(exported["resource"]["path"]))
+        path = self.root / "bound-share.json"
+        path.write_bytes(json.dumps(bound, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
+        self.assertEqual(bound, load_share(path))
+        source = bound["lock"]["project_source_lock"]
+        self.assertEqual(
+            "sha256:" + sha256((self.source_suite / source["relative_path"]).read_bytes()).hexdigest(),
+            source["sha256"],
+        )
+        report = assess_reconstruction_feasibility(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        feasibility_schema = json.loads((
+            SOURCE_SUITE / "core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json"
+        ).read_text(encoding="utf-8"))
+        Draft202012Validator(feasibility_schema).validate(report)
+        self.assertEqual("portable-lock-bound", report["project_source"]["state"])
+        self.assertEqual(["workspace-project-bytes"], report["project_source"]["required"])
+        plan = plan_import(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual(("ready", "workbench-environment-import-plan-v3"), (plan["state"], plan["format"]))
+        self.assertEqual(source, plan["project_source_lock"])
+        imported = apply_import(
+            self.target_suite, bound, expected_plan_id=plan["plan_id"],
+            workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual("workbench-environment-import-result-v3", imported["format"])
+        self.assertEqual(source, imported["project_source_lock"])
+        self.assertIn("workspace-project-bytes", imported["unresolved_inputs"])
+        self.assertEqual(original, build_share(self.source_suite, "pack", environment=self.source_environment))
+
+    def test_v2_share_refuses_source_lock_drift_before_workspace_binding(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice()
+        bound = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True,
+        )
+        reviewed = plan_import(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        lock = self.target_suite / bound["lock"]["project_source_lock"]["relative_path"]
+        document = json.loads(lock.read_text(encoding="utf-8"))
+        document["pack"]["revision"] = "0" * 40
+        lock.write_bytes(json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
+        blocked = plan_import(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual("blocked", blocked["state"])
+        self.assertIn("project source lock differs", " ".join(blocked["blockers"]))
+        self.assertNotEqual(reviewed["plan_id"], blocked["plan_id"])
+        report = assess_reconstruction_feasibility(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual("local-lock-drifted", report["project_source"]["state"])
+        with self.assertRaisesRegex(ReconstructionError, "changed after review"):
+            apply_import(
+                self.target_suite, bound, expected_plan_id=reviewed["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                environment=self.target_environment,
+            )
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+        self.assertFalse((self.target_root / "config").exists())
+
+    def test_v2_share_requires_selected_source_lock(self) -> None:
+        self._source_choice()
+        self.assertEqual(
+            "workbench-environment-share-v1",
+            build_share(self.source_suite, "pack", environment=self.source_environment)["format"],
+        )
+        with self.assertRaisesRegex(ReconstructionError, "missing-variant-lock"):
+            build_share(
+                self.source_suite, "pack", environment=self.source_environment,
+                bind_project_source_lock=True,
+            )
+
+    def test_v2_share_rejects_resealed_source_lock_escape(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice()
+        bound = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True,
+        )
+        forged = deepcopy(bound)
+        forged["lock"]["project_source_lock"]["relative_path"] = (
+            "profiles/packs/supersymmetry/../other/source-lock.json"
+        )
+        _reseal(forged["lock"], "workbench-environment-lock", "lock_id")
+        _reseal(forged, "workbench-environment-share", "share_id")
+        with self.assertRaisesRegex(ReconstructionError, "source lock is incomplete or non-portable"):
+            plan_import(
+                self.target_suite, forged, workspace_name="shared", workspace=self.target_workspace,
+                environment=self.target_environment,
+            )
+
+    def test_v2_source_lock_and_explicit_java_8_recheck_after_acquisition(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice(feature=8)
+        bound = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True,
+        )
+        plan = plan_import(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            acquire_managed_java=True, environment=self.target_environment,
+        )
+        self.assertEqual(("ready", "workbench-environment-import-plan-v3"), (plan["state"], plan["format"]))
+        with patch(
+            "workbench_core.environment_reconstruction.ensure_java_runtime",
+            side_effect=self._managed_result(outcome="provisioned"),
+        ):
+            result = apply_import(
+                self.target_suite, bound, expected_plan_id=plan["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                acquire_managed_java=True, environment=self.target_environment,
+            )
+        self.assertEqual("workbench-environment-import-result-v3", result["format"])
+        self.assertEqual(8, bound["lock"]["java_policy"]["feature_version"])
+        self.assertEqual("provisioned", result["managed_java"]["outcome"])
+        self.assertNotIn("managed-java-archive", result["unresolved_inputs"])
+        self.assertIn("workspace-project-bytes", result["unresolved_inputs"])
+
+    def test_v2_source_lock_drift_during_java_acquisition_prevents_binding(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice(feature=8)
+        bound = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True,
+        )
+        plan = plan_import(
+            self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,
+            acquire_managed_java=True, environment=self.target_environment,
+        )
+
+        def drift(suite, **options):
+            result = self._managed_result(outcome="provisioned")(suite, **options)
+            lock = self.target_suite / bound["lock"]["project_source_lock"]["relative_path"]
+            document = json.loads(lock.read_text(encoding="utf-8"))
+            document["pack"]["revision"] = "0" * 40
+            lock.write_bytes(json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
+            return result
+
+        with patch("workbench_core.environment_reconstruction.ensure_java_runtime", side_effect=drift):
+            with self.assertRaisesRegex(ReconstructionError, "target profiles changed during Java acquisition"):
+                apply_import(
+                    self.target_suite, bound, expected_plan_id=plan["plan_id"],
+                    workspace_name="shared", workspace=self.target_workspace,
+                    acquire_managed_java=True, environment=self.target_environment,
+                )
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+
     def test_feasibility_rejects_invalid_local_source_lock_candidate(self) -> None:
         self._attach_local_source_lock()
         self._source_choice()

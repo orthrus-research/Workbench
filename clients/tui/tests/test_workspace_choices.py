@@ -187,6 +187,38 @@ class WorkspaceChoiceClientTests(IsolatedAsyncioTestCase):
             "--acquire-managed-java", "--plan-id", "with-java", "--json", timeout=600,
         )
 
+    async def test_client_accepts_reviewed_v2_source_lock_share(self) -> None:
+        client = CoreClient(("workbench",))
+        source_lock = {
+            "relative_path": "profiles/packs/example/source-lock.json",
+            "sha256": "sha256:" + "a" * 64,
+            "repository": "https://example.com/pack.git",
+            "revision": "b" * 40, "tree": "c" * 40,
+        }
+        client.json_record = AsyncMock(side_effect=[
+            {"format": "workbench-environment-share-export-v1",
+             "share": {"format": "workbench-environment-share-v2", "share_id": "share-id",
+                       "lock": {"project_source_lock": source_lock}},
+             "resource": {"path": "/share.json"}},
+            {"format": "workbench-environment-import-plan-v3", "state": "ready",
+             "plan_id": "bound-plan", "project_source_lock": source_lock,
+             "blockers": [], "unresolved_inputs": ["workspace-project-bytes"]},
+            {"format": "workbench-environment-import-result-v3", "outcome": "bound",
+             "plan_id": "bound-plan", "project_source_lock": source_lock,
+             "resource": {"path": "/receipt.json"},
+             "unresolved_inputs": ["workspace-project-bytes"]},
+        ])
+        await client.export_environment_share("beta", bind_project_source_lock=True)
+        client.json_record.assert_any_await(
+            "settings", "environment", "export", "beta", "--bind-project-source-lock", "--json",
+        )
+        plan = await client.plan_environment_import("/share.json", "shared", "/workspace")
+        self.assertEqual(source_lock, plan["project_source_lock"])
+        result = await client.import_environment_share(
+            "/share.json", "shared", "/workspace", expected_plan_id="bound-plan",
+        )
+        self.assertEqual(source_lock, result["project_source_lock"])
+
 
 class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
     async def _settle(self, pilot, predicate) -> None:
@@ -308,6 +340,30 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
                 screen.query_one("#choice-status").render()
             ))
 
+    async def test_export_can_bind_selected_project_source_lock(self) -> None:
+        core = _core()
+        core.export_environment_share.return_value = {
+            "share": {"share_id": "bound-share", "lock": {
+                "project_source_lock": {"sha256": "sha256:" + "a" * 64},
+            }},
+            "resource": {"path": "/exports/bound-share.json"},
+        }
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            app.push_screen(WorkspaceChoicesScreen(_record()))
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen)
+                               and bool(app.screen.query("#choice-bind-source-lock")))
+            screen = app.screen
+            screen.query_one("#choice-bind-source-lock", Checkbox).value = True
+            screen.query_one("#choice-export", Button).press()
+            await self._settle(pilot, lambda: core.export_environment_share.await_count == 1)
+            core.export_environment_share.assert_awaited_with(
+                "alpha", bind_project_source_lock=True,
+            )
+            await self._settle(pilot, lambda: "Project source lock:" in str(
+                screen.query_one("#choice-status").render()
+            ))
+
     async def test_import_requires_current_ready_plan_and_review(self) -> None:
         core = _core()
         app = WorkbenchApp(core)
@@ -341,6 +397,31 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
                 expected_plan_id="plan-id", config="/matching.toml", java_home="",
             )
             await self._settle(pilot, lambda: screen.plan is None)
+
+    async def test_import_reviews_v2_project_source_lock(self) -> None:
+        core = _core()
+        source_lock = {"sha256": "sha256:" + "a" * 64, "revision": "b" * 40}
+        core.plan_environment_import.return_value = {
+            "format": "workbench-environment-import-plan-v3", "state": "ready",
+            "plan_id": "bound-plan", "action": "create", "blockers": [],
+            "unresolved_inputs": ["workspace-project-bytes"],
+            "project_source_lock": source_lock,
+        }
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 44)) as pilot:
+            app.push_screen(EnvironmentImportScreen())
+            await self._settle(pilot, lambda: isinstance(app.screen, EnvironmentImportScreen)
+                               and bool(app.screen.query("#import-share")))
+            screen = app.screen
+            screen.query_one("#import-share", Input).value = "/share.json"
+            screen.query_one("#import-name", Input).value = "shared"
+            screen.query_one("#import-workspace", Input).value = "/workspace"
+            screen.query_one("#import-plan", Button).press()
+            await self._settle(pilot, lambda: screen.plan is not None)
+            self.assertIn(source_lock["sha256"], str(screen.query_one("#import-detail").render()))
+            screen.query_one("#import-apply", Button).press()
+            await self._settle(pilot, lambda: bool(app.screen.query("#review-body")))
+            self.assertIn(source_lock["revision"], str(app.screen.query_one("#review-body").render()))
 
     async def test_import_acquisition_choice_invalidates_plan_and_is_reviewed(self) -> None:
         core = _core()

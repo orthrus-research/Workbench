@@ -48,12 +48,16 @@ from .user_preferences import (
 
 
 SHARE_FORMAT = "workbench-environment-share-v1"
+SHARE_FORMAT_V2 = "workbench-environment-share-v2"
 INTENT_FORMAT = "workbench-environment-intent-v1"
 LOCK_FORMAT = "workbench-environment-lock-v1"
+LOCK_FORMAT_V2 = "workbench-environment-lock-v2"
 PLAN_FORMAT = "workbench-environment-import-plan-v1"
 PLAN_FORMAT_V2 = "workbench-environment-import-plan-v2"
+PLAN_FORMAT_V3 = "workbench-environment-import-plan-v3"
 RESULT_FORMAT = "workbench-environment-import-result-v1"
 RESULT_FORMAT_V2 = "workbench-environment-import-result-v2"
+RESULT_FORMAT_V3 = "workbench-environment-import-result-v3"
 FEASIBILITY_FORMAT = "workbench-environment-feasibility-v1"
 MAX_SHARE_BYTES = 256 * 1024
 MAX_SOURCE_LOCK_BYTES = 256 * 1024
@@ -116,10 +120,13 @@ def build_share(
     *,
     environment: Mapping[str, str] | None = None,
     host: Mapping[str, str] | None = None,
+    bind_project_source_lock: bool = False,
 ) -> dict[str, Any]:
     """Describe one saved workspace without exporting any local path choice."""
 
     values = dict(os.environ if environment is None else environment)
+    if type(bind_project_source_lock) is not bool:
+        raise ReconstructionError("project source-lock binding choice must be Boolean")
     if type(workspace_name) is not str or _NAME.fullmatch(workspace_name) is None:
         raise ReconstructionError("choose a named workspace to export")
     registry = load_workspaces(environment=values)
@@ -164,7 +171,7 @@ def build_share(
         unresolved.append("local-java-home")
     else:
         unresolved.append("managed-java-archive")
-    lock = _seal({
+    lock_body = {
         "format": LOCK_FORMAT,
         "schema_version": 1,
         "intent_id": intent["intent_id"],
@@ -194,10 +201,22 @@ def build_share(
         },
         "host_variant": _host_variant(host_platform() if host is None else host),
         "unresolved_inputs": unresolved,
-    }, "workbench-environment-lock", "lock_id")
+    }
+    if bind_project_source_lock:
+        project = _project_source_feasibility(suite, configuration)
+        if project["state"] != "local-lock-unbound":
+            raise ReconstructionError(
+                f"selected pack variant has no usable exact project source lock: {project['state']}"
+            )
+        lock_body.update({
+            "format": LOCK_FORMAT_V2,
+            "schema_version": 2,
+            "project_source_lock": project["candidate"],
+        })
+    lock = _seal(lock_body, "workbench-environment-lock", "lock_id")
     return _seal({
-        "format": SHARE_FORMAT,
-        "schema_version": 1,
+        "format": SHARE_FORMAT_V2 if bind_project_source_lock else SHARE_FORMAT,
+        "schema_version": 2 if bind_project_source_lock else 1,
         "intent": intent,
         "lock": lock,
     }, "workbench-environment-share", "share_id")
@@ -207,16 +226,25 @@ def validate_share(value: object) -> dict[str, Any]:
     """Strictly read the portable bytes before consulting local state."""
 
     share = _exact(value, {"format", "schema_version", "intent", "lock", "share_id"}, "share")
-    if share["format"] != SHARE_FORMAT or type(share["schema_version"]) is not int or share["schema_version"] != 1:
+    version = share["schema_version"]
+    if type(version) is not int or type(share["format"]) is not str or (share["format"], version) not in {
+        (SHARE_FORMAT, 1), (SHARE_FORMAT_V2, 2),
+    }:
         raise ReconstructionError("unsupported environment share schema")
+    binds_project_source = version == 2
     intent = _exact(share["intent"], {"format", "schema_version", "selection", "java", "intent_id"}, "intent")
-    lock = _exact(share["lock"], {
+    lock_fields = {
         "format", "schema_version", "intent_id", "selection_digest", "pack_profile",
         "platform_profile", "java_policy", "host_variant", "unresolved_inputs", "lock_id",
-    }, "lock")
+    }
+    if binds_project_source:
+        lock_fields.add("project_source_lock")
+    lock = _exact(share["lock"], lock_fields, "lock")
     if intent["format"] != INTENT_FORMAT or type(intent["schema_version"]) is not int or intent["schema_version"] != 1:
         raise ReconstructionError("unsupported environment intent schema")
-    if lock["format"] != LOCK_FORMAT or type(lock["schema_version"]) is not int or lock["schema_version"] != 1:
+    if type(lock["schema_version"]) is not int or (lock["format"], lock["schema_version"]) != (
+        (LOCK_FORMAT_V2, 2) if binds_project_source else (LOCK_FORMAT, 1)
+    ):
         raise ReconstructionError("unsupported environment lock schema")
     selection = _exact(intent["selection"], {
         "configuration_schema", "pack_document", "pack_variant", "platform_document",
@@ -227,6 +255,30 @@ def validate_share(value: object) -> dict[str, Any]:
     _profile_path(selection["platform_document"], "platform document")
     if type(selection["pack_variant"]) is not str or re.fullmatch(r"[a-z0-9][a-z0-9._-]*", selection["pack_variant"]) is None:
         raise ReconstructionError("invalid pack variant in environment intent")
+    if binds_project_source:
+        project = _exact(lock["project_source_lock"], {
+            "relative_path", "sha256", "repository", "revision", "tree",
+        }, "project source lock")
+        relative = project["relative_path"]
+        if type(relative) is not str or "\\" in relative:
+            raise ReconstructionError("project source lock path is invalid")
+        source_path = PurePosixPath(relative)
+        profile_parent = PurePosixPath(selection["pack_document"]).parent
+        if (
+            source_path.as_posix() != relative
+            or not source_path.is_relative_to(profile_parent)
+            or source_path == profile_parent or source_path.suffix != ".json"
+            or any(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", part) is None
+                   for part in source_path.parts)
+            or type(project["sha256"]) is not str
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", project["sha256"]) is None
+            or not _git_repository(project["repository"])
+            or type(project["revision"]) is not str
+            or _GIT_ID.fullmatch(project["revision"]) is None
+            or type(project["tree"]) is not str
+            or _GIT_ID.fullmatch(project["tree"]) is None
+        ):
+            raise ReconstructionError("project source lock is incomplete or non-portable")
     java = _exact(intent["java"], {"mode", "feature_version"}, "intent Java choice")
     if type(java["mode"]) is not str or java["mode"] not in _MODES:
         raise ReconstructionError("unsupported Java choice in environment intent")
@@ -448,6 +500,7 @@ def _configuration_from_intent(
 def _configuration_blockers(
     suite: Path, configuration: configuration_source.WorkbenchConfiguration,
     portable: Mapping[str, Any],
+    *, include_project_source: bool = True,
 ) -> list[str]:
     intent = portable["intent"]["selection"]
     lock = portable["lock"]
@@ -485,6 +538,13 @@ def _configuration_blockers(
             blockers.append("target Java policy differs from the exact lock")
     except JavaRuntimeError as exc:
         blockers.append(f"target Java policy is unavailable: {exc}")
+    if include_project_source and portable["format"] == SHARE_FORMAT_V2:
+        project = _project_source_feasibility(suite, configuration)
+        if (
+            project["state"] != "local-lock-unbound"
+            or project["candidate"] != lock["project_source_lock"]
+        ):
+            blockers.append("target project source lock differs from the exact portable lock")
     return blockers
 
 
@@ -622,8 +682,9 @@ def assess_reconstruction_feasibility(
 ) -> dict[str, Any]:
     """Report exact inputs still needed before a clean-root acquisition can run.
 
-    This never acquires bytes or alters V1/V2 share, plan, and import identities.
-    A target-side lock file is a candidate only: the share does not bind its hash.
+    This never acquires bytes or alters earlier share, plan, and import identities.
+    A V1 target-side lock file remains a candidate because the share does not
+    bind its hash; V2 can prove the exact lock while project bytes remain absent.
     """
 
     portable = validate_share(dict(share))
@@ -639,11 +700,27 @@ def assess_reconstruction_feasibility(
         candidate = _configuration_from_intent(
             suite, Path(plan["profile_config"]), _configuration_bytes(selection), selection,
         )
-        if not _configuration_blockers(suite, candidate, portable):
+        if not _configuration_blockers(
+            suite, candidate, portable, include_project_source=False,
+        ):
             configuration = candidate
     except WorkbenchConfigurationError:
         pass
     project = _project_source_feasibility(suite, configuration)
+    if portable["format"] == SHARE_FORMAT_V2 and project["state"] == "local-lock-unbound":
+        project = {
+            **project,
+            "state": (
+                "portable-lock-bound"
+                if project["candidate"] == portable["lock"]["project_source_lock"]
+                else "local-lock-drifted"
+            ),
+            "required": (
+                ["workspace-project-bytes"]
+                if project["candidate"] == portable["lock"]["project_source_lock"]
+                else ["matching-source-lock-file"]
+            ),
+        }
     java_mode = portable["intent"]["java"]["mode"]
     java_state = (
         "local-binding-unchecked" if java_home is not None else "local-binding-missing"
@@ -677,12 +754,16 @@ def assess_reconstruction_feasibility(
 
 def export_share(
     suite_root: Path, workspace_name: str, *, environment: Mapping[str, str] | None = None,
+    bind_project_source_lock: bool = False,
 ) -> dict[str, Any]:
     """Publish the share through Core's registered immutable artifact service."""
 
     values = dict(os.environ if environment is None else environment)
     source_registry = load_workspaces(environment=values)
-    share = build_share(suite_root, workspace_name, environment=values)
+    share = build_share(
+        suite_root, workspace_name, environment=values,
+        bind_project_source_lock=bind_project_source_lock,
+    )
     registry = load_workspaces(environment=values)
     if registry["record_id"] != source_registry["record_id"]:
         raise ReconstructionError("source workspace choices changed during export")
@@ -835,9 +916,13 @@ def plan_import(
         and old["managed_java_feature"] == portable["intent"]["java"]["feature_version"]
     )
     action = "reuse" if same else "update" if old is not None else "create"
+    source_bound = portable["format"] == SHARE_FORMAT_V2
     plan_body = {
-        "format": PLAN_FORMAT_V2 if acquire_managed_java else PLAN_FORMAT,
-        "schema_version": 2 if acquire_managed_java else 1,
+        "format": (
+            PLAN_FORMAT_V3 if source_bound
+            else PLAN_FORMAT_V2 if acquire_managed_java else PLAN_FORMAT
+        ),
+        "schema_version": 3 if source_bound else 2 if acquire_managed_java else 1,
         "share_id": portable["share_id"],
         "lock_id": portable["lock"]["lock_id"],
         "workspace_name": workspace_name,
@@ -864,6 +949,8 @@ def plan_import(
     }
     if acquire_managed_java:
         plan_body["acquire_managed_java"] = True
+    if source_bound:
+        plan_body["project_source_lock"] = portable["lock"]["project_source_lock"]
     return _seal(plan_body, "workbench-environment-import-plan", "plan_id")
 
 
@@ -942,12 +1029,14 @@ def apply_import(
     service = _resource_host(Path(suite_root), Path(plan["workspace"]), values)
     if service.policy_id != plan["environment_resolution_id"]:
         raise ReconstructionError("environment import resolution changed after review")
+    source_bound = portable["format"] == SHARE_FORMAT_V2
     prepared = {
         "format": (
-            "workbench-environment-import-attempt-v2"
+            "workbench-environment-import-attempt-v3" if source_bound
+            else "workbench-environment-import-attempt-v2"
             if acquire_managed_java else "workbench-environment-import-attempt-v1"
         ),
-        "schema_version": 2 if acquire_managed_java else 1,
+        "schema_version": 3 if source_bound else 2 if acquire_managed_java else 1,
         "state": "prepared",
         "share": portable,
         "plan_id": plan["plan_id"],
@@ -962,6 +1051,8 @@ def apply_import(
     }
     if acquire_managed_java:
         prepared["acquire_managed_java"] = True
+    if source_bound:
+        prepared["project_source_lock"] = portable["lock"]["project_source_lock"]
     prepared_payload = _canonical(prepared) + b"\n"
     prepared_ref = service.publish_bytes(
         "evidence", "environment-import-attempt.json", prepared_payload,
@@ -1052,8 +1143,11 @@ def apply_import(
     )
     entry = next(row for row in registry["entries"] if row["name"] == workspace_name)
     receipt = {
-        "format": RESULT_FORMAT_V2 if managed_java is not None else RESULT_FORMAT,
-        "schema_version": 2 if managed_java is not None else 1,
+        "format": (
+            RESULT_FORMAT_V3 if source_bound
+            else RESULT_FORMAT_V2 if managed_java is not None else RESULT_FORMAT
+        ),
+        "schema_version": 3 if source_bound else 2 if managed_java is not None else 1,
         "outcome": (
             "reused"
             if plan["action"] == "reuse" and plan["configuration_manifest_action"] != "create"
@@ -1082,6 +1176,8 @@ def apply_import(
     }
     if managed_java is not None:
         receipt["managed_java"] = managed_java
+    if source_bound:
+        receipt["project_source_lock"] = portable["lock"]["project_source_lock"]
     payload = _canonical(receipt) + b"\n"
     complete_service = _resource_host(Path(suite_root), Path(plan["workspace"]), values)
     references = (prepared_ref.resource_id,)

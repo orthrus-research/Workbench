@@ -214,6 +214,10 @@ class WorkspaceChoicesScreen(Screen[None]):
             yield Static("Detected Java", classes="field-label")
             yield Select([("Enter a Java home above", "manual")], value="manual",
                          allow_blank=False, id="choice-java-candidates")
+            yield Checkbox(
+                "Bind the selected pack source lock in the exported share",
+                id="choice-bind-source-lock",
+            )
             with Horizontal(classes="button-row"):
                 yield Button("Find Java", id="choice-find-java")
                 yield Button("Save choices", id="choice-save", variant="primary",
@@ -375,10 +379,20 @@ class WorkspaceChoicesScreen(Screen[None]):
         self.query_one("#choice-export", Button).disabled = True
         self.query_one("#choice-status", Static).update("Asking Core to export the saved environment selection…")
         try:
-            result = await self.core.export_environment_share(self.selected_name)
+            bind_source = self.query_one("#choice-bind-source-lock", Checkbox).value
+            result = await self.core.export_environment_share(
+                self.selected_name,
+                **({"bind_project_source_lock": True} if bind_source else {}),
+            )
+            source_lock = result["share"].get("lock", {}).get("project_source_lock")
+            source_line = (
+                f"Project source lock: {source_lock['sha256']}\n"
+                if isinstance(source_lock, dict) else ""
+            )
             self.query_one("#choice-status", Static).update(
                 f"Share: {result['resource']['path']}\n"
                 f"Identity: {result['share']['share_id']}\n"
+                f"{source_line}"
                 "Project, fixture and tool bytes must be supplied separately."
             )
         except (CoreClientError, TimeoutError) as exc:
@@ -485,6 +499,12 @@ class EnvironmentImportScreen(Screen[None]):
                 f"Action: {plan.get('action', '?')}",
                 f"Acquire managed Java: {'yes' if acquire else 'no'}",
             ]
+            source_lock = plan.get("project_source_lock")
+            if isinstance(source_lock, dict):
+                lines.append(
+                    f"Project source lock: {source_lock.get('sha256', '?')} "
+                    f"(commit {source_lock.get('revision', '?')})"
+                )
             lines.extend(f"Blocked: {item}" for item in plan["blockers"])
             lines.extend(f"Additional input: {item}" for item in plan["unresolved_inputs"])
             self.query_one("#import-detail", Static).update("\n".join(lines))
@@ -508,6 +528,12 @@ class EnvironmentImportScreen(Screen[None]):
         if plan is None or options is None or plan.get("state") != "ready" or self.busy:
             return
         source, name, workspace, config, java, acquire = options
+        source_lock = plan.get("project_source_lock")
+        source_review = (
+            f"Project source lock\n{source_lock.get('sha256', '?')}\n"
+            f"Commit: {source_lock.get('revision', '?')}\n\n"
+            if isinstance(source_lock, dict) else ""
+        )
         body = (
             f"Plan ID\n{plan['plan_id']}\n\n"
             f"Share\n{source}\n\n"
@@ -515,6 +541,7 @@ class EnvironmentImportScreen(Screen[None]):
             f"Configuration: {config or 'suite default'}\n"
             f"Java home: {java or 'shared managed choice'}\n\n"
             f"Acquire managed Java: {'yes' if acquire else 'no'}\n\n"
+            f"{source_review}"
             "Core will recheck the exact lock and registry revision before saving the selection."
         )
         approved = await self.app.push_screen_wait(
