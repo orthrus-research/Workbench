@@ -50,7 +50,7 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
     reconstruction = actions.add_parser(
         "environment", help="share or import one exact workspace environment selection"
     )
-    reconstruction.add_argument("operation", choices=("export", "plan", "import"))
+    reconstruction.add_argument("operation", choices=("export", "plan", "feasibility", "import"))
     reconstruction.add_argument("source", help="workspace name for export or share file for import")
     reconstruction.add_argument("--name", help="local workspace name for plan or import")
     reconstruction.add_argument("--workspace", help="local workspace directory for plan or import")
@@ -126,7 +126,7 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
         return 1 if result["state"] == "conflict" else 0
     if selected.action == "environment":
         from .environment_reconstruction import (
-            apply_import, export_share, load_share, plan_import,
+            apply_import, assess_reconstruction_feasibility, export_share, load_share, plan_import,
         )
         suite = Path.cwd() if suite_root is None else suite_root
         if selected.operation == "export":
@@ -141,9 +141,9 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
                 print(f"  Share: {result['share']['share_id']}")
             return 0
         if selected.name is None or selected.workspace is None:
-            parser.error("environment plan/import require --name and --workspace")
-        if selected.operation == "plan" and selected.plan_id is not None:
-            parser.error("environment plan does not take --plan-id")
+            parser.error("environment plan/feasibility/import require --name and --workspace")
+        if selected.operation in {"plan", "feasibility"} and selected.plan_id is not None:
+            parser.error(f"environment {selected.operation} does not take --plan-id")
         if selected.operation == "import" and selected.plan_id is None:
             parser.error("environment import requires the reviewed --plan-id")
         share = load_share(selected.source)
@@ -166,6 +166,20 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
                 for unresolved in result["unresolved_inputs"]:
                     print(f"  Additional input: {unresolved}")
             return 1 if result["state"] == "blocked" else 0
+        if selected.operation == "feasibility":
+            result = assess_reconstruction_feasibility(suite, share, **options)
+            if selected.json:
+                print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+            else:
+                print(f"Environment feasibility: {result['state']}")
+                print(f"  Import plan: {result['import_plan_id']} ({result['import_state']})")
+                print(f"  Project source: {result['project_source']['state']}")
+                print(f"  Optional modules: {result['optional_module_packages']['state']}")
+                print(f"  Fixture/tools: {result['profile_fixture_tools']['state']}")
+                print(f"  Java: {result['java']['state']}")
+                for blocker in result["import_blockers"]:
+                    print(f"  Local blocker: {blocker}")
+            return 0
         result = apply_import(suite, share, expected_plan_id=selected.plan_id, **options)
         if selected.json:
             print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))

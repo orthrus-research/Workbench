@@ -4,7 +4,8 @@ The share document contains no machine path. Core binds it to a matching
 Configuration V1 manifest and workspace only on the receiving host. When the
 manifest is missing, Core can generate an immutable local one from the exact
 intent after checking the target suite's profile documents. Project bytes,
-optional packages, fixtures and Java archives remain unresolved inputs.
+optional packages, fixtures and Java archives remain unresolved inputs. A
+separate read-only feasibility report identifies missing acquisition locks.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from pathlib import Path, PurePosixPath
 import re
 import stat
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 from . import configuration as configuration_source
 from .configuration import (
@@ -52,9 +54,12 @@ PLAN_FORMAT = "workbench-environment-import-plan-v1"
 PLAN_FORMAT_V2 = "workbench-environment-import-plan-v2"
 RESULT_FORMAT = "workbench-environment-import-result-v1"
 RESULT_FORMAT_V2 = "workbench-environment-import-result-v2"
+FEASIBILITY_FORMAT = "workbench-environment-feasibility-v1"
 MAX_SHARE_BYTES = 256 * 1024
+MAX_SOURCE_LOCK_BYTES = 256 * 1024
 _NAME = re.compile(r"[a-z][a-z0-9_-]{0,63}\Z")
 _SHA256 = re.compile(r"(?:sha256:)?[0-9a-f]{64}\Z")
+_GIT_ID = re.compile(r"[0-9a-f]{40}\Z")
 _MODES = frozenset({"profile-default", "managed-feature", "local-binding-required"})
 _UNRESOLVED = (
     "workspace-project-bytes",
@@ -300,6 +305,25 @@ def _unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _reject_json_constant(token: str) -> None:
+    raise ReconstructionError(f"non-finite source-lock value: {token}")
+
+
+def _git_repository(value: object) -> bool:
+    if type(value) is not str or any(character.isspace() for character in value):
+        return False
+    try:
+        parsed = urlsplit(value)
+        return (
+            parsed.scheme == "https" and bool(parsed.hostname)
+            and parsed.username is None and parsed.password is None
+            and parsed.path.startswith("/") and parsed.path.endswith(".git")
+            and not parsed.query and not parsed.fragment
+        )
+    except ValueError:
+        return False
+
+
 def load_share(path: Path | str) -> dict[str, Any]:
     selected = Path(path)
     try:
@@ -476,6 +500,179 @@ def _generated_manifest_resource(
         and row["sha256"] == "sha256:" + digest
     ]
     return rows[0]["resource_id"] if len(rows) == 1 else None
+
+
+def _project_source_feasibility(
+    suite: Path, configuration: configuration_source.WorkbenchConfiguration | None,
+) -> dict[str, Any]:
+    """Inspect a local source-lock candidate without treating it as portable authority."""
+
+    missing = {
+        "state": "selected-profile-unavailable", "candidate": None,
+        "required": ["selected-profile", "portable-source-lock-sha256"],
+    }
+    if configuration is None:
+        return missing
+    variant = configuration.pack_document.values["profiles"][configuration.pack_variant]
+    reference = variant.get("source_lock")
+    if reference is None:
+        return {
+            "state": "missing-variant-lock", "candidate": None,
+            "required": ["pack-source-repository", "pack-source-revision", "pack-source-tree",
+                         "portable-source-lock-sha256"],
+        }
+    if (type(reference) is not str or not reference or "\\" in reference
+            or "\x00" in reference):
+        return {
+            "state": "invalid-lock-reference", "candidate": None,
+            "required": ["safe-variant-source-lock", "portable-source-lock-sha256"],
+        }
+    relative = PurePosixPath(reference)
+    if (relative.is_absolute() or relative.as_posix() != reference
+            or relative.suffix != ".json"
+            or any(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", part) is None
+                   for part in relative.parts)):
+        return {
+            "state": "invalid-lock-reference", "candidate": None,
+            "required": ["safe-variant-source-lock", "portable-source-lock-sha256"],
+        }
+    profile_relative = PurePosixPath(configuration.pack_document.source.relative_path)
+    selected_relative = (profile_relative.parent / relative).as_posix()
+    try:
+        path = configuration_source._suite_profile_path(
+            suite, selected_relative, "/pack_document/profiles/source_lock",
+        )
+        snapshot = configuration_source._source_snapshot(
+            path, maximum=MAX_SOURCE_LOCK_BYTES, label="pack source lock",
+            relative_path=selected_relative,
+        )
+    except WorkbenchConfigurationError:
+        return {
+            "state": "referenced-lock-unavailable", "candidate": None,
+            "required": ["exact-source-lock-file", "portable-source-lock-sha256"],
+        }
+    try:
+        document = json.loads(
+            snapshot.source_bytes.decode("utf-8"), object_pairs_hook=_unique_pairs,
+            parse_constant=_reject_json_constant,
+        )
+        pack = document["pack"]
+        sources = document["sources"]
+        valid = (
+            type(document) is dict
+            and set(document) == {"format", "schema_version", "lock_id", "pack", "sources"}
+            and document["format"] == "workbench-source-lock-v3"
+            and type(document["schema_version"]) is int
+            and document["schema_version"] == 3
+            and type(document["lock_id"]) is str
+            and bool(document["lock_id"])
+            and type(pack) is dict
+            and set(pack) == {"source_id", "snapshot_id", "version", "repository", "revision", "tree"}
+            and all(type(pack[key]) is str and bool(pack[key]) for key in (
+                "source_id", "snapshot_id", "version",
+            ))
+            and _git_repository(pack["repository"])
+            and type(pack["revision"]) is str
+            and _GIT_ID.fullmatch(pack["revision"]) is not None
+            and type(pack["tree"]) is str
+            and _GIT_ID.fullmatch(pack["tree"]) is not None
+            and type(sources) is list
+            and bool(sources)
+            and all(
+                type(item) is dict
+                and set(item) == {"source_id", "repository", "revision", "tree", "license", "scope"}
+                and all(type(item[key]) is str and bool(item[key]) for key in (
+                    "source_id", "license", "scope",
+                ))
+                and _git_repository(item["repository"])
+                and type(item["revision"]) is str
+                and _GIT_ID.fullmatch(item["revision"]) is not None
+                and type(item["tree"]) is str
+                and _GIT_ID.fullmatch(item["tree"]) is not None
+                for item in sources
+            )
+            and snapshot.source_bytes == _canonical(document) + b"\n"
+        )
+    except (KeyError, TypeError, UnicodeError, ValueError, json.JSONDecodeError, RecursionError):
+        valid = False
+    if not valid:
+        return {
+            "state": "referenced-lock-invalid", "candidate": None,
+            "required": ["valid-exact-source-lock", "portable-source-lock-sha256"],
+        }
+    return {
+        "state": "local-lock-unbound",
+        "candidate": {
+            "relative_path": selected_relative,
+            "sha256": "sha256:" + snapshot.sha256,
+            "repository": pack["repository"],
+            "revision": pack["revision"],
+            "tree": pack["tree"],
+        },
+        "required": ["portable-source-lock-sha256"],
+    }
+
+
+def assess_reconstruction_feasibility(
+    suite_root: Path, share: Mapping[str, Any], *, workspace_name: str,
+    workspace: Path | str, config_path: Path | str = CONFIGURATION_PATH,
+    java_home: Path | str | None = None, acquire_managed_java: bool = False,
+    environment: Mapping[str, str] | None = None,
+    host: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Report exact inputs still needed before a clean-root acquisition can run.
+
+    This never acquires bytes or alters V1/V2 share, plan, and import identities.
+    A target-side lock file is a candidate only: the share does not bind its hash.
+    """
+
+    portable = validate_share(dict(share))
+    suite = Path(suite_root).expanduser().resolve()
+    plan = plan_import(
+        suite, portable, workspace_name=workspace_name, workspace=workspace,
+        config_path=config_path, java_home=java_home,
+        acquire_managed_java=acquire_managed_java, environment=environment, host=host,
+    )
+    selection = portable["intent"]["selection"]
+    configuration = None
+    try:
+        candidate = _configuration_from_intent(
+            suite, Path(plan["profile_config"]), _configuration_bytes(selection), selection,
+        )
+        if not _configuration_blockers(suite, candidate, portable):
+            configuration = candidate
+    except WorkbenchConfigurationError:
+        pass
+    project = _project_source_feasibility(suite, configuration)
+    java_mode = portable["intent"]["java"]["mode"]
+    java_state = (
+        "local-binding-unchecked" if java_home is not None else "local-binding-missing"
+    ) if java_mode == "local-binding-required" else "managed-archive-unresolved"
+    body = {
+        "format": FEASIBILITY_FORMAT,
+        "schema_version": 1,
+        "share_id": portable["share_id"],
+        "import_plan_id": plan["plan_id"],
+        "import_state": plan["state"],
+        "import_blockers": list(plan["blockers"]),
+        "state": "local-import-blocked" if plan["state"] == "blocked" else "exact-inputs-required",
+        "project_source": project,
+        "optional_module_packages": {
+            "state": "missing-package-lock",
+            "required": ["module-identity", "package-sha256"],
+        },
+        "profile_fixture_tools": {
+            "state": "missing-artifact-lock",
+            "required": ["artifact-identity", "artifact-sha256"],
+        },
+        "java": {
+            "state": java_state,
+            "feature_version": portable["lock"]["java_policy"]["feature_version"],
+            "reviewed_managed_acquisition": acquire_managed_java,
+        },
+        "unresolved_inputs": list(plan["unresolved_inputs"]),
+    }
+    return _seal(body, "workbench-environment-feasibility", "feasibility_id")
 
 
 def export_share(
@@ -908,6 +1105,6 @@ def apply_import(
 
 
 __all__ = [
-    "ReconstructionError", "apply_import", "build_share", "export_share",
-    "load_share", "plan_import", "validate_share",
+    "ReconstructionError", "apply_import", "assess_reconstruction_feasibility",
+    "build_share", "export_share", "load_share", "plan_import", "validate_share",
 ]

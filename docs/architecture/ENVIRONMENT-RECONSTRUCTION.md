@@ -56,6 +56,7 @@ can be reopened under Core custody; a new plan is required before retry.
 ```text
 workbench settings environment export NAME
 workbench settings environment plan SHARE.json --name LOCAL_NAME --workspace /local/workspace --json
+workbench settings environment feasibility SHARE.json --name LOCAL_NAME --workspace /local/workspace --json
 workbench settings environment import SHARE.json --name LOCAL_NAME --workspace /local/workspace --plan-id PLAN_ID
 ```
 
@@ -88,6 +89,20 @@ and binds the workspace only after verifying the published bytes and profiles.
 A fresh configuration home and state root are supported when a compatible
 checked-out suite and workspace directory already exist. The project source
 and external dependency bytes must be obtained separately.
+
+`environment feasibility` is read-only and uses the same local options as
+`plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
+names the exact import plan, local blockers and missing acquisition inputs. The
+Cleanroom provisional pack variant has no
+project source lock. A variant may reference a local source-lock file with Git
+repository, full commit and tree identities, but the V1 portable share hashes
+only the profile document, not that referenced file. The report marks such a
+file as a local, unbound candidate and shows its current SHA-256. Core cannot
+acquire project source from it until a later portable lock binds that file's
+digest. Optional module packages and profile fixture/tool artifacts likewise
+need exact identities and hashes. The report does not inspect or reject a
+user-supplied Java path; managed Java acquisition remains the reviewed import
+operation.
 
 WSL is a Linux managed-Java host. A WSL-mounted Windows path is a local binding and
 never enters the share. Windows execution from WSL is a different host variant;

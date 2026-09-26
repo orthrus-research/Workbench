@@ -21,6 +21,7 @@ from workbench_core import settings_cli
 from workbench_core.environment_reconstruction import (
     ReconstructionError,
     apply_import,
+    assess_reconstruction_feasibility,
     build_share,
     export_share,
     load_share,
@@ -95,6 +96,23 @@ class EnvironmentReconstructionTests(TestCase):
             java_home=java_home, managed_java_feature=feature,
             environment=self.source_environment,
         )
+
+    def _attach_local_source_lock(self) -> None:
+        for suite in (self.source_suite, self.target_suite):
+            profile = suite / "profiles/packs/supersymmetry/profile.yaml"
+            original = profile.read_text(encoding="utf-8")
+            updated = original.replace(
+                "    maturity: experimental\n",
+                "    source_lock: source-locks/legacy-forge/source-lock.json\n"
+                "    maturity: experimental\n",
+                1,
+            )
+            self.assertNotEqual(original, updated)
+            profile.write_text(updated, encoding="utf-8")
+            source = SOURCE_SUITE / "profiles/packs/supersymmetry/source-locks/legacy-forge/source-lock.json"
+            destination = suite / "profiles/packs/supersymmetry/source-locks/legacy-forge/source-lock.json"
+            destination.parent.mkdir(parents=True)
+            copy2(source, destination)
 
     def _managed_result(self, *, outcome: str, registered: int = 0):
         def acquire(_suite, **options):
@@ -588,6 +606,98 @@ class EnvironmentReconstructionTests(TestCase):
         )
         self.assertEqual("reused", second["outcome"])
         self.assertEqual(registry["record_id"], load_workspaces(environment=self.target_environment)["record_id"])
+
+    def test_feasibility_reports_missing_project_and_artifact_locks_without_writing(self) -> None:
+        self._source_choice()
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        before = deepcopy(share)
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        report = assess_reconstruction_feasibility(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        schema = json.loads((
+            SOURCE_SUITE / "core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json"
+        ).read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(report)
+        self.assertEqual("workbench-environment-feasibility-v1", report["format"])
+        self.assertEqual(plan["plan_id"], report["import_plan_id"])
+        self.assertEqual("exact-inputs-required", report["state"])
+        self.assertEqual("missing-variant-lock", report["project_source"]["state"])
+        self.assertIsNone(report["project_source"]["candidate"])
+        self.assertIn("portable-source-lock-sha256", report["project_source"]["required"])
+        self.assertEqual("missing-package-lock", report["optional_module_packages"]["state"])
+        self.assertEqual("missing-artifact-lock", report["profile_fixture_tools"]["state"])
+        self.assertEqual("managed-archive-unresolved", report["java"]["state"])
+        self.assertEqual(before, share)
+        self.assertFalse((self.target_root / "config").exists())
+        self.assertFalse((self.target_root / "state").exists())
+
+    def test_feasibility_marks_exact_git_lock_as_unbound_local_candidate(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice()
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        report = assess_reconstruction_feasibility(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        project = report["project_source"]
+        schema = json.loads((
+            SOURCE_SUITE / "core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json"
+        ).read_text(encoding="utf-8"))
+        Draft202012Validator(schema).validate(report)
+        self.assertEqual("local-lock-unbound", project["state"])
+        self.assertEqual(["portable-source-lock-sha256"], project["required"])
+        lock = self.target_suite / project["candidate"]["relative_path"]
+        self.assertEqual("sha256:" + sha256(lock.read_bytes()).hexdigest(), project["candidate"]["sha256"])
+        self.assertEqual(40, len(project["candidate"]["revision"]))
+        self.assertEqual(40, len(project["candidate"]["tree"]))
+        document = json.loads(lock.read_text(encoding="utf-8"))
+        document["pack"]["revision"] = "0" * 40
+        lock.write_bytes(json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
+        changed = assess_reconstruction_feasibility(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual(share["share_id"], changed["share_id"])
+        self.assertEqual("local-lock-unbound", changed["project_source"]["state"])
+        self.assertNotEqual(project["candidate"]["sha256"], changed["project_source"]["candidate"]["sha256"])
+        self.assertNotEqual(report["feasibility_id"], changed["feasibility_id"])
+
+    def test_feasibility_rejects_invalid_local_source_lock_candidate(self) -> None:
+        self._attach_local_source_lock()
+        self._source_choice()
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        lock = self.target_suite / "profiles/packs/supersymmetry/source-locks/legacy-forge/source-lock.json"
+        lock.write_text('{"format":"workbench-source-lock-v3","pack":{}}\n', encoding="utf-8")
+        report = assess_reconstruction_feasibility(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual("referenced-lock-invalid", report["project_source"]["state"])
+        self.assertIsNone(report["project_source"]["candidate"])
+
+    def test_feasibility_cli_and_unchecked_java_path(self) -> None:
+        self._source_choice(java_home=str(self.source_root / "unverified-java"))
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        path = self.root / "share.json"
+        path.write_bytes(json.dumps(share, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n")
+        local_java = self.target_root / "unverified-java"
+        with patch.dict(os.environ, self.target_environment, clear=False), redirect_stdout(StringIO()) as stream:
+            self.assertEqual(0, settings_cli.main([
+                "environment", "feasibility", str(path), "--name", "shared",
+                "--workspace", str(self.target_workspace), "--java-home", str(local_java), "--json",
+            ], suite_root=self.target_suite))
+        report = json.loads(stream.getvalue())
+        self.assertEqual("ready", report["import_state"])
+        self.assertEqual("local-binding-unchecked", report["java"]["state"])
+        self.assertNotIn(str(local_java), stream.getvalue())
+        self.assertFalse(local_java.exists())
+        self.assertFalse((self.target_root / "config").exists())
 
     def test_missing_changed_and_cross_host_inputs_block_without_binding(self) -> None:
         self._source_choice()
