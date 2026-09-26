@@ -52,8 +52,16 @@ FIXTURE_ROOT_RELATIVE = Path(
     "profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop"
 )
 OWNER_RELATIVE = Path(
+    "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2-core.json"
+)
+HISTORICAL_OWNER_RELATIVE = Path(
     "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2.json"
 )
+HISTORICAL_OWNER_ID = (
+    "workbench-cleanroom-mod-construction-owner:sha256:"
+    "befe2af77e834818a6e2746ef9ddad70f740267330ddde2cbbf5f1730a1661ce"
+)
+HISTORICAL_OWNER_SHA256 = "a373d634f5daf5870d4f75a7ca90101fd9e7670406bcbdec349bea42590d0b1e"
 OWNER_SCHEMA_RELATIVE = Path(
     "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json"
 )
@@ -439,6 +447,24 @@ def validate_construction_owner(
     return owner
 
 
+def _historical_construction_owner(suite: Path) -> dict[str, Any]:
+    """Reopen the exact pre-Core owner only for an interrupted old plan."""
+
+    path = _suite_file(suite, HISTORICAL_OWNER_RELATIVE, "historical construction owner")
+    raw = _read_regular(path, "historical construction owner")
+    if sha256(raw).hexdigest() != HISTORICAL_OWNER_SHA256:
+        _fail("historical construction owner bytes changed")
+    owner = _load_json(path, "historical construction owner")
+    _validate_schema(suite, OWNER_SCHEMA_RELATIVE, owner)
+    body = dict(owner)
+    supplied = body.pop("id", None)
+    if supplied != HISTORICAL_OWNER_ID or supplied != application_transaction.content_id(
+        "workbench-cleanroom-mod-construction-owner", body
+    ):
+        _fail("historical construction owner identity changed")
+    return owner
+
+
 def build_cleanroom_mod_request(
     target: Path | str,
     *,
@@ -572,7 +598,8 @@ def _plan_body(
 
 
 def validate_cleanroom_mod_plan(
-    suite_root: Path | str, value: Mapping[str, Any]
+    suite_root: Path | str, value: Mapping[str, Any], *,
+    allow_historical_owner: bool = False,
 ) -> dict[str, Any]:
     suite = _ordinary_directory(_absolute(suite_root), "suite root")
     if type(value) is not dict:
@@ -583,7 +610,11 @@ def validate_cleanroom_mod_plan(
     supplied = body.pop("id", None)
     if supplied != application_transaction.content_id(PLAN_KIND, body):
         _fail("construction plan content identity changed")
-    owner = validate_construction_owner(suite)
+    owner = (
+        _historical_construction_owner(suite)
+        if allow_historical_owner and plan.get("owner_record_id") == HISTORICAL_OWNER_ID
+        else validate_construction_owner(suite)
+    )
     if (
         plan.get("owner_record_id") != owner["id"]
         or plan.get("authority_boundary") != AUTHORITY_BOUNDARY
@@ -910,7 +941,7 @@ def recover_cleanroom_mod_construction(
     """Recover an interrupted bootstrap/application without guessing ownership."""
 
     suite = _ordinary_directory(_absolute(suite_root), "suite root")
-    reviewed = validate_cleanroom_mod_plan(suite, plan)
+    reviewed = validate_cleanroom_mod_plan(suite, plan, allow_historical_owner=True)
     target = _target_from_uri(reviewed["target_uri"])
     state = _absolute(state_root)
     transaction_journal = state / "active-transaction.json"
@@ -987,7 +1018,10 @@ def validate_cleanroom_mod_result(
     supplied = body.pop("id", None)
     if supplied != application_transaction.content_id(RESULT_KIND, body):
         _fail("construction result content identity changed")
-    plan = validate_cleanroom_mod_plan(suite, cast(Mapping[str, Any], result["plan"]))
+    plan = validate_cleanroom_mod_plan(
+        suite, cast(Mapping[str, Any], result["plan"]),
+        allow_historical_owner=True,
+    )
     if (
         result.get("plan_id") != plan["id"]
         or result.get("request_id") != plan["request_id"]

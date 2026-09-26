@@ -49,7 +49,7 @@
                   "const": "BLUEPRINTS-FRESH-PROJECT-CONSTRUCTION-V2"
                 },
                 "construction_owner_id": {
-                  "const": "workbench-cleanroom-mod-construction-owner:sha256:befe2af77e834818a6e2746ef9ddad70f740267330ddde2cbbf5f1730a1661ce"
+                  "const": "workbench-cleanroom-mod-construction-owner:sha256:3532f7b1f11fdfb3242fb9e84eac44b7648ff262991c065b1fadc6ee85928e12"
                 },
                 "construction_owner_ref": {
                   "allOf": [
@@ -57,7 +57,7 @@
                     {
                       "properties": {
                         "path": {
-                          "const": "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2.json"
+                          "const": "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2-core.json"
                         },
                         "schema_path": {
                           "const": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json"
@@ -66,7 +66,7 @@
                           "const": "sha256:d7bf003ea570c221045c30d7b4f508fbbdb98e12b206287a0a44c5ae7335325a"
                         },
                         "sha256": {
-                          "const": "sha256:a373d634f5daf5870d4f75a7ca90101fd9e7670406bcbdec349bea42590d0b1e"
+                          "const": "sha256:73352c114cfef6e284e3b6ec1647e44a38c07c5625b4de506d28c3bb0aba905b"
                         }
                       },
                       "required": ["path", "schema_path", "schema_sha256", "sha256"]

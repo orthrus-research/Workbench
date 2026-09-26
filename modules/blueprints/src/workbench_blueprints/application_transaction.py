@@ -1,9 +1,8 @@
 """Generic exact-byte application transactions owned by Blueprints.
 
-Callers validate their own plan and receipt formats.  This module owns bounded
-regular-file access, durable token-owned locking, exact preflight and byte
-replacement, retained history, crash recovery, mode preservation, and rollback
-that refuses to overwrite later edits.
+Callers validate their own plan and receipt formats. This module owns bounded
+source preflight, retained history, the V2 attempt journal, and recovery
+interpretation. Core stages, replaces, restores, and cleans the source bytes.
 """
 
 from __future__ import annotations
@@ -18,6 +17,9 @@ import tempfile
 from typing import Any, Callable, Mapping, NoReturn, Sequence, cast
 import uuid
 from workbench_api.host_filesystem import fsync_directory as _fsync_directory
+from workbench_api.source_transactions import (
+    SourceImage, SourceStage, SourceTransaction, open_source_transaction,
+)
 
 
 MAXIMUM_OPERATION_BYTES = 4 * 1024 * 1024
@@ -441,32 +443,10 @@ def _target_mode(root: Path, row: Mapping[str, Any], label: str) -> int:
     return stat.S_IMODE(state.st_mode)
 
 
-def _write_staged(
-    root: Path,
-    relative: PurePosixPath,
-    raw: bytes,
-    *,
-    mode: int = 0o644,
-    transaction_token: str | None = None,
-) -> Path:
-    path = _rooted_target(
-        root,
-        relative,
-        "transaction target",
-        create_parents=True,
-    )
-    token = "" if transaction_token is None else f"{transaction_token}-"
-    descriptor, name = tempfile.mkstemp(
-        prefix=f".{path.name}.workbench-{token}",
-        suffix=".tmp",
-        dir=path.parent,
-    )
-    with os.fdopen(descriptor, "wb") as stream:
-        stream.write(raw)
-        stream.flush()
-        os.fsync(stream.fileno())
-    os.chmod(name, mode)
-    return Path(name)
+def _source_image(raw: bytes | None, *, mode: int | None = None) -> SourceImage | None:
+    # M2's V2 journal owns byte identity and preserves the target's current
+    # exact mode during replacement and restoration. It does not record modes.
+    return None if raw is None else SourceImage("file", raw, executable=None, mode=mode)
 
 
 def _success_receipt(
@@ -628,52 +608,9 @@ def _validated_transaction_journal(
         observed_ordinals.append(ordinal)
     if observed_ordinals != list(range(len(observed_ordinals))):
         _fail("interrupted staged-file order changed")
+    if len(staged_files) < len(attempted):
+        _fail("interrupted source attempt lacks its staged-file owner")
     return journal
-
-
-def _cleanup_transaction_staged_files(
-    root: Path,
-    journal: Mapping[str, Any],
-) -> None:
-    for row in journal["staged_files"]:
-        relative = _relative(row["path"], "interrupted staged file")
-        path = _rooted_target(root, relative, "interrupted staged file")
-        try:
-            state = path.lstat()
-        except FileNotFoundError:
-            continue
-        except OSError:
-            continue
-        if stat.S_ISREG(state.st_mode) and not stat.S_ISLNK(state.st_mode):
-            path.unlink(missing_ok=True)
-
-
-def _cleanup_token_staged_files(
-    root: Path,
-    plan: Mapping[str, Any],
-    transaction_token: str,
-) -> None:
-    """Remove only temp names carrying one interrupted transaction token."""
-
-    for row in plan["operations"]:
-        relative = _relative(row["path"], "transaction target")
-        target = _rooted_target(root, relative, "transaction target")
-        prefix = f".{target.name}.workbench-{transaction_token}-"
-        try:
-            candidates = list(target.parent.iterdir())
-        except OSError:
-            continue
-        for candidate in candidates:
-            if not candidate.name.startswith(prefix) or not candidate.name.endswith(
-                ".tmp"
-            ):
-                continue
-            try:
-                state = candidate.lstat()
-            except OSError:
-                continue
-            if stat.S_ISREG(state.st_mode) and not stat.S_ISLNK(state.st_mode):
-                candidate.unlink(missing_ok=True)
 
 
 def apply_application_transaction(
@@ -693,10 +630,9 @@ def apply_application_transaction(
 ) -> dict[str, Any]:
     """Apply one already owner-validated plan with shared transaction mechanics.
 
-    The caller owns the plan and receipt formats.  This helper owns only the
-    atomic write, exact revalidation, retained history, lock, and immediate
-    partial-failure rollback mechanics shared by disposable and admitted
-    direct-checkout application.
+    The caller owns the plan and receipt formats. This helper retains the
+    exact V2 journal and history while Core executes each source replacement
+    after its attempted ordinal is durable.
     """
 
     root = _absolute_path(workspace)
@@ -737,13 +673,14 @@ def apply_application_transaction(
     lock_descriptor, lock_token, lock_identity = held_lock
     journal_path = state / "active-transaction.json"
     prepared_receipt_path = state / "prepared-receipt.json"
-    staged: list[Path] = []
+    staged: list[SourceStage] = []
     staged_files: list[dict[str, Any]] = []
     attempted: list[Mapping[str, Any]] = []
     history_objects: list[dict[str, Any]] = []
     journal: dict[str, Any] | None = None
     own_journal = False
     preserve_recovery = False
+    source_transaction: SourceTransaction | None = None
     try:
         if (
             journal_path.exists()
@@ -752,6 +689,9 @@ def apply_application_transaction(
             or prepared_receipt_path.is_symlink()
         ):
             _fail("an interrupted transaction must be recovered before applying")
+        source_transaction = open_source_transaction(
+            root, binding=value["id"], staging_token=lock_token,
+        )
         journal = _transaction_journal(
             plan_id=value["id"],
             workspace_uri=root_resolved.as_uri(),
@@ -792,18 +732,16 @@ def apply_application_transaction(
             after = base64.b64decode(row["after_base64"], validate=True)
             history_objects.append(_retain_object(state, after))
             relative = _relative(row["path"], "transaction target")
-            temporary = _write_staged(
-                root,
-                relative,
-                after,
-                mode=mode,
-                transaction_token=lock_token,
+            stage = source_transaction.prepare(
+                relative.as_posix(), before=_source_image(before),
+                after=_source_image(after, mode=mode),
+                create_parents=True, preserve_target_mode=True,
             )
-            staged.append(temporary)
+            staged.append(stage)
             staged_files.append(
                 {
                     "ordinal": row["ordinal"],
-                    "path": temporary.resolve().relative_to(root_resolved).as_posix(),
+                    "path": stage.staged_relative,
                 }
             )
             journal = _transaction_journal(
@@ -855,20 +793,8 @@ def apply_application_transaction(
             }
             return seal(receipt_content_kind, body)
         try:
-            for row, temporary in zip(value["operations"], staged, strict=True):
+            for row, stage in zip(value["operations"], staged, strict=True):
                 _target_bytes(root, row, "before")
-                relative = _relative(row["path"], "transaction target")
-                target = _rooted_target(
-                    root,
-                    relative,
-                    "transaction target",
-                    create_parents=True,
-                )
-                if row["before_base64"] is not None:
-                    os.chmod(
-                        temporary,
-                        _target_mode(root, row, "transaction target"),
-                    )
                 attempted.append(row)
                 journal = _transaction_journal(
                     plan_id=value["id"],
@@ -882,8 +808,7 @@ def apply_application_transaction(
                 # Persist ownership before replacement so recovery never
                 # guesses whether a path was transaction-owned.
                 _write_transaction_journal(journal_path, journal)
-                os.replace(temporary, target)
-                _fsync_directory(target.parent)
+                source_transaction.commit(stage)
                 _target_bytes(root, row, "after")
                 if fail_after_ordinal == row["ordinal"]:
                     raise OSError("injected bounded partial failure")
@@ -919,27 +844,7 @@ def apply_application_transaction(
                         except ApplicationTransactionError:
                             rollback_state = "blocked-by-later-edit"
                         continue
-                    relative = _relative(row["path"], "rollback target")
-                    target = _rooted_target(
-                        root,
-                        relative,
-                        "rollback target",
-                        create_parents=True,
-                    )
-                    before_encoded = row["before_base64"]
-                    if before_encoded is None:
-                        target.unlink()
-                    else:
-                        before = base64.b64decode(before_encoded, validate=True)
-                        replacement = _write_staged(
-                            root,
-                            relative,
-                            before,
-                            mode=_target_mode(root, row, "rollback target"),
-                            transaction_token=lock_token,
-                        )
-                        os.replace(replacement, target)
-                    _fsync_directory(target.parent)
+                    source_transaction.rollback(staged[row["ordinal"]])
                     _target_bytes(root, row, "before")
                 except Exception:
                     rollback_state = "blocked-by-later-edit"
@@ -976,22 +881,24 @@ def apply_application_transaction(
             return seal(receipt_content_kind, body)
         return receipt
     finally:
-        if own_journal and not preserve_recovery:
-            for temporary in staged:
-                temporary.unlink(missing_ok=True)
-            prepared_receipt_path.unlink(missing_ok=True)
-            journal_path.unlink(missing_ok=True)
-            _fsync_directory(state)
-        if preserve_recovery:
-            _close_transaction_lock(lock_descriptor)
-            _mark_transaction_lock_recoverable(lock_path, value["id"])
-        else:
-            _release_transaction_lock(
-                lock_path,
-                lock_descriptor,
-                lock_token,
-                lock_identity,
-            )
+        try:
+            if own_journal and not preserve_recovery:
+                if source_transaction is not None:
+                    source_transaction.cleanup()
+                prepared_receipt_path.unlink(missing_ok=True)
+                journal_path.unlink(missing_ok=True)
+                _fsync_directory(state)
+        finally:
+            if preserve_recovery:
+                _close_transaction_lock(lock_descriptor)
+                _mark_transaction_lock_recoverable(lock_path, value["id"])
+            else:
+                _release_transaction_lock(
+                    lock_path,
+                    lock_descriptor,
+                    lock_token,
+                    lock_identity,
+                )
 
 
 def recover_application_transaction(
@@ -1045,11 +952,17 @@ def recover_application_transaction(
     prepared_receipt_path = state / "prepared-receipt.json"
     preserve_recovery = False
     journal: dict[str, Any] | None = None
+    source_transaction: SourceTransaction | None = None
     try:
         if not journal_path.exists() or journal_path.is_symlink():
             if stale is None:
                 _fail("no interrupted transaction is available to recover")
-            _cleanup_token_staged_files(root, plan, stale["token"])
+            source_transaction = open_source_transaction(
+                root, binding=plan["id"], staging_token=stale["token"],
+            )
+            source_transaction.cleanup_orphaned_stages(
+                [row["path"] for row in plan["operations"]],
+            )
             prepared_receipt_path.unlink(missing_ok=True)
             _fsync_directory(state)
             return {
@@ -1064,6 +977,27 @@ def recover_application_transaction(
             plan=plan,
             workspace_uri=root_resolved.as_uri(),
         )
+        preserve_recovery = True
+        source_transaction = open_source_transaction(
+            root, binding=plan["id"],
+            staging_token=journal["transaction_token"],
+        )
+        stages: dict[int, SourceStage] = {}
+        attempted_ordinals = cast(list[int], journal["attempted_ordinals"])
+        for staged_row in journal["staged_files"]:
+            ordinal = staged_row["ordinal"]
+            operation = plan["operations"][ordinal]
+            before_raw = (
+                None if operation["before_base64"] is None
+                else base64.b64decode(operation["before_base64"], validate=True)
+            )
+            after_raw = base64.b64decode(operation["after_base64"], validate=True)
+            stages[ordinal] = source_transaction.attach(
+                operation["path"], before=_source_image(before_raw),
+                after=_source_image(after_raw),
+                staged_relative=staged_row["path"],
+                attempted=ordinal in attempted_ordinals,
+            )
         journal = {
             **journal,
             "phase": "recovering",
@@ -1099,21 +1033,9 @@ def recover_application_transaction(
             ):
                 prepared_receipt = candidate
 
-        attempted_ordinals = cast(list[int], journal["attempted_ordinals"])
         classifications: dict[int, str] = {}
         for ordinal in attempted_ordinals:
-            row = plan["operations"][ordinal]
-            try:
-                _target_bytes(root, row, "after")
-                classifications[ordinal] = "after"
-                continue
-            except ApplicationTransactionError:
-                pass
-            try:
-                _target_bytes(root, row, "before")
-                classifications[ordinal] = "before"
-            except ApplicationTransactionError:
-                classifications[ordinal] = "other"
+            classifications[ordinal] = source_transaction.classify(stages[ordinal])
 
         if any(value == "other" for value in classifications.values()):
             preserve_recovery = True
@@ -1148,10 +1070,14 @@ def recover_application_transaction(
                     "review-required",
                 )
                 raise
-            _cleanup_transaction_staged_files(root, journal)
+            source_transaction.cleanup()
+            source_transaction.cleanup_orphaned_stages(
+                [row["path"] for row in plan["operations"]],
+            )
             prepared_receipt_path.unlink(missing_ok=True)
             journal_path.unlink(missing_ok=True)
             _fsync_directory(state)
+            preserve_recovery = False
             return {
                 "application_receipt": prepared_receipt,
                 "attempted_ordinals": attempted_ordinals,
@@ -1168,27 +1094,7 @@ def recover_application_transaction(
                 if classifications[ordinal] != "after":
                     continue
                 row = plan["operations"][ordinal]
-                relative = _relative(row["path"], "recovery target")
-                target = _rooted_target(
-                    root,
-                    relative,
-                    "recovery target",
-                    create_parents=True,
-                )
-                before_encoded = row["before_base64"]
-                if before_encoded is None:
-                    target.unlink()
-                else:
-                    before = base64.b64decode(before_encoded, validate=True)
-                    replacement = _write_staged(
-                        root,
-                        relative,
-                        before,
-                        mode=_target_mode(root, row, "recovery target"),
-                        transaction_token=lock_token,
-                    )
-                    os.replace(replacement, target)
-                _fsync_directory(target.parent)
+                source_transaction.rollback(stages[ordinal])
                 _target_bytes(root, row, "before")
                 mutated = True
             for ordinal in attempted_ordinals:
@@ -1201,10 +1107,14 @@ def recover_application_transaction(
                 "review-required",
             )
             raise
-        _cleanup_transaction_staged_files(root, journal)
+        source_transaction.cleanup()
+        source_transaction.cleanup_orphaned_stages(
+            [row["path"] for row in plan["operations"]],
+        )
         prepared_receipt_path.unlink(missing_ok=True)
         journal_path.unlink(missing_ok=True)
         _fsync_directory(state)
+        preserve_recovery = False
         return {
             "application_receipt": None,
             "attempted_ordinals": attempted_ordinals,
@@ -1349,6 +1259,7 @@ def rollback_application_transaction(
         }
         return seal(rollback_content_kind, body)
     lock_descriptor, lock_token, lock_identity = held_lock
+    source_transaction: SourceTransaction | None = None
 
     try:
         _verify_retained_history(state, applied)
@@ -1366,26 +1277,27 @@ def rollback_application_transaction(
                 "workspace_mutated": False,
             }
             return seal(rollback_content_kind, body)
+        source_transaction = open_source_transaction(
+            root, binding=applied["id"], staging_token=lock_token,
+        )
+        stages: list[tuple[Mapping[str, Any], SourceStage]] = []
         for row in reversed(value["operations"]):
-            relative = _relative(row["path"], "rollback target")
-            target = _rooted_target(
-                root,
-                relative,
-                "rollback target",
-                create_parents=True,
-            )
             before_encoded = row["before_base64"]
-            if before_encoded is None:
-                target.unlink()
-            else:
-                before = base64.b64decode(before_encoded, validate=True)
-                replacement = _write_staged(
-                    root,
-                    relative,
-                    before,
-                    mode=_target_mode(root, row, "rollback target"),
-                )
-                os.replace(replacement, target)
+            before = (
+                None if before_encoded is None
+                else base64.b64decode(before_encoded, validate=True)
+            )
+            after = base64.b64decode(row["after_base64"], validate=True)
+            mode = _target_mode(root, row, "rollback target")
+            stage = source_transaction.prepare(
+                row["path"], before=_source_image(after),
+                after=_source_image(before, mode=mode),
+                create_parents=True,
+                preserve_target_mode=before is not None,
+            )
+            stages.append((row, stage))
+        for row, stage in stages:
+            source_transaction.commit(stage)
             _target_bytes(root, row, "before")
         body = {
             "diagnostic_code": None,
@@ -1398,12 +1310,16 @@ def rollback_application_transaction(
         }
         return seal(rollback_content_kind, body)
     finally:
-        _release_transaction_lock(
-            lock_path,
-            lock_descriptor,
-            lock_token,
-            lock_identity,
-        )
+        try:
+            if source_transaction is not None:
+                source_transaction.cleanup()
+        finally:
+            _release_transaction_lock(
+                lock_path,
+                lock_descriptor,
+                lock_token,
+                lock_identity,
+            )
 
 
 __all__ = [

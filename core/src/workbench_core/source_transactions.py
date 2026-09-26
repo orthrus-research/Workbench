@@ -8,11 +8,13 @@ resource cleanup: an external source tree is never Core-owned scratch.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from hashlib import sha256
 import os
 from pathlib import Path, PurePosixPath
 import stat
 import tempfile
+from typing import Sequence
 from uuid import uuid4
 
 from workbench_api.source_transactions import (
@@ -47,14 +49,18 @@ def _check_image(image: SourceImage | None) -> None:
         not isinstance(image, SourceImage)
         or image.kind not in {"file", "symlink"}
         or type(image.data) is not bytes
-        or type(image.executable) is not bool
-        or (image.kind == "symlink" and image.executable)
+        or (image.executable is not None and type(image.executable) is not bool)
+        or (image.mode is not None and (type(image.mode) is not int or not 0 <= image.mode <= 0o7777))
+        or (image.kind == "symlink" and (image.executable or image.mode is not None))
     ):
         _fail("image", "source image is invalid")
 
 
 class _SourceTransaction:
-    def __init__(self, root: Path, *, binding: str, check_cancelled):
+    def __init__(
+        self, root: Path, *, binding: str, staging_token: str | None,
+        check_cancelled,
+    ):
         if not isinstance(root, Path) or not root.is_absolute():
             _fail("path", "protected source root must be absolute")
         for ancestor in (root, *root.parents):
@@ -65,7 +71,13 @@ class _SourceTransaction:
             _fail("binding", "protected source transaction binding is invalid")
         self.root = root
         self.root_identity = _identity(root_state)
-        self.binding_token = sha256(binding.encode("utf-8")).hexdigest()[:20]
+        if staging_token is not None and (
+            type(staging_token) is not str or len(staging_token) != 32
+            or any(character not in "0123456789abcdef" for character in staging_token)
+        ):
+            _fail("binding", "source staging token must be 32 lowercase hex characters")
+        self.binding_token = staging_token or sha256(binding.encode("utf-8")).hexdigest()[:20]
+        self.persisted_token = staging_token is not None
         self.check_cancelled = check_cancelled
         self._stages: dict[str, dict] = {}
         self._created: list[tuple[Path, tuple[int, int]]] = []
@@ -120,7 +132,9 @@ class _SourceTransaction:
         else:
             if not stat.S_ISREG(visible.st_mode):
                 _fail("stale", "protected source kind changed after review")
-            if bool(visible.st_mode & stat.S_IXUSR) != expected.executable:
+            if expected.mode is not None and stat.S_IMODE(visible.st_mode) != expected.mode:
+                _fail("stale", "protected source mode changed after review")
+            if expected.mode is None and expected.executable is not None and bool(visible.st_mode & stat.S_IXUSR) != expected.executable:
                 _fail("stale", "protected source mode changed after review")
             flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
             descriptor = os.open(path, flags)
@@ -170,7 +184,10 @@ class _SourceTransaction:
             with os.fdopen(descriptor, "wb") as stream:
                 stream.write(image.data)
                 stream.flush()
-                os.fchmod(stream.fileno(), 0o755 if image.executable else 0o644)
+                os.fchmod(
+                    stream.fileno(), image.mode if image.mode is not None
+                    else 0o755 if image.executable else 0o644,
+                )
                 os.fsync(stream.fileno())
             fsync_directory(path.parent)
             return temporary, _identity(temporary.lstat())
@@ -185,21 +202,97 @@ class _SourceTransaction:
     def prepare(
         self, relative: str, *, before: SourceImage | None,
         after: SourceImage | None, create_parents: bool = False,
+        preserve_target_mode: bool = False,
     ) -> SourceStage:
         self.check_cancelled()
         _check_image(before)
         _check_image(after)
+        if preserve_target_mode and (after is None or after.kind != "file"):
+            _fail("image", "mode preservation requires a regular after image")
         target = self._target(relative, create_parents=create_parents)
         self._match(target, before)
         parent_identity = _identity(_ordinary_directory(target.parent))
         staged, identity = (None, None) if after is None else self._stage(target, after)
-        reference = SourceStage(uuid4().hex)
+        staged_relative = None if staged is None else staged.relative_to(self.root).as_posix()
+        reference = SourceStage(uuid4().hex, staged_relative)
         self._stages[reference.token] = {
             "relative": relative, "before": before, "after": after,
             "staged": staged, "identity": identity, "committed": False,
             "restored": False, "parent_identity": parent_identity,
+            "preserve_target_mode": preserve_target_mode,
+            "attempted": False,
         }
         return reference
+
+    def attach(
+        self, relative: str, *, before: SourceImage | None,
+        after: SourceImage | None, staged_relative: str | None,
+        attempted: bool,
+    ) -> SourceStage:
+        """Reopen an owner-journaled stage after process death.
+
+        The caller validates its journal, plan, and attempt order. Core checks
+        that the named stage belongs to this token and still holds after bytes.
+        """
+
+        if not self.persisted_token:
+            _fail("binding", "reopening requires an owner-supplied staging token")
+        _check_image(before)
+        _check_image(after)
+        if type(attempted) is not bool:
+            _fail("stage", "source attempt state is invalid")
+        target = self._target(relative, create_parents=False)
+        parent_identity = _identity(_ordinary_directory(target.parent))
+        if after is None:
+            if staged_relative is not None:
+                _fail("stage", "deleted source cannot have a staged file")
+            staged = None
+            identity = None
+        else:
+            if type(staged_relative) is not str:
+                _fail("stage", "source stage path is missing")
+            staged = self._target(staged_relative, create_parents=False)
+            prefix = f".{target.name}.workbench-{self.binding_token}-"
+            if (
+                staged.parent != target.parent
+                or not staged.name.startswith(prefix)
+                or not staged.name.endswith(".tmp")
+            ):
+                _fail("stage", "source stage is not owned by this transaction")
+            try:
+                visible = staged.lstat()
+            except FileNotFoundError:
+                staged = None
+                identity = None
+            else:
+                identity = _identity(visible)
+                self._match(staged, after)
+        reference = SourceStage(uuid4().hex, staged_relative)
+        self._stages[reference.token] = {
+            "relative": relative, "before": before, "after": after,
+            "staged": staged, "identity": identity,
+            "committed": False, "restored": False,
+            "parent_identity": parent_identity, "preserve_target_mode": False,
+            "attempted": attempted,
+        }
+        if attempted and self.classify(reference) == "after":
+            self._stages[reference.token]["committed"] = True
+        return reference
+
+    def classify(self, reference: SourceStage) -> str:
+        entry = self._entry(reference)
+        target = self._target(entry["relative"], create_parents=False)
+        if _identity(_ordinary_directory(target.parent)) != entry["parent_identity"]:
+            _fail("path", "protected source parent changed after stage ownership")
+        for label in ("after", "before"):
+            try:
+                self._match(target, entry[label])
+            except SourceTransactionError as exc:
+                if exc.code != "stale":
+                    raise
+            else:
+                return label
+        return "other"
 
     def _entry(self, reference: SourceStage) -> dict:
         if not isinstance(reference, SourceStage) or reference.token not in self._stages:
@@ -215,12 +308,17 @@ class _SourceTransaction:
         if _identity(_ordinary_directory(target.parent)) != entry["parent_identity"]:
             _fail("path", "protected source parent changed before commit")
         self._match(target, entry["before"])
+        entry["attempted"] = True
         if entry["after"] is None:
             target.unlink()
         else:
             staged = entry["staged"]
             if staged is None or _identity(staged.lstat()) != entry["identity"]:
                 _fail("stage", "source staging identity changed")
+            if entry["preserve_target_mode"] and entry["before"] is not None:
+                mode = stat.S_IMODE(target.lstat().st_mode)
+                os.chmod(staged, mode, follow_symlinks=False)
+                entry["after"] = replace(entry["after"], mode=mode)
             self._match(staged, entry["after"])
             os.replace(staged, target)
         entry["committed"] = True
@@ -229,6 +327,14 @@ class _SourceTransaction:
 
     def rollback(self, reference: SourceStage) -> None:
         entry = self._entry(reference)
+        if entry["preserve_target_mode"] and entry["after"] is not None:
+            # M2's V2 journal records bytes, not a frozen mode. A chmod after
+            # replacement does not forfeit ownership of those exact bytes.
+            entry["after"] = replace(entry["after"], mode=None)
+        if entry["attempted"] and not entry["committed"] and self.classify(reference) == "after":
+            # A replace may have completed before the caller observed an
+            # exception or process death. The owner journal gates this call.
+            entry["committed"] = True
         if not entry["committed"] or entry["restored"]:
             _fail("stage", "source stage is not available for rollback")
         target = self._target(entry["relative"], create_parents=False)
@@ -238,7 +344,10 @@ class _SourceTransaction:
         if entry["before"] is None:
             target.unlink()
         else:
-            replacement, identity = self._stage(target, entry["before"])
+            before = entry["before"]
+            if before.kind == "file" and before.mode is None and before.executable is None:
+                before = replace(before, mode=stat.S_IMODE(target.lstat().st_mode))
+            replacement, identity = self._stage(target, before)
             try:
                 os.replace(replacement, target)
             finally:
@@ -249,7 +358,7 @@ class _SourceTransaction:
                 else:
                     if _identity(visible) != identity:
                         _fail("stage", "rollback staging identity changed")
-                    self._match(replacement, entry["before"])
+                    self._match(replacement, before)
                     replacement.unlink()
                     fsync_directory(replacement.parent)
         fsync_directory(target.parent)
@@ -292,9 +401,37 @@ class _SourceTransaction:
                     continue
                 fsync_directory(directory.parent)
 
+    def cleanup_orphaned_stages(self, relatives: Sequence[str]) -> None:
+        """Remove regular token-named stages whose journal was never published."""
+
+        if not self.persisted_token:
+            _fail("binding", "orphan cleanup requires an owner-supplied staging token")
+        for relative in relatives:
+            try:
+                target = self._target(relative, create_parents=False)
+            except SourceTransactionError as exc:
+                if exc.code == "path" and str(exc) == "protected source parent is unavailable":
+                    continue
+                raise
+            prefix = f".{target.name}.workbench-{self.binding_token}-"
+            try:
+                candidates = tuple(target.parent.iterdir())
+            except FileNotFoundError:
+                continue
+            for candidate in candidates:
+                if not candidate.name.startswith(prefix) or not candidate.name.endswith(".tmp"):
+                    continue
+                try:
+                    visible = candidate.lstat()
+                except FileNotFoundError:
+                    continue
+                if stat.S_ISREG(visible.st_mode) and not stat.S_ISLNK(visible.st_mode):
+                    candidate.unlink()
+                    fsync_directory(target.parent)
+
 
 class CoreSourceTransactions:
-    """Bind source mutations only for a dispatched module owner."""
+    """Bind source mutations for a dispatched owner or a composed local host."""
 
     def __init__(self, *, owner_id: str, check_cancelled=lambda: None):
         if type(owner_id) is not str or not owner_id:
@@ -302,9 +439,12 @@ class CoreSourceTransactions:
         self.owner_id = owner_id
         self.check_cancelled = check_cancelled
 
-    def open(self, root: Path, *, binding: str) -> _SourceTransaction:
+    def open(
+        self, root: Path, *, binding: str, staging_token: str | None = None,
+    ) -> _SourceTransaction:
         return _SourceTransaction(
-            root, binding=binding, check_cancelled=self.check_cancelled,
+            root, binding=binding, staging_token=staging_token,
+            check_cancelled=self.check_cancelled,
         )
 
 

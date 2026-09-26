@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import copy
 from hashlib import sha256
 import json
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, os.fspath(ROOT / "modules/blueprints/src"))
 sys.path.insert(0, os.fspath(ROOT / "profiles/platforms/cleanroom/src"))
 
-from workbench_blueprints import fresh_project  # noqa: E402
+from workbench_blueprints import application_transaction, fresh_project  # noqa: E402
 from workbench_blueprints.interface import AdapterSet  # noqa: E402
 from workbench_cleanroom_new_project import construction  # noqa: E402
 from workbench_cleanroom_new_project import cli as construction_cli  # noqa: E402
@@ -25,7 +26,8 @@ from workbench_cleanroom_new_project import cli as construction_cli  # noqa: E40
 
 PROFILE = ROOT / "profiles/platforms/cleanroom"
 SCHEMAS = PROFILE / "schemas"
-OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2.json"
+OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core.json"
+HISTORICAL_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2.json"
 KIND = PROFILE / "new-project-kinds/cleanroom-mod.json"
 
 
@@ -144,6 +146,19 @@ class CleanroomModConstructionV2Tests(unittest.TestCase):
             allow_direct_apply=direct,
         )
         return construction.preview_cleanroom_mod_construction(ROOT, request)
+
+    def _historical_plan(self, target: Path) -> dict[str, object]:
+        request = construction.build_cleanroom_mod_request(
+            target, output_mode="direct-apply", allow_direct_apply=True,
+        )
+        owner = construction._historical_construction_owner(ROOT)
+        return construction._sealed(
+            construction.PLAN_KIND,
+            construction._plan_body(
+                ROOT, request, owner, fresh_project.observe_fresh_target(target),
+                construction.cleanroom_mod_adapter_set(ROOT),
+            ),
+        )
 
     def test_owner_and_current_kind_schemas_are_closed(self) -> None:
         owner = construction.validate_construction_owner(ROOT)
@@ -287,6 +302,79 @@ class CleanroomModConstructionV2Tests(unittest.TestCase):
             )
             self.assertEqual("restored", result["state"])
             self.assertFalse(target.exists())
+
+    def test_historical_owner_plan_reopens_only_for_recovery(self) -> None:
+        self.assertEqual(
+            construction.HISTORICAL_OWNER_SHA256,
+            sha256(HISTORICAL_OWNER.read_bytes()).hexdigest(),
+        )
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh-project"
+            state_root = root / "state"
+            plan = self._historical_plan(target)
+            self.assertEqual(construction.HISTORICAL_OWNER_ID, plan["owner_record_id"])
+            with self.assertRaisesRegex(ValueError, "owner binding changed"):
+                construction.validate_cleanroom_mod_plan(ROOT, plan)
+            self.assertEqual(
+                plan, construction.validate_cleanroom_mod_plan(
+                    ROOT, plan, allow_historical_owner=True,
+                ),
+            )
+            fresh_project.prepare_fresh_target(
+                target, plan["target_observation"], state_root, plan_id=plan["id"],
+            )
+            recovered = construction.recover_cleanroom_mod_construction(
+                ROOT, plan, state_root,
+            )
+            self.assertEqual("restored", recovered["state"])
+            self.assertFalse(target.exists())
+
+    def test_historical_owner_plan_recovers_interrupted_v2_source_journal(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh-project"
+            state_root = root / "state"
+            plan = self._historical_plan(target)
+            fresh_project.prepare_fresh_target(
+                target, plan["target_observation"], state_root, plan_id=plan["id"],
+            )
+            # Recreate the previous M2 writer's exact token-named stage and
+            # V2 attempt record, then reopen it with the current Core port.
+            token = "d" * 32
+            staged_files = []
+            for row in plan["operations"]:
+                source = target / row["path"]
+                source.parent.mkdir(parents=True, exist_ok=True)
+                descriptor, staged = tempfile.mkstemp(
+                    prefix=f".{source.name}.workbench-{token}-",
+                    suffix=".tmp", dir=source.parent,
+                )
+                with os.fdopen(descriptor, "wb") as stream:
+                    stream.write(base64.b64decode(row["after_base64"], validate=True))
+                os.chmod(staged, 0o644)
+                staged_files.append({
+                    "ordinal": row["ordinal"],
+                    "path": Path(staged).relative_to(target).as_posix(),
+                })
+            first = plan["operations"][0]
+            os.replace(target / staged_files[0]["path"], target / first["path"])
+            journal = application_transaction._transaction_journal(
+                plan_id=plan["id"], workspace_uri=target.resolve().as_uri(),
+                transaction_token=token, phase="applying",
+                attempted_ordinals=[0], staged_files=staged_files,
+                expected_receipt_id=None,
+            )
+            (state_root / "active-transaction.json").write_bytes(
+                application_transaction.canonical_json_bytes(journal) + b"\n"
+            )
+            self.assertTrue((state_root / "active-transaction.json").is_file())
+            recovered = construction.recover_cleanroom_mod_construction(
+                ROOT, plan, state_root,
+            )
+            self.assertEqual("restored", recovered["state"])
+            self.assertFalse(target.exists())
+            self.assertFalse((state_root / "active-transaction.json").exists())
 
     def test_altered_plan_and_result_identities_reject(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
