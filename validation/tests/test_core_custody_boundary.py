@@ -23,6 +23,12 @@ DIRECT_CORE_COMPATIBILITY = {
     "modules/atlas/src/workbench_atlas/layout.py": {
         ("workbench_core.environment_resolution", "resolve_environment"),
     },
+    "modules/atlas/src/workbench_atlas_recipe_health/cli.py": {
+        ("workbench_core.host_services", "direct_atlas_derived_index_scope"),
+    },
+    "modules/atlas/src/workbench_atlas_observations/cli.py": {
+        ("workbench_core.host_services", "direct_atlas_derived_index_scope"),
+    },
     "modules/blueprints/src/workbench_blueprints/cli.py": {
         # The supported direct CLI composes Core after validating its target.
         ("workbench_core.host_services", "direct_module_custody_scope"),

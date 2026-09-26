@@ -28,6 +28,8 @@ from workbench_atlas_categorical_graph import (  # noqa: E402
     verify_query_index,
 )
 from workbench_atlas_categorical_graph import bundle as bundle_module  # noqa: E402
+from workbench_api.derived_indexes import derived_indexes_scope  # noqa: E402
+from workbench_core.derived_indexes import CoreDerivedIndexes  # noqa: E402
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -111,6 +113,13 @@ def _refresh_index_descriptor(root: Path, manifest: dict[str, object]) -> None:
 
 
 class CategoricalGraphBundleV2Tests(unittest.TestCase):
+    def setUp(self) -> None:
+        home = tempfile.TemporaryDirectory()
+        self.addCleanup(home.cleanup)
+        scope = derived_indexes_scope(CoreDerivedIndexes(configuration_home=Path(home.name) / "config"))
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
+
     def test_sql_verification_preserves_cancellation_and_resets_progress_handler(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "graph"

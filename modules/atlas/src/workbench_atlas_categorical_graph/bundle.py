@@ -15,9 +15,10 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 import shutil
 import sqlite3
 import stat
-import tempfile
 from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
 from urllib.parse import quote
+
+from workbench_api.derived_indexes import derived_indexes
 
 
 BUNDLE_FORMAT = "workbench-atlas-categorical-graph-bundle-v2"
@@ -1593,31 +1594,6 @@ def _manifest_bytes(manifest: Mapping[str, Any]) -> bytes:
     )
 
 
-def _write_manifest_atomically(root: Path, manifest: Mapping[str, Any]) -> None:
-    destination = _bundle_file(
-        root, "manifest.json", "categorical graph manifest", must_exist=True
-    )
-    descriptor, temporary_name = tempfile.mkstemp(
-        dir=root, prefix=".manifest.", suffix=".tmp"
-    )
-    temporary = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(_manifest_bytes(manifest))
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, destination)
-    except OSError as exc:
-        raise AtlasCategoricalGraphError(
-            f"categorical graph manifest replacement failed: {exc}"
-        ) from exc
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
-
-
 def rebuild_query_index(
     path: Path,
     *,
@@ -1731,10 +1707,8 @@ def rebuild_query_index(
             f"categorical graph query index cannot be inspected: {exc}"
         ) from exc
 
-    with tempfile.TemporaryDirectory(
-        dir=root, prefix=".query-index-rebuild-"
-    ) as temporary:
-        staged = Path(temporary) / _QUERY_INDEX_FILE
+    with derived_indexes().stage(root, graph_set_id=manifest["graph_set_id"]) as custody:
+        staged = custody.path
         if max_index_bytes is None and progress is None and check_cancelled is None:
             # Preserve the original call surface for V2 callers and focused
             # construction interposition tests.
@@ -1779,13 +1753,14 @@ def rebuild_query_index(
                 "categorical graph authority changed during query index rebuild"
             )
         check()
-        try:
-            os.replace(staged, target)
-        except OSError as exc:
-            raise AtlasCategoricalGraphError(
-                f"categorical graph query index replacement failed: {exc}"
-            ) from exc
-    _write_manifest_atomically(root, candidate_manifest)
+        custody.publish(
+            manifest_bytes=_manifest_bytes(candidate_manifest),
+            expected_size=descriptor["size"],
+            expected_sha256=descriptor["sha256"],
+            validate_source=lambda selected: validate_bundle_directory(
+                selected, check_cancelled=check_cancelled,
+            ),
+        )
     if progress is not None:
         progress(
             {

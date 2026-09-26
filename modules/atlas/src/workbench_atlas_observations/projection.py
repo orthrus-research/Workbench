@@ -117,6 +117,7 @@ def project_retained_observations(reader, output, *, side="single",
             domain_id=graph["graph_set_id"],
             references=(reference,),
             derived_members=("query-index.sqlite3",),
+            derived_manifest_rule="atlas-categorical-query-index-v1",
         )
         return {"format": PROJECTION_FORMAT, "schema_version": 1, "state": "complete",
             "root": str(published.path), "tree_id": published.tree_id,

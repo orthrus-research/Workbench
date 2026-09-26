@@ -53,11 +53,15 @@ or fall back to the ordinary pager. All byte, schema and semantic-equivalence
 checks still run; the mapping does not admit unverified cache content.
 
 `rebuild_query_index` first validates the authoritative streams, builds
-deterministically in bounded batches under a staging directory, and remeasures
-the exact stream reads used for construction against their descriptors. It
-verifies the staged index's complete semantic equivalence and validates the
-authoritative directory again before atomic exposure, then atomically replaces
-the database and its descriptor without changing the graph-set ID.
+deterministically in bounded batches in a Core-owned stage outside the graph,
+and remeasures the exact stream reads used for construction against their
+descriptors. Atlas verifies the staged index's complete semantic equivalence
+and validates the authoritative directory again. Core holds the graph lease,
+records the prepared attempt, compares the exact manifest and staged bytes,
+then replaces the database and the manifest in that order. It preserves the
+manifest's file mode and graph-set ID. Each replacement is atomic, but the pair
+is not: an interruption between them leaves a descriptor mismatch until an
+explicit rebuild. Core classifies that partial attempt before a later rebuild.
 `CategoricalGraphQuery(..., rebuild_if_missing=True)` is the explicit recovery
 path for a missing index; invalid present indexes still fail closed and require
 an explicit rebuild call.

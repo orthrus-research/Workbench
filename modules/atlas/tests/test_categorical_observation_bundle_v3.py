@@ -10,9 +10,18 @@ from workbench_atlas_categorical_graph import (
     node_record, edge_record, rebuild_query_index, validate_bundle_directory,
     validate_bundle_manifest,
 )
+from workbench_api.derived_indexes import derived_indexes_scope
+from workbench_core.derived_indexes import CoreDerivedIndexes
 
 
 class ObservationBundleTests(unittest.TestCase):
+    def setUp(self) -> None:
+        home = tempfile.TemporaryDirectory()
+        self.addCleanup(home.cleanup)
+        scope = derived_indexes_scope(CoreDerivedIndexes(configuration_home=Path(home.name) / "config"))
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
+
     def build(self, root, *, authority="retained-observations-v1"):
         material = node_record("initialization-material", "fixture:iron", {"fingerprint": "a"})
         registry = node_record("initialization-registry", "fixture:materials", {})

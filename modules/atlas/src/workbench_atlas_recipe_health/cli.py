@@ -791,12 +791,14 @@ def main(
                     file=error,
                 )
 
-            record = rebuild_recipe_health_index(
-                args.path,
-                max_source_bytes=args.max_source_bytes,
-                max_index_bytes=args.max_index_bytes,
-                progress=progress,
-            )
+            from workbench_core.host_services import direct_atlas_derived_index_scope
+            with direct_atlas_derived_index_scope():
+                record = rebuild_recipe_health_index(
+                    args.path,
+                    max_source_bytes=args.max_source_bytes,
+                    max_index_bytes=args.max_index_bytes,
+                    progress=progress,
+                )
             rendered = _render_index_operation(record)
         elif args.action == "assess-plan":
             record = _assess_plan(args, plan_adapter)

@@ -118,6 +118,11 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         working_stores = nullcontext()
         fixture_stores = nullcontext()
         source_stores = nullcontext()
+        if owner.id == "atlas":
+            from workbench_api.derived_indexes import derived_indexes_scope
+            derived_stores = derived_indexes_scope(None)
+        else:
+            derived_stores = nullcontext()
         if context.configuration_home is not None:
             from .storage.registered import CoreDurableResources
             from .storage.record_stores import CoreRecordStores
@@ -133,6 +138,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
             from workbench_api.fixture_selections import fixture_selections_scope
             from .source_transactions import CoreSourceTransactions
             from workbench_api.source_transactions import source_transactions_scope
+            from .derived_indexes import CoreDerivedIndexes
             durable_resources = CoreDurableResources(
                 workspace=context.workspace,
                 configuration_home=context.configuration_home,
@@ -183,6 +189,11 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
                 owner_id=owner.id,
                 check_cancelled=context.check_cancelled,
             ))
+            if owner.id == "atlas":
+                derived_stores = derived_indexes_scope(CoreDerivedIndexes(
+                    configuration_home=context.configuration_home,
+                    workspace=context.workspace, owner_id=owner.id,
+                ))
         operation_context = replace(
             context,
             output_resolver=invocation.output_path if invocation is not None else None,
@@ -199,7 +210,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         try:
             from workbench_api.archive_exchange import archive_exchange_scope
             from .archive_port import CoreArchiveExchange
-            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, source_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
+            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, source_stores, derived_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
                 handler = getattr(import_module(package), name)
                 result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:

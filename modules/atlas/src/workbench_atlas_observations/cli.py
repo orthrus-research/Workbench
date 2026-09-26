@@ -172,9 +172,11 @@ def main(argv: Sequence[str] | None = None, *, context: ExecutionContext | None 
             def progress(update: dict[str, Any]) -> None:
                 cancel()
                 print(f"Atlas observation index: {update.get('phase', 'working')}", file=error)
-            manifest = rebuild_query_index(args.path, max_source_bytes=args.max_source_bytes,
-                                           max_index_bytes=args.max_index_bytes, progress=progress,
-                                           check_cancelled=cancel)
+            from workbench_core.host_services import direct_atlas_derived_index_scope
+            with direct_atlas_derived_index_scope():
+                manifest = rebuild_query_index(args.path, max_source_bytes=args.max_source_bytes,
+                                               max_index_bytes=args.max_index_bytes, progress=progress,
+                                               check_cancelled=cancel)
             record = {"format": "workbench-atlas-observation-index-v1", "schema_version": 1,
                       "state": "complete", "graph_set_id": manifest["graph_set_id"],
                       "query_index": manifest["query_index"], "authoritative_graph_evidence_mutated": False}
