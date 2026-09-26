@@ -114,7 +114,13 @@ effects, and materialize reviewed overlays only into fresh ignored storage.
 python3 modules/crucible/tools/run_strata_observation.py --help
 python3 modules/crucible/tools/inventory_gtceu_worldgen_impact.py --help
 python3 modules/crucible/tools/materialize_gtceu_worldgen_overlay.py --help
+python3 modules/crucible/tools/materialize_gtceu_worldgen_overlay_v2.py --help
 ```
+
+The V1 command keeps its source-only behavior. The opt-in V2 command publishes
+one complete `config` envelope through Core, and has explicit `review` and
+`reconcile` commands for retained attempts. See the
+[V2 copied-tree and Core publication contract](contracts/gtceu-worldgen-overlay-copy-inventory-v2.md).
 
 ## Layout
 

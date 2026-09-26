@@ -5,6 +5,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -150,6 +151,25 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
             emit_chunk=emit,
         )
         return manifest, [chunks[index] for index in range(len(chunks))]
+
+    def add_plan(self, source_inventory: dict) -> dict:
+        return {
+            "format": "workbench-crucible-gtceu-worldgen-overlay-v1",
+            "schema_version": 1,
+            "target_inventory_id": source_inventory["inventory_id"],
+            "operations": [{
+                "op": "add", "kind": "ore",
+                "relative_path": "worldgen/vein/overworld/new.json",
+                "definition": self.ore_definition(),
+            }],
+        }
+
+    def core_context(self) -> tuple[Path, Path, Path]:
+        workspace = self.root / "workspace"
+        workspace.mkdir(exist_ok=True)
+        configuration_home = self.root / "settings"
+        output = workspace / ".workbench/overlays/selected/config/gregtech"
+        return workspace, configuration_home, output
 
     def test_exact_inventory_quantifies_and_correlates_without_causality(self) -> None:
         report = self.build()
@@ -449,6 +469,160 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
         self.assertEqual(materialization_bytes, (target / "overlay-materialization-v1.json").read_bytes())
         self.assertEqual(b"selected sidecar\n", (target / "gregtech/worldgen/vein/overworld/notes.txt").read_bytes())
         self.assertEqual("published", host.inventory()[0]["status"])
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Core overlay requires Linux")
+    def test_v2_cli_publishes_reviews_and_refuses_existing_target(self) -> None:
+        report = self.build()
+        plan = self.add_plan(report)
+        workspace, configuration_home, output = self.core_context()
+        inventory_path = self.root / "inventory.json"
+        plan_path = self.root / "plan.json"
+        inventory_path.write_text(json.dumps(report), encoding="utf-8")
+        plan_path.write_text(json.dumps(plan), encoding="utf-8")
+        tool = ROOT / "modules/crucible/tools/materialize_gtceu_worldgen_overlay_v2.py"
+        prefix = [
+            sys.executable, str(tool), "--workspace", str(workspace),
+            "--configuration-home", str(configuration_home),
+        ]
+        command = [
+            *prefix, "materialize", "--jar", str(self.jar),
+            "--config-root", str(self.config), "--inventory", str(inventory_path),
+            "--plan", str(plan_path), "--out-config-root", str(output.relative_to(workspace)),
+        ]
+        first = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(0, first.returncode, first.stderr)
+        self.assertIn(f"config: {output}\n", first.stdout)
+        first_bytes = {
+            path.relative_to(output.parent).as_posix(): path.read_bytes()
+            for path in output.parent.rglob("*") if path.is_file()
+        }
+        self.assertIn("overlay-materialization-v1.json", first_bytes)
+        self.assertIn("gtceu-worldgen-inventory-v1.json", first_bytes)
+        second = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(1, second.returncode)
+        self.assertIn("already exists", second.stderr)
+        self.assertEqual(first_bytes, {
+            path.relative_to(output.parent).as_posix(): path.read_bytes()
+            for path in output.parent.rglob("*") if path.is_file()
+        })
+        review = subprocess.run([*prefix, "review"], cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(0, review.returncode, review.stderr)
+        attempts = json.loads(review.stdout)["attempts"]
+        self.assertEqual(1, len(attempts))
+        self.assertEqual("published", attempts[0]["status"])
+        self.assertEqual(str(output.parent), attempts[0]["target"])
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Core overlay requires Linux")
+    def test_v2_core_route_refuses_capacity_before_first_copy(self) -> None:
+        from workbench_api.managed_trees import managed_trees_scope
+        from workbench_api.overlay_envelopes import overlay_envelopes_scope
+        from workbench_core.managed_trees import CoreManagedTrees
+        from workbench_core.overlay_envelope_inputs import (
+            CoreOverlayEnvelopeInputAttempt, CoreOverlayEnvelopeInputs,
+            OverlayEnvelopeInputError,
+        )
+        import workbench_core.overlay_envelope_inputs as envelope
+        from workbench_crucible_gtceu_worldgen.core_overlay import materialize_core_overlay
+
+        report = self.build()
+        workspace, configuration_home, output = self.core_context()
+        trees = CoreManagedTrees(
+            workspace=workspace, configuration_home=configuration_home,
+            locations={"artifacts": workspace}, owner_id="crucible",
+        )
+        inputs = CoreOverlayEnvelopeInputs(
+            workspace=workspace, configuration_home=configuration_home,
+            owner_id="crucible",
+        )
+        with managed_trees_scope(trees), overlay_envelopes_scope(inputs), patch.object(
+            envelope, "MAX_FILES", 1,
+        ), patch.object(
+            CoreOverlayEnvelopeInputAttempt, "copy_source",
+            side_effect=AssertionError("copy must not begin"),
+        ):
+            with self.assertRaises(OverlayEnvelopeInputError) as error:
+                materialize_core_overlay(
+                    jar_path=self.jar, config_root=self.config, inventory=report,
+                    plan_bytes=canonical_json_bytes(self.add_plan(report)),
+                    output_config_root=output,
+                )
+        self.assertEqual("overlay.unsupported", error.exception.code)
+        self.assertFalse(output.parent.exists())
+        rows = CoreOverlayEnvelopeInputs(
+            workspace=workspace, configuration_home=configuration_home,
+            owner_id="crucible",
+        ).inventory()
+        self.assertEqual(1, len(rows))
+        self.assertEqual("input-sealed", rows[0]["status"])
+        self.assertFalse(Path(rows[0]["stage_path"]).exists())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Core overlay requires Linux")
+    def test_v2_core_route_reviews_and_reconciles_pre_rename_restart(self) -> None:
+        report = self.build()
+        workspace, configuration_home, output = self.core_context()
+        inventory_path = self.root / "inventory.json"
+        plan_path = self.root / "plan.json"
+        inventory_path.write_text(json.dumps(report), encoding="utf-8")
+        plan_path.write_bytes(canonical_json_bytes(self.add_plan(report)))
+        hard_exit = """
+import json
+import os
+from pathlib import Path
+import sys
+from unittest.mock import patch
+from workbench_api.managed_trees import managed_trees_scope
+from workbench_api.overlay_envelopes import overlay_envelopes_scope
+from workbench_core import managed_trees
+from workbench_core.managed_trees import CoreManagedTrees
+from workbench_core.overlay_envelope_inputs import CoreOverlayEnvelopeInputs
+from workbench_crucible_gtceu_worldgen.core_overlay import materialize_core_overlay
+
+jar, source, inventory, plan, output, workspace, home = map(Path, sys.argv[1:])
+trees = CoreManagedTrees(workspace=workspace, configuration_home=home,
+                         locations={'artifacts': workspace}, owner_id='crucible')
+inputs = CoreOverlayEnvelopeInputs(workspace=workspace, configuration_home=home,
+                                   owner_id='crucible')
+with managed_trees_scope(trees), overlay_envelopes_scope(inputs), patch.object(
+    managed_trees, '_rename_no_replace', side_effect=lambda *a, **k: os._exit(77),
+):
+    materialize_core_overlay(
+        jar_path=jar, config_root=source,
+        inventory=json.loads(inventory.read_bytes()), plan_bytes=plan.read_bytes(),
+        output_config_root=output,
+    )
+"""
+        environment = dict(os.environ)
+        environment["PYTHONPATH"] = "api/src:core/src:modules/crucible/src"
+        interrupted = subprocess.run(
+            [sys.executable, "-c", hard_exit, str(self.jar), str(self.config),
+             str(inventory_path), str(plan_path), str(output), str(workspace),
+             str(configuration_home)],
+            cwd=ROOT, env=environment, capture_output=True, text=True,
+        )
+        self.assertEqual(77, interrupted.returncode, interrupted.stderr)
+        self.assertFalse(output.parent.exists())
+        tool = ROOT / "modules/crucible/tools/materialize_gtceu_worldgen_overlay_v2.py"
+        prefix = [
+            sys.executable, str(tool), "--workspace", str(workspace),
+            "--configuration-home", str(configuration_home),
+        ]
+        review = subprocess.run([*prefix, "review"], cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(0, review.returncode, review.stderr)
+        rows = json.loads(review.stdout)["attempts"]
+        self.assertEqual("publication-prepared", rows[0]["status"])
+        selected_id = rows[0]["attempt_id"]
+        reconciled = subprocess.run(
+            [*prefix, "reconcile", "--attempt-id", selected_id],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        self.assertEqual(0, reconciled.returncode, reconciled.stderr)
+        self.assertIn(f"config: {output}\n", reconciled.stdout)
+        self.assertIn(f"attempt: {selected_id}\n", reconciled.stdout)
+        self.assertTrue(output.is_dir())
+        final_review = subprocess.run([*prefix, "review"], cwd=ROOT,
+                                      capture_output=True, text=True)
+        self.assertEqual(0, final_review.returncode, final_review.stderr)
+        self.assertEqual("published", json.loads(final_review.stdout)["attempts"][0]["status"])
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
     def test_v2_copy_inventory_refuses_external_symlink(self) -> None:
