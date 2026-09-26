@@ -79,6 +79,19 @@ class DerivedIndexCustodyTests(unittest.TestCase):
             )["record_stores"])
         self.assertEqual("available", rows[0]["status"])
 
+    def test_direct_managed_graph_registers_from_exact_tree_custody(self) -> None:
+        graph, manifest, owner = self._managed(derived_rule=True, observation=False)
+        graph.joinpath("query-index.sqlite3").unlink()
+        direct = CoreDerivedIndexes(configuration_home=self.config)
+        with derived_indexes_scope(direct):
+            rebuild_query_index(graph)
+        rows = ResourceCatalog(self.config).inventory(workspace=owner.workspace)["record_stores"]
+        self.assertEqual(1, len(rows))
+        self.assertEqual("atlas-derived-index-v1", rows[0]["family"])
+        self.assertEqual("atlas", rows[0]["owner_id"])
+        self.assertEqual(str(graph.parent / f".{graph.name}.derived-index-core"), rows[0]["path"])
+        self.assertEqual(manifest["graph_set_id"], verify_query_index(graph)["graph_set_id"])
+
     def test_missing_and_corrupt_prior_index_rebuild_preserves_manifest_mode(self) -> None:
         root = self.base / "graph"
         source = _graph(root)

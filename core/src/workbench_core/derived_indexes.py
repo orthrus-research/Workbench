@@ -302,7 +302,8 @@ class CoreDerivedIndexes:
             raise DerivedIndexError("path", "Atlas graph path is unavailable or redirecting") from exc
 
     @contextmanager
-    def _lease(self, root: Path, parent_id: list[int], root_id: list[int]) -> Iterator[Path]:
+    def _lease(self, root: Path, parent_id: list[int], root_id: list[int],
+               workspace: Path | None = None) -> Iterator[Path]:
         holder = _stage_root(root)
         try:
             holder.mkdir(mode=0o700)
@@ -319,13 +320,14 @@ class CoreDerivedIndexes:
         if (record.get("root") != str(root) or record.get("parent_identity") != parent_id
                 or record.get("root_identity") != root_id):
             raise DerivedIndexError("changed", "Atlas derived-index root identity changed")
-        if self.workspace is not None:
+        selected_workspace = workspace if workspace is not None else self.workspace
+        if selected_workspace is not None:
             # Dispatch supplies the selected workspace independently of the
             # graph path, which may live in an external evidence store. Bind
             # this attempt namespace before exposing a new SQLite stage.
             ResourceCatalog(self.configuration_home).register_record_store(
                 family="atlas-derived-index-v1", owner_id=self.owner_id,
-                workspace=self.workspace, root=holder,
+                workspace=selected_workspace, root=holder,
             )
         lock = holder / "owner.lock"
         flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
@@ -344,14 +346,14 @@ class CoreDerivedIndexes:
             os.close(descriptor)
 
     @contextmanager
-    def _managed(self, root: Path, graph_set_id: str) -> Iterator[None]:
+    def _managed(self, root: Path, graph_set_id: str) -> Iterator[Path | None]:
         catalog = ResourceCatalog(self.configuration_home)
         trees = catalog.trees
         matching = [row for row in trees.inventory() if row["path"] == str(root)]
         if len(matching) > 1:
             raise DerivedIndexError("managed", "Atlas graph has ambiguous managed-tree custody")
         if not matching:
-            yield
+            yield self.workspace
             return
         tree_id = str(matching[0]["tree_id"])
         try:
@@ -364,7 +366,7 @@ class CoreDerivedIndexes:
                     raise DerivedIndexError("managed", "Atlas managed graph lacks the exact derived-index rule")
                 trees.commit(tree_id, intent)
                 trees._verify(intent)  # Authoritative bytes and the V2 baseline must still match.
-                yield
+                yield Path(str(intent["workspace"]))
                 trees._verify(intent)
         except ManagedTreeError as exc:
             raise DerivedIndexError("managed", f"Atlas managed graph custody changed: {exc}") from exc
@@ -374,7 +376,9 @@ class CoreDerivedIndexes:
         if not isinstance(graph_set_id, str) or _GRAPH_ID.fullmatch(graph_set_id) is None:
             raise DerivedIndexError("policy", "Atlas graph-set identity is invalid")
         graph, parent_id, root_id = self._root(root)
-        with self._managed(graph, graph_set_id), self._lease(graph, parent_id, root_id) as holder:
+        with self._managed(graph, graph_set_id) as workspace, self._lease(
+            graph, parent_id, root_id, workspace=workspace,
+        ) as holder:
             attempts = self._inspect_locked(graph, holder, parent_id, root_id)
             if any(item.state == "conflict" for item in attempts):
                 raise DerivedIndexError("conflict", "an earlier Atlas derived-index attempt changed")
