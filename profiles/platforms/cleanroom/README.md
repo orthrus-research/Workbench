@@ -10,6 +10,15 @@ validated owner record and blocks fixture execution when those inputs drift.
 The profile's build input digest also binds its Python implementation and CLI
 entry point, so a retained Home cannot authorize changed owner code.
 
+The generic-mod fixture now has a separate [portable execution policy](policies/generic-mod-fixture-execution-v1.json).
+It selects the exact Gradle 9.6.1 archive used by the existing IDE toolchain
+lock, Java 25, the cleanup init script, projection/cache locations, command,
+bounded output, and restart rule. Core can retain and reopen this policy with
+the fixture source. The selection is unqualified for a reconstructed fixture;
+Gradle acquisition, Java binding, execution, and artifact admission remain
+separate steps. Older three-witness fixture snapshots remain readable but have
+no portable execution policy.
+
 The generic-mod fixture runner accepts `--core-supervised` for a local build.
 Core holds the existing source projection lease while Gradle runs as a child,
 reuses the separate project cache and Gradle home, and retains bounded raw

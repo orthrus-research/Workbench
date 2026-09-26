@@ -31,9 +31,12 @@ FIXTURE_LOCK_SCHEMA = (
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 FIXTURE_RUNNER = PROFILE / "tools/run_generic_mod_fixture_build.py"
 FIXTURE_CLEANUP_INIT = PROFILE / "tools/clean_generic_mod_fixture.gradle"
+FIXTURE_EXECUTION_POLICY = PROFILE / "policies/generic-mod-fixture-execution-v1.json"
+FIXTURE_EXECUTION_SCHEMA = PROFILE / "schemas/workbench-cleanroom-fixture-execution-policy-v1.schema.json"
 sys.path.insert(0, str(ROOT / "api/src"))
 sys.path.insert(0, str(PROFILE / "src"))
 from workbench_profile_cleanroom import fixture_build as RUNNER  # noqa: E402
+from workbench_profile_cleanroom import fixture_home as HOME  # noqa: E402
 
 
 def _digest(path: Path) -> str:
@@ -133,6 +136,27 @@ def _lock_errors(root: Path, lock: dict[str, object]) -> list[str]:
 
 
 class GenericModDailyLoopFixtureTests(unittest.TestCase):
+    def test_portable_execution_policy_binds_current_fixture_and_cleanup(self) -> None:
+        policy = HOME.validate_execution_policy(HOME.read_execution_policy())
+        Draft202012Validator(_load(FIXTURE_EXECUTION_SCHEMA)).validate(policy)
+        lock = _load(FIXTURE_LOCK)
+        self.assertEqual(lock["declared_values"]["tree_digest"], policy["fixture"]["tree_digest"])
+        self.assertEqual("sha256:" + _digest(FIXTURE_CLEANUP_INIT), policy["cleanup_init"]["sha256"])
+        self.assertEqual(FIXTURE_CLEANUP_INIT.stat().st_size, policy["cleanup_init"]["size"])
+        self.assertEqual("9.6.1", policy["gradle"]["version"])
+        self.assertEqual("profile-selected-unqualified", policy["gradle"]["selection"])
+        existing_gradle = _load(ROOT / "validation/ide-toolchains-v1.json")["gradle"]
+        self.assertEqual(existing_gradle["archive_url"], policy["gradle"]["archive_url"])
+        self.assertEqual(existing_gradle["archive_root"], policy["gradle"]["archive_root"])
+        self.assertEqual("sha256:" + existing_gradle["archive_sha256"],
+                         policy["gradle"]["archive_sha256"])
+        self.assertEqual(existing_gradle["archive_size"], policy["gradle"]["archive_size"])
+        self.assertEqual(6, len(HOME.source_inputs()))
+        self.assertEqual(FIXTURE_EXECUTION_POLICY, next(
+            row["path"] for row in HOME.source_inputs()
+            if row["kind"] == "fixture-execution-policy"
+        ))
+
     def test_candidate_lock_is_exact_experimental_platform_identity(self) -> None:
         candidate = _load(CANDIDATE_LOCK)
 

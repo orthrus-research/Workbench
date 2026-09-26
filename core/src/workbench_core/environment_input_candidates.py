@@ -11,6 +11,8 @@ from pathlib import Path, PurePosixPath
 import re
 from typing import Any, Mapping, Sequence
 
+from jsonschema.exceptions import SchemaError
+
 from workbench_api import ModuleError
 from workbench_api.profile_extensions import (
     ProfileExtensionError, profile_extension_identity, require_profile_extension,
@@ -31,6 +33,10 @@ _PROFILE_PATH = re.compile(r"profiles/(?:[A-Za-z0-9][A-Za-z0-9._-]*/)*[A-Za-z0-9
 _FIXTURE_KINDS = frozenset({
     "fixture-owner-lock", "fixture-owner-schema", "profile-preflight-tool",
 })
+_PORTABLE_FIXTURE_KINDS = _FIXTURE_KINDS | frozenset({
+    "fixture-cleanup-init", "fixture-execution-policy", "fixture-execution-schema",
+})
+_FIXTURE_KIND_SETS = (_FIXTURE_KINDS, _PORTABLE_FIXTURE_KINDS)
 _MAX_WHEELS = 64
 _MAX_SOURCE_BYTES = 2 * 1024 * 1024
 _MAX_RECORD_BYTES = 64 * 1024
@@ -99,9 +105,16 @@ def _profile_fixture_candidate(
                 or fixture_identity.get("digest") != tree_digest):
             raise ReconstructionError("fixture owner lock lacks an exact source tree identity")
         inputs = source_inputs()
-        if (not isinstance(inputs, tuple) or len(inputs) != len(_FIXTURE_KINDS)
-                or {row.get("kind") for row in inputs if type(row) is dict} != _FIXTURE_KINDS):
-            raise ReconstructionError("fixture owner does not expose its complete V1 source witnesses")
+        kinds = {row.get("kind") for row in inputs if type(row) is dict} if type(inputs) is tuple else set()
+        if (type(inputs) is not tuple or len(inputs) != len(kinds)
+                or kinds not in _FIXTURE_KIND_SETS):
+            raise ReconstructionError("fixture owner does not expose a complete supported source witness set")
+        if kinds == _PORTABLE_FIXTURE_KINDS:
+            read_policy = getattr(owner, "read_execution_policy")
+            validate_policy = getattr(owner, "validate_execution_policy")
+            policy = read_policy()
+            if validate_policy(policy) != policy:
+                raise ReconstructionError("fixture owner did not validate its execution policy")
         sources = []
         for row in inputs:
             relative = row.get("display_path")
@@ -118,6 +131,9 @@ def _profile_fixture_candidate(
             })
         if len({item["relative_path"] for item in sources}) != len(sources):
             raise ReconstructionError("fixture source witness paths are repeated")
+        if (kinds == _PORTABLE_FIXTURE_KINDS
+                and validate_policy(read_policy()) != policy):
+            raise ReconstructionError("fixture execution policy changed during candidate inspection")
         if (sha256(read_bounded_bytes(profile_source, byte_limit=_MAX_SOURCE_BYTES)).hexdigest()
                 != platform_document_sha256 or validate_lock(read_lock()) != lock
                 or identity != profile_extension_identity(
@@ -130,7 +146,8 @@ def _profile_fixture_candidate(
             "declaration_id": declaration, "tree_digest": tree_digest,
             "sources": sorted(sources, key=lambda row: row["relative_path"].encode("utf-8")),
         }
-    except (ProfileExtensionError, OSError, ValueError, AttributeError, KeyError, TypeError) as exc:
+    except (ProfileExtensionError, OSError, ValueError, AttributeError, KeyError, TypeError,
+            SchemaError) as exc:
         if isinstance(exc, ReconstructionError):
             raise
         raise ReconstructionError(f"profile fixture owner cannot prove its exact inputs: {exc}") from exc
@@ -230,7 +247,7 @@ def validate_input_candidate(share: Mapping[str, Any], value: object) -> dict[st
             or _DIGEST.fullmatch(fixture["tree_digest"]) is None
             or type(fixture["owner_code"]) is not dict
             or type(fixture["sources"]) is not list
-            or len(fixture["sources"]) != len(_FIXTURE_KINDS)):
+            or len(fixture["sources"]) not in {len(kinds) for kinds in _FIXTURE_KIND_SETS}):
         raise ReconstructionError("environment fixture candidate is invalid")
     owner_code = fixture["owner_code"]
     if (set(owner_code) != {"profile_id", "group", "module", "distribution", "version",
@@ -249,7 +266,7 @@ def validate_input_candidate(share: Mapping[str, Any], value: object) -> dict[st
     for source in fixture["sources"]:
         if (type(source) is not dict
                 or set(source) != {"kind", "relative_path", "sha256", "size"}
-                or type(source["kind"]) is not str or source["kind"] not in _FIXTURE_KINDS
+                or type(source["kind"]) is not str or source["kind"] not in _PORTABLE_FIXTURE_KINDS
                 or type(source["relative_path"]) is not str
                 or _PROFILE_PATH.fullmatch(source["relative_path"]) is None
                 or PurePosixPath(source["relative_path"]).as_posix() != source["relative_path"]
@@ -257,7 +274,7 @@ def validate_input_candidate(share: Mapping[str, Any], value: object) -> dict[st
                 or type(source["sha256"]) is not str or _DIGEST.fullmatch(source["sha256"]) is None
                 or type(source["size"]) is not int or not 0 <= source["size"] <= _MAX_SOURCE_BYTES):
             raise ReconstructionError("environment fixture source candidate is invalid")
-    if ({row["kind"] for row in fixture["sources"]} != _FIXTURE_KINDS
+    if ({row["kind"] for row in fixture["sources"]} not in _FIXTURE_KIND_SETS
             or len({row["relative_path"] for row in fixture["sources"]}) != len(fixture["sources"])
             or fixture["sources"] != sorted(fixture["sources"], key=lambda row: row["relative_path"].encode("utf-8"))
             or candidate["candidate_id"] != _seal(

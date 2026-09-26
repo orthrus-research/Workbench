@@ -1,0 +1,50 @@
+{
+  "format": "workbench-cleanroom-fixture-execution-policy-v1",
+  "schema_version": 1,
+  "scope": "portable-input-policy-only",
+  "fixture": {
+    "declaration_id": "cleanroom-generic-mod-daily-loop-fixture-v1",
+    "tree_digest": "sha256:21c67a6372b57aa538853458eef8a7ade5f30b6079b4a2c476a5d75c5769b157"
+  },
+  "gradle": {
+    "selection": "profile-selected-unqualified",
+    "version": "9.6.1",
+    "archive_root": "gradle-9.6.1",
+    "archive_url": "https://services.gradle.org/distributions/gradle-9.6.1-bin.zip",
+    "archive_sha256": "sha256:9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14",
+    "archive_size": 140682664
+  },
+  "java": {
+    "required_major": 25,
+    "selection": "managed-profile-or-elected-local-java-25"
+  },
+  "cleanup_init": {
+    "relative_path": "profiles/platforms/cleanroom/tools/clean_generic_mod_fixture.gradle",
+    "sha256": "sha256:5a474d3d228a64f4acafa2049f92696e85e24fc5fc9bb85b8f6c7ecdf03063fc",
+    "size": 789
+  },
+  "paths": {
+    "project_relative_to_state": "source-projections/cleanroom/{fixture_digest_hex}/profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop",
+    "project_cache_relative_to_state": "gradle-project-cache/generic-mod-daily-loop",
+    "gradle_home_relative_to_state": "gradle-home/generic-mod-daily-loop",
+    "generated_root_relative_to_projection_digest": ".workbench/build/cleanroom/0.6.8-alpha/generic-mod-daily-loop"
+  },
+  "argv_template": [
+    "{gradle_bin}", "--no-daemon", "-p", "{project}",
+    "--project-cache-dir", "{project_cache}",
+    "--init-script", "{cleanup_init}",
+    "clean", "check", "workbenchCleanFixtureLocalCache"
+  ],
+  "environment": {
+    "JAVA_HOME": "{java_home}",
+    "PATH_PREPEND": "{java_home}/bin",
+    "GRADLE_USER_HOME": "{gradle_home}",
+    "TZ": "UTC"
+  },
+  "capture": {
+    "maximum_bytes_per_stream": 4194304,
+    "timeout_seconds": 3600,
+    "require_process_group_closure": true
+  },
+  "restart": "retain-prepared-attempt-and-refuse-automatic-rerun-after-launch"
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -17,6 +18,9 @@ PROFILE_API_VERSION = 1
 _PROFILE_ROOT = profile().root
 _SCHEMA = _PROFILE_ROOT / "schemas/workbench-cleanroom-generic-mod-fixture-lock-v1.schema.json"
 _TOOL = _PROFILE_ROOT / "tools/run_generic_mod_fixture_build.py"
+_CLEANUP = _PROFILE_ROOT / "tools/clean_generic_mod_fixture.gradle"
+_EXECUTION_POLICY = _PROFILE_ROOT / "policies/generic-mod-fixture-execution-v1.json"
+_EXECUTION_SCHEMA = _PROFILE_ROOT / "schemas/workbench-cleanroom-fixture-execution-policy-v1.schema.json"
 
 
 def fixture_root() -> Path:
@@ -55,7 +59,7 @@ def validate_owner_lock(value: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def source_inputs() -> tuple[dict[str, Any], ...]:
-    """Exact profile resources Home retains as preflight input witnesses."""
+    """Exact profile resources Core retains as fixture input witnesses."""
 
     return (
         {"kind": "fixture-owner-lock", "path": fixture_build.LOCK,
@@ -64,11 +68,55 @@ def source_inputs() -> tuple[dict[str, Any], ...]:
          "display_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-generic-mod-fixture-lock-v1.schema.json"},
         {"kind": "profile-preflight-tool", "path": _TOOL,
          "display_path": "profiles/platforms/cleanroom/tools/run_generic_mod_fixture_build.py"},
+        {"kind": "fixture-cleanup-init", "path": _CLEANUP,
+         "display_path": "profiles/platforms/cleanroom/tools/clean_generic_mod_fixture.gradle"},
+        {"kind": "fixture-execution-policy", "path": _EXECUTION_POLICY,
+         "display_path": "profiles/platforms/cleanroom/policies/generic-mod-fixture-execution-v1.json"},
+        {"kind": "fixture-execution-schema", "path": _EXECUTION_SCHEMA,
+         "display_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-fixture-execution-policy-v1.schema.json"},
     )
 
 
 def cleanup_path() -> Path:
     return fixture_build.CLEANUP_INIT
+
+
+def read_execution_policy() -> dict[str, Any]:
+    return _json_object(_EXECUTION_POLICY, "Cleanroom fixture execution policy")
+
+
+def validate_execution_policy(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the portable policy and its exact current fixture/init bytes."""
+
+    current = read_execution_policy()
+    if value != current:
+        raise ValueError("Cleanroom fixture execution policy changed")
+    schema = _json_object(_EXECUTION_SCHEMA, "Cleanroom fixture execution schema")
+    Draft202012Validator.check_schema(schema)
+    if any(Draft202012Validator(schema).iter_errors(current)):
+        raise ValueError("Cleanroom fixture execution policy differs from its schema")
+    lock = validate_owner_lock(read_owner_lock())
+    if current["fixture"] != {
+        "declaration_id": lock["declaration_id"],
+        "tree_digest": lock["declared_values"]["tree_digest"],
+    }:
+        raise ValueError("Cleanroom fixture execution policy names another fixture")
+    cleanup = fixture_build._read_ordinary_bytes(
+        _CLEANUP, label="Cleanroom fixture cleanup init script",
+        limit=fixture_build.MAX_TOOL_RECORD_BYTES,
+    )
+    if current["cleanup_init"] != {
+        "relative_path": "profiles/platforms/cleanroom/tools/clean_generic_mod_fixture.gradle",
+        "sha256": "sha256:" + sha256(cleanup).hexdigest(),
+        "size": len(cleanup),
+    }:
+        raise ValueError("Cleanroom fixture cleanup init changed")
+    gradle = current["gradle"]
+    if (gradle["archive_root"] != f"gradle-{gradle['version']}"
+            or gradle["archive_url"] !=
+            f"https://services.gradle.org/distributions/gradle-{gradle['version']}-bin.zip"):
+        raise ValueError("Cleanroom fixture Gradle archive selection is inconsistent")
+    return current
 
 
 def inspect_build_inputs(*, gradle_cmd: Path, java_home: Path) -> dict[str, Any]:

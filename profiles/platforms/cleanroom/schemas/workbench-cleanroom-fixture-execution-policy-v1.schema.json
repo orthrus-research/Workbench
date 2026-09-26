@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.local/profiles/cleanroom/workbench-cleanroom-fixture-execution-policy-v1.schema.json",
+  "title": "Cleanroom generic mod fixture execution input policy V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "scope", "fixture", "gradle", "java", "cleanup_init", "paths", "argv_template", "environment", "capture", "restart"],
+  "properties": {
+    "format": {"const": "workbench-cleanroom-fixture-execution-policy-v1"},
+    "schema_version": {"const": 1},
+    "scope": {"const": "portable-input-policy-only"},
+    "fixture": {
+      "type": "object", "additionalProperties": false,
+      "required": ["declaration_id", "tree_digest"],
+      "properties": {
+        "declaration_id": {"const": "cleanroom-generic-mod-daily-loop-fixture-v1"},
+        "tree_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "gradle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["selection", "version", "archive_root", "archive_url", "archive_sha256", "archive_size"],
+      "properties": {
+        "selection": {"const": "profile-selected-unqualified"},
+        "version": {"type": "string", "minLength": 1},
+        "archive_root": {"type": "string", "pattern": "^gradle-[0-9][A-Za-z0-9.~-]*$"},
+        "archive_url": {"type": "string", "pattern": "^https://services\\.gradle\\.org/distributions/gradle-[A-Za-z0-9.~-]+-bin\\.zip$"},
+        "archive_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "archive_size": {"type": "integer", "minimum": 1, "maximum": 268435456}
+      }
+    },
+    "java": {
+      "type": "object", "additionalProperties": false,
+      "required": ["required_major", "selection"],
+      "properties": {
+        "required_major": {"const": 25},
+        "selection": {"const": "managed-profile-or-elected-local-java-25"}
+      }
+    },
+    "cleanup_init": {
+      "type": "object", "additionalProperties": false,
+      "required": ["relative_path", "sha256", "size"],
+      "properties": {
+        "relative_path": {"const": "profiles/platforms/cleanroom/tools/clean_generic_mod_fixture.gradle"},
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "size": {"type": "integer", "minimum": 1, "maximum": 2097152}
+      }
+    },
+    "paths": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_relative_to_state", "project_cache_relative_to_state", "gradle_home_relative_to_state", "generated_root_relative_to_projection_digest"],
+      "properties": {
+        "project_relative_to_state": {"const": "source-projections/cleanroom/{fixture_digest_hex}/profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop"},
+        "project_cache_relative_to_state": {"const": "gradle-project-cache/generic-mod-daily-loop"},
+        "gradle_home_relative_to_state": {"const": "gradle-home/generic-mod-daily-loop"},
+        "generated_root_relative_to_projection_digest": {"const": ".workbench/build/cleanroom/0.6.8-alpha/generic-mod-daily-loop"}
+      }
+    },
+    "argv_template": {
+      "const": ["{gradle_bin}", "--no-daemon", "-p", "{project}", "--project-cache-dir", "{project_cache}", "--init-script", "{cleanup_init}", "clean", "check", "workbenchCleanFixtureLocalCache"]
+    },
+    "environment": {
+      "const": {"JAVA_HOME": "{java_home}", "PATH_PREPEND": "{java_home}/bin", "GRADLE_USER_HOME": "{gradle_home}", "TZ": "UTC"}
+    },
+    "capture": {
+      "type": "object", "additionalProperties": false,
+      "required": ["maximum_bytes_per_stream", "timeout_seconds", "require_process_group_closure"],
+      "properties": {
+        "maximum_bytes_per_stream": {"const": 4194304},
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 21600},
+        "require_process_group_closure": {"const": true}
+      }
+    },
+    "restart": {"const": "retain-prepared-attempt-and-refuse-automatic-rerun-after-launch"}
+  }
+}

@@ -1,8 +1,8 @@
 """Core custody of an admitted platform owner's exact fixture and tool bytes.
 
 The profile validates its source and lock. Core copies only the lock's declared
-files and the candidate's three witnesses into one recoverable managed tree.
-This is input custody, not fixture execution or environment reconstruction.
+files and the candidate's complete three- or six-witness set into one recoverable
+managed tree. This is input custody, not execution or reconstruction.
 """
 
 from __future__ import annotations
