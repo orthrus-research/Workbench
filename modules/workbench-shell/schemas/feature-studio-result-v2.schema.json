@@ -478,6 +478,7 @@
       "required": ["state", "receipt_id", "directory_uri", "patch_uri", "receipt_uri", "patch_sha256", "patch_size"],
       "properties": {
         "state": {"const": "written"},
+        "tree_id": {"type": "string", "pattern": "^workbench-transport-tree-v2:[0-9a-f]{32}$"},
         "receipt_id": {"type": "string", "pattern": "^feature-studio-export-receipt:sha256:[0-9a-f]{64}$"},
         "directory_uri": {"type": "string", "format": "uri"},
         "patch_uri": {"type": "string", "format": "uri"},

@@ -11,18 +11,16 @@ from urllib.request import url2pathname
 
 from workbench_api.resources import module_root as _module_resource_root, repository_root as _repository_resource_root
 
-import ctypes
-import errno
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import re
-import shutil
-import tempfile
 from typing import Any, Mapping, NoReturn, Sequence
 from urllib.parse import urlparse
 from datetime import datetime
+
+from workbench_api.feature_exports import FeatureExportError, feature_exports, feature_exports_bound
 
 from .material_fluid_flow import (
     MaterialFluidFlowError,
@@ -1013,8 +1011,6 @@ def _safe_export_destination(
     lexical = Path(os.path.abspath(Path(value).expanduser()))
     if lexical.name in {"", ".", ".."}:
         _fail("Feature Studio export destination is invalid")
-    if lexical.exists() or lexical.is_symlink():
-        _fail("Feature Studio export destination already exists")
     parent = lexical.parent
     cursor = Path(parent.anchor)
     for part in parent.parts[1:]:
@@ -1031,67 +1027,6 @@ def _safe_export_destination(
     if _paths_overlap(destination, workspace):
         _fail("Feature Studio export must not overlap the developer workspace")
     return destination, resolved_parent
-
-
-def _write_fsynced(path: Path, payload: bytes) -> None:
-    with path.open("xb") as stream:
-        stream.write(payload)
-        stream.flush()
-        os.fsync(stream.fileno())
-
-
-def _open_directory(path: Path) -> int:
-    flags = os.O_RDONLY
-    flags |= getattr(os, "O_DIRECTORY", 0)
-    flags |= getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    return os.open(path, flags)
-
-
-def _publish_directory_no_replace(
-    source: Path,
-    destination: Path,
-    *,
-    parent_fd: int,
-) -> None:
-    """Atomically publish ``source`` without replacing an existing entry."""
-
-    if os.name == "nt":
-        # Windows rename is already create-new: it fails when the destination
-        # exists, including when the existing entry is an empty directory.
-        os.rename(source, destination)
-        return
-    libc = ctypes.CDLL(None, use_errno=True)
-    renameat2 = getattr(libc, "renameat2", None)
-    if renameat2 is None:
-        raise OSError(
-            errno.ENOSYS,
-            "atomic no-replace directory publication is unavailable",
-        )
-    renameat2.argtypes = (
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_uint,
-    )
-    renameat2.restype = ctypes.c_int
-    if (
-        renameat2(
-            parent_fd,
-            os.fsencode(source.name),
-            parent_fd,
-            os.fsencode(destination.name),
-            1,  # Linux RENAME_NOREPLACE.
-        )
-        != 0
-    ):
-        error_number = ctypes.get_errno()
-        raise OSError(
-            error_number,
-            os.strerror(error_number),
-            str(destination),
-        )
 
 
 def export_feature(
@@ -1123,7 +1058,7 @@ def export_feature(
         source_snapshot_id=plan["source_snapshot"]["snapshot_id"],
     )
     workspace = _workspace_from_uri(plan["source"]["workspace_uri"])
-    destination, parent = _safe_export_destination(
+    destination, _parent = _safe_export_destination(
         output_root, workspace=workspace
     )
     patch_bytes = "".join(row["diff"] for row in plan["operations"]).encode("utf-8")
@@ -1145,36 +1080,18 @@ def export_feature(
         },
     }
     receipt = {"receipt_id": _content_id("feature-studio-export-receipt", receipt_material), **receipt_material}
-    temporary = Path(tempfile.mkdtemp(prefix=".feature-studio-export-", dir=parent))
-    parent_fd: int | None = None
+    receipt_bytes = _canonical_bytes(receipt) + b"\n"
     try:
-        parent_fd = _open_directory(parent)
-        _write_fsynced(temporary / "feature.patch", patch_bytes)
-        _write_fsynced(
-            temporary / "receipt.json", _canonical_bytes(receipt) + b"\n"
+        tree_id = feature_exports().publish(
+            workspace=workspace, target=destination,
+            patch=patch_bytes, receipt=receipt_bytes,
+            receipt_id=receipt["receipt_id"],
         )
-        temporary_fd = _open_directory(temporary)
-        try:
-            os.fsync(temporary_fd)
-        finally:
-            os.close(temporary_fd)
-        _publish_directory_no_replace(
-            temporary,
-            destination,
-            parent_fd=parent_fd,
-        )
-        os.fsync(parent_fd)
-    except OSError as exc:
-        if exc.errno in {errno.EEXIST, errno.ENOTEMPTY}:
-            _fail("Feature Studio export destination appeared during publication")
+    except FeatureExportError as exc:
         _fail(f"Feature Studio could not publish its export: {exc}")
-    finally:
-        if parent_fd is not None:
-            os.close(parent_fd)
-        if temporary.exists():
-            shutil.rmtree(temporary)
     export = {
         "state": "written",
+        "tree_id": tree_id,
         "receipt_id": receipt["receipt_id"],
         "directory_uri": destination.as_uri(),
         "patch_uri": (destination / "feature.patch").as_uri(),
@@ -1712,6 +1629,31 @@ def validate_feature_result(
             or len(receipt_raw) != retained["size"]
         ):
             _fail("Feature Studio export bytes differ from the sealed result")
+        if "tree_id" in export_value:
+            try:
+                feature_exports().verify(
+                    workspace=_workspace_from_uri(
+                        owner_plan["source"]["workspace_uri"]
+                    ),
+                    target=directory,
+                    tree_id=export_value["tree_id"],
+                    patch_sha256=export_value["patch_sha256"],
+                    patch_size=export_value["patch_size"],
+                    receipt_sha256=retained["sha256"],
+                    receipt_size=retained["size"],
+                    receipt_id=export_value["receipt_id"],
+                )
+            except FeatureExportError as exc:
+                _fail(f"Feature Studio Core export custody changed: {exc}")
+        elif feature_exports_bound():
+            try:
+                if feature_exports().cataloged(
+                    workspace=_workspace_from_uri(owner_plan["source"]["workspace_uri"]),
+                    target=directory,
+                ):
+                    _fail("Feature Studio cataloged export lacks its Core tree identity")
+            except FeatureExportError as exc:
+                _fail(f"Feature Studio Core export catalog changed: {exc}")
 
     expected_context = _context(
         owner_plan,

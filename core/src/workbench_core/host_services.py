@@ -14,6 +14,7 @@ from workbench_api.sessions import bind_retained_session_reader
 from workbench_api.source_transactions import bind_source_transactions
 from workbench_api.source_checkouts import bind_source_checkouts
 from workbench_api.registration_attempts import bind_registration_attempts, registration_attempts_scope
+from workbench_api.feature_exports import bind_feature_export_host
 from workbench_api.derived_indexes import (
     DerivedIndexError, bind_derived_indexes, derived_indexes_bound, derived_indexes_scope,
     derived_indexes_scope_active,
@@ -41,6 +42,8 @@ def install_local_host_services() -> None:
         configuration_home=default_user_config_home(), owner_id="local-host",
     ))
     bind_derived_indexes(CoreDerivedIndexes(configuration_home=default_user_config_home()))
+    from .feature_exports import HOST as feature_export_host
+    bind_feature_export_host(feature_export_host)
 
 
 @contextmanager

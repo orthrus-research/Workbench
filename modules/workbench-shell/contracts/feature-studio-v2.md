@@ -42,7 +42,15 @@ paths bind the result to the flow-plan and source-snapshot identities.
 `verify` and `export` require the reviewed plan ID and fresh source
 revalidation. Verification delegates staging, runtime, observation, and
 source-immutability decisions to the material-flow owner. Export rejects any
-destination overlapping the source workspace and publishes by atomic rename.
+destination overlapping the source workspace. Core stages the exact
+`feature.patch` and V1 `receipt.json` pair and publishes their directory once
+with atomic no-replace semantics. New V2 export results name Core's transport
+tree ID; reopening checks that cataloged tree and both exact files together.
+An earlier V2 result without a tree ID remains readable when its output has
+no Core catalog row. A retained prepared attempt can resume only with the
+same reviewed receipt and bytes; an incomplete or changed attempt is refused.
+This Core transport path currently requires Linux or WSL on a supported POSIX
+filesystem. Windows, macOS, and WSL DrvFS are not qualified by this path.
 Feature Studio has no source-apply operation.
 
 The separately versioned

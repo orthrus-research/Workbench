@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-import errno
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -30,6 +29,9 @@ for source in (
 sys.path.insert(0, str(Path(__file__).parent))
 
 from packwiz_v2_fixture import seal_packwiz_v2_receipt  # noqa: E402
+from workbench_api.feature_exports import feature_export_scope  # noqa: E402
+from workbench_api.transport_trees import TransportTreeError  # noqa: E402
+from workbench_core.feature_exports import CoreFeatureExports  # noqa: E402
 
 from workbench_shell.feature_studio import (  # noqa: E402
     FeatureStudioError,
@@ -416,10 +418,11 @@ class FeatureStudioTests(unittest.TestCase):
             output.parent.mkdir()
             owner_plan = _plan(workspace)
             before = {path: (workspace / path).read_bytes() for path in PATHS}
+            host = CoreFeatureExports(configuration_home=root / "config")
             with patch(
                 "workbench_shell.feature_studio.plan_material_fluid_trial",
                 return_value=owner_plan,
-            ):
+            ), feature_export_scope(host):
                 result = export_feature(
                     SUITE_ROOT,
                     workspace,
@@ -460,7 +463,7 @@ class FeatureStudioTests(unittest.TestCase):
                 crash_output = output.parent / "crash"
                 with (
                     patch(
-                        "workbench_shell.feature_studio._publish_directory_no_replace",
+                        "workbench_core.transport_trees._rename_no_replace",
                         side_effect=OSError("injected crash boundary"),
                     ),
                     self.assertRaisesRegex(FeatureStudioError, "could not publish"),
@@ -477,15 +480,14 @@ class FeatureStudioTests(unittest.TestCase):
                 raced_output = output.parent / "raced"
                 with (
                     patch(
-                        "workbench_shell.feature_studio._publish_directory_no_replace",
-                        side_effect=OSError(
-                            errno.EEXIST,
-                            "destination appeared",
+                        "workbench_core.transport_trees._rename_no_replace",
+                        side_effect=TransportTreeError(
+                            "output.exists", "destination appeared",
                         ),
                     ),
                     self.assertRaisesRegex(
                         FeatureStudioError,
-                        "destination appeared during publication",
+                        "could not publish",
                     ),
                 ):
                     export_feature(
@@ -497,6 +499,10 @@ class FeatureStudioTests(unittest.TestCase):
                         expected_plan_id=owner_plan["plan_id"],
                     )
                 self.assertFalse(raced_output.exists())
+                self.assertEqual(
+                    2,
+                    sum(row["status"] == "prepared-incomplete" for row in host._host(workspace).inventory()),
+                )
                 self.assertFalse(
                     any(
                         child.name.startswith(".feature-studio-export-")
@@ -507,9 +513,27 @@ class FeatureStudioTests(unittest.TestCase):
             patch_bytes = "".join(row["diff"] for row in owner_plan["operations"]).encode()
             self.assertEqual((output / "feature.patch").read_bytes(), patch_bytes)
             receipt = json.loads((output / "receipt.json").read_text())
-            self.result_validator.validate(result)
+            with feature_export_scope(host):
+                self.result_validator.validate(result)
+                validate_feature_result(result, suite_root=SUITE_ROOT)
+                extra = output / "extra.txt"
+                extra.write_bytes(b"unexpected")
+                with self.assertRaisesRegex(FeatureStudioError, "Core export custody changed"):
+                    validate_feature_result(result, suite_root=SUITE_ROOT)
+                extra.unlink()
+                historical = deepcopy(result)
+                historical["export"].pop("tree_id")
+                historical["result_id"] = _content_id(
+                    "feature-studio-result",
+                    {key: value for key, value in historical.items() if key != "result_id"},
+                )
+                with self.assertRaisesRegex(FeatureStudioError, "lacks its Core tree identity"):
+                    validate_feature_result(historical, suite_root=SUITE_ROOT)
+                with feature_export_scope(CoreFeatureExports(configuration_home=root / "historical-config")):
+                    validate_feature_result(historical, suite_root=SUITE_ROOT)
             self.assertEqual(receipt["patch_sha256"], sha256(patch_bytes).hexdigest())
             self.assertEqual(result["export"]["receipt_id"], receipt["receipt_id"])
+            self.assertTrue(result["export"]["tree_id"].startswith("workbench-transport-tree-v2:"))
             self.assertEqual(
                 before,
                 {path: (workspace / path).read_bytes() for path in PATHS},
@@ -1027,6 +1051,7 @@ class FeatureStudioTests(unittest.TestCase):
             workspace.mkdir()
             owner_plan = _plan(workspace)
             owner_result = _owner_result("d", root, workspace, owner_plan)
+            export_host = CoreFeatureExports(configuration_home=root / "config")
 
             def request(operation: str) -> dict:
                 runtime = None
@@ -1085,6 +1110,7 @@ class FeatureStudioTests(unittest.TestCase):
                     "workbench_shell.feature_studio.validate_retained_material_fluid_success",
                     side_effect=_validated_runtime,
                 ),
+                feature_export_scope(export_host),
             ):
                 for operation in (
                     "inspect",
