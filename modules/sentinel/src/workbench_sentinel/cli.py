@@ -11,11 +11,6 @@ from typing import Any, Mapping, Sequence, TextIO
 from workbench_api.events import sanitize_terminal
 
 
-DEFAULT_POLICY_RELATIVE = Path(
-    "profiles/platforms/cleanroom/mixins/cleanroom-mixin-doctor-policy-v1.json"
-)
-
-
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="workbench diagnose mixins",
@@ -67,8 +62,9 @@ def _profile_api(root: Path):
         inspect_artifact_paths,
         render_report,
     )
+    from workbench_profile_cleanroom import profile  # noqa: PLC0415
 
-    return DoctorError, inspect_artifact_paths, render_report
+    return DoctorError, inspect_artifact_paths, render_report, profile().resource("mixin-policy")
 
 
 def _safe(value: object) -> str:
@@ -156,9 +152,9 @@ def main(
     suite_root = Path.cwd() if root is None else root
     stdout = sys.stdout if output is None else output
     stderr = sys.stderr if error is None else error
-    DoctorError, inspect_artifact_paths, render_report = _profile_api(suite_root)
+    DoctorError, inspect_artifact_paths, render_report, owner_policy = _profile_api(suite_root)
     policy = (
-        suite_root / DEFAULT_POLICY_RELATIVE
+        owner_policy
         if arguments.policy is None
         else arguments.policy
     )

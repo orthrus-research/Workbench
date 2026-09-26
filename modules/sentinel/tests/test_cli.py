@@ -79,6 +79,27 @@ class SentinelCliTests(unittest.TestCase):
             json.loads(output.getvalue())["format"],
         )
 
+    def test_default_policy_uses_declared_profile_resource_outside_suite_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            other_root = Path(temporary)
+            artifact = other_root / "example.jar"
+            _empty_archive(artifact)
+            output = StringIO()
+            error = StringIO()
+            code = main(
+                [str(artifact), "--json"],
+                root=other_root,
+                output=output,
+                error=error,
+            )
+            expected = inspect_artifact_paths([str(artifact)], policy_path=POLICY)
+
+        self.assertEqual(0, code, error.getvalue())
+        self.assertEqual(
+            expected["policy"]["policy_id"],
+            json.loads(output.getvalue())["policy"]["policy_id"],
+        )
+
     def test_strict_maps_review_to_exit_one_after_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             artifact = Path(temporary) / "example.jar"

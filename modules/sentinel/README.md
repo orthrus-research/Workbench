@@ -15,6 +15,8 @@ workbench diagnose mixins mod-a.jar --strict
 It asks the profile-owned Cleanroom Mixin Doctor to scan exact archive bytes,
 then translates that report into a short explanation of what was observed,
 why it matters, where it was found, and what the developer should do next.
+The default Mixin policy comes from Cleanroom's declared `mixin-policy`
+resource, so a selected workspace does not need a copy of the source checkout.
 `--json` returns the complete owner report rather than a Sentinel-specific
 replacement. `--strict` returns exit 1 for the owner's `review` or `reject`
 dispositions.
