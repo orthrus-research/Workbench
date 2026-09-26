@@ -98,6 +98,24 @@ This candidate proof does not change the catalog's `ready-unproven` state or
 workspace cleanup protection. Opt-in witness storage requires an owner-private
 workspace location; WSL Windows-mounted workspaces have not been qualified.
 
+Before the first opt-in issue row, Core also seals an epoch anchor in the
+workspace that names the configuration home and catalog root. A shared
+workspace lease prevents this V2 issuer from starting another epoch beside a
+retained anchor or issue ledger.
+`ResourceCatalog.inspect_workspace_issuance_epoch` can report that surviving
+evidence after the configuration home is lost; a foreign epoch
+or incomplete paired ledger blocks further opt-in issuance. Earlier V2 issue
+ledgers without an anchor gain one only after their exact rows and reservations
+reopen under the selected root. Older V2 writers that do not check the anchor
+remain outside this protection.
+
+`ResourceCatalog.inspect_current_file_issuance` compares a selected
+workspace's visible file resource rows with its retained V2 issue rows. It
+reports publication state and resources with no matching retained issue.
+Ordinary file writers do not share the issue lease, so this diagnostic does not
+certify a complete current snapshot or any missing history. Its result grants
+no cleanup authority; the catalog root remains `ready-unproven`.
+
 Core's managed-tree API can locate one retained tree by its exact target path,
 workspace, owner and role, returning the catalog tree ID and publication state.
 An optional domain identity must match a prepared intent. Missing, duplicate,
