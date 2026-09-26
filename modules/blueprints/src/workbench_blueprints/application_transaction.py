@@ -199,7 +199,12 @@ def _atomic_replace(
 
 
 def _read_json_record(path: Path, label: str) -> dict[str, Any]:
-    raw = _read_regular(path, label)
+    try:
+        raw = read_private_single_link_bytes(
+            path, byte_limit=MAXIMUM_OPERATION_BYTES,
+        )
+    except HostFilesystemError as exc:
+        raise ApplicationTransactionError(f"cannot read {label}: {exc}") from exc
     try:
         value = json.loads(raw.decode("utf-8", errors="strict"))
     except (UnicodeError, json.JSONDecodeError) as exc:
@@ -207,6 +212,23 @@ def _read_json_record(path: Path, label: str) -> dict[str, Any]:
     if type(value) is not dict:
         _fail(f"{label} must be one ordinary object")
     return cast(dict[str, Any], value)
+
+
+def _remove_transaction_record_if_present(path: Path, label: str) -> None:
+    """Ask Core to remove only the exact private record reviewed here."""
+
+    if not path.exists() and not path.is_symlink():
+        return
+    try:
+        raw = read_private_single_link_bytes(
+            path, byte_limit=MAXIMUM_OPERATION_BYTES,
+        )
+        remove_private_bytes(
+            path, expected_sha256="sha256:" + sha256(raw).hexdigest(),
+            byte_limit=MAXIMUM_OPERATION_BYTES,
+        )
+    except HostFilesystemError as exc:
+        raise ApplicationTransactionError(f"cannot remove {label}: {exc}") from exc
 
 
 def _acquire_transaction_lock(
@@ -857,9 +879,12 @@ def apply_application_transaction(
             if own_journal and not preserve_recovery:
                 if source_transaction is not None:
                     source_transaction.cleanup()
-                prepared_receipt_path.unlink(missing_ok=True)
-                journal_path.unlink(missing_ok=True)
-                _fsync_directory(state)
+                _remove_transaction_record_if_present(
+                    prepared_receipt_path, "prepared transaction receipt",
+                )
+                _remove_transaction_record_if_present(
+                    journal_path, "active transaction journal",
+                )
         finally:
             if preserve_recovery:
                 _close_transaction_lock(lock_lease)
@@ -933,8 +958,9 @@ def recover_application_transaction(
             source_transaction.cleanup_orphaned_stages(
                 [row["path"] for row in plan["operations"]],
             )
-            prepared_receipt_path.unlink(missing_ok=True)
-            _fsync_directory(state)
+            _remove_transaction_record_if_present(
+                prepared_receipt_path, "prepared transaction receipt",
+            )
             return {
                 "application_receipt": None,
                 "attempted_ordinals": [],
@@ -1044,9 +1070,12 @@ def recover_application_transaction(
             source_transaction.cleanup_orphaned_stages(
                 [row["path"] for row in plan["operations"]],
             )
-            prepared_receipt_path.unlink(missing_ok=True)
-            journal_path.unlink(missing_ok=True)
-            _fsync_directory(state)
+            _remove_transaction_record_if_present(
+                prepared_receipt_path, "prepared transaction receipt",
+            )
+            _remove_transaction_record_if_present(
+                journal_path, "active transaction journal",
+            )
             preserve_recovery = False
             return {
                 "application_receipt": prepared_receipt,
@@ -1081,9 +1110,12 @@ def recover_application_transaction(
         source_transaction.cleanup_orphaned_stages(
             [row["path"] for row in plan["operations"]],
         )
-        prepared_receipt_path.unlink(missing_ok=True)
-        journal_path.unlink(missing_ok=True)
-        _fsync_directory(state)
+        _remove_transaction_record_if_present(
+            prepared_receipt_path, "prepared transaction receipt",
+        )
+        _remove_transaction_record_if_present(
+            journal_path, "active transaction journal",
+        )
         preserve_recovery = False
         return {
             "application_receipt": None,

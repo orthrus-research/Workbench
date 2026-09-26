@@ -10,7 +10,9 @@ transaction record directories before Blueprints publishes its V1 journal and
 history bytes through the filesystem port. Core also creates and holds the M2
 transaction lock at its historical path with its V1 token bytes. Blueprints
 decides whether an interrupted lock is live or should be quarantined, then asks
-Core to remove the exact stale marker. The resumable session holds its
+Core to remove the exact stale marker. Core also reads and removes the V2
+attempt journal and prepared receipt at their historical paths after Blueprints
+decides an attempt is complete. The resumable session holds its
 historical exclusive marker through Core, so older Blueprints processes still
 exclude a concurrent writer. Blueprints retains plan admission and source
 semantics.

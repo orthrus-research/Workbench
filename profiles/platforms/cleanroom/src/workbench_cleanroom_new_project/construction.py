@@ -78,6 +78,14 @@ BOOTSTRAP_CORE_OWNER_ID = (
     "ee1eae2548b741baf99c56e90e624074a8441e425a84df5480a7197d1ea89e2c"
 )
 BOOTSTRAP_CORE_OWNER_SHA256 = "121ef11ec36a86e701bc67ec78d37192adadea65ffcbddb6ef7037887e6620ad"
+M2_LOCK_CORE_OWNER_RELATIVE = Path(
+    "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2-core-m2-lock.json"
+)
+M2_LOCK_CORE_OWNER_ID = (
+    "workbench-cleanroom-mod-construction-owner:sha256:"
+    "5fe7c2891efe179013e7b5927583238121daa0cc14e116485871a530e09421db"
+)
+M2_LOCK_CORE_OWNER_SHA256 = "39a21cece07c717525205dfe84ba77d79af456ffd1a76d7049b1d4623967e0e9"
 OWNER_SCHEMA_RELATIVE = Path(
     "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json"
 )
@@ -474,6 +482,8 @@ def _historical_construction_owner(
         relative, expected_sha256 = PREVIOUS_CORE_OWNER_RELATIVE, PREVIOUS_CORE_OWNER_SHA256
     elif owner_id == BOOTSTRAP_CORE_OWNER_ID:
         relative, expected_sha256 = BOOTSTRAP_CORE_OWNER_RELATIVE, BOOTSTRAP_CORE_OWNER_SHA256
+    elif owner_id == M2_LOCK_CORE_OWNER_ID:
+        relative, expected_sha256 = M2_LOCK_CORE_OWNER_RELATIVE, M2_LOCK_CORE_OWNER_SHA256
     else:
         _fail("historical construction owner is not admitted")
     path = _suite_file(suite, relative, "historical construction owner")
@@ -640,6 +650,7 @@ def validate_cleanroom_mod_plan(
         _historical_construction_owner(suite, plan["owner_record_id"])
         if allow_historical_owner and plan.get("owner_record_id") in {
             HISTORICAL_OWNER_ID, PREVIOUS_CORE_OWNER_ID, BOOTSTRAP_CORE_OWNER_ID,
+            M2_LOCK_CORE_OWNER_ID,
         }
         else validate_construction_owner(suite)
     )

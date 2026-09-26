@@ -274,7 +274,9 @@ can finish or must restore exact applied bytes. Core can reopen those stages
 after a process exit; it preserves a later source edit instead of replacing
 it during recovery. Core holds the M2 transaction marker at its historical
 path with V1 token bytes, and removes only the exact marker Blueprints admits
-as stale during recovery. Existing Cleanroom plans remain bound to their
+as stale during recovery. Core also reads the V2 attempt journal and prepared
+receipt and removes their reviewed bytes once Blueprints decides the attempt
+has finished. Existing Cleanroom plans remain bound to their
 original sealed construction owner, while new plans use the current owner
 record.
 Core registers the selected Fresh Project V2 state root and handles physical

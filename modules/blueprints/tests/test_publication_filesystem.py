@@ -85,3 +85,23 @@ class PublicationFilesystemTests(unittest.TestCase):
             self.assertIsNone(application_transaction._acquire_transaction_lock(lock, 'plan:test'))
             application_transaction._release_transaction_lock(lease)
             self.assertFalse(lock.exists())
+
+    def test_m2_cleanup_refuses_a_second_link_to_a_journal(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            journal = Path(temporary) / 'active-transaction.json'
+            alternate = Path(temporary) / 'alternate.json'
+            journal.write_bytes(b'{"phase":"prepared"}\n')
+            journal.chmod(0o600)
+            try:
+                os.link(journal, alternate)
+            except OSError as exc:
+                self.skipTest(f'host cannot create hardlinks: {exc}')
+            with self.assertRaisesRegex(
+                application_transaction.ApplicationTransactionError,
+                'cannot remove active transaction journal',
+            ):
+                application_transaction._remove_transaction_record_if_present(
+                    journal, 'active transaction journal',
+                )
+            self.assertTrue(journal.is_file())
+            self.assertEqual(journal.read_bytes(), alternate.read_bytes())
