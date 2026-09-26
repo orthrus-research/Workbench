@@ -309,6 +309,10 @@ pixi run --locked --no-config workbench atlas recipes index \
   /path/to/graph --max-source-bytes 8589934592 --max-index-bytes 4294967296
 ```
 
+For a direct command against a graph outside a cataloged Workbench tree, add
+`--workspace /absolute/workspace` to retain the index attempt with that
+workspace. The regular Workbench dispatch supplies its selected workspace.
+
 See the [index-operation contract](contracts/atlas-recipe-index-operation-v1.md),
 [bounded recipe-impact contract](contracts/atlas-recipe-impact-report-v1.md),
 [complete finite recipe-impact contract](contracts/atlas-complete-recipe-impact-report-v2.md), and

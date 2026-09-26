@@ -123,6 +123,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     index.add_argument("path", type=Path)
     index.add_argument(
+        "--workspace", type=Path,
+        help="absolute Workbench workspace for direct index attempt custody",
+    )
+    index.add_argument(
         "--max-source-bytes",
         type=int,
         default=DEFAULT_MAX_SOURCE_BYTES,
@@ -792,7 +796,7 @@ def main(
                 )
 
             from workbench_core.host_services import direct_atlas_derived_index_scope
-            with direct_atlas_derived_index_scope():
+            with direct_atlas_derived_index_scope(workspace=args.workspace):
                 record = rebuild_recipe_health_index(
                     args.path,
                     max_source_bytes=args.max_source_bytes,

@@ -294,6 +294,64 @@ class DerivedIndexCustodyTests(unittest.TestCase):
                 self.assertEqual(original["graph_set_id"], verify_query_index(root)["graph_set_id"])
                 self.assertEqual(["complete"], [attempt.state for attempt in self.host.inspect(root)])
 
+    def test_direct_external_graph_indexes_bind_explicit_workspace(self) -> None:
+        from workbench_atlas_observations.cli import main as observations_main
+        from workbench_atlas_recipe_health.cli import main as recipes_main
+
+        workspace = self.base / "selected-workspace"
+        workspace.mkdir()
+        for name, entry in (("recipe", recipes_main), ("observation", observations_main)):
+            with self.subTest(name=name):
+                graph = self.base / f"external-{name}" / "graph"
+                graph.parent.mkdir()
+                manifest = _graph(graph, observation=name == "observation")
+                (graph / "query-index.sqlite3").unlink()
+                output, error = StringIO(), StringIO()
+                with mock.patch.dict("os.environ", {"WORKBENCH_CONFIG_HOME": str(self.config)}):
+                    status = entry(
+                        ["index", str(graph), "--workspace", str(workspace),
+                         "--max-source-bytes", "1000000", "--max-index-bytes", "1000000"],
+                        output=output, error=error,
+                    )
+                self.assertEqual(0, status, error.getvalue())
+                self.assertEqual(manifest["graph_set_id"], verify_query_index(graph)["graph_set_id"])
+        rows = ResourceCatalog(self.config).inventory(workspace=workspace)["record_stores"]
+        self.assertEqual(2, len(rows))
+        self.assertEqual({"atlas-derived-index-v1"}, {row["family"] for row in rows})
+        self.assertEqual([], ResourceCatalog(self.config).inventory(
+            workspace=self.base / "unselected-workspace",
+        )["record_stores"])
+
+    def test_explicit_workspace_cannot_override_dispatch_or_admit_old_managed_graph(self) -> None:
+        from workbench_core.host_services import direct_atlas_derived_index_scope
+
+        workspace = self.base / "selected-workspace"
+        workspace.mkdir()
+        old, manifest, _ = self._managed(derived_rule=False, observation=False)
+        with mock.patch.dict("os.environ", {"WORKBENCH_CONFIG_HOME": str(self.config)}):
+            with direct_atlas_derived_index_scope(workspace=workspace):
+                with self.assertRaises(DerivedIndexError) as raised:
+                    rebuild_query_index(old)
+        self.assertEqual("managed", raised.exception.code)
+        self.assertFalse((old.parent / f".{old.name}.derived-index-core").exists())
+        self.assertEqual(manifest, validate_bundle_directory(old))
+        with derived_indexes_scope(None):
+            with self.assertRaises(DerivedIndexError) as raised:
+                with direct_atlas_derived_index_scope(workspace=workspace):
+                    self.fail("explicit workspace replaced dispatch")
+        self.assertEqual("policy", raised.exception.code)
+        for unsafe in (Path("relative-workspace"), self.base / "missing-workspace"):
+            with self.subTest(unsafe=unsafe), self.assertRaises(DerivedIndexError) as raised:
+                with direct_atlas_derived_index_scope(workspace=unsafe):
+                    self.fail("invalid workspace entered Core scope")
+            self.assertEqual("policy", raised.exception.code)
+        redirected = self.base / "redirected-workspace"
+        redirected.symlink_to(workspace, target_is_directory=True)
+        with self.assertRaises(DerivedIndexError) as raised:
+            with direct_atlas_derived_index_scope(workspace=redirected):
+                self.fail("redirecting workspace entered Core scope")
+        self.assertEqual("policy", raised.exception.code)
+
     def test_explicit_unavailable_dispatch_scope_does_not_use_direct_fallback(self) -> None:
         from workbench_core.host_services import direct_atlas_derived_index_scope
 

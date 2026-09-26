@@ -20,6 +20,12 @@ workbench atlas recipes index GRAPH \
   --max-index-bytes 4294967296 --json
 ```
 
+For a direct command over an external graph, `--workspace /absolute/workspace`
+binds the retained Core index attempt to the selected Workbench workspace.
+Dispatch already supplies its selected workspace, so the flag is refused there.
+Core validates the direct selection and still refuses a cataloged historical
+managed graph whose original tree intent did not allow derived-index changes.
+
 The operation:
 
 1. validates every authoritative stream before staging;

@@ -51,6 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument("--snapshot", type=Path, help="explicit retained source reopened by the selected profile")
             command.add_argument("--pack-profile", help="profile providing the original-evidence reader")
         if action == "index":
+            command.add_argument("--workspace", type=Path,
+                                 help="absolute Workbench workspace for direct index attempt custody")
             command.add_argument("--max-source-bytes", type=int, default=8 * 1024**3)
             command.add_argument("--max-index-bytes", type=int, default=4 * 1024**3)
         if action == "import-snapshot":
@@ -173,7 +175,7 @@ def main(argv: Sequence[str] | None = None, *, context: ExecutionContext | None 
                 cancel()
                 print(f"Atlas observation index: {update.get('phase', 'working')}", file=error)
             from workbench_core.host_services import direct_atlas_derived_index_scope
-            with direct_atlas_derived_index_scope():
+            with direct_atlas_derived_index_scope(workspace=args.workspace):
                 manifest = rebuild_query_index(args.path, max_source_bytes=args.max_source_bytes,
                                                max_index_bytes=args.max_index_bytes, progress=progress,
                                                check_cancelled=cancel)

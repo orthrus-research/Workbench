@@ -65,6 +65,9 @@ explicit rebuild. Core classifies that partial attempt before a later rebuild.
 `CategoricalGraphQuery(..., rebuild_if_missing=True)` is the explicit recovery
 path for a missing index; invalid present indexes still fail closed and require
 an explicit rebuild call.
+Direct recipe and observation index commands accept `--workspace` with an
+absolute existing workspace path when rebuilding an external graph. Core binds
+the attempt to that workspace; dispatch uses its already selected workspace.
 
 New builders publish validation profile
 `workbench-atlas-categorical-graph-declared-dependency-closure-v1`. This field

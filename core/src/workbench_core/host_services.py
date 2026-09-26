@@ -15,7 +15,7 @@ from workbench_api.source_transactions import bind_source_transactions
 from workbench_api.source_checkouts import bind_source_checkouts
 from workbench_api.registration_attempts import bind_registration_attempts, registration_attempts_scope
 from workbench_api.derived_indexes import (
-    bind_derived_indexes, derived_indexes_bound, derived_indexes_scope,
+    DerivedIndexError, bind_derived_indexes, derived_indexes_bound, derived_indexes_scope,
     derived_indexes_scope_active,
 )
 from workbench_api.record_stores import record_store_scope
@@ -104,9 +104,27 @@ def suite_managed_tree_scope(
 
 
 @contextmanager
-def direct_atlas_derived_index_scope() -> Iterator[None]:
-    """Compose the supported direct Atlas index command when dispatch did not."""
+def direct_atlas_derived_index_scope(*, workspace: Path | None = None) -> Iterator[None]:
+    """Compose a direct Atlas index command with an optional selected workspace."""
 
+    if workspace is not None:
+        if derived_indexes_scope_active():
+            raise DerivedIndexError(
+                "policy", "an explicit workspace cannot replace the selected Core dispatch workspace",
+            )
+        if not isinstance(workspace, Path) or not workspace.is_absolute():
+            raise DerivedIndexError("policy", "select an absolute Atlas index workspace")
+        from . import check_storage
+        from .user_config_home import default_user_config_home
+        try:
+            selected = check_storage.ordinary(workspace, directory=True)
+        except (OSError, ValueError) as exc:
+            raise DerivedIndexError("policy", "Atlas index workspace is unavailable or redirecting") from exc
+        with derived_indexes_scope(CoreDerivedIndexes(
+            configuration_home=default_user_config_home(), workspace=selected,
+        )):
+            yield
+        return
     if derived_indexes_scope_active() or derived_indexes_bound():
         yield
         return
