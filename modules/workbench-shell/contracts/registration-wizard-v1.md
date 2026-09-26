@@ -77,6 +77,12 @@ registration; the returned plan names the required launch checks.
 
 ## Interrupted completion
 
+`workbench register WORKSPACE --inspect-attempt PLAN_ID` shows Core's retained
+receipt state, ordered source classification, stage presence and rollback
+intent. Its JSON form is available with `--json`. Inspection does not rewrite
+source or retained evidence. A `review-required` journal calls for explicit
+review; the display itself never authorizes resume, rollback or cleanup.
+
 If the wizard exits after every ordered source replacement but before the
 applied receipt reaches its final path, `workbench register WORKSPACE
 --finalize-attempt PLAN_ID` asks Core to finish publication. Core reopens the

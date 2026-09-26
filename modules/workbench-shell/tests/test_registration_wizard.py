@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import io
 import json
 import os
@@ -278,6 +278,52 @@ class RegistrationWizardTest(unittest.TestCase):
                         ) / "backups").is_dir())
 
     @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_cli_inspects_partial_attempt_without_changing_source_or_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project, payload, state, plan, _answers = self._interrupted_material_apply(
+                Path(temporary), ordinal=1, after_replace=True,
+            )
+            retained = state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            )
+            before_source = {
+                row["path"]: (payload / row["path"]).read_bytes()
+                for row in plan["operations"]
+            }
+            before_receipt = (retained / "receipt.json").read_bytes()
+            arguments = [
+                "register", str(project), "--suite-root", str(SUITE_ROOT),
+                "--state-root", str(state), "--inspect-attempt", plan["plan_id"],
+            ]
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, cli_main([*arguments, "--json"]))
+            inspected = json.loads(output.getvalue())
+            self.assertEqual("workbench-registration-attempt-inspection-v1", inspected["format"])
+            self.assertEqual("prepared", inspected["receipt_state"])
+            self.assertEqual("consistent", inspected["journal_status"])
+            self.assertEqual(["after", "after", "before"], [
+                row["source_state"] for row in inspected["operations"]
+            ])
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, cli_main(arguments))
+            self.assertIn("Journal: consistent", output.getvalue())
+            self.assertIn("stage recorded=yes", output.getvalue())
+            self.assertIn(str(retained.as_uri()), output.getvalue())
+            self.assertEqual(before_source, {
+                row["path"]: (payload / row["path"]).read_bytes()
+                for row in plan["operations"]
+            })
+            self.assertEqual(before_receipt, (retained / "receipt.json").read_bytes())
+            self.assertFalse((retained / "rollback.json").exists())
+            self.assertFalse((state / "registrations" / plan["plan_id"][7:]).exists())
+            with redirect_stderr(io.StringIO()):
+                self.assertEqual(2, cli_main([
+                    *arguments, "--resume-attempt", plan["plan_id"], "--json",
+                ]))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
     def test_restart_resumes_ordered_partial_attempts_and_is_idempotent(self) -> None:
         for ordinal in range(3):
             for after_replace in (False, True):
@@ -420,6 +466,22 @@ class RegistrationWizardTest(unittest.TestCase):
                     ),
                 )),
             )
+            inspection_output = io.StringIO()
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(root / "other-config")}):
+                with redirect_stdout(inspection_output):
+                    code = dispatch([
+                        "register", str(project), "--suite-root", str(SUITE_ROOT),
+                        "--state-root", str(state), "--inspect-attempt", plan["plan_id"],
+                        "--json",
+                    ], context, (module,), suite_root=SUITE_ROOT)
+            self.assertEqual(0, code)
+            self.assertEqual(
+                "workbench-registration-attempt-inspection-v1",
+                json.loads(inspection_output.getvalue())["format"],
+            )
+            self.assertFalse((state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            ) / "rollback.json").exists())
             output = io.StringIO()
             with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(root / "other-config")}):
                 with redirect_stdout(output):
@@ -995,6 +1057,14 @@ class RegistrationWizardTest(unittest.TestCase):
                 SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
             )
             self.assertEqual("review-required", inspected["journal_status"])
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(0, cli_main([
+                    "register", str(project), "--suite-root", str(SUITE_ROOT),
+                    "--state-root", str(state), "--inspect-attempt", plan["plan_id"],
+                    "--json",
+                ]))
+            self.assertEqual("review-required", json.loads(output.getvalue())["journal_status"])
             self.assertEqual(
                 ["before"] * len(plan["operations"]),
                 [row["source_state"] for row in inspected["operations"]],

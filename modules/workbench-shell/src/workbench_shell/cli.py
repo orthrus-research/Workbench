@@ -98,6 +98,7 @@ from .registration_wizard import (
     RegistrationWizardError,
     apply_active_registration,
     finalize_active_registration_attempt,
+    inspect_active_registration_attempt,
     plan_active_registration,
     registration_capabilities,
     rollback_active_registration_attempt,
@@ -657,6 +658,11 @@ def _parser(*, feature_program: str | None = None) -> argparse.ArgumentParser:
         help="apply the previewed edits directly to the active instance",
     )
     register.add_argument(
+        "--inspect-attempt",
+        metavar="PLAN_ID",
+        help="inspect a retained attempt and its source stages without changing them",
+    )
+    register.add_argument(
         "--finalize-attempt",
         metavar="PLAN_ID",
         help="finish an interrupted attempt only if Core proves all edits completed",
@@ -687,7 +693,7 @@ def _parser(*, feature_program: str | None = None) -> argparse.ArgumentParser:
     register.add_argument(
         "--json",
         action="store_true",
-        help="emit the catalog, plan, or application result",
+        help="emit the catalog, plan, application, or attempt result",
     )
 
     blueprint_stage = subcommands.add_parser(
@@ -1614,6 +1620,29 @@ def _human_registration_result(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _human_registration_attempt_inspection(result: dict[str, Any]) -> str:
+    lines = [
+        f"Registration attempt: {result['plan_id']}",
+        f"Journal: {result['journal_status']}",
+        f"Receipt: {result['receipt_state']}",
+        f"Rollback requested: {'yes' if result['rollback_requested'] else 'no'}",
+        f"Retained attempt: {result['attempt_uri']}",
+        "Source files:",
+    ]
+    for row in result["operations"]:
+        lines.append(
+            f"  - {row['path']}: {row['source_state']}; "
+            f"stage recorded={'yes' if row['stage_recorded'] else 'no'}, "
+            f"present={'yes' if row['stage_present'] else 'no'}, "
+            f"attempted={'yes' if row['attempted'] else 'no'}, "
+            f"extra stage={'yes' if row['extra_stage_present'] else 'no'}"
+        )
+    if result["outstanding_checks"]:
+        lines.append("Outstanding checks:")
+        lines.extend(f"  - {item}" for item in result["outstanding_checks"])
+    return "\n".join(lines)
+
+
 def _read_prompt(prompt: str) -> str:
     sys.stderr.write(prompt)
     sys.stderr.flush()
@@ -1782,18 +1811,20 @@ def _run_registration(
 ) -> tuple[dict[str, Any], bool]:
     selected = [
         action for action in (
-            args.finalize_attempt, args.resume_attempt, args.rollback_attempt,
+            args.inspect_attempt, args.finalize_attempt, args.resume_attempt,
+            args.rollback_attempt,
         ) if action is not None
     ]
     if len(selected) > 1:
-        raise RegistrationWizardError("select one registration recovery action")
+        raise RegistrationWizardError("select one registration attempt action")
     recovery_id = selected[0] if selected else None
     if recovery_id is not None:
         if args.list or args.pattern is not None or args.answers is not None or args.apply or args.yes:
             raise RegistrationWizardError(
-                "registration recovery cannot be combined with planning or application options"
+                "registration attempt action cannot be combined with planning or application options"
             )
         action = (
+            inspect_active_registration_attempt if args.inspect_attempt is not None else
             finalize_active_registration_attempt if args.finalize_attempt is not None else
             resume_active_registration_attempt if args.resume_attempt is not None else
             rollback_active_registration_attempt
@@ -3497,6 +3528,8 @@ def main(
         elif args.command == "register":
             if result["format"] == "workbench-registration-capabilities-v1":
                 print(_human_registration_capabilities(result))
+            elif result["format"] == "workbench-registration-attempt-inspection-v1":
+                print(_human_registration_attempt_inspection(result))
             elif result["format"] == "workbench-registration-result-v1":
                 print(_human_registration_result(result))
             elif result["format"] == "workbench-registration-recovery-v1":
