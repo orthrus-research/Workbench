@@ -88,12 +88,25 @@ class CoreIdeToolchainAdmissions:
         except TemporaryLeaseError as exc:
             raise IdeToolchainAdmissionError("IDE toolchain source stages need review") from exc
         prefix = f"ide-{archive_sha256}-"
-        return [row for row in rows if (
+        selected = [row for row in rows if (
             row["owner_id"] == "validation"
             and row["role"] == "ide-toolchain"
             and Path(row["path"]).parent == destination.parent
             and Path(row["path"]).name.startswith(prefix)
         )]
+        try:
+            for row in selected:
+                if row["status"] == "disposed":
+                    continue
+                with CoreTemporaryLeases.reference_lease(
+                    self.configuration_home, row["lease_id"],
+                    workspace=self.workspace, owner_id="validation",
+                    role="ide-toolchain", path=Path(row["path"]),
+                ):
+                    pass
+        except TemporaryLeaseError as exc:
+            raise IdeToolchainAdmissionError("IDE toolchain source stage changed") from exc
+        return selected
 
     def inventory_catalog(self) -> list[dict[str, Any]]:
         """Read current admission rows and interrupted stages without opening trees."""

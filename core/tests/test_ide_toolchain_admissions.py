@@ -14,7 +14,7 @@ from workbench_core.ide_toolchain_admissions import (
     CoreIdeToolchainAdmissions, IdeToolchainAdmissionError,
 )
 from workbench_core.storage.registered import ResourceCatalog
-from workbench_core.temporary_leases import CoreTemporaryLeases
+from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
 
 class IdeToolchainAdmissionTests(unittest.TestCase):
@@ -86,6 +86,8 @@ class IdeToolchainAdmissionTests(unittest.TestCase):
         with stages.execution(stage):
             first = self.admit(stage_lease_id=stage.lease_id)
             stages.retain(stage, outcome="completed")
+            with self.assertRaisesRegex(TemporaryLeaseError, "IDE toolchain source stage remains retained"):
+                stages.dispose(stage, drained=lambda: True)
         self.assertEqual(stage.lease_id, first["stage_lease_id"])
         self.assertEqual(first, self.admit())
         with self.assertRaisesRegex(IdeToolchainAdmissionError, "differs"):
@@ -111,6 +113,26 @@ class IdeToolchainAdmissionTests(unittest.TestCase):
             self.assertTrue(self.target.is_dir())
         finally:
             held.rename(record)
+
+    def test_retained_source_marker_change_refuses_exact_reuse(self) -> None:
+        stages = CoreTemporaryLeases(
+            workspace=self.host.workspace,
+            configuration_home=self.host.configuration_home,
+            locations={"ide-toolchain": self.root}, owner_id="validation",
+        )
+        stage = stages.allocate("ide-toolchain", f"ide-{self.digest}-source")
+        with stages.execution(stage):
+            self.admit(stage_lease_id=stage.lease_id)
+            stages.retain(stage, outcome="completed")
+        marker = stage.path / ".workbench-temporary-lease.json"
+        retained = marker.read_bytes()
+        marker.write_bytes(b"changed\n")
+        try:
+            with self.assertRaisesRegex(IdeToolchainAdmissionError, "source stage changed"):
+                self.admit()
+            self.assertTrue(self.target.is_dir())
+        finally:
+            marker.write_bytes(retained)
 
     def test_changed_bytes_and_replaced_root_refuse_without_rewriting_admission(self) -> None:
         self.admit()

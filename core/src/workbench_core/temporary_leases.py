@@ -655,6 +655,11 @@ class CoreTemporaryLeases:
                 "temporary.policy",
                 "Packwiz source scratch remains retained until its dependency and process absence policy is complete",
             )
+        if reservation["role"] == "ide-toolchain":
+            raise TemporaryLeaseError(
+                "temporary.policy",
+                "IDE toolchain source stage remains retained until its admission and history policy is complete",
+            )
         if not callable(drained) or drained() is not True:
             raise TemporaryLeaseError("temporary.active", "temporary lease process tree is not confirmed drained")
         try:
