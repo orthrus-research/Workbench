@@ -132,6 +132,16 @@ fixture and tool input from the share's unresolved list. Linux and WSL use the
 Linux tool policy; a selected state root that cannot enforce owner-private
 custody is refused before provisioning.
 
+For a V3 share whose selection, project and managed tools were already imported,
+`plan_environment_composition` reopens their three Core result resource IDs
+under the same workspace. It checks the current Configuration V1 selection,
+exact managed Git checkout and acquisition receipt, and retained Prism and
+Packwiz state. `apply_environment_composition` requires that plan ID, repeats
+the checks and publishes one Core evidence result referencing all three prior
+results. It downloads nothing and does not claim a complete environment:
+optional module packages and profile fixtures remain unresolved, and Java
+acquisition still follows the selection import's separate reviewed choice.
+
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
 names the exact import plan, local blockers and missing acquisition inputs. The
@@ -165,8 +175,10 @@ intent admission.
 
 Provisioning must connect the exact lock to optional packages and profile
 fixtures, preserving incomplete outcomes and reporting unavailable inputs.
-Exact project and managed-tool byte imports exist separately; joining them to
-selection import and reconciling interrupted acquisition still need work.
+The Core composition receipt links already imported selection, project and
+tool results but does not perform a combined acquire. Interrupted project and
+tool acquisition still need restart reconciliation; missing package and fixture
+locks prevent a claim that one small manifest rebuilds a complete environment.
 Textual presents the same reviewed managed Java acquisition choice during
 import. Its checkbox change invalidates the prior plan and requires a new
 review before any download or binding.

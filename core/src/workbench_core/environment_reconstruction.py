@@ -1291,8 +1291,23 @@ def apply_tool_import(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def plan_environment_composition(*args, **kwargs) -> dict[str, Any]:
+    """Review prior V3 selection, project and tool results together."""
+
+    from .environment_composition import plan_environment_composition as operation
+    return operation(*args, **kwargs)
+
+
+def apply_environment_composition(*args, **kwargs) -> dict[str, Any]:
+    """Retain a Core-linked result for three independently verified inputs."""
+
+    from .environment_composition import apply_environment_composition as operation
+    return operation(*args, **kwargs)
+
+
 __all__ = [
     "ReconstructionError", "apply_import", "assess_reconstruction_feasibility",
     "build_share", "export_share", "load_share", "plan_import", "validate_share",
     "plan_project_import", "apply_project_import", "plan_tool_import", "apply_tool_import",
+    "plan_environment_composition", "apply_environment_composition",
 ]
