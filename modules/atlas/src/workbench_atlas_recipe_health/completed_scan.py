@@ -1,7 +1,7 @@
 """Portable, historical recipe scans and reading their already evaluated audit.
 
 The domain checks never invoke a profile, game, projection or audit evaluator.
-Archive transport is delegated lazily to Core. Original path strings are evidence
+Archive transport is supplied by Core through the API. Original path strings are evidence
 only: this reader neither resolves them nor promotes omitted execution custody.
 """
 from __future__ import annotations
@@ -16,6 +16,7 @@ import re
 import stat
 from typing import Any, Callable
 
+from workbench_api.archive_exchange import current_archive_exchange
 from workbench_crucible_runtime_snapshot.capture import read_runtime_capture
 from . import dead_ends
 from .view import GraphRecipeHealthView, RecipeHealthError
@@ -452,8 +453,7 @@ def _cancelled(poll):
 
 
 def _transport():
-    from workbench_core import archive_exchange
-    return archive_exchange
+    return current_archive_exchange()
 
 
 def _verified(root, poll):

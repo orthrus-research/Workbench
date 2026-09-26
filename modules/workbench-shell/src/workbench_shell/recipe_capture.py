@@ -11,6 +11,7 @@ from threading import Event
 
 from workbench_api.processes import capture_process, ProcessError, open_process_output
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
+from workbench_api.managed_attempts import managed_attempts
 from workbench_core import check_storage as storage, capture_workspace as workspace_storage
 from workbench_core import process_capture
 from workbench_core.fixture_selection import (
@@ -22,6 +23,8 @@ from workbench_project_intelligence.working_tree import capture_source_inputs, o
 from workbench_project_intelligence.saved_candidate import candidate_manifest, stage_candidate
 
 GROUP = 'workbench.recipe_captures'
+ATTEMPT_FAMILY = 'recipe-capture-v1'
+ATTEMPT_PREFIX = 'recipe-capture'
 REQUEST = 'workbench-developer-recipe-capture-request-v1'
 PREPARED = 'workbench-developer-recipe-capture-prepared-v1'
 RESULT = 'workbench-developer-recipe-capture-result-v1'
@@ -88,7 +91,7 @@ class Cancellation:
         self.event, self.attempt = event, attempt
 
     def is_set(self):
-        return self.event.is_set() or self.attempt is not None and (self.attempt / 'cancel.json').exists()
+        return self.event.is_set() or self.attempt is not None and managed_attempts().cancellation_requested(self.attempt)
 
     def check(self):
         if self.is_set():
@@ -139,10 +142,11 @@ def plan(root, *, source, runtime=None, java_home=None, profile, heap_mib, cance
     """Retain immutable source and a reviewed exact environment inventory."""
     cancel = Cancellation(cancelled)
     cancel.check()
-    root, source = [Path(p).expanduser().absolute() for p in (root, source)]
+    source = Path(source).expanduser().absolute()
+    selected_root = managed_attempts().default_root(ATTEMPT_FAMILY, workspace=source) if root is None else Path(root).expanduser().absolute()
     selection = resolve_recipe_fixture(profile, source, runtime=runtime, java_home=java_home)
     runtime, java_home = Path(selection['runtime']), Path(selection['java_home'])
-    _overlap(root, source, runtime, java_home)
+    _overlap(selected_root, source, runtime, java_home)
     owner, provider = _owner(profile)
     descriptor = owner.descriptor()
     inputs = capture_source_inputs(source)
@@ -170,7 +174,9 @@ def plan(root, *, source, runtime=None, java_home=None, profile, heap_mib, cance
     if type(heap_mib) is not int or heap_mib < 1:
         raise ValueError('heap MiB must be positive')
     cancel.check()
-    attempt = storage.allocate_attempt(root, 'recipe-capture')
+    attempt = managed_attempts().allocate(
+        ATTEMPT_FAMILY, ATTEMPT_PREFIX, requested_root=root, workspace=source,
+    ).path
     execution_root = java_execution_path(attempt)
     stage_candidate(inputs, attempt / 'source')
     if observe_source(source) != inputs.observation:
@@ -192,11 +198,15 @@ def plan(root, *, source, runtime=None, java_home=None, profile, heap_mib, cance
 def load(root, identity):
     if re.fullmatch(r'recipe-capture-[0-9a-f]{32}', identity or '') is None:
         raise ValueError('select an exact recipe capture attempt ID')
-    attempt = storage.ordinary(Path(root).absolute() / '.workbench/check-attempts' / identity, directory=True)
+    reference = managed_attempts().open(
+        ATTEMPT_FAMILY, ATTEMPT_PREFIX, identity,
+        requested_root=root, legacy_basename='recipe-captures',
+    )
+    attempt = reference.path
     request = _read(attempt, 'request.json', 'recipe-capture-request')
     if request.get('format') != REQUEST or request.get('attempt_id') != identity:
         raise ValueError('unsupported capture request or changed attempt identity')
-    return attempt, request
+    return reference, request
 
 
 def _source(attempt, request, *, cancelled=lambda: False):
@@ -236,13 +246,14 @@ def _fail(attempt, filename, kind, request, stage, exc):
 
 
 def prepare(root, identity, confirm, *, cancelled):
-    attempt, request = load(root, identity)
+    reference, request = load(root, identity)
+    attempt = reference.path
     if confirm != request['id']:
         raise ValueError('preparation requires the exact reviewed plan ID')
-    with storage.execution_lock(attempt):
+    with managed_attempts().execution(reference):
         if any((attempt / name).exists() for name in ('prepare-started.json', 'prepared.json', 'prepare-failed.json')):
             raise ValueError('this preparation was already attempted; make a new plan')
-        cancel = Cancellation(cancelled, attempt)
+        cancel = Cancellation(cancelled, reference)
         cancel.check()
         owner = _current(attempt, request)
         execution_root = java_execution_path(attempt)
@@ -298,16 +309,17 @@ def _environment(attempt):
 
 
 def run(root, identity, confirm, *, accept_eula, cancelled):
-    attempt, request = load(root, identity)
+    reference, request = load(root, identity)
+    attempt = reference.path
     if not accept_eula:
         raise ValueError('Minecraft EULA acceptance is required: read https://www.minecraft.net/en-us/eula and supply --accept-eula')
     prepared = _read(attempt, 'prepared.json', 'recipe-capture-prepared', request_id=request['id'])
     if prepared.get('format') != PREPARED or confirm != prepared['id']:
         raise ValueError('execution requires the exact prepared capture ID')
-    with storage.execution_lock(attempt):
+    with managed_attempts().execution(reference):
         if any((attempt / name).exists() for name in ('run-started.json', 'result.json')):
             raise ValueError('this capture was already attempted; make a new plan')
-        cancel = Cancellation(cancelled, attempt)
+        cancel = Cancellation(cancelled, reference)
         cancel.check()
         owner = _current(attempt, request)
         execution_root = java_execution_path(attempt)
@@ -402,7 +414,8 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
 def show(root, identity, *, cancelled=None):
     cancel = Cancellation(cancelled if cancelled is not None else Event())
     cancel.check()
-    attempt, request = load(root, identity)
+    reference, request = load(root, identity)
+    attempt = reference.path
     _source(attempt, request, cancelled=cancel.is_set)
     if (attempt / 'result.json').exists():
         result = _read(attempt, 'result.json', 'recipe-capture-result', request_id=request['id'])
@@ -447,18 +460,16 @@ def show(root, identity, *, cancelled=None):
         if (attempt / filename).exists():
             value = _read(attempt, filename, kind, request_id=request['id'])
             if (attempt / 'run-started.json').exists():
-                return {'format': RESULT, 'attempt_id': identity, 'state': 'running' if storage.execution_active(attempt) else 'interrupted', 'prepared': value}
+                return {'format': RESULT, 'attempt_id': identity, 'state': 'running' if managed_attempts().active(reference) else 'interrupted', 'prepared': value}
             return value
     if (attempt / 'prepare-started.json').exists():
-        return {'format': RESULT, 'attempt_id': identity, 'state': 'preparing' if storage.execution_active(attempt) else 'interrupted', 'request': request}
+        return {'format': RESULT, 'attempt_id': identity, 'state': 'preparing' if managed_attempts().active(reference) else 'interrupted', 'request': request}
     return request
 
 
 def cancel(root, identity):
-    attempt, request = load(root, identity)
-    path = attempt / 'cancel.json'
-    if not path.exists():
-        storage.write_json(path, {'request_id': request['id']})
+    reference, request = load(root, identity)
+    managed_attempts().request_cancel(reference, request['id'])
     return {'format': 'workbench-recipe-capture-cancellation-v1', 'attempt_id': identity, 'state': 'requested'}
 
 
@@ -466,11 +477,12 @@ def export(root, identity, output, *, cancelled=None):
     """Export a verified completed attempt without carrying its runnable runtime."""
     cancel = Cancellation(cancelled if cancelled is not None else Event())
     cancel.check()
-    attempt, _ = load(root, identity)
+    reference, _ = load(root, identity)
+    attempt = reference.path
     output = Path(output).expanduser().absolute()
     if output.resolve().is_relative_to(attempt.resolve()):
         raise ValueError('select an export destination outside the retained attempt')
-    with storage.execution_lock(attempt):
+    with managed_attempts().execution(reference):
         result = show(root, identity, cancelled=cancel.event)
         if result.get('state') != 'complete' or result.get('native_admitted') is not True:
             raise ValueError('only a complete admitted recipe capture can be exported')
@@ -511,7 +523,8 @@ def main(argv, *, context, output=None, error=None):
             command.add_argument('--output', type=Path, required=True,
                                  help='new completed-scan archive; existing files are never replaced')
     for command in actions.choices.values():
-        command.add_argument('--state-root', type=Path, default=context.state_root / 'recipe-captures')
+        command.add_argument('--state-root', type=Path,
+                             help='explicit capture store; otherwise Core selects the evidence store')
         command.add_argument('--json', action='store_true')
     args = parser.parse_args(argv)
     try:

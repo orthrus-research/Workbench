@@ -45,16 +45,25 @@ does not supply one, select a shorter ASCII JDK or retained-state path.
 Core handles long retained filenames at Windows filesystem boundaries without
 changing the paths stored in evidence. Use a user-owned state directory whose
 ancestors allow directory lookup; Java 8 also checks those ancestors when
-opening JAR files. The installed default is under the user's local application
-data directory.
+opening JAR files. Core selects the configured evidence store for new attempts.
 
 Replace the quoted placeholders below with your own absolute paths. Keep the
 checkout, prepared server, JDK and retained-state directories in separate trees.
-The commands use the same flags on Linux and Windows:
+The commands use the same flags on Linux and Windows. Omit `--state-root` to
+let Core select the evidence store; retain the flag when choosing an explicit
+capture store:
 
 ```text
 workbench capture recipes plan --workspace "<checkout>" --pack-profile supersymmetry --state-root "<capture-state>" --heap-mib 8192 --json
 ```
+
+Core selects a separate default attempt store for each checkout and registers
+that store for protected retention before the first attempt is allocated.
+Later commands reopen an exact attempt ID from registered compatible stores,
+even when the currently selected checkout or evidence location has changed.
+Core also looks in the historical default capture store for older attempts.
+Keep using `--state-root` for an unregistered historical explicit store, or
+when two stores contain the same ID.
 
 `--runtime` and `--java-home` override the registered locations for this plan.
 Core can also use the matching Setup JDK if the fixture registry supplies no

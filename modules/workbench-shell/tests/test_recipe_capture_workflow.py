@@ -19,8 +19,11 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api.processes import ProcessError
+from workbench_api.managed_attempts import managed_attempts_scope
 from workbench_atlas_categorical_graph import CategoricalGraphBundleBuilder, edge_record, node_record
 from workbench_core import check_storage, fixture_selection, runtime_java, tool_process
+from workbench_core.managed_attempts import CoreManagedAttempts
+from workbench_core.storage.registered import ResourceCatalog
 from workbench_shell import recipe_capture as capture
 
 
@@ -161,6 +164,13 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.cancelled = Event()
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
+        self.evidence = self.root / 'Selected evidence'
+        self.config = self.root / 'User config'
+        self.stack.enter_context(managed_attempts_scope(CoreManagedAttempts(
+            workspace=self.source, configuration_home=self.config,
+            state_root=self.state, locations={'evidence': self.evidence},
+            owner_id='workbench-shell',
+        )))
         self.stack.enter_context(patch.object(capture, 'require_profile_extension', side_effect=self.extension))
         self.stack.enter_context(patch.object(capture, 'profile_extension_identity', side_effect=self.provider_identity))
         self.stack.enter_context(patch.object(capture, 'probe_java', return_value={
@@ -222,6 +232,46 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
 
     def attempt(self, value):
         return self.state / '.workbench/check-attempts' / value['attempt_id']
+
+    def test_default_capture_store_is_core_selected_and_registered(self):
+        request = capture.plan(None, source=self.source, runtime=self.runtime, java_home=self.java,
+                               profile='fixture:pack', heap_mib=128, cancelled=self.cancelled)
+        root = CoreManagedAttempts(
+            workspace=self.source, configuration_home=self.config,
+            state_root=self.state, locations={'evidence': self.evidence},
+            owner_id='workbench-shell',
+        ).default_root(capture.ATTEMPT_FAMILY, workspace=self.source)
+        attempt = root / '.workbench/check-attempts' / request['attempt_id']
+        self.assertTrue(attempt.is_dir())
+        self.assertEqual(request, capture.show(None, request['attempt_id']))
+        stores = ResourceCatalog(self.config).inventory(workspace=self.source)['record_stores']
+        self.assertEqual([str(attempt.parent)], [row['path'] for row in stores])
+
+    def test_explicit_checkout_selects_own_store_and_reopens_after_context_switch(self):
+        other = self.root / 'Another source'
+        shutil.copytree(self.source, other)
+        original = capture.plan(None, source=self.source, runtime=self.runtime, java_home=self.java,
+                                profile='fixture:pack', heap_mib=128, cancelled=self.cancelled)
+        selected = capture.plan(None, source=other, runtime=self.runtime, java_home=self.java,
+                                profile='fixture:pack', heap_mib=128, cancelled=self.cancelled)
+        rows = ResourceCatalog(self.config).inventory()['record_stores']
+        self.assertEqual({str(self.source), str(other)}, {row['workspace'] for row in rows})
+        self.assertEqual(2, len({row['path'] for row in rows}))
+        with managed_attempts_scope(CoreManagedAttempts(
+            workspace=other, configuration_home=self.config,
+            state_root=self.root / 'Changed state',
+            locations={'evidence': self.root / 'Changed evidence'},
+            owner_id='workbench-shell',
+        )):
+            self.assertEqual(original, capture.show(None, original['attempt_id']))
+            self.assertEqual(selected, capture.show(None, selected['attempt_id']))
+
+    def test_historical_default_root_reopens_from_core_lookup(self):
+        previous_root = self.state / 'recipe-captures'
+        request = capture.plan(previous_root, source=self.source, runtime=self.runtime,
+                               java_home=self.java, profile='fixture:pack', heap_mib=128,
+                               cancelled=self.cancelled)
+        self.assertEqual(request, capture.show(None, request['attempt_id']))
 
     def test_export_requires_complete_verified_local_custody(self):
         from workbench_atlas_recipe_health import completed_scan

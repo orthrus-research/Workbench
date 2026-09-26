@@ -112,9 +112,12 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
     with recording as invocation:
         durable_resources = None
         record_stores = nullcontext()
+        attempt_stores = nullcontext()
         if context.configuration_home is not None:
             from .storage.registered import CoreDurableResources
             from .storage.record_stores import CoreRecordStores
+            from .managed_attempts import CoreManagedAttempts
+            from workbench_api.managed_attempts import managed_attempts_scope
             durable_resources = CoreDurableResources(
                 workspace=context.workspace,
                 configuration_home=context.configuration_home,
@@ -127,6 +130,13 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
             record_stores = record_store_scope(CoreRecordStores(
                 workspace=context.workspace,
                 configuration_home=context.configuration_home,
+                owner_id=owner.id,
+            ))
+            attempt_stores = managed_attempts_scope(CoreManagedAttempts(
+                workspace=context.workspace,
+                configuration_home=context.configuration_home,
+                state_root=context.state_root,
+                locations=context.locations,
                 owner_id=owner.id,
             ))
         operation_context = replace(
@@ -143,7 +153,9 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
                 ),
             )
         try:
-            with record_stores:
+            from workbench_api.archive_exchange import archive_exchange_scope
+            from .archive_port import CoreArchiveExchange
+            with record_stores, attempt_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
                 handler = getattr(import_module(package), name)
                 result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:

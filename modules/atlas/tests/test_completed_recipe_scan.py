@@ -11,6 +11,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from workbench_api.archive_exchange import archive_exchange_scope
+from workbench_core.archive_port import CoreArchiveExchange
 from workbench_atlas_categorical_graph import CategoricalGraphBundleBuilder
 from workbench_atlas_recipe_health import audit_recipe_dead_ends, open_recipe_health
 from workbench_atlas_recipe_health import completed_scan as scan
@@ -122,6 +124,9 @@ def scan_fixture(root, *, cyclic=False):
 
 class CompletedRecipeScanTests(unittest.TestCase):
     def setUp(self):
+        transport = archive_exchange_scope(CoreArchiveExchange())
+        transport.__enter__()
+        self.addCleanup(transport.__exit__, None, None, None)
         temporary = tempfile.TemporaryDirectory(prefix="atlas-completed-scan-")
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)

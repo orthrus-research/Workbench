@@ -156,3 +156,8 @@ an export adds archive path/size/hash information. Domain failures raise
 `ScanError`, a `RecipeHealthError`. The CLI reports failure with exit status 2
 and does not print a successful partial record. The APIs accept a cancellation
 callback; clients do not reimplement transport or the evaluator.
+
+Archive operations require an admitted Core archive transport binding through
+`workbench_api.archive_exchange.archive_exchange_scope`. The `workbench` command
+binds this for installed Atlas. Direct Python composition must supply the same
+host port explicitly; an unbound archive operation fails before publication.
