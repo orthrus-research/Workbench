@@ -266,6 +266,8 @@ class _SourceTransaction:
                 identity = None
             else:
                 identity = _identity(visible)
+                if after.kind == "file" and visible.st_nlink != 1:
+                    _fail("stage", "reopened source stage is not an independent file")
                 self._match(staged, after)
         reference = SourceStage(uuid4().hex, staged_relative)
         self._stages[reference.token] = {
@@ -313,7 +315,9 @@ class _SourceTransaction:
             target.unlink()
         else:
             staged = entry["staged"]
-            if staged is None or _identity(staged.lstat()) != entry["identity"]:
+            visible = None if staged is None else staged.lstat()
+            if (visible is None or _identity(visible) != entry["identity"]
+                    or (entry["after"].kind == "file" and visible.st_nlink != 1)):
                 _fail("stage", "source staging identity changed")
             if entry["preserve_target_mode"] and entry["before"] is not None:
                 mode = stat.S_IMODE(target.lstat().st_mode)

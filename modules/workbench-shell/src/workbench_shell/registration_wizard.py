@@ -577,6 +577,40 @@ def finalize_active_registration_attempt(
 ) -> dict[str, Any]:
     """Complete a proven source application interrupted before publication."""
 
+    return _recover_active_registration_attempt(
+        suite_root, workspace_root, plan_id=plan_id, state_root=state_root,
+        configuration=configuration, config_path=config_path, resume=False,
+    )
+
+
+def resume_active_registration_attempt(
+    suite_root: Path | str,
+    workspace_root: Path | str,
+    *,
+    plan_id: str,
+    state_root: Path | str | None = None,
+    configuration: WorkbenchConfiguration | None = None,
+    config_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Resume only a fully staged and ordered partial source application."""
+
+    return _recover_active_registration_attempt(
+        suite_root, workspace_root, plan_id=plan_id, state_root=state_root,
+        configuration=configuration, config_path=config_path, resume=True,
+    )
+
+
+def _recover_active_registration_attempt(
+    suite_root: Path | str,
+    workspace_root: Path | str,
+    *,
+    plan_id: str,
+    state_root: Path | str | None,
+    configuration: WorkbenchConfiguration | None,
+    config_path: Path | str | None,
+    resume: bool,
+) -> dict[str, Any]:
+
     suite = Path(suite_root).resolve()
     active_configuration = _active_configuration(suite, configuration, config_path)
     selection = load_active_instance(
@@ -590,7 +624,7 @@ def finalize_active_registration_attempt(
             payload=selection["payload_path"], plan_id=plan_id,
             selection_id=selection["selection_id"],
         ) as attempt:
-            inspected = attempt.finalize_committed()
+            inspected = attempt.resume_partial() if resume else attempt.finalize_committed()
     except (OSError, DurableResourceError, ModuleError) as exc:
         _fail(f"registration attempt requires review: {exc}")
     return {
@@ -609,6 +643,7 @@ __all__ = [
     "RegistrationWizardError",
     "apply_active_registration",
     "finalize_active_registration_attempt",
+    "resume_active_registration_attempt",
     "inspect_active_registration_attempt",
     "plan_active_registration",
     "registration_capabilities",

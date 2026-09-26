@@ -40,7 +40,7 @@ _EXPORT_GROUPS = {
     ".runtime_observe": ("RuntimeObserveError", "observe_project_runtime"),
     ".runtime_materialize": ("PackwizMaterializationError", "materialize_packwiz_workspace_v2", "materialize_project_runtime", "packwiz_materialization_version", "verify_packwiz_materialization_receipt_identity"),
     ".runtime_plan": ("RuntimePlanError", "build_runtime_plan", "plan_project_runtime"),
-    ".registration_wizard": ("RegistrationWizardError", "apply_active_registration", "finalize_active_registration_attempt", "plan_active_registration", "registration_capabilities"),
+    ".registration_wizard": ("RegistrationWizardError", "apply_active_registration", "finalize_active_registration_attempt", "plan_active_registration", "registration_capabilities", "resume_active_registration_attempt"),
     ".diagnose_reproduce": ("DiagnoseReproduceV2Error", "create_reproduction_capsule", "diagnose_live_console", "inspect_reproduction_capsule", "replay_reproduction_capsule", "validate_diagnosis", "validate_reproduction_capsule_manifest"),
     ".cleanroom_dev_loop": ("CleanroomDevLoopError", "execute_cleanroom_dev_loop", "find_cleanroom_dev_loop_stage", "load_cleanroom_dev_loop_receipt", "plan_cleanroom_dev_loop", "recover_cleanroom_dev_loop", "validate_cleanroom_dev_loop_plan", "validate_cleanroom_dev_loop_receipt"),
     ".feature_change_workspace": ("FeatureChangeWorkspaceError", "apply_feature_change", "open_feature_change", "recover_feature_change", "rollback_feature_change", "run_feature_change_matrix", "start_material_fluid_recipe_change", "verify_feature_change"),

@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -35,9 +36,12 @@ from workbench_shell.active_instance import (  # noqa: E402
 from workbench_shell.cli import main as cli_main  # noqa: E402
 from workbench_core.configuration import load_workbench_configuration  # noqa: E402
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core.modules import InstalledModule, dispatch  # noqa: E402
 from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
 from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
 from workbench_core.source_transactions import _SourceTransaction  # noqa: E402
+from workbench_api.source_transactions import SourceImage  # noqa: E402
+from workbench_api.modules import Capability, ExecutionContext, Module  # noqa: E402
 from workbench_core.registration_attempts import _Attempt  # noqa: E402
 from workbench_core import registration_attempts as registration_attempt_core  # noqa: E402
 from workbench_api.record_stores import record_store_scope  # noqa: E402
@@ -48,6 +52,7 @@ from workbench_shell.registration_wizard import (  # noqa: E402
     inspect_active_registration_attempt,
     plan_active_registration,
     registration_capabilities,
+    resume_active_registration_attempt,
 )
 
 
@@ -270,6 +275,228 @@ class RegistrationWizardTest(unittest.TestCase):
                         self.assertTrue((state / "registrations" / (
                             ".apply-" + plan["plan_id"].removeprefix("sha256:")
                         ) / "backups").is_dir())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_resumes_ordered_partial_attempts_and_is_idempotent(self) -> None:
+        for ordinal in range(3):
+            for after_replace in (False, True):
+                with self.subTest(ordinal=ordinal, after_replace=after_replace):
+                    with tempfile.TemporaryDirectory() as temporary:
+                        project, payload, state, plan, _answers = self._interrupted_material_apply(
+                            Path(temporary), ordinal=ordinal, after_replace=after_replace,
+                        )
+                        retained = state / "registrations" / (
+                            ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                        )
+                        expected = {
+                            row["path"]: (retained / "after" / row["path"]).read_bytes()
+                            for row in plan["operations"]
+                        }
+                        result = resume_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                        self.assertEqual("applied", result["outcome"])
+                        self.assertEqual(expected, {
+                            path: (payload / path).read_bytes() for path in expected
+                        })
+                        final = state / "registrations" / plan["plan_id"].removeprefix("sha256:")
+                        self.assertEqual("applied", json.loads((final / "receipt.json").read_bytes())["state"])
+                        self.assertEqual(result, resume_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        ))
+                        self.assertFalse(retained.exists())
+                        if ordinal == 0 and not after_replace:
+                            output = io.StringIO()
+                            with redirect_stdout(output):
+                                code = cli_main([
+                                    "register", str(project), "--suite-root", str(SUITE_ROOT),
+                                    "--state-root", str(state), "--resume-attempt", plan["plan_id"],
+                                    "--json",
+                                ])
+                            self.assertEqual(0, code)
+                            self.assertEqual("applied", json.loads(output.getvalue())["outcome"])
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_installed_dispatch_resumes_with_selected_configuration_home(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project, payload, state, plan, _answers = self._interrupted_material_apply(
+                root, ordinal=0, after_replace=True,
+            )
+            context = ExecutionContext(
+                project, state, configuration_home=self.configuration_home,
+            )
+            module = InstalledModule(
+                "workbench-shell", "workbench-shell", "0.1.0", "available",
+                module=Module("workbench-shell", "0.1.0", (
+                    Capability(
+                        "workbench-shell.register", ("register",),
+                        "workbench_shell.commands:register", "Run register",
+                    ),
+                )),
+            )
+            output = io.StringIO()
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(root / "other-config")}):
+                with redirect_stdout(output):
+                    code = dispatch([
+                        "register", str(project), "--suite-root", str(SUITE_ROOT),
+                        "--state-root", str(state), "--resume-attempt", plan["plan_id"],
+                        "--json",
+                    ], context, (module,), suite_root=SUITE_ROOT)
+            self.assertEqual(0, code)
+            self.assertEqual("applied", json.loads(output.getvalue())["outcome"])
+            self.assertTrue(all((payload / row["path"]).is_file()
+                                for row in plan["operations"]))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_resumption_survives_exit_around_replay(self) -> None:
+        for window in ("after-new-marker", "after-first-replay-commit"):
+            with self.subTest(window=window):
+                with tempfile.TemporaryDirectory() as temporary:
+                    project, payload, state, plan, _answers = self._interrupted_material_apply(
+                        Path(temporary), ordinal=0,
+                        after_replace=window == "after-new-marker",
+                    )
+                    pid = os.fork()
+                    if pid == 0:
+                        original_commit = _SourceTransaction.commit
+                        calls = 0
+
+                        def exit_during_resume(transaction, stage):
+                            nonlocal calls
+                            current = calls
+                            calls += 1
+                            if current == 0 and window == "after-new-marker":
+                                os._exit(86)
+                            original_commit(transaction, stage)
+                            if current == 0 and window == "after-first-replay-commit":
+                                os._exit(86)
+
+                        try:
+                            with patch.object(_SourceTransaction, "commit", exit_during_resume):
+                                resume_active_registration_attempt(
+                                    SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                                )
+                        except BaseException:
+                            os._exit(87)
+                        os._exit(88)
+                    _, status = os.waitpid(pid, 0)
+                    self.assertEqual(86, os.waitstatus_to_exitcode(status))
+                    inspected = inspect_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    )
+                    self.assertEqual("prepared", inspected["receipt_state"])
+                    self.assertEqual("consistent", inspected["journal_status"])
+                    if window == "after-new-marker":
+                        self.assertTrue(inspected["operations"][1]["attempted"])
+                        self.assertEqual("before", inspected["operations"][1]["source_state"])
+                        self.assertTrue(inspected["operations"][1]["stage_present"])
+                    else:
+                        self.assertEqual("after", inspected["operations"][0]["source_state"])
+                        self.assertFalse(inspected["operations"][1]["attempted"])
+                    completed = resume_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    )
+                    self.assertEqual("applied", completed["outcome"])
+                    self.assertEqual(["after"] * len(plan["operations"]), [
+                        row["source_state"] for row in inspect_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )["operations"]
+                    ])
+                    self.assertTrue(all((payload / row["path"]).is_file()
+                                        for row in plan["operations"]))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_resumption_refuses_rollback_unknown_source_and_parent(self) -> None:
+        for condition in ("rollback", "unknown-source", "changed-parent", "extra-stage", "changed-backup", "linked-stage"):
+            with self.subTest(condition=condition):
+                with tempfile.TemporaryDirectory() as temporary:
+                    project, payload, state, plan, _answers = self._interrupted_material_apply(
+                        Path(temporary), ordinal=1, after_replace=True,
+                    )
+                    retained = state / "registrations" / (
+                        ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                    )
+                    if condition == "rollback":
+                        manifest = json.loads((retained / "attempt.json").read_bytes())
+                        ordinal = 1
+                        relative = plan["operations"][ordinal]["path"]
+                        stage = json.loads((retained / "stages" / f"{ordinal:03d}.json").read_bytes())
+                        transaction = _SourceTransaction(
+                            payload, binding=f"registration:{plan['plan_id']}",
+                            staging_token=manifest["staging_token"], check_cancelled=lambda: None,
+                        )
+                        reference = transaction.attach(
+                            relative,
+                            before=SourceImage("file", (retained / "backups" / relative).read_bytes(),
+                                               mode=stat.S_IMODE((payload / relative).stat().st_mode)),
+                            after=SourceImage("file", (retained / "after" / relative).read_bytes(),
+                                              mode=stat.S_IMODE((payload / relative).stat().st_mode)),
+                            staged_relative=stage["staged_relative"], attempted=True,
+                        )
+                        transaction.rollback(reference)
+                        self.assertFalse((payload / stage["staged_relative"]).exists())
+                    elif condition == "unknown-source":
+                        (payload / plan["operations"][0]["path"]).write_bytes(b"later user edit\n")
+                    elif condition == "changed-parent":
+                        parent = (payload / plan["operations"][0]["path"]).parent
+                        parent.rename(parent.with_name(parent.name + "-replaced"))
+                        parent.mkdir()
+                    elif condition == "extra-stage":
+                        manifest = json.loads((retained / "attempt.json").read_bytes())
+                        source = payload / plan["operations"][2]["path"]
+                        (source.parent / (
+                            f".{source.name}.workbench-{manifest['staging_token']}-extra.tmp"
+                        )).write_bytes(b"unrecorded")
+                    elif condition == "linked-stage":
+                        stage = json.loads((retained / "stages/002.json").read_bytes())
+                        os.link(payload / stage["staged_relative"], Path(temporary) / "outside-stage-link")
+                    else:
+                        (retained / "backups" / plan["operations"][0]["path"]).write_bytes(b"changed")
+                    before = {row["path"]: (payload / row["path"]).read_bytes()
+                              for row in plan["operations"] if (payload / row["path"]).is_file()}
+                    with self.assertRaisesRegex(RegistrationWizardError, "review"):
+                        resume_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                    self.assertTrue((retained / "attempt.json").is_file())
+                    self.assertEqual(before, {path: (payload / path).read_bytes() for path in before})
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_resumption_survives_exit_at_receipt_promotion(self) -> None:
+        for after_rename in (False, True):
+            with self.subTest(after_rename=after_rename):
+                with tempfile.TemporaryDirectory() as temporary:
+                    project, _payload, state, plan, _answers = self._interrupted_material_apply(
+                        Path(temporary), ordinal=0, after_replace=True,
+                    )
+                    pid = os.fork()
+                    if pid == 0:
+                        original_rename = registration_attempt_core._rename_noreplace
+
+                        def exit_at_rename(source, target):
+                            if not after_rename:
+                                os._exit(86)
+                            original_rename(source, target)
+                            os._exit(86)
+
+                        try:
+                            with patch.object(registration_attempt_core, "_rename_noreplace", exit_at_rename):
+                                resume_active_registration_attempt(
+                                    SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                                )
+                        except BaseException:
+                            os._exit(87)
+                        os._exit(88)
+                    _, status = os.waitpid(pid, 0)
+                    self.assertEqual(86, os.waitstatus_to_exitcode(status))
+                    completed = resume_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    )
+                    self.assertEqual("applied", completed["outcome"])
+                    self.assertEqual(completed, resume_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    ))
 
     @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
     def test_restart_marks_external_edit_for_review_and_retains_backups(self) -> None:
@@ -533,6 +760,10 @@ class RegistrationWizardTest(unittest.TestCase):
             self.assertEqual(1, len(list(first.parent.glob(
                 f".{first.name}.workbench-{token}-*.tmp",
             ))))
+            with self.assertRaisesRegex(RegistrationWizardError, "review"):
+                resume_active_registration_attempt(
+                    SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                )
 
     @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
     def test_restart_rejects_source_parent_redirect_and_state_root_replacement(self) -> None:

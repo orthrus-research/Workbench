@@ -100,6 +100,7 @@ from .registration_wizard import (
     finalize_active_registration_attempt,
     plan_active_registration,
     registration_capabilities,
+    resume_active_registration_attempt,
 )
 from .stdio_host import main as serve_stdio
 
@@ -658,6 +659,11 @@ def _parser(*, feature_program: str | None = None) -> argparse.ArgumentParser:
         "--finalize-attempt",
         metavar="PLAN_ID",
         help="finish an interrupted attempt only if Core proves all edits completed",
+    )
+    register.add_argument(
+        "--resume-attempt",
+        metavar="PLAN_ID",
+        help="resume an interrupted partial attempt only if Core proves its source order",
     )
     register.add_argument(
         "--yes",
@@ -1768,13 +1774,18 @@ def _run_registration(
     *,
     configuration: WorkbenchConfiguration,
 ) -> tuple[dict[str, Any], bool]:
-    if args.finalize_attempt is not None:
+    if args.finalize_attempt is not None and args.resume_attempt is not None:
+        raise RegistrationWizardError("select one registration recovery action")
+    recovery_id = args.finalize_attempt if args.finalize_attempt is not None else args.resume_attempt
+    if recovery_id is not None:
         if args.list or args.pattern is not None or args.answers is not None or args.apply or args.yes:
             raise RegistrationWizardError(
-                "--finalize-attempt cannot be combined with planning or application options"
+                "registration recovery cannot be combined with planning or application options"
             )
-        return finalize_active_registration_attempt(
-            suite_root, args.workspace, plan_id=args.finalize_attempt,
+        action = (finalize_active_registration_attempt if args.finalize_attempt is not None
+                  else resume_active_registration_attempt)
+        return action(
+            suite_root, args.workspace, plan_id=recovery_id,
             state_root=args.state_root, configuration=configuration,
         ), False
     if args.yes and not args.apply:
@@ -3475,8 +3486,9 @@ def main(
             elif result["format"] == "workbench-registration-result-v1":
                 print(_human_registration_result(result))
             elif result["format"] == "workbench-registration-recovery-v1":
+                recovered_as = "resumed" if args.resume_attempt is not None else "finalized"
                 print(
-                    f"Registration attempt finalized: {result['plan_id']}\n"
+                    f"Registration attempt {recovered_as}: {result['plan_id']}\n"
                     f"Receipt: {result['receipt_uri']}\n"
                     "Relaunch the selected instance to check Groovy compilation and registration."
                 )

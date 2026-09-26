@@ -85,6 +85,23 @@ workspace, state root, original receipt, ordered journal, retained images and
 exact current source bytes. This action does not rewrite the installed source.
 It is repeatable after successful promotion.
 
-Partial attempts, changed source, remaining staged files and changed retained
-evidence stay protected for review. This completion action does not assert
+The completion action leaves partial attempts, changed source, remaining staged
+files and changed retained evidence protected for review. It does not assert
 Groovy compilation or runtime registration; launch checks are still required.
+
+`workbench register WORKSPACE --resume-attempt PLAN_ID` has a narrower restart
+action for a partial attempt. Core requires every source stage to have an
+ordered journal marker, a prepared receipt, intact retained images, unchanged
+selected roots and source parents, and no extra stage files. Completed source
+edits must form a prefix with their stages consumed. Only the last attempted
+edit may still show its original bytes, and then its exact staged replacement
+must remain. Later unattempted edits must also retain their original bytes and
+exact stages. Core records the next attempt marker before each replacement,
+rechecks the source bytes, and finishes through the same applied receipt and
+no-replace promotion as uninterrupted application.
+
+The action can be repeated after an exit around a marker, replacement, receipt
+or promotion. Missing stage markers, interrupted rollback, unknown source
+bytes or changed retained evidence remain protected for review. An applied V1
+receipt still means that every planned source edit was verified; it does not
+claim Groovy compilation or runtime registration.

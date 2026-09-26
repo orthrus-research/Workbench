@@ -499,6 +499,95 @@ class _Attempt:
             _fail("changed", "promoted registration changed before final verification")
         return final
 
+    def resume_partial(self) -> dict:
+        """Replay only an ordered, fully staged source prefix after process exit.
+
+        An attempted operation before the final attempt marker must already
+        have consumed its stage and reached its after image. The final attempt
+        may still be at its before image only while that exact stage exists.
+        This excludes interrupted rollback, whose original stage was consumed
+        before its source could return to the before image.
+        """
+
+        if self.transaction_path.exists() or self.transaction_path.is_symlink():
+            return self.finalize_committed()
+
+        def recoverable(inspection: dict) -> None:
+            operations = inspection["operations"]
+            if (inspection["receipt_state"] != "prepared"
+                    or inspection["journal_status"] != "consistent"
+                    or not operations
+                    or any(not row["stage_recorded"] or row["extra_stage_present"]
+                           for row in operations)):
+                _fail("review", "registration partial attempt lacks a complete source stage proof")
+            attempted = sum(bool(row["attempted"]) for row in operations)
+            for ordinal, row in enumerate(operations):
+                state, present = row["source_state"], row["stage_present"]
+                if ordinal < attempted - 1:
+                    valid = state == "after" and not present
+                elif ordinal == attempted - 1:
+                    valid = (state == "after" and not present) or (state == "before" and present)
+                else:
+                    valid = state == "before" and present
+                if not valid:
+                    _fail("review", "registration source order cannot prove safe resumption")
+
+        inspected = self.inspect()
+        if inspected["receipt_state"] == "applied":
+            return self.finalize_committed()
+        recoverable(inspected)
+        retained = self.path
+        manifest_raw = read_private_bytes(retained / "attempt.json", byte_limit=32 * 1024)
+        manifest = _read_json(manifest_raw, label="attempt manifest")
+        token = manifest["staging_token"]
+        rows = manifest["operations"]
+        transaction = CoreSourceTransactions(owner_id="workbench-shell").open(
+            self.payload, binding=f"registration:{self.plan_id}", staging_token=token,
+        )
+        for ordinal in range(len(rows)):
+            inspected = self.inspect()
+            recoverable(inspected)
+            if read_private_bytes(retained / "attempt.json", byte_limit=32 * 1024) != manifest_raw:
+                _fail("changed", "registration attempt manifest changed during resumption")
+            operation = inspected["operations"][ordinal]
+            if operation["source_state"] == "after":
+                continue
+            row = rows[ordinal]
+            relative = row["path"]
+            before = read_private_bytes(retained / "backups" / relative, byte_limit=_MAX_FILE)
+            after = read_private_bytes(retained / "after" / relative, byte_limit=_MAX_FILE)
+            if (len(before) != row["before_size"] or sha256(before).hexdigest() != row["before_sha256"]
+                    or len(after) != row["after_size"] or sha256(after).hexdigest() != row["after_sha256"]):
+                _fail("changed", "registration retained source image changed during resumption")
+            stage = _read_json(
+                read_private_bytes(retained / "stages" / f"{ordinal:03d}.json", byte_limit=4096),
+                label="source stage",
+            )
+            if stage != {
+                "format": "workbench-registration-source-stage-v1", "ordinal": ordinal,
+                "path": relative, "staged_relative": stage.get("staged_relative"),
+                "staging_token": token,
+            }:
+                _fail("record", "registration source stage changed during resumption")
+            reference = transaction.attach(
+                relative,
+                before=SourceImage("file", before, mode=row["mode"]),
+                after=SourceImage("file", after, mode=row["mode"]),
+                staged_relative=stage["staged_relative"], attempted=True,
+            )
+            if not operation["attempted"]:
+                _write_file(retained / "attempts" / f"{ordinal:03d}.json", _canonical({
+                    "format": "workbench-registration-source-attempt-v1", "ordinal": ordinal,
+                    "path": relative, "staging_token": token,
+                }), limit=4096)
+                # The marker must reopen before Core can replace source.
+                marked = self.inspect()
+                recoverable(marked)
+                if not marked["operations"][ordinal]["attempted"]:
+                    _fail("changed", "registration source attempt marker did not reopen")
+            transaction.commit(reference)
+        return self.finalize_committed()
+
     def record_stage(self, ordinal: int, staged_relative: str | None) -> None:
         self._check_roots()
         if (not self._prepared or type(ordinal) is not int
