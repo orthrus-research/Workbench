@@ -9,9 +9,12 @@ import tracemalloc
 import unittest
 from unittest.mock import patch
 
+from workbench_api.durable_resources import DurableResourceError
 from workbench_api.managed_trees import ManagedTreeError
 from workbench_api.transport_trees import TransportTreeError
+from workbench_core import check_storage
 from workbench_core import transport_trees as module
+from workbench_core.storage.registered import ResourceCatalog
 from workbench_core.transport_trees import CoreTransportTrees, inventory_tree, summarize_rows
 
 
@@ -64,6 +67,69 @@ class TransportTreeTests(unittest.TestCase):
         self.assertEqual({"tree", "export-manifest.json"}, {entry.name for entry in reference.path.iterdir()})
         self.assertFalse((reference.path / "transport-intent.json").exists())
         self.assertFalse(hasattr(reference, "members"))
+
+    def test_resource_catalog_validates_foreign_transport_records_without_payload_scan(self) -> None:
+        selected = self._publish("selected")
+        foreign = self.base / "foreign-workspace"
+        foreign.mkdir()
+        other = CoreTransportTrees(
+            workspace=foreign, configuration_home=self.config, owner_id="public-export",
+        )
+        with other.stage(self.base / "foreign-outputs" / "other") as stage:
+            self._fill(stage.path)
+            foreign_tree = stage.publish(validate=lambda _: None, domain_id="reviewed")
+        catalog = ResourceCatalog(self.config)
+        with patch.object(module, "inventory_tree", side_effect=AssertionError("payload scan")):
+            inventory = catalog.inventory(workspace=self.workspace)
+        self.assertEqual("ready-unproven", inventory["root_state"])
+        self.assertEqual([selected.tree_id], [row["tree_id"] for row in inventory["transport_trees"]])
+        self.assertEqual("committed-record", inventory["transport_trees"][0]["status"])
+        self.assertEqual("catalog-only", inventory["transport_trees"][0]["verification"])
+
+        nonce = foreign_tree.tree_id.rsplit(":", 1)[1]
+        commit = catalog.root / "transport-trees" / "commits" / f"{nonce}.json"
+        original = commit.read_bytes()
+        changed = check_storage.read_json(commit)
+        changed["intent_id"] = "wrong"
+        changed.pop("id")
+        commit.write_bytes(check_storage.canonical(check_storage.seal(
+            "workbench-transport-commit-v2", changed,
+        )))
+        try:
+            with self.assertRaises(DurableResourceError) as caught:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual("resource.changed", caught.exception.code)
+        finally:
+            commit.write_bytes(original)
+        self.assertEqual([selected.tree_id], [
+            row["tree_id"] for row in catalog.inventory(workspace=self.workspace)["transport_trees"]
+        ])
+
+    def test_resource_catalog_refuses_orphan_record_and_preserves_pre_record_lock(self) -> None:
+        selected = self._publish("selected")
+        catalog = ResourceCatalog(self.config)
+        namespace = catalog.root / "transport-trees"
+        foreign = self.base / "foreign-workspace"
+        foreign.mkdir()
+        orphan = namespace / "intents" / ("a" * 32 + ".json")
+        orphan.write_bytes(b"{}")
+        orphan.chmod(0o600)
+        try:
+            with self.assertRaises(DurableResourceError) as caught:
+                catalog.inventory(workspace=foreign)
+            self.assertEqual("resource.changed", caught.exception.code)
+        finally:
+            orphan.unlink()
+
+        pre_record_lock = namespace / "leases" / ("b" * 32 + ".lock")
+        pre_record_lock.touch(mode=0o600)
+        try:
+            self.assertEqual([], catalog.inventory(workspace=foreign)["transport_trees"])
+        finally:
+            pre_record_lock.unlink()
+        self.assertEqual([selected.tree_id], [
+            row["tree_id"] for row in catalog.inventory(workspace=self.workspace)["transport_trees"]
+        ])
 
     def test_accepted_310000_parent_directory_model_streams_with_small_memory(self) -> None:
         def rows(branches: int):
@@ -271,6 +337,13 @@ with host.stage(Path(os.environ['W8_OUTPUTS']) / name) as stage:
         self.assertTrue(rows["before-intent"]["staging"].is_dir())
         self.assertTrue(rows["after-rename"]["path"].is_dir())
         self.assertFalse(rows["after-rename"]["staging"].exists())
+        catalog_rows = {
+            Path(row["path"]).name: row
+            for row in ResourceCatalog(self.config).inventory(workspace=self.workspace)["transport_trees"]
+        }
+        self.assertEqual("reserved-incomplete", catalog_rows["before-intent"]["status"])
+        self.assertEqual("prepared-incomplete", catalog_rows["after-intent"]["status"])
+        self.assertEqual("prepared-incomplete", catalog_rows["after-rename"]["status"])
         with self.assertRaises(TransportTreeError):
             self._host().reconcile(rows["before-intent"]["tree_id"])
         reference = self._host().reconcile(rows["after-intent"]["tree_id"])

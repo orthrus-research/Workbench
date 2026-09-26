@@ -11,6 +11,7 @@ from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import re
@@ -25,7 +26,10 @@ from workbench_api.transport_trees import TransportTreeError, TransportTreeRefer
 
 from . import check_storage
 from .durable_files import _directory as pinned_directory
-from .durable_records import DurableRecordError, private_record_lock, publish_immutable_bytes
+from .durable_records import (
+    DurableRecordError, private_record_lock, publish_immutable_bytes,
+    read_private_single_link_bytes,
+)
 from .host_filesystem import fsync_directory, private_path, secure_private_path
 from .managed_trees import _ensure_parent, _rename_no_replace
 from .output_routing import _WINDOWS_RESERVED, _private_directory
@@ -41,6 +45,9 @@ _INTENT = "workbench-transport-intent-v2"
 _COMMIT = "workbench-transport-commit-v2"
 _ABORT = "workbench-transport-abort-v2"
 _RECORD_LIMIT = 1024 * 1024
+_CATALOG_CHILDREN = frozenset({"reservations", "intents", "commits", "aborts", "leases"})
+_RECORD_NAME = re.compile(r"([0-9a-f]{32})\.json\Z")
+_LEASE_NAME = re.compile(r"[0-9a-f]{32}\.lock\Z")
 
 # One V1 public-export manifest wraps the complete accepted 10,000-file tree.
 # Each source path can contribute 31 unique parent directories, plus tree/.
@@ -312,9 +319,7 @@ class CoreTransportTrees:
     def _read(self, name: str, nonce: str, kind: str) -> dict:
         path = self._record(name, nonce)
         try:
-            if not private_path(path, directory=False):
-                raise TransportTreeError("transport.changed", "transport catalog lost private custody")
-            record = check_storage.read_json(path, byte_limit=_RECORD_LIMIT)
+            record = json.loads(read_private_single_link_bytes(path, byte_limit=_RECORD_LIMIT))
         except TransportTreeError:
             raise
         except (OSError, ValueError) as exc:
@@ -339,7 +344,8 @@ class CoreTransportTrees:
                 or row["store_root"] != str(target.parent)
                 or row["store_id"] != _store_id(target.parent)
                 or row["staging"] != str(stage)
-                or type(row["parent_device"]) is not int or type(row["parent_inode"]) is not int):
+                or type(row["parent_device"]) is not int or type(row["parent_inode"]) is not int
+                or not isinstance(row["allocated_at"], str) or not row["allocated_at"]):
             raise TransportTreeError("transport.changed", "transport reservation changed")
         return row
 
@@ -360,7 +366,8 @@ class CoreTransportTrees:
                 or not 0 <= row["directory_count"] <= MAX_DIRECTORIES
                 or type(row["total_bytes"]) is not int
                 or not 0 <= row["total_bytes"] <= MAX_TOTAL_BYTES
-                or type(row["domain_id"]) is not str or not 0 < len(row["domain_id"]) <= 512):
+                or type(row["domain_id"]) is not str or not 0 < len(row["domain_id"]) <= 512
+                or not isinstance(row["prepared_at"], str) or not row["prepared_at"]):
             raise TransportTreeError("transport.changed", "transport intent changed")
         return row
 
@@ -371,9 +378,105 @@ class CoreTransportTrees:
         row = self._read("commits", nonce, _COMMIT)
         if (set(row) != {"id", "format", "tree_id", "intent_id", "committed_at"}
                 or row["format"] != _COMMIT or row["tree_id"] != tree_id
-                or row["intent_id"] != intent["id"]):
+                or row["intent_id"] != intent["id"]
+                or not isinstance(row["committed_at"], str) or not row["committed_at"]):
             raise TransportTreeError("transport.changed", "transport commit changed")
         return True
+
+    def _abort(self, tree_id: str, reservation: dict) -> dict:
+        row = self._read("aborts", _nonce(tree_id), _ABORT)
+        if (set(row) != {"id", "format", "tree_id", "reservation_id", "reason", "aborted_at"}
+                or row["format"] != _ABORT or row["tree_id"] != tree_id
+                or row["reservation_id"] != reservation["id"]
+                or not isinstance(row["reason"], str) or not row["reason"]
+                or not isinstance(row["aborted_at"], str) or not row["aborted_at"]):
+            raise TransportTreeError("transport.changed", "transport abort changed")
+        return row
+
+    @staticmethod
+    def _inventory_directory(path: Path) -> Path:
+        try:
+            directory = check_storage.ordinary(path, directory=True)
+        except (OSError, ValueError) as exc:
+            raise TransportTreeError("transport.changed", "transport catalog directory changed") from exc
+        if not private_path(directory, directory=True):
+            raise TransportTreeError("transport.changed", "transport catalog directory lost private custody")
+        return directory
+
+    @classmethod
+    def inventory_catalog(cls, configuration_home: Path, *, workspace: Path | None = None) -> list[dict[str, object]]:
+        """Close present-day records globally without replaying large payloads."""
+
+        root = ResourceCatalog(configuration_home).root / "transport-trees"
+        if not root.exists() and not root.is_symlink():
+            return []
+        try:
+            if {entry.name for entry in cls._inventory_directory(root).iterdir()} != _CATALOG_CHILDREN:
+                raise TransportTreeError("transport.changed", "transport catalog has an unknown or missing child")
+            children = {
+                name: sorted(cls._inventory_directory(root / name).iterdir())
+                for name in sorted(_CATALOG_CHILDREN)
+            }
+            reservations = {}
+            for path in children["reservations"]:
+                match = _RECORD_NAME.fullmatch(path.name)
+                if match is None:
+                    raise TransportTreeError("transport.changed", "transport reservation has an invalid name")
+                raw = json.loads(read_private_single_link_bytes(path, byte_limit=_RECORD_LIMIT))
+                if (not isinstance(raw, dict) or not isinstance(raw.get("workspace"), str)
+                        or not isinstance(raw.get("owner_id"), str)):
+                    raise TransportTreeError("transport.changed", "transport reservation changed")
+                host = cls(
+                    workspace=Path(raw["workspace"]), configuration_home=configuration_home,
+                    owner_id=raw["owner_id"],
+                )
+                nonce = match.group(1)
+                reservation = host._reservation(f"workbench-transport-tree-v2:{nonce}")
+                if raw != reservation:
+                    raise TransportTreeError("transport.changed", "transport reservation changed during inventory")
+                reservations[nonce] = (host, reservation)
+            for name in ("intents", "commits", "aborts"):
+                for path in children[name]:
+                    match = _RECORD_NAME.fullmatch(path.name)
+                    if match is None or match.group(1) not in reservations:
+                        raise TransportTreeError("transport.changed", "transport catalog has an orphan record")
+                    read_private_single_link_bytes(path, byte_limit=_RECORD_LIMIT)
+                    if name == "commits" and not (root / "intents" / path.name).is_file():
+                        raise TransportTreeError("transport.changed", "transport commit lost its intent")
+            for path in children["leases"]:
+                if _LEASE_NAME.fullmatch(path.name) is None:
+                    raise TransportTreeError("transport.changed", "transport catalog has an invalid lease")
+                # Stage acquires this lock before publishing its reservation.
+                read_private_single_link_bytes(path, byte_limit=0)
+            rows = []
+            for nonce, (host, reservation) in sorted(reservations.items()):
+                tree_id = reservation["tree_id"]
+                intent = host._intent(tree_id) if (root / "intents" / f"{nonce}.json").exists() else None
+                if (root / "aborts" / f"{nonce}.json").exists():
+                    host._abort(tree_id, reservation)
+                if (root / "commits" / f"{nonce}.json").exists():
+                    if intent is None:
+                        raise TransportTreeError("transport.changed", "transport commit lost its intent")
+                    host._committed(tree_id, intent)
+                    status = "committed-record"
+                elif intent is not None:
+                    status = "prepared-incomplete"
+                elif (root / "aborts" / f"{nonce}.json").exists():
+                    status = "failed"
+                else:
+                    status = "reserved-incomplete"
+                if workspace is None or reservation["workspace"] == str(workspace):
+                    rows.append({
+                        "tree_id": tree_id, "workspace": reservation["workspace"],
+                        "owner_id": reservation["owner_id"], "path": reservation["path"],
+                        "staging": reservation["staging"], "status": status,
+                        "verification": "catalog-only",
+                    })
+            return rows
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            if isinstance(exc, TransportTreeError):
+                raise
+            raise TransportTreeError("transport.changed", "transport catalog changed") from exc
 
     def _reference(self, reservation: dict, intent: dict) -> TransportTreeReference:
         return TransportTreeReference(
@@ -548,12 +651,7 @@ class CoreTransportTrees:
                 self._intent(tree_id)
                 status = "prepared-incomplete"
             elif self._record("aborts", path.stem).exists():
-                abort = self._read("aborts", path.stem, _ABORT)
-                if (set(abort) != {"id", "format", "tree_id", "reservation_id",
-                                   "reason", "aborted_at"}
-                        or abort["format"] != _ABORT or abort["tree_id"] != tree_id
-                        or abort["reservation_id"] != reservation["id"]):
-                    raise TransportTreeError("transport.changed", "transport abort changed")
+                self._abort(tree_id, reservation)
                 status = "failed"
             else:
                 status = "reserved-incomplete"

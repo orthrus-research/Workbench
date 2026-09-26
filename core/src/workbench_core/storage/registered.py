@@ -719,6 +719,7 @@ class ResourceCatalog:
 
     def inventory(self, *, workspace: Path | None = None) -> dict:
         from ..temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
+        from ..transport_trees import CoreTransportTrees, TransportTreeError
         from ..working_allocations import WorkingAllocationCatalog
 
         root_state = self.verify_root()
@@ -934,6 +935,14 @@ class ResourceCatalog:
             raise DurableResourceError(
                 "resource.changed", "temporary lease catalog is unavailable or changed",
             ) from exc
+        try:
+            transport_trees = CoreTransportTrees.inventory_catalog(
+                self.configuration_home, workspace=workspace,
+            )
+        except TransportTreeError as exc:
+            raise DurableResourceError(
+                "resource.changed", "transport tree catalog is unavailable or changed",
+            ) from exc
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,
@@ -944,6 +953,7 @@ class ResourceCatalog:
                 workspace=workspace,
             ),
             "temporary_leases": temporary_leases,
+            "transport_trees": transport_trees,
             "overlay_envelopes": overlay_envelopes,
         }
 
