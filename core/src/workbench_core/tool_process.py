@@ -69,6 +69,13 @@ def capture(argv, *, directory, binding, cwd, stdin, environment, cancelled, tim
     return process_capture.result(directory, record)
 
 
+def execute_logged(argv, *, cwd, log_path, environment, cancelled, timeout_seconds, output_limit):
+    from .logged_process import execute_logged as execute
+    return execute(argv, cwd=cwd, log_path=log_path, environment=environment,
+                   cancelled=cancelled, timeout_seconds=timeout_seconds,
+                   output_limit=output_limit)
+
+
 def _validate(argv, cancelled):
     if cancelled.is_set():
         raise ProcessError("native-tool invocation was cancelled before launch")

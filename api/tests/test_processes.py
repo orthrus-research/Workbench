@@ -7,6 +7,27 @@ from workbench_api import processes
 
 
 class ProcessPortTests(unittest.TestCase):
+    def test_logged_process_requires_core_and_preserves_selected_log(self):
+        arguments = dict(
+            cwd=Path('/owned/work'), log_path=Path('/owned/log/tool.log'),
+            environment={'LANG': 'C'}, cancelled=Event(),
+            timeout_seconds=1800, output_limit=16 * 1024 * 1024,
+        )
+        with patch.object(processes, '_host', None), self.assertRaisesRegex(
+            processes.ProcessError, 'logged process host',
+        ):
+            processes.execute_logged_process(['/bin/true'], **arguments)
+        with patch.object(processes, '_host', Mock()) as host:
+            expected = processes.LoggedProcessResult(0, arguments['log_path'], 'a' * 64, 5)
+            host.execute_logged.return_value = expected
+            self.assertIs(expected, processes.execute_logged_process(['/bin/true'], **arguments))
+            self.assertEqual(arguments['log_path'], host.execute_logged.call_args.kwargs['log_path'])
+            for change in ({'timeout_seconds': 3601}, {'output_limit': 16 * 1024 * 1024 + 1},
+                           {'log_path': Path('relative.log')}):
+                with self.assertRaises(processes.ProcessError):
+                    processes.execute_logged_process(['/bin/true'], **{**arguments, **change})
+            host.execute_logged.assert_called_once()
+
     def test_file_capture_and_reads_require_explicit_host_support(self):
         arguments = dict(directory=Path('/owned/capture'), binding='request', cwd=Path.cwd(),
                          stdin=b'', environment={}, cancelled=Event())

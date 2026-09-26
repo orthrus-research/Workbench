@@ -40,6 +40,16 @@ class CapturedProcessResult:
                 "binding": self.binding}
 
 
+@dataclass(frozen=True)
+class LoggedProcessResult:
+    """One completed child and the exact historical log published by Core."""
+
+    exit_code: int
+    log_path: Path
+    log_sha256: str
+    log_size: int
+
+
 class ProcessOutputReader(Protocol):
     """Forward-only binary reads; Core verifies the remainder on successful close."""
 
@@ -58,6 +68,12 @@ class ProcessHost(Protocol):
                 timeout_seconds: float | None, output_limit: int | None) -> CapturedProcessResult: ...
 
     def open_output(self, output: ProcessOutput) -> ContextManager[ProcessOutputReader]: ...
+
+    def execute_logged(
+        self, argv: Sequence[str], *, cwd: Path, log_path: Path,
+        environment: Mapping[str, str], cancelled: Event,
+        timeout_seconds: float, output_limit: int,
+    ) -> LoggedProcessResult: ...
 
 
 _host: ProcessHost | None = None
@@ -110,6 +126,34 @@ def open_process_output(output: ProcessOutput) -> ContextManager[ProcessOutputRe
     if _host is None or not callable(getattr(_host, "open_output", None)):
         raise ProcessError("process host does not implement captured output reads")
     return _host.open_output(output)
+
+
+def execute_logged_process(
+    argv: Sequence[str], *, cwd: Path, log_path: Path,
+    environment: Mapping[str, str], cancelled: Event,
+    timeout_seconds: float, output_limit: int,
+) -> LoggedProcessResult:
+    """Supervise a child and retain its bounded, historical merged log via Core.
+
+    The owner selects the legacy log path and interprets the exit status. Core
+    owns process closure, prior-log preservation and physical log publication.
+    """
+
+    if (_host is None or not callable(getattr(_host, "execute_logged", None))):
+        raise ProcessError("no logged process host is bound; start through Workbench Core")
+    if (not isinstance(cwd, Path) or not cwd.is_absolute()
+            or not isinstance(log_path, Path) or not log_path.is_absolute()
+            or type(timeout_seconds) not in {int, float}
+            or not 0 < timeout_seconds <= 3600
+            or type(output_limit) is not int or not 1 <= output_limit <= 16 * 1024 * 1024):
+        raise ProcessError("logged process path or bounds are invalid")
+    if cancelled.is_set():
+        raise ProcessError("logged process was cancelled before launch")
+    return _host.execute_logged(
+        tuple(argv), cwd=cwd, log_path=log_path,
+        environment=dict(environment), cancelled=cancelled,
+        timeout_seconds=timeout_seconds, output_limit=output_limit,
+    )
 
 
 def _validate(stdin, cancelled, timeout_seconds, output_limit, input_limit):

@@ -15,6 +15,7 @@ import stat
 import subprocess
 import tempfile
 import tomllib
+from threading import Event
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 from urllib.parse import urlparse
 from urllib.request import url2pathname
@@ -32,6 +33,7 @@ from workbench_api.host_filesystem import (
     HostFilesystemError, count_prepared_directory_stages,
     promote_prepared_directory,
 )
+from workbench_api.processes import ProcessError, execute_logged_process
 from workbench_core.artifact_store import DOWNLOAD_CHUNK_BYTES, sha256_file
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
@@ -1134,72 +1136,26 @@ def _run_logged(
         raise PackwizMaterializationError(
             f"{label} timeout must be positive"
         )
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    if log_path.exists() or log_path.is_symlink():
-        if not log_path.is_file() or log_path.is_symlink():
-            raise PackwizMaterializationError(
-                f"{label} log target is not a regular file"
-            )
-        previous_digest, _previous_size = sha256_file(log_path)
-        history = log_path.parent / "history"
-        if history.exists() and (
-            not history.is_dir() or history.is_symlink()
-        ):
-            raise PackwizMaterializationError(
-                f"{label} log history is not a regular directory"
-            )
-        history.mkdir(exist_ok=True)
-        archived = (
-            history
-            / f"{log_path.stem}-{previous_digest[:16]}{log_path.suffix}"
-        )
-        if not archived.exists():
-            try:
-                with log_path.open("rb") as source:
-                    with archived.open("xb") as destination:
-                        shutil.copyfileobj(
-                            source,
-                            destination,
-                            DOWNLOAD_CHUNK_BYTES,
-                        )
-            except OSError as exc:
-                raise PackwizMaterializationError(
-                    f"cannot retain the previous {label} log"
-                ) from exc
     try:
-        with log_path.open("wb") as log:
-            header = json.dumps(
-                {"command": list(command), "cwd": str(cwd)},
-                ensure_ascii=False,
-                sort_keys=True,
-            ).encode("utf-8")
-            log.write(header + b"\n")
-            log.flush()
-            completed = subprocess.run(
-                list(command),
-                check=False,
-                cwd=cwd,
-                stdin=subprocess.DEVNULL,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                timeout=timeout_seconds,
-            )
-    except subprocess.TimeoutExpired as exc:
-        raise PackwizMaterializationError(
-            f"{label} timed out; see {log_path.as_uri()}"
-        ) from exc
-    except OSError as exc:
-        raise PackwizMaterializationError(
-            f"cannot execute {label}; see {log_path.as_uri()}"
-        ) from exc
-    if log_path.stat().st_size > MAX_LOG_BYTES:
-        raise PackwizMaterializationError(
-            f"{label} log exceeds the retained size limit: "
-            f"{log_path.as_uri()}"
+        completed = execute_logged_process(
+            command, cwd=cwd, log_path=log_path,
+            environment=dict(os.environ), cancelled=Event(),
+            timeout_seconds=timeout_seconds, output_limit=MAX_LOG_BYTES,
         )
-    if completed.returncode:
+    except (OSError, ValueError, ProcessError) as exc:
+        detail = str(exc)
+        if "timed out" in detail:
+            message = f"{label} timed out; see {log_path.as_uri()}"
+        elif "byte bound" in detail:
+            message = f"{label} log exceeds the retained size limit: {log_path.as_uri()}"
+        else:
+            message = f"cannot execute {label}; see {log_path.as_uri()}"
         raise PackwizMaterializationError(
-            f"{label} exited with {completed.returncode}; "
+            message
+        ) from exc
+    if completed.exit_code:
+        raise PackwizMaterializationError(
+            f"{label} exited with {completed.exit_code}; "
             f"see {log_path.as_uri()}"
         )
 
