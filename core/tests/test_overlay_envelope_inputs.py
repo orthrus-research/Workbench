@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from workbench_core.managed_trees import CoreManagedTrees
+from workbench_core.managed_trees import CoreManagedTrees, ManagedTreeError
 from workbench_core.overlay_envelope_inputs import (
     CoreOverlayEnvelopeInputs, OverlayEnvelopeInputError,
 )
@@ -75,7 +75,7 @@ class OverlayEnvelopeInputTests(unittest.TestCase):
         return {"inventory_id": "fixture-copy:sha256:" + sha256(chunk).hexdigest(),
                 "chunk_count": 1, "chunks_sha256": chunks_digest}, chunk
 
-    def _attempt(self, stage):
+    def _attempt(self, stage, effects=None):
         manifest, chunk = self._inventory()
         attempt = self.host.start(stage=stage, source_root=self.source,
                                   plan_chunks=(b'{"operations":["replace"]}',))
@@ -83,12 +83,16 @@ class OverlayEnvelopeInputTests(unittest.TestCase):
         attempt.seal_inputs(manifest, validate_inventory=lambda selected, chunks: (
             selected if list(chunks) == [chunk] else None
         ))
+        if effects is None:
+            effects = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                        "expected_sha256": None, "data": b"{}\n"},)
+        attempt.seal_effects(effects, validate_plan=lambda _chunks: effects)
         return attempt, manifest
 
     def test_core_copies_complete_rows_and_retains_pre_copy_attempt(self) -> None:
         with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
             attempt, manifest = self._attempt(stage)
-            self.assertEqual("input-sealed", self.host.inventory()[0]["status"])
+            self.assertEqual("effects-sealed", self.host.inventory()[0]["status"])
             content = attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
             self.assertEqual(b"sidecar\n", (content / "worldgen/vein/sidecar.txt").read_bytes())
             self.assertEqual(0o600, stat.S_IMODE((content / "worldgen/vein/sidecar.txt").stat().st_mode))
@@ -105,6 +109,192 @@ class OverlayEnvelopeInputTests(unittest.TestCase):
         json.dumps(ResourceCatalog(self.configuration_home).inventory(
             workspace=self.workspace)["overlay_envelopes"])
         self.assertTrue(stage.path.is_dir())
+
+    def test_ordered_effects_write_only_the_unpublished_stage(self) -> None:
+        oil = (self.source / "worldgen/fluid/oil.json").read_bytes()
+        sidecar = (self.source / "worldgen/vein/sidecar.txt").read_bytes()
+        effects = (
+            {"op": "replace", "relative_path": "worldgen/fluid/oil.json",
+             "expected_sha256": sha256(oil).hexdigest(), "data": b'{"fluid":"gas"}\n'},
+            {"op": "remove", "relative_path": "worldgen/vein/sidecar.txt",
+             "expected_sha256": sha256(sidecar).hexdigest(), "data": None},
+            {"op": "add", "relative_path": "worldgen/vein/new/ore.json",
+             "expected_sha256": None, "data": b"{}\n"},
+        )
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, manifest = self._attempt(stage, effects)
+            content = attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+            self.assertEqual("copy-complete", self.host.inventory()[0]["status"])
+            attempt.apply_effects(effects)
+            self.assertEqual(b'{"fluid":"gas"}\n', (content / "worldgen/fluid/oil.json").read_bytes())
+            self.assertFalse((content / "worldgen/vein/sidecar.txt").exists())
+            self.assertEqual(b"{}\n", (content / "worldgen/vein/new/ore.json").read_bytes())
+            self.assertEqual("operations-complete", self.host.inventory()[0]["status"])
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "already attempted"):
+                attempt.apply_effects(effects)
+            self.assertFalse(self.target.exists())
+        self.assertEqual(oil, (self.source / "worldgen/fluid/oil.json").read_bytes())
+        self.assertEqual(sidecar, (self.source / "worldgen/vein/sidecar.txt").read_bytes())
+
+    def test_interrupted_operation_keeps_stage_and_refuses_replay(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, manifest = self._attempt(stage)
+            content = attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+            effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                       "expected_sha256": None, "data": b"{}\n"},)
+            with patch.object(attempt, "_apply_effect", side_effect=OSError("hard exit window")):
+                with self.assertRaisesRegex(OSError, "hard exit window"):
+                    attempt.apply_effects(effect)
+            self.assertEqual("operations-incomplete", self.host.inventory()[0]["status"])
+            self.assertFalse((content / "worldgen/vein/new.json").exists())
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "already attempted"):
+                attempt.apply_effects(effect)
+            self.assertFalse(self.target.exists())
+
+    def test_cancellation_after_effect_write_keeps_completion_unsealed(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                       "expected_sha256": None, "data": b"{}\n"},)
+            attempt, manifest = self._attempt(stage, effect)
+            content = attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+            cancelled = False
+            original = attempt._apply_effect
+
+            def check_cancelled():
+                if cancelled:
+                    raise RuntimeError("cancelled")
+
+            def cancel_after_write(*args):
+                nonlocal cancelled
+                original(*args)
+                cancelled = True
+
+            with (patch.object(self.trees, "check_cancelled", side_effect=check_cancelled),
+                  patch.object(attempt, "_apply_effect", side_effect=cancel_after_write)):
+                with self.assertRaisesRegex(ManagedTreeError, "cancelled"):
+                    attempt.apply_effects(effect)
+            self.assertEqual(b"{}\n", (content / "worldgen/vein/new.json").read_bytes())
+            self.assertFalse((attempt.root / "operations-complete.json").exists())
+            self.assertFalse(self.target.exists())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_hard_exit_after_each_effect_write_keeps_unpublished_attempt(self) -> None:
+        old_oil = (self.source / "worldgen/fluid/oil.json").read_bytes()
+        old_sidecar = (self.source / "worldgen/vein/sidecar.txt").read_bytes()
+        cases = (
+            ("add", "worldgen/vein/new.json", None, b"{}\n"),
+            ("replace", "worldgen/fluid/oil.json", sha256(old_oil).hexdigest(), b"gas\n"),
+            ("remove", "worldgen/vein/sidecar.txt", sha256(old_sidecar).hexdigest(), None),
+        )
+        for action, relative_path, expected_sha256, data in cases:
+            with self.subTest(action=action):
+                target = self.target.parent / action / "config"
+                effect = ({"op": action, "relative_path": relative_path,
+                           "expected_sha256": expected_sha256, "data": data},)
+                with self.trees.stage("artifacts", "config", requested_path=target) as stage:
+                    attempt, manifest = self._attempt(stage, effect)
+                    content = attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+                    child = os.fork()
+                    if child == 0:
+                        original = attempt._apply_effect
+
+                        def exit_after_write(*args):
+                            original(*args)
+                            os._exit(73)
+
+                        try:
+                            with patch.object(attempt, "_apply_effect", side_effect=exit_after_write):
+                                attempt.apply_effects(effect)
+                        except BaseException:
+                            os._exit(74)
+                        os._exit(75)
+                    _pid, status = os.waitpid(child, 0)
+                    self.assertEqual(73, os.waitstatus_to_exitcode(status))
+                    selected = content / relative_path
+                    if action == "remove":
+                        self.assertFalse(selected.exists())
+                    else:
+                        self.assertEqual(data, selected.read_bytes())
+                    row = next(row for row in self.host.inventory()
+                               if row["attempt_id"] == attempt.attempt_id)
+                    self.assertEqual("operations-incomplete", row["status"])
+                    with self.assertRaisesRegex(OverlayEnvelopeInputError, "already attempted"):
+                        attempt.apply_effects(effect)
+                    self.assertFalse(target.exists())
+        self.assertEqual(old_oil, (self.source / "worldgen/fluid/oil.json").read_bytes())
+        self.assertEqual(old_sidecar, (self.source / "worldgen/vein/sidecar.txt").read_bytes())
+
+    def test_completed_effect_stage_is_checked_again_on_inventory(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, manifest = self._attempt(stage)
+            content = attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+            effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                       "expected_sha256": None, "data": b"{}\n"},)
+            attempt.apply_effects(effect)
+            self.assertEqual("operations-complete", self.host.inventory()[0]["status"])
+            (content / "worldgen/vein/new.json").write_bytes(b"changed\n")
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "operation completion changed"):
+                self.host.inventory()
+            self.assertFalse(self.target.exists())
+
+    def test_changed_effect_record_is_reported_as_changed_attempt(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, _manifest = self._attempt(stage)
+            path = attempt.root / "effects" / "0000000000000000.json"
+            record = json.loads(path.read_bytes())
+            record["effect"]["op"] = ["add"]
+            path.write_bytes(self._canonical(record) + b"\n")
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "effect metadata changed"):
+                self.host.inventory()
+            self.assertFalse(stage.path.exists())
+
+    def test_changed_sealed_capacity_blocks_copy_before_payload(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, manifest = self._attempt(stage)
+            path = attempt.root / "effect-seal.json"
+            record = json.loads(path.read_bytes())
+            record["capacity"]["reserved_bytes"] -= 1
+            path.write_bytes(self._canonical(record) + b"\n")
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "sealed overlay capacity changed"):
+                attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+            self.assertFalse((attempt.root / "copy-attempted.json").exists())
+            self.assertFalse(stage.path.exists())
+
+    def test_add_conflicting_with_copied_directory_refuses_before_copy(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, _manifest = self._attempt(stage)
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "add precondition"):
+                attempt.preflight_v3(({
+                    "op": "add", "relative_path": "worldgen/vein",
+                    "expected_sha256": None, "data": b"{}\n",
+                },))
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "add precondition"):
+                attempt.preflight_v3(({
+                    "op": "add", "relative_path": "dimensions.json/child.json",
+                    "expected_sha256": None, "data": b"{}\n",
+                },))
+            self.assertFalse((attempt.root / "copy-attempted.json").exists())
+            self.assertFalse(stage.path.exists())
+
+    def test_read_only_copied_parent_refuses_effects_before_copy(self) -> None:
+        vein = self.source / "worldgen/vein"
+        os.chmod(vein, 0o550)
+        self.addCleanup(os.chmod, vein, 0o750)
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            manifest, chunk = self._inventory()
+            attempt = self.host.start(stage=stage, source_root=self.source,
+                                      plan_chunks=(b'{"operations":["add"]}',))
+            attempt.emit_chunk(0, chunk)
+            attempt.seal_inputs(manifest, validate_inventory=lambda selected, chunks: (
+                selected if list(chunks) == [chunk] else None
+            ))
+            effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                       "expected_sha256": None, "data": b"{}\n"},)
+            with self.assertRaisesRegex(OverlayEnvelopeInputError, "not writable") as raised:
+                attempt.seal_effects(effect, validate_plan=lambda _chunks: effect)
+            self.assertEqual("overlay.unsupported", raised.exception.code)
+            self.assertFalse((attempt.root / "copy-attempted.json").exists())
+            self.assertFalse(stage.path.exists())
 
     def test_v3_preflight_checks_copied_tree_and_planned_add_before_copy(self) -> None:
         with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
@@ -249,6 +439,9 @@ with trees.stage('artifacts', 'config', requested_path=Path(os.environ['W5_TARGE
         plan_chunks=(b'{"operations":["replace"]}',))
     attempt.emit_chunk(0, chunk)
     attempt.seal_inputs(manifest, validate_inventory=lambda m, chunks: m if list(chunks) == [chunk] else None)
+    effects = ({'op': 'add', 'relative_path': 'worldgen/vein/new.json',
+                'expected_sha256': None, 'data': b'{}\\n'},)
+    attempt.seal_effects(effects, validate_plan=lambda _chunks: effects)
     copy_file = attempt._copy_file
     def crash_after_one(*args):
         copy_file(*args)

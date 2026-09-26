@@ -389,16 +389,29 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
             workspace=workspace, configuration_home=configuration_home,
             owner_id="crucible",
         )
+        plan = {
+            "format": "workbench-crucible-gtceu-worldgen-overlay-v1",
+            "schema_version": 1, "target_inventory_id": report["inventory_id"],
+            "operations": [{"op": "add", "kind": "ore",
+                            "relative_path": "worldgen/vein/overworld/new.json",
+                            "definition": self.ore_definition()}],
+        }
+        effects = planned_overlay_effects(plan=plan, source_inventory=report)
         with trees.stage("artifacts", "config", requested_path=target) as stage:
             attempt = host.start(
                 stage=stage, source_root=self.config,
-                plan_chunks=(canonical_json_bytes({"operations": ["reviewed-placeholder"]}),),
+                plan_chunks=(canonical_json_bytes(plan),),
             )
             manifest = build_gtceu_overlay_copy_inventory(
                 config_root=self.config, source_inventory=report,
                 emit_chunk=attempt.emit_chunk,
             )
             attempt.seal_inputs(manifest, validate_inventory=parse_gtceu_overlay_copy_inventory)
+            attempt.seal_effects(
+                effects, validate_plan=lambda chunks: planned_overlay_effects(
+                    plan=json.loads(b"".join(chunks)), source_inventory=report,
+                ),
+            )
             copied = attempt.copy_source(verify_source=lambda selected, chunks:
                 verify_gtceu_overlay_copy_source(
                     config_root=self.config, source_inventory=report,
