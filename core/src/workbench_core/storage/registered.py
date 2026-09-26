@@ -634,6 +634,11 @@ class ResourceCatalog:
         rows = []
         if self.root.exists() or self.root.is_symlink():
             check_storage.ordinary(self.root, directory=True)
+            if any(
+                entry.name not in {*_ROOT_KNOWN, ROOT_ANCHOR_NAME}
+                for entry in self.root.iterdir()
+            ):
+                raise DurableResourceError("resource.changed", "resource catalog has an unknown root entry")
             for name in ("reservations", "intents", "commits", "aborts", "leases"):
                 check_storage.ordinary(self._directory(name), directory=True)
             for name in ("reservations", "intents", "commits", "aborts"):

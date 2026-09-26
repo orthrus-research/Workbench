@@ -327,6 +327,26 @@ class CatalogRootTests(unittest.TestCase):
                 path.unlink()
         self.assertEqual(1, len(catalog.inventory(workspace=self.workspace)["resources"]))
 
+    def test_inventory_refuses_unknown_root_entries_without_claiming_lost_history(self) -> None:
+        self.resources.publish_bytes("evidence", "retained.json", b"retained\n")
+        catalog = ResourceCatalog(self.config)
+        unknown = catalog.root / "future-namespace"
+        for create in (
+            lambda: unknown.mkdir(),
+            lambda: unknown.write_bytes(b"unrecognized\n"),
+            lambda: unknown.symlink_to(catalog.root / "stores", target_is_directory=True),
+        ):
+            with self.subTest(create=create):
+                create()
+                with self.assertRaises(DurableResourceError) as changed:
+                    catalog.inventory(workspace=self.workspace)
+                self.assertEqual(changed.exception.code, "resource.changed")
+                self.assertEqual(catalog.verify_root(), "ready-unproven")
+                if unknown.is_dir() and not unknown.is_symlink():
+                    unknown.rmdir()
+                else:
+                    unknown.unlink()
+
     def test_cleanup_blocks_unregistered_workspace_items_with_unproven_history(self) -> None:
         from workbench_core.storage.manager import inventory_storage
 
