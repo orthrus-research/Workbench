@@ -29,6 +29,7 @@ from workbench_api.host_filesystem import (
     read_private_bytes,
     secure_private_path,
 )
+from workbench_api.processes import ProcessError, execute_process
 from workbench_api.working_allocations import (
     WorkingAllocationReference,
     WorkingAllocations,
@@ -1631,20 +1632,21 @@ def _powershell(
             ),
         },
     )
-    completed = subprocess.run(
-        [executable, "-NoProfile", "-NonInteractive", "-Command", script],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-        timeout=15,
-        env=environment,
-    )
-    if completed.returncode:
+    try:
+        completed = execute_process(
+            [
+                str(Path(executable).resolve(strict=True)),
+                "-NoProfile", "-NonInteractive", "-Command", script,
+            ],
+            cwd=Path.cwd(), stdin=b"", environment=environment,
+            cancelled=threading.Event(), timeout_seconds=15,
+            output_limit=1024 * 1024,
+        )
+    except (OSError, ProcessError) as exc:
+        raise PackProgramError(f"Windows process custody failed: {_safe_text(str(exc), 2048)}") from exc
+    if completed.exit_code:
         message = _safe_text(completed.stderr.decode("utf-8", "replace"), 2048)
-        raise PackProgramError(f"Windows process custody failed: {message or completed.returncode}")
-    if len(completed.stdout) > 1024 * 1024:
-        raise PackProgramError("Windows process custody output exceeded its bound")
+        raise PackProgramError(f"Windows process custody failed: {message or completed.exit_code}")
     return completed.stdout.decode("utf-8", "strict").strip()
 
 
@@ -2015,21 +2017,22 @@ def _server_workspace_uri(path: Path, *, bridge_required: bool) -> str:
         raise PackProgramError(
             "wslpath is required to bind the Windows GroovyScript workspace URI"
         )
-    completed = subprocess.run(
-        [executable, "-w", str(resolved)],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-        timeout=5,
-    )
-    if completed.returncode:
+    try:
+        completed = execute_process(
+            [str(Path(executable).resolve(strict=True)), "-w", str(resolved)],
+            cwd=Path.cwd(), stdin=b"", environment=os.environ,
+            cancelled=threading.Event(), timeout_seconds=5,
+            output_limit=16384,
+        )
+    except (OSError, ProcessError) as exc:
+        raise PackProgramError(
+            f"unable to translate managed workspace into Windows: {_safe_text(str(exc), 2048)}"
+        ) from exc
+    if completed.exit_code:
         message = _safe_text(completed.stderr.decode("utf-8", "replace"), 2048)
         raise PackProgramError(
-            f"unable to translate managed workspace into Windows: {message or completed.returncode}"
+            f"unable to translate managed workspace into Windows: {message or completed.exit_code}"
         )
-    if len(completed.stdout) > 16384:
-        raise PackProgramError("translated Windows workspace path exceeded its bound")
     try:
         windows_path = completed.stdout.decode("utf-8", "strict").strip("\r\n")
     except UnicodeError as exc:
