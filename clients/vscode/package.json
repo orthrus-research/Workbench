@@ -73,6 +73,12 @@
         "category": "Workbench"
       },
       {
+        "command": "workbench.core.configureProductSpineStateRoot",
+        "title": "Configure Product Spine State Root",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
         "command": "workbench.core.checkInstallation",
         "title": "Check CLI Installation",
         "category": "Workbench"
@@ -510,7 +516,7 @@
           "type": "string",
           "default": "",
           "scope": "machine",
-          "description": "Optional exact external state root for Workspace Home, Work Sessions, and pack qualification. Configure this when retained product state must live outside the workspace or installed package."
+          "description": "Earlier Product Spine state-root selection. Use Workbench: Configure Product Spine State Root to review and save this choice in Core; this setting no longer selects the effective root."
         },
         "workbench.feature.launcher": {
           "type": "string",

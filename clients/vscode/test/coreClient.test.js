@@ -25,12 +25,14 @@ test("scrubs interpreter injection from developer command environments", () => {
     PYTHONPATH: "/evil",
     WORKBENCH_CLEANROOM_FIXTURE_GRADLEW: "/opt/gradle/bin/gradle",
     WORKBENCH_CLEANROOM_FIXTURE_JAVA_HOME: "/opt/jdk",
+    WORKBENCH_CONFIG_HOME: "/home/me/.workbench",
     WORKBENCH_STATE_ROOT: "/var/lib/workbench-state",
   }), {
     PATH: "/bin",
     HOME: "/home/me",
     WORKBENCH_CLEANROOM_FIXTURE_GRADLEW: "/opt/gradle/bin/gradle",
     WORKBENCH_CLEANROOM_FIXTURE_JAVA_HOME: "/opt/jdk",
+    WORKBENCH_CONFIG_HOME: "/home/me/.workbench",
     WORKBENCH_STATE_ROOT: "/var/lib/workbench-state",
   });
 });

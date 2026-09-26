@@ -7,7 +7,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 for (const relative of [
   "package.json", "extension.js", "coreLaunch.js", "coreClient.js",
-  "coreStatusClient.js", "recipeReviewClient.js",
+  "coreStatusClient.js", "stateRootPolicyClient.js", "recipeReviewClient.js",
   "prRecipeReviewClient.js", "prRecipeReviewTree.js",
   "projectQualificationClient.js",
   "coreCommandClient.js", "commandCenterClient.js", "developerToolsClient.js",
@@ -258,7 +258,9 @@ assert.match(
   qualificationActionSource,
   /showWarningMessage\([\s\S]*"Apply Exact Qualification"[\s\S]*confirmed !== "Apply Exact Qualification"[\s\S]*return plan;[\s\S]*applyProjectQualification/,
 );
-assert.match(qualificationActionSource, /stateRoot: selectedProductSpineStateRoot|const stateRoot = selectedProductSpineStateRoot/);
+assert.match(qualificationActionSource, /const statePolicy = await selectedProductSpinePolicy/);
+assert.match(qualificationActionSource, /const stateRoot = statePolicy\.stateRoot/);
+assert.match(qualificationActionSource, /expectedPolicyId: statePolicy\.policyId/);
 assert.doesNotMatch(
   qualificationActionSource,
   /workspaceHome\.reset\(\);[\s\S]*await openWorkspaceHome\(workspaceHome\)/,
@@ -268,7 +270,7 @@ const liveConsoleStart = extensionSource.indexOf("async function inspectLiveCons
 const liveConsoleEnd = extensionSource.indexOf("\nfunction retainedStateRoot", liveConsoleStart);
 assert.ok(liveConsoleStart >= 0 && liveConsoleEnd > liveConsoleStart);
 const liveConsoleSource = extensionSource.slice(liveConsoleStart, liveConsoleEnd);
-assert.match(liveConsoleSource, /stateRoot: selectedProductSpineStateRoot\(\)/);
+assert.match(liveConsoleSource, /stateRoot: await selectedProductSpineStateRoot\(\)/);
 assert.match(liveConsoleSource, /invokeWorkSessionArtifactEvents\([\s\S]*\.\.\.options/);
 assert.match(liveConsoleSource, /invokeWorkSessionArtifactRange\([\s\S]*\n    options,/);
 assert.match(
@@ -303,6 +305,7 @@ assert.deepEqual(
     "workbench.commandCenter.open",
     "workbench.core.checkInstallation",
     "workbench.core.configureExecutable",
+    "workbench.core.configureProductSpineStateRoot",
     "workbench.core.openInstallationGuide",
     "workbench.feature.browseExamples",
     "workbench.feature.browseRetainedRecords",

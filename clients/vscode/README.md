@@ -157,9 +157,17 @@ operation can stop safely.
 
 Workbench runs locally. The extension does not upload project files, read
 launcher account data, embed pack policy, or create a second approval path.
-Machine-local settings select launcher inputs and optional external state
-roots. When Core runs in WSL, explicit Windows paths must be UNC paths for the
-same configured distribution.
+Machine-local settings select launcher inputs. For Workspace Home, Work Sessions
+and project qualification, **Configure Product Spine State Root** saves the
+selected retained root through Core for this workspace. The earlier
+`workbench.productSpine.stateRoot` setting is shown as the migration suggestion;
+it no longer chooses the active root. Other Workbench clients can read the same
+Core choice with `workbench settings state-root resolve WORKSPACE product-spine
+--json`. A configured Core executable remains a machine-local bootstrap choice
+so the extension can find Core before reading its policy. The developer-feature
+state-root setting has not yet moved to this Core selection route. When Core
+runs in WSL, explicit Windows paths must be UNC paths for the same configured
+distribution.
 
 ## Development and packaging
 

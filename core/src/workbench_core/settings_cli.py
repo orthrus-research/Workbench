@@ -35,6 +35,16 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
     set_parser.add_argument("path")
     unset = actions.add_parser("unset", help="return one location to its default")
     unset.add_argument("role", choices=sorted(LOCATION_ROLES))
+    state_root = actions.add_parser(
+        "state-root", help="resolve or save one workspace's retained state root",
+    )
+    state_root.add_argument("operation", choices=("resolve", "select", "clear", "clear-stale"))
+    state_root.add_argument("workspace", type=Path)
+    state_root.add_argument("role", choices=("product-spine", "feature"))
+    state_root.add_argument("path", nargs="?")
+    state_root.add_argument("--expected-policy-id")
+    state_root.add_argument("--expected-record-id")
+    state_root.add_argument("--json", action="store_true")
     workspace = actions.add_parser("workspace", help="register or list named workspaces")
     workspace.add_argument("operation", choices=["list", "add", "remove", "default", "clear-default", "select", "acquire"])
     workspace.add_argument("name", nargs="?")
@@ -80,13 +90,17 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
     selected = parser.parse_args(list(argv) if argv is not None else None)
 
     if selected.action in (None, "show"):
+        from .state_root_selection import load_state_root_selections
+
         settings = load_settings()
         workspaces = load_workspaces()
+        state_roots = load_state_root_selections()
         if getattr(selected, "json", False):
             print(json.dumps({
                 "configuration_home": str(default_user_config_home()),
                 "settings": settings,
                 "workspaces": workspaces,
+                "state_roots": state_roots,
             }, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             print(f"Workbench settings: {default_user_config_home()}")
@@ -97,6 +111,7 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
             else:
                 print("    Defaults in use")
             print(f"  Workspaces: {default_workspaces_path()}")
+            print(f"  Retained state roots: {default_user_config_home() / 'state-roots-v1.json'}")
             if workspaces["entries"]:
                 for row in workspaces["entries"]:
                     marker = " (default)" if row["name"] == workspaces["default"] else ""
@@ -117,6 +132,48 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
     if selected.action == "unset":
         set_location(selected.role, None)
         print(f"Using the default for {selected.role}")
+        return 0
+    if selected.action == "state-root":
+        from .state_root_selection import (
+            clear_stale_state_root, effective_state_root, select_state_root,
+        )
+
+        suite = Path.cwd() if suite_root is None else suite_root
+        if selected.operation != "clear-stale" and selected.expected_record_id is not None:
+            parser.error("--expected-record-id is only for state-root clear-stale")
+        if selected.operation == "resolve":
+            if selected.path is not None:
+                parser.error("state-root resolve takes no path")
+            result = effective_state_root(
+                selected.workspace, selected.role, suite_root=suite,
+                expected_policy_id=selected.expected_policy_id,
+            )
+        elif selected.operation == "clear-stale":
+            if selected.path is not None or selected.expected_policy_id is not None:
+                parser.error("state-root clear-stale takes no path or policy ID")
+            if selected.expected_record_id is None:
+                parser.error("state-root clear-stale requires --expected-record-id from settings show")
+            result = clear_stale_state_root(
+                selected.workspace, selected.role, suite_root=suite,
+                expected_record_id=selected.expected_record_id,
+            )
+        else:
+            if selected.operation == "select" and selected.path is None:
+                parser.error("state-root select requires a path")
+            if selected.operation == "clear" and selected.path is not None:
+                parser.error("state-root clear takes no path")
+            if selected.expected_policy_id is None:
+                parser.error("state-root changes require --expected-policy-id from resolve")
+            result = select_state_root(
+                selected.workspace, selected.role,
+                selected.path if selected.operation == "select" else None,
+                suite_root=suite, expected_policy_id=selected.expected_policy_id,
+            )
+        if selected.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            print(f"{result['role']}: {result['state_root']} ({result['source']})")
+            print(f"  Policy: {result['policy_id']}")
         return 0
     if selected.action == "migrate":
         result = (

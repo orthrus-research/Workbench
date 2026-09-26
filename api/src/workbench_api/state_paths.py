@@ -24,22 +24,25 @@ def default_feature_state_root(
         return Path(explicit).expanduser().resolve()
     if os.name == "nt":
         local = values.get("LOCALAPPDATA")
+        home = Path(values["USERPROFILE"]).expanduser() if values.get("USERPROFILE") else Path.home()
         base = (
             Path(local).expanduser()
             if local
-            else Path.home() / "AppData" / "Local"
+            else home / "AppData" / "Local"
         )
         return base / "Workbench" / "developer-features"
     if sys.platform == "darwin":
+        home = Path(values["HOME"]).expanduser() if values.get("HOME") else Path.home()
         return (
-            Path.home()
+            home
             / "Library"
             / "Application Support"
             / "Workbench"
             / "developer-features"
         )
     xdg_state = values.get("XDG_STATE_HOME")
-    base = Path(xdg_state).expanduser() if xdg_state else Path.home() / ".local/state"
+    home = Path(values["HOME"]).expanduser() if values.get("HOME") else Path.home()
+    base = Path(xdg_state).expanduser() if xdg_state else home / ".local/state"
     return base / "workbench" / "developer-features"
 
 

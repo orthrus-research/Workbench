@@ -133,6 +133,20 @@ workspace or a matching Setup workspace. A different workspace does not
 inherit Setup's Java. Explicit process Java remains a candidate with its own
 provenance. Earlier V1 records still open without changing their IDs or bytes.
 
+Core stores retained client state-root choices per exact workspace in the
+stable user configuration home. `workbench settings state-root resolve WORKSPACE
+product-spine --json` returns the effective root and a policy ID without
+creating the destination. `state-root select WORKSPACE product-spine PATH
+--expected-policy-id ID` saves a reviewed choice; `clear` restores the default.
+The same API has a separate `feature` role. A changed workspace identity,
+redirected selected path, or stale policy ID is refused. An explicit
+`WORKBENCH_STATE_ROOT` remains an invocation override. Owner commands still
+accept their documented direct path overrides; clients can resolve the Core
+selection before invoking them. If a workspace is replaced and its saved root
+is bound to the old identity, `settings show --json` exposes the selections
+record ID; `state-root clear-stale WORKSPACE ROLE --expected-record-id ID`
+removes only that stale role after review.
+
 On Linux, private record directories must enforce owner-only access. On WSL,
 the Linux filesystem meets that condition in the tested configuration. The
 tested Windows-mounted 9p location did not preserve Unix mode bits and is

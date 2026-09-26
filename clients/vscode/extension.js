@@ -53,6 +53,11 @@ const {
 const { invokeResult } = require("./featureServiceClient");
 const { invokeRun } = require("./developerFeatureClient");
 const {
+  invokeStateRootPolicy,
+  legacyProductSpineDecision,
+  selectStateRootPolicy,
+} = require("./stateRootPolicyClient");
+const {
   invokeCurrentContextFeatureAction,
 } = require("./currentContextFeatureClient");
 const { invokeWorkspaceHomeV2 } = require("./workspaceHomeV2Client");
@@ -136,6 +141,10 @@ function activate(context) {
       impactDocuments.release(document.uri);
     }),
     vscode.commands.registerCommand("workbench.core.configureExecutable", () => configureCore()),
+    vscode.commands.registerCommand(
+      "workbench.core.configureProductSpineStateRoot",
+      () => configureProductSpineStateRoot(workspaceHome),
+    ),
     vscode.commands.registerCommand("workbench.core.checkInstallation", () => refreshCoreStatus(true)),
     vscode.commands.registerCommand(
       "workbench.core.openInstallationGuide",
@@ -600,10 +609,91 @@ function selectedCore() {
   return discoverExecutable(configuration.get("coreExecutable", ""));
 }
 
-function selectedProductSpineStateRoot() {
+let legacyProductSpineWarningShown = false;
+
+function legacyProductSpineStateRoot() {
   const configured = vscode.workspace.getConfiguration("workbench")
     .get("productSpine.stateRoot", "");
-  return typeof configured === "string" && configured.trim() ? configured : undefined;
+  return configured;
+}
+
+async function selectedProductSpinePolicy(workspacePath) {
+  const policy = await invokeStateRootPolicy(
+    selectedCore(), workspacePath || localWorkspace().uri.fsPath, "product-spine",
+    { cwd: currentWorkingDirectory() },
+  );
+  const legacy = legacyProductSpineStateRoot();
+  const legacyDecision = legacyProductSpineDecision(policy, legacy);
+  if (legacyDecision === "migration-required") {
+    throw new Error(
+      "The earlier VS Code product-spine state-root setting needs review. "
+      + "Run Workbench: Configure Product Spine State Root to save it in Core.",
+    );
+  }
+  if (legacyDecision === "historical-hint" && !legacyProductSpineWarningShown) {
+    legacyProductSpineWarningShown = true;
+    void vscode.window.showWarningMessage(
+      "Workbench now uses Core's product-spine state-root selection. "
+      + "The earlier VS Code setting remains available for review in Configure Product Spine State Root.",
+    );
+  }
+  return policy;
+}
+
+async function selectedProductSpineStateRoot(workspacePath) {
+  return (await selectedProductSpinePolicy(workspacePath)).stateRoot;
+}
+
+async function configureProductSpineStateRoot(workspaceHome) {
+  if (!requireTrustedWorkspace(
+    "Workbench state-root selection requires a trusted local workspace.",
+  )) return undefined;
+  try {
+    const workspace = localWorkspace().uri.fsPath;
+    const executable = selectedCore();
+    const policy = await invokeStateRootPolicy(executable, workspace, "product-spine", {
+      cwd: workspace,
+    });
+    const legacy = legacyProductSpineStateRoot();
+    legacyProductSpineDecision(policy, legacy);
+    const selected = await vscode.window.showInputBox({
+      title: "Product Spine State Root",
+      prompt: "Choose the retained Workbench state directory seen by Core. Leave empty to use Core's default.",
+      value: legacy.trim() || (policy.source === "user-selection" ? policy.stateRoot : ""),
+      ignoreFocusOut: true,
+      validateInput: (value) => value.includes("\0") || Buffer.byteLength(value, "utf8") > 32 * 1024
+        ? "Enter one bounded state-root path." : undefined,
+    });
+    if (selected === undefined) return undefined;
+    const result = await selectStateRootPolicy(
+      executable, workspace, "product-spine", selected.trim() || null,
+      policy.policyId, { cwd: workspace },
+    );
+    if (legacy.trim()) {
+      try {
+        await vscode.workspace.getConfiguration("workbench").update(
+          "productSpine.stateRoot", undefined, vscode.ConfigurationTarget.Global,
+        );
+      } catch (error) {
+        workspaceHome.reset();
+        void vscode.window.showWarningMessage(
+          "Core saved the Product Spine state root, but VS Code could not clear its earlier setting. "
+          + `Clear workbench.productSpine.stateRoot before reopening Home: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return result;
+      }
+    }
+    workspaceHome.reset();
+    void vscode.window.showInformationMessage(
+      `Core selected the Product Spine state root: ${result.stateRoot}`,
+    );
+    return result;
+  } catch (error) {
+    void vscode.window.showErrorMessage(
+      `Could not save the Product Spine state root: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
+  }
 }
 
 function currentWorkingDirectory() {
@@ -632,7 +722,8 @@ async function qualifyProject(workspaceHome) {
   }
   try {
     const executable = selectedCore();
-    const stateRoot = selectedProductSpineStateRoot();
+    const statePolicy = await selectedProductSpinePolicy(workspace.uri.fsPath);
+    const stateRoot = statePolicy.stateRoot;
     const plan = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Window,
@@ -665,6 +756,9 @@ async function qualifyProject(workspaceHome) {
       );
       return plan;
     }
+    await invokeStateRootPolicy(executable, workspace.uri.fsPath, "product-spine", {
+      cwd: workspace.uri.fsPath, expectedPolicyId: statePolicy.policyId,
+    });
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Window,
@@ -706,7 +800,7 @@ async function openWorkspaceHome(workspaceHome) {
     return undefined;
   }
   try {
-    const stateRoot = selectedProductSpineStateRoot();
+    const stateRoot = await selectedProductSpineStateRoot(workspace.uri.fsPath);
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Window,
@@ -778,7 +872,7 @@ async function runWorkSessionOperation(operation, workspaceHome) {
   const executable = selectedCore();
   const options = {
     cwd: workspace.uri.fsPath,
-    stateRoot: selectedProductSpineStateRoot(),
+    stateRoot: await selectedProductSpineStateRoot(workspace.uri.fsPath),
   };
   let result;
   if (operation.operation === "recovery-preview") {
@@ -857,7 +951,7 @@ async function inspectHomeOwner(reference, workspaceHome) {
 async function inspectLiveConsoleOwner(reference, sessionId) {
   const options = {
     cwd: currentWorkingDirectory(),
-    stateRoot: selectedProductSpineStateRoot(),
+    stateRoot: await selectedProductSpineStateRoot(),
   };
   const events = [];
   let afterSequence = -1;

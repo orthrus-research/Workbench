@@ -117,7 +117,11 @@ for (const version of executedVersions) {
   const resultPath = path.join(temporary, "extension-host-result.json");
   const processProfile = vscodeProcessProfile(path.join(temporary, "process-profile"));
   await prepareVSCodeProcessProfile(processProfile);
-  const hostEnvironment = activateVSCodeProcessProfile(process.env, processProfile);
+  const hostEnvironment = {
+    ...activateVSCodeProcessProfile(process.env, processProfile),
+    WORKBENCH_CONFIG_HOME: path.join(temporary, "core-config"),
+  };
+  delete hostEnvironment.WORKBENCH_STATE_ROOT;
   let adoptedBindingId = null;
   let adoptedSessionId = null;
   let observedWorkspaceKind = null;
@@ -143,6 +147,33 @@ for (const version of executedVersions) {
     settings, null, 2,
   )}\n`);
   try {
+    if (installedCore) {
+      const preview = await execFile(installedCore, [
+        "settings", "state-root", "resolve", workspace, "product-spine", "--json",
+      ], {
+        cwd: workspace, encoding: "utf8", maxBuffer: 1024 * 1024,
+        timeout: 120_000, windowsHide: true, env: hostEnvironment,
+      });
+      if (preview.stderr.trim()) {
+        throw new Error(`installed core state-root policy returned stderr: ${preview.stderr.trim()}`);
+      }
+      const initialPolicy = JSON.parse(preview.stdout);
+      const saved = await execFile(installedCore, [
+        "settings", "state-root", "select", workspace, "product-spine",
+        productSpineStateRoot, "--expected-policy-id", initialPolicy.policy_id, "--json",
+      ], {
+        cwd: workspace, encoding: "utf8", maxBuffer: 1024 * 1024,
+        timeout: 120_000, windowsHide: true, env: hostEnvironment,
+      });
+      if (saved.stderr.trim()) {
+        throw new Error(`installed core state-root selection returned stderr: ${saved.stderr.trim()}`);
+      }
+      const selectedPolicy = JSON.parse(saved.stdout);
+      if (selectedPolicy.source !== "user-selection"
+          || selectedPolicy.state_root !== productSpineStateRoot) {
+        throw new Error("installed core did not retain the exact Extension Host state root");
+      }
+    }
     if (installedCore && !sharedWorkspace) {
       const adoptionProcess = await execFile(installedCore, [
         "adopt", workspace, "--state-root", productSpineStateRoot, "--json",
