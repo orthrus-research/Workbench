@@ -216,12 +216,30 @@ stage or a foreign target is preserved for review. The 32 GiB exact-tree bound
 is enforced before copy. On WSL the destination must support owner-private
 Linux tree custody; Windows-mounted storage remains unqualified.
 
-The retained wheelhouse still has no installed-package authority. The next
-operation must separately review installation target and launcher collisions,
-install into a new private environment, and verify installed dependency,
-module/profile and fixture-owner admission. The `optional-module-packages`
-marker stays unresolved until that evidence exists. Native installation and
-WSL filesystem qualification remain separate evidence.
+The retained wheelhouse still has no installed-package authority.
+`plan_package_install_preflight` takes the exact V3 share, input candidate,
+reviewed closure, workspace and retained package result ID. It reopens the
+managed wheelhouse, binds the executing and base Python binaries by resolved
+path, size and SHA-256, and checks the exact Python, host and virtual
+environment layout. Core derives one stable destination directly beneath its
+owner-private state root from the closure and base interpreter identities. It
+requires that destination to be absent; an existing file, directory or redirect
+is blocked for explicit recovery review. The future installer must create the
+environment at that final path after a prepared attempt. Renaming a populated
+virtual environment from a temporary path would leave generated scripts bound
+to the old path.
+
+The preflight maps every retained wheel member and console/GUI launcher to its
+prospective destination and refuses duplicate files, file/directory overlaps,
+reserved launchers, bytecode and unsupported `.data` layouts. It checks the
+Linux mount under the state root and blocks Windows-mounted WSL filesystems
+such as 9p/DrvFS; WSL native execution still needs separate qualification.
+The result is a sealed, read-only review with `state` `reviewed` or `blocked`
+and coverage `read-only-isolated-install-preflight-only`. It creates no
+directory or environment, invokes neither venv nor pip, and preserves every
+unresolved input marker, including `optional-module-packages`. Installation,
+restart reconciliation, dependency checks, module/profile and fixture-owner
+admission remain separate work and evidence.
 
 `plan_environment_input_composition` is a V2 linked review of five separately
 completed Core results: workspace selection, exact project checkout, managed
