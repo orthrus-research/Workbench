@@ -23,7 +23,8 @@ from workbench_api.durable_resources import DurableResourceError, ResourceRefere
 from .. import check_storage
 from ..durable_files import StagedFile, read_verified, unlink_prepared
 from ..durable_records import (
-    private_record_lock, publish_immutable_bytes, read_private_single_link_bytes,
+    private_record_lock, publish_immutable_bytes, read_private_bytes,
+    read_private_single_link_bytes,
 )
 from ..host_filesystem import file_lease, private_path, secure_private_path
 from ..output_routing import _WINDOWS_RESERVED, _private_directory
@@ -271,11 +272,10 @@ class ResourceCatalog:
             if self.verify_root() != "ready-unproven":
                 raise DurableResourceError("resource.changed", "resource catalog root was not durably bound")
 
-    def register_record_store(
-        self, *, family: str, owner_id: str, workspace: Path, root: Path,
-    ) -> str:
-        """Register one mutable namespace before its owner publishes records."""
-
+    @staticmethod
+    def _record_store_registration(
+        *, family: str, owner_id: str, workspace: Path, root: Path,
+    ) -> tuple[str, str, dict, bytes]:
         if (
             _OWNER.fullmatch(owner_id) is None
             or _OWNER.fullmatch(family) is None
@@ -283,8 +283,6 @@ class ResourceCatalog:
             or not root.is_absolute()
         ):
             raise DurableResourceError("resource.policy", "record store identity is invalid")
-        if root.is_symlink() or not root.is_dir() or not private_path(root, directory=True):
-            raise DurableResourceError("resource.unsafe", "record store is not an owner-private directory")
         identity = {
             "family": family, "owner_id": owner_id,
             "workspace": str(workspace), "root": str(root),
@@ -295,14 +293,89 @@ class ResourceCatalog:
             "format": RECORD_STORE_KIND, "store_id": store_id, **identity,
             "retention": "protected-until-reviewed-policy",
         }
+        expected = _sealed(RECORD_STORE_KIND, body)
+        return digest, store_id, expected, check_storage.canonical(expected) + b"\n"
+
+    def register_record_store(
+        self, *, family: str, owner_id: str, workspace: Path, root: Path,
+    ) -> str:
+        """Register one mutable namespace before its owner publishes records."""
+
+        digest, store_id, expected, raw = self._record_store_registration(
+            family=family, owner_id=owner_id, workspace=workspace, root=root,
+        )
+        if root.is_symlink() or not root.is_dir() or not private_path(root, directory=True):
+            raise DurableResourceError("resource.unsafe", "record store is not an owner-private directory")
         self._ensure()
         path = self._directory("stores") / f"{digest}.json"
-        expected = _sealed(RECORD_STORE_KIND, body)
-        raw = check_storage.canonical(expected) + b"\n"
         with private_record_lock(self._directory("leases") / f"{digest}.record-store.lock", wait=True):
             publish_immutable_bytes(path, raw, byte_limit=1024 * 1024, idempotent=True)
             if _read_sealed(path, RECORD_STORE_KIND) != expected:
                 raise DurableResourceError("resource.changed", "record store registration changed")
+        return store_id
+
+    def reconcile_interrupted_record_store_registration(
+        self, *, family: str, owner_id: str, workspace: Path, root: Path,
+    ) -> str:
+        """Remove only a surviving post-link stage for an exact registration.
+
+        The immutable publisher links its private stage to the final name, then
+        removes that stage. An interrupted pre-link stage has no published
+        binding and cannot be adopted. This does not attest catalog history.
+        """
+
+        digest, store_id, expected, raw = self._record_store_registration(
+            family=family, owner_id=owner_id, workspace=workspace, root=root,
+        )
+        if root.is_symlink() or not root.is_dir() or not private_path(root, directory=True):
+            raise DurableResourceError("resource.unsafe", "record store is not an owner-private directory")
+        if self.verify_root() != "ready-unproven":
+            raise DurableResourceError("resource.unavailable", "record store catalog root is not bound")
+        path = self._directory("stores") / f"{digest}.json"
+        prefix = f".{path.name}."
+        with private_record_lock(self._directory("leases") / f"{digest}.record-store.lock", wait=True):
+            # Keep every unknown entry visible to strict inventory. Python's
+            # mkstemp publisher emits an eight-character suffix here.
+            try:
+                stages = sorted(
+                    (entry for entry in path.parent.iterdir() if entry.name.startswith(prefix)),
+                    key=lambda entry: entry.name,
+                )
+            except OSError as exc:
+                raise DurableResourceError("resource.changed", "record store registration stages are unavailable") from exc
+            if not stages:
+                try:
+                    unchanged = read_private_single_link_bytes(path, byte_limit=1024 * 1024) == raw
+                except OSError as exc:
+                    raise DurableResourceError("resource.unavailable", "record store registration is unavailable") from exc
+                if not unchanged:
+                    raise DurableResourceError("resource.changed", "record store registration bytes changed")
+                if _read_sealed(path, RECORD_STORE_KIND) != expected:
+                    raise DurableResourceError("resource.changed", "record store registration changed")
+                return store_id
+            if len(stages) != 1 or re.fullmatch(rf"\.{digest}\.json\.[a-z0-9_]{{8}}", stages[0].name) is None:
+                raise DurableResourceError("resource.changed", "record store registration stage is ambiguous")
+            stage = stages[0]
+            try:
+                published = path.lstat()
+                prepared = stage.lstat()
+                if (
+                    not stat.S_ISREG(published.st_mode)
+                    or not stat.S_ISREG(prepared.st_mode)
+                    or (published.st_dev, published.st_ino) != (prepared.st_dev, prepared.st_ino)
+                    or published.st_nlink != 2
+                    or prepared.st_nlink != 2
+                    or read_private_bytes(path, byte_limit=1024 * 1024) != raw
+                    or read_private_bytes(stage, byte_limit=1024 * 1024) != raw
+                ):
+                    raise DurableResourceError("resource.changed", "record store registration stage changed")
+                unlink_prepared(path, stage.name, (published.st_dev, published.st_ino))
+            except DurableResourceError:
+                raise
+            except OSError as exc:
+                raise DurableResourceError("resource.changed", "record store registration cannot be reconciled") from exc
+            if _read_sealed(path, RECORD_STORE_KIND) != expected:
+                raise DurableResourceError("resource.changed", "record store registration changed after reconciliation")
         return store_id
 
     def _registered_record_stores(self, workspace: Path | None) -> list[dict]:
