@@ -53,6 +53,36 @@ def _check_windows_paths(wheelhouse, destination, manifest):
             raise WheelhouseError("cannot inspect installation paths in an invalid wheel") from exc
 
 
+def _publish_install_receipt(path: Path, state: dict) -> None:
+    """Publish one complete bootstrap state without importing the installed Core.
+
+    The first state is ``installing``. An interrupted later replacement leaves
+    that readable state behind for diagnosis instead of a truncated receipt.
+    """
+    raw = (json.dumps(state, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".workbench-install-", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        if os.name == "posix":
+            directory = os.open(
+                path.parent,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+            )
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def install(wheelhouse: Path, destination: Path, *, command_runner=None):
     run_command = command_runner or subprocess.run
     wheelhouse = wheelhouse.absolute()
@@ -76,7 +106,7 @@ def install(wheelhouse: Path, destination: Path, *, command_runner=None):
     receipt = destination / "workbench-install.json"
     manifest_identity = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     state = {"format": "workbench-native-install-v1", "state": "installing", "target": expected, "native_versions": manifest["native_versions"], "wheelhouse_manifest_sha256": manifest_identity}
-    receipt.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _publish_install_receipt(receipt, state)
     try:
         venv.EnvBuilder(with_pip=False, clear=False, symlinks=False).create(destination)
         python = destination / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
@@ -113,11 +143,11 @@ def install(wheelhouse: Path, destination: Path, *, command_runner=None):
             executable=str(executable) if executable.exists() else None,
             tui_executable=str(tui_executable) if "workbench-tui" in manifest["native_versions"] else None,
         )
-        receipt.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _publish_install_receipt(receipt, state)
         return state
     except BaseException:
         state["state"] = "failed"
-        receipt.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _publish_install_receipt(receipt, state)
         raise
 
 

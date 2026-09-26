@@ -154,6 +154,18 @@ class NativeInstallTests(unittest.TestCase):
         receipt = json.loads((destination / "workbench-install.json").read_text())
         self.assertEqual("failed", receipt["state"])
 
+    def test_interrupted_receipt_replacement_preserves_complete_prior_state(self):
+        receipt = self.base / "workbench-install.json"
+        installing = {"format": "workbench-native-install-v1", "state": "installing"}
+        installer._publish_install_receipt(receipt, installing)
+        previous = receipt.read_bytes()
+        with patch.object(installer.os, "replace", side_effect=OSError("fixture replacement failed")):
+            with self.assertRaisesRegex(OSError, "fixture replacement failed"):
+                installer._publish_install_receipt(receipt, {**installing, "state": "installed"})
+        self.assertEqual(previous, receipt.read_bytes())
+        self.assertEqual(installing, json.loads(receipt.read_text(encoding="utf-8")))
+        self.assertEqual([], list(self.base.glob(".workbench-install-*.tmp")))
+
     def test_pip_is_offline_isolated_hash_enforced_and_uses_private_copy(self):
         destination = self.base / "installed"
         with patch.object(installer.venv.EnvBuilder, "create"), patch.object(installer.subprocess, "run") as run:
