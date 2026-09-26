@@ -135,6 +135,73 @@ class ManagedTreeTests(unittest.TestCase):
         self.assertEqual("committed", inventory[0]["status"])
         self.assertEqual("graph-set:one", reference.domain_id)
 
+    def test_inventory_refuses_unknown_or_unsafe_tree_catalog_entries_across_workspaces(self) -> None:
+        reference = self._publish()
+        catalog = ResourceCatalog(self.config)
+        root = catalog.root / "trees"
+        foreign_workspace = self.home / "another-workspace"
+        foreign_workspace.mkdir()
+        reservation = root / "reservations" / (reference.tree_id.split(":", 1)[1] + ".json")
+        cases = (
+            (root / "future", lambda path: path.mkdir(), lambda path: path.rmdir()),
+            (root / "reservations" / "pending.tmp",
+             lambda path: path.write_bytes(b"pending"), lambda path: path.unlink()),
+            (root / "intents" / ("a" * 32 + ".json"),
+             lambda path: path.symlink_to(reservation), lambda path: path.unlink()),
+            (root / "aborts" / ("b" * 32 + ".json"),
+             lambda path: os.link(reservation, path), lambda path: path.unlink()),
+            (root / "leases" / "unknown.lock",
+             lambda path: path.write_bytes(b""), lambda path: path.unlink()),
+        )
+        for path, create, remove in cases:
+            with self.subTest(path=path):
+                create(path)
+                try:
+                    with self.assertRaises(ManagedTreeError) as changed:
+                        catalog.inventory(workspace=foreign_workspace)
+                    self.assertEqual(changed.exception.code, "tree.changed")
+                finally:
+                    remove(path)
+        self.assertEqual([reference.tree_id], [
+            row["tree_id"] for row in catalog.inventory(workspace=self.workspace)["trees"]
+        ])
+
+    def test_inventory_refuses_missing_child_or_orphan_commit_but_retains_pre_reservation_lease(self) -> None:
+        reference = self._publish()
+        catalog = ResourceCatalog(self.config)
+        root = catalog.root / "trees"
+        leases = root / "leases"
+        displaced = root / "leases-lost"
+        leases.rename(displaced)
+        try:
+            with self.assertRaises(ManagedTreeError) as missing:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual(missing.exception.code, "tree.changed")
+        finally:
+            displaced.rename(leases)
+
+        commit = root / "commits" / ("c" * 32 + ".json")
+        existing = root / "commits" / (reference.tree_id.split(":", 1)[1] + ".json")
+        commit.write_bytes(existing.read_bytes())
+        commit.chmod(0o600)
+        try:
+            with self.assertRaises(ManagedTreeError) as orphan:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual(orphan.exception.code, "tree.changed")
+        finally:
+            commit.unlink()
+
+        # A hard exit after opening the lease but before reserve leaves this
+        # exact private file; it must not turn into an invented reservation.
+        orphan_lease = leases / ("d" * 32 + ".lock")
+        orphan_lease.write_bytes(b"")
+        orphan_lease.chmod(0o600)
+        try:
+            rows = catalog.inventory(workspace=self.workspace)["trees"]
+            self.assertEqual([reference.tree_id], [row["tree_id"] for row in rows])
+        finally:
+            orphan_lease.unlink()
+
     def test_exact_target_lookup_scopes_committed_and_allocated_trees(self) -> None:
         output = self.workspace / "graphs" / "selected"
         reference = self._publish(output=output)

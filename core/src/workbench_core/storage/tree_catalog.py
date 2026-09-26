@@ -20,7 +20,7 @@ from workbench_api.managed_trees import ManagedTreeError, ManagedTreeReference
 
 from .. import check_storage
 from ..durable_records import publish_immutable_bytes
-from ..host_filesystem import file_lease, secure_private_path
+from ..host_filesystem import file_lease, private_path, secure_private_path
 from ..output_routing import _private_directory
 
 
@@ -462,15 +462,33 @@ class TreeCatalog:
     def inventory(self, *, workspace: Path | None = None) -> list[dict[str, object]]:
         if not self.root.exists() and not self.root.is_symlink():
             return []
-        check_storage.ordinary(self.root, directory=True)
-        for name in ("reservations", "intents", "commits", "aborts", "leases"):
-            check_storage.ordinary(self._directory(name), directory=True)
-        for name in ("reservations", "intents", "commits", "aborts"):
-            for path in self._directory(name).iterdir():
-                if (not path.is_file() or path.is_symlink() or path.suffix != ".json"
-                        or not _TREE_ID.fullmatch(f"workbench-tree-v1:{path.stem}")
-                        or name != "reservations" and not self._path("reservations", path.stem).is_file()):
-                    raise ManagedTreeError("tree.changed", "managed tree catalog has an invalid or orphan record")
+        names = ("reservations", "intents", "commits", "aborts", "leases")
+        try:
+            check_storage.ordinary(self.root, directory=True)
+            if not private_path(self.root, directory=True):
+                raise ValueError("managed tree catalog lost private custody")
+            if {path.name for path in self.root.iterdir()} != set(names):
+                raise ValueError("managed tree catalog has an unknown or missing namespace")
+            for name in names:
+                directory = self._directory(name)
+                check_storage.ordinary(directory, directory=True)
+                if not private_path(directory, directory=True):
+                    raise ValueError("managed tree namespace lost private custody")
+                suffix = ".lock" if name == "leases" else ".json"
+                for path in directory.iterdir():
+                    info = path.lstat()
+                    if (re.fullmatch(r"[0-9a-f]{32}" + re.escape(suffix), path.name) is None
+                            or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                            or not private_path(path, directory=False)):
+                        raise ValueError("managed tree catalog has an unknown or unsafe entry")
+                    if (name in {"intents", "commits", "aborts"}
+                            and not self._path("reservations", path.stem).is_file()):
+                        raise ValueError("managed tree catalog has an orphan record")
+                    if name == "commits" and not self._path("intents", path.stem).is_file():
+                        raise ValueError("managed tree catalog has an orphan commit")
+            # A lease may precede its reservation if staging was interrupted.
+        except (OSError, ValueError) as exc:
+            raise ManagedTreeError("tree.changed", "managed tree catalog inventory is unavailable or changed") from exc
         result = []
         for path in sorted(self._directory("reservations").glob("*.json")):
             tree_id = f"workbench-tree-v1:{path.stem}"
