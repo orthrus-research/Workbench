@@ -67,6 +67,10 @@ creates and protects that directory, publishes the plan, and retains its
 storage identity. A shared or redirected parent is refused without changing
 its permissions. The preview leaves the construction target untouched.
 
+Apply and recover use the workspace's Core-selected product state root while
+the selected policy is held through the owner operation. `--state-root`
+remains an explicit override for one command.
+
 ## Compatibility claims
 
 Cleanroom's broad Forge compatibility is a starting hypothesis, not a

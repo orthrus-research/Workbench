@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 from hashlib import sha256
 import importlib.util
 import json
@@ -10,10 +11,10 @@ import os
 from pathlib import Path
 import stat
 import sys
-from typing import Any, Mapping, Sequence, TextIO
+from typing import Any, ContextManager, Mapping, Sequence, TextIO
 
-from workbench_api.state_paths import default_product_spine_state_root
 from workbench_api.record_stores import publish_review_artifact
+from workbench_api.state_root_policies import state_root_policies
 
 
 PROFILE_PACKAGE = Path(
@@ -221,21 +222,29 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _state(root: Path, plan: Mapping[str, Any], supplied: Path | None) -> Path:
+def _state(
+    root: Path, plan: Mapping[str, Any], supplied: Path | None,
+) -> tuple[Path, ContextManager[None]]:
     if supplied is not None:
         candidate = supplied.expanduser()
         if candidate.is_symlink():
             raise CleanroomNewProjectCliV2Error(
                 "construction state root cannot be a symbolic link"
             )
-        return Path(os.path.abspath(candidate))
+        return Path(os.path.abspath(candidate)), nullcontext()
     identity = plan.get("id")
     if not isinstance(identity, str) or not identity:
         raise CleanroomNewProjectCliV2Error(
             "construction plan has no exact identity"
         )
     token = sha256(identity.encode("utf-8", "strict")).hexdigest()
-    return default_product_spine_state_root(root) / "new-project-v2" / token
+    policy_host = state_root_policies()
+    policy = policy_host.resolve(root, "product-spine")
+    selected = Path(policy["state_root"])
+    return (
+        selected / "new-project-v2" / token,
+        policy_host.hold(root, "product-spine", selected, policy["policy_id"]),
+    )
 
 
 def _render(value: Mapping[str, Any], output: TextIO) -> None:
@@ -281,18 +290,19 @@ def new_project_main(
                 _publish_plan(args.output, plan)
         else:
             plan = _read_json(args.plan, "Cleanroom construction plan")
-            state_root = _state(suite, plan, args.state_root)
-            if args.action == "apply":
-                value = profile.apply_cleanroom_mod_construction(
-                    suite,
-                    plan,
-                    state_root,
-                    consent_plan_id=args.consent_plan_id,
-                )
-            else:
-                value = profile.recover_cleanroom_mod_construction(
-                    suite, plan, state_root
-                )
+            state_root, selection_guard = _state(suite, plan, args.state_root)
+            with selection_guard:
+                if args.action == "apply":
+                    value = profile.apply_cleanroom_mod_construction(
+                        suite,
+                        plan,
+                        state_root,
+                        consent_plan_id=args.consent_plan_id,
+                    )
+                else:
+                    value = profile.recover_cleanroom_mod_construction(
+                        suite, plan, state_root
+                    )
         if args.json:
             output.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
         else:
