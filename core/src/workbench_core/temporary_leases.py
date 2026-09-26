@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
 import os
 from pathlib import Path
 import re
@@ -21,7 +22,10 @@ from typing import Callable, Iterator, Mapping
 from uuid import uuid4
 
 from . import check_storage
-from .durable_records import DurableRecordError, private_record_lock, publish_immutable_bytes
+from .durable_records import (
+    DurableRecordError, private_record_lock, publish_immutable_bytes,
+    read_private_single_link_bytes,
+)
 from .host_filesystem import fsync_directory, private_path, secure_private_path
 from .managed_trees import _rename_no_replace
 from .output_routing import _private_directory
@@ -38,6 +42,11 @@ _DISPOSAL = "workbench-temporary-disposal-v1"
 _FAILURE = "workbench-temporary-disposal-failure-v1"
 _MARKER_NAME = ".workbench-temporary-lease.json"
 _RECORD_LIMIT = 1024 * 1024
+_CATALOG_CHILDREN = frozenset({
+    "reservations", "activations", "disposal-intents", "disposals", "failures", "leases",
+})
+_RECORD_NAME = re.compile(r"([0-9a-f]{32})\.json\Z")
+_LEASE_NAME = re.compile(r"([0-9a-f]{32})\.lock\Z")
 _active: ContextVar[frozenset[str]] = ContextVar("workbench_active_temporary_leases", default=frozenset())
 
 
@@ -135,9 +144,7 @@ class CoreTemporaryLeases:
     def _read(self, name: str, nonce: str, kind: str) -> dict:
         try:
             path = self._path(name, nonce)
-            if not private_path(path, directory=False):
-                raise TemporaryLeaseError("temporary.changed", "temporary lease record lost private custody")
-            record = check_storage.read_json(path, byte_limit=_RECORD_LIMIT)
+            record = json.loads(read_private_single_link_bytes(path, byte_limit=_RECORD_LIMIT))
         except (OSError, ValueError) as exc:
             if isinstance(exc, TemporaryLeaseError):
                 raise
@@ -166,7 +173,8 @@ class CoreTemporaryLeases:
                 or not _TOKEN.fullmatch(Path(selected_path).name)
                 or Path(selected_path).parent != Path(selected_root)
                 or type(row["parent_device"]) is not int
-                or type(row["parent_inode"]) is not int):
+                or type(row["parent_inode"]) is not int
+                or not isinstance(row["reserved_at"], str) or not row["reserved_at"]):
             raise TemporaryLeaseError("temporary.changed", "temporary lease reservation changed")
         return row
 
@@ -177,7 +185,8 @@ class CoreTemporaryLeases:
         if (set(row) != {"id", "format", "lease_id", "reservation_id", "device", "inode", "activated_at"}
                 or row["format"] != _ACTIVATION or row["lease_id"] != lease_id
                 or row["reservation_id"] != reservation["id"]
-                or type(row["device"]) is not int or type(row["inode"]) is not int):
+                or type(row["device"]) is not int or type(row["inode"]) is not int
+                or not isinstance(row["activated_at"], str) or not row["activated_at"]):
             raise TemporaryLeaseError("temporary.changed", "temporary lease activation changed")
         return row
 
@@ -196,9 +205,133 @@ class CoreTemporaryLeases:
         intent = self._read("disposal-intents", nonce, _DISPOSAL_INTENT)
         if (set(row) != {"id", "format", "lease_id", "intent_id", "disposed_at"}
                 or row["format"] != _DISPOSAL or row["lease_id"] != lease_id
-                or row["intent_id"] != intent["id"]):
+                or row["intent_id"] != intent["id"]
+                or not isinstance(row["disposed_at"], str) or not row["disposed_at"]):
             raise TemporaryLeaseError("temporary.changed", "temporary lease disposal record changed")
         return True
+
+    def _disposal_intent(self, lease_id: str) -> dict:
+        nonce = _nonce(lease_id)
+        row = self._read("disposal-intents", nonce, _DISPOSAL_INTENT)
+        reservation = self._reservation(lease_id)
+        activation = self._activation(lease_id)
+        tombstone = Path(reservation["path"]).parent / f".workbench-temporary-{nonce}.disposing"
+        if (set(row) != {"id", "format", "lease_id", "reservation_id", "activation_id",
+                         "device", "inode", "tombstone", "processes_drained"}
+                or row["format"] != _DISPOSAL_INTENT or row["lease_id"] != lease_id
+                or row["reservation_id"] != reservation["id"]
+                or row["activation_id"] != activation["id"]
+                or type(row["device"]) is not int or type(row["inode"]) is not int
+                or row["device"] != activation["device"] or row["inode"] != activation["inode"]
+                or row["tombstone"] != str(tombstone)
+                or row["processes_drained"] is not True):
+            raise TemporaryLeaseError("temporary.changed", "temporary lease disposal intent changed")
+        return row
+
+    @staticmethod
+    def _inventory_directory(path: Path) -> Path:
+        try:
+            directory = check_storage.ordinary(path, directory=True)
+        except (OSError, ValueError) as exc:
+            raise TemporaryLeaseError("temporary.changed", "temporary lease catalog directory changed") from exc
+        if not private_path(directory, directory=True):
+            raise TemporaryLeaseError("temporary.changed", "temporary lease catalog directory lost private custody")
+        return directory
+
+    @classmethod
+    def inventory_catalog(cls, configuration_home: Path, *, workspace: Path | None = None) -> list[dict[str, object]]:
+        """Validate every current child before selecting one workspace's leases."""
+
+        root = ResourceCatalog(configuration_home).root / "temporary-leases"
+        if not root.exists() and not root.is_symlink():
+            return []
+        try:
+            if {entry.name for entry in cls._inventory_directory(root).iterdir()} != _CATALOG_CHILDREN:
+                raise TemporaryLeaseError("temporary.changed", "temporary lease catalog has an unknown or missing child")
+            children = {
+                name: sorted(cls._inventory_directory(root / name).iterdir())
+                for name in sorted(_CATALOG_CHILDREN)
+            }
+            reservations = {}
+            for path in children["reservations"]:
+                match = _RECORD_NAME.fullmatch(path.name)
+                if match is None:
+                    raise TemporaryLeaseError("temporary.changed", "temporary lease reservation has an invalid name")
+                raw_bytes = read_private_single_link_bytes(path, byte_limit=_RECORD_LIMIT)
+                nonce = match.group(1)
+                raw = json.loads(raw_bytes)
+                if (not isinstance(raw, dict) or not isinstance(raw.get("workspace"), str)
+                        or not isinstance(raw.get("owner_id"), str)
+                        or not isinstance(raw.get("role"), str)
+                        or not isinstance(raw.get("store_root"), str)):
+                    raise TemporaryLeaseError("temporary.changed", "temporary lease reservation changed")
+                host = cls(
+                    workspace=Path(raw["workspace"]), configuration_home=configuration_home,
+                    locations={raw["role"]: Path(raw["store_root"])}, owner_id=raw["owner_id"],
+                )
+                reservation = host._reservation(f"workbench-temporary-lease-v1:{nonce}")
+                if raw != reservation:
+                    raise TemporaryLeaseError("temporary.changed", "temporary lease reservation changed during inventory")
+                reservations[nonce] = (host, reservation)
+            for name in ("activations", "disposal-intents", "disposals"):
+                for path in children[name]:
+                    match = _RECORD_NAME.fullmatch(path.name)
+                    if match is None or match.group(1) not in reservations:
+                        raise TemporaryLeaseError("temporary.changed", "temporary lease catalog has an orphan record")
+                    read_private_single_link_bytes(path, byte_limit=_RECORD_LIMIT)
+            for path in children["leases"]:
+                match = _LEASE_NAME.fullmatch(path.name)
+                if match is None or match.group(1) not in reservations:
+                    raise TemporaryLeaseError("temporary.changed", "temporary lease catalog has an orphan lock")
+                read_private_single_link_bytes(path, byte_limit=0)
+            for path in children["failures"]:
+                if _RECORD_NAME.fullmatch(path.name) is None:
+                    raise TemporaryLeaseError("temporary.changed", "temporary lease failure has an invalid name")
+                raw = json.loads(read_private_single_link_bytes(path, byte_limit=_RECORD_LIMIT))
+                nonce = _nonce(raw.get("lease_id") if isinstance(raw, dict) else None)
+                if nonce not in reservations:
+                    raise TemporaryLeaseError("temporary.changed", "temporary lease catalog has an orphan failure")
+                host, _ = reservations[nonce]
+                failure = host._read("failures", path.stem, _FAILURE)
+                intent = host._disposal_intent(failure["lease_id"])
+                if (set(failure) != {"id", "format", "lease_id", "intent_id", "error", "failed_at"}
+                        or failure["format"] != _FAILURE
+                        or failure["intent_id"] != intent["id"]
+                        or not isinstance(failure["error"], str)
+                        or not failure["error"] or len(failure["error"]) > 4096
+                        or not isinstance(failure["failed_at"], str) or not failure["failed_at"]):
+                    raise TemporaryLeaseError("temporary.changed", "temporary lease failure changed")
+            rows = []
+            for nonce, (host, reservation) in sorted(reservations.items()):
+                lease_id = reservation["lease_id"]
+                if (root / "activations" / f"{nonce}.json").exists():
+                    host._activation(lease_id)
+                if (root / "disposal-intents" / f"{nonce}.json").exists():
+                    host._disposal_intent(lease_id)
+                if (root / "disposals" / f"{nonce}.json").exists():
+                    host._disposed(lease_id)
+                    status = "disposed"
+                elif (root / "disposal-intents" / f"{nonce}.json").exists():
+                    target = Path(reservation["path"])
+                    tombstone = target.parent / f".workbench-temporary-{nonce}.disposing"
+                    status = ("disposal-incomplete" if any(
+                        path.exists() or path.is_symlink() for path in (target, tombstone)
+                    ) else "disposal-unknown")
+                elif (root / "activations" / f"{nonce}.json").exists():
+                    status = "active-or-abandoned"
+                else:
+                    status = "reserved-incomplete"
+                if workspace is None or reservation["workspace"] == str(workspace):
+                    rows.append({
+                        "lease_id": lease_id, "workspace": reservation["workspace"],
+                        "owner_id": reservation["owner_id"], "role": reservation["role"],
+                        "path": reservation["path"], "status": status,
+                    })
+            return rows
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            if isinstance(exc, TemporaryLeaseError):
+                raise
+            raise TemporaryLeaseError("temporary.changed", "temporary lease catalog changed") from exc
 
     def inventory(self) -> tuple[dict[str, object], ...]:
         """Expose exact local leases for explicit restart reconciliation."""

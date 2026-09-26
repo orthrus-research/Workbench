@@ -6,6 +6,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from workbench_api.durable_resources import DurableResourceError
+from workbench_core import check_storage
+from workbench_core.storage.registered import ResourceCatalog
 from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
 
@@ -25,6 +28,128 @@ class TemporaryLeaseTests(unittest.TestCase):
             workspace=self.workspace, configuration_home=self.config,
             locations={"system": self.scratch}, owner_id="validation",
         )
+
+    def test_resource_inventory_validates_all_leases_before_workspace_filter(self) -> None:
+        current = self.host.allocate("system", "current")
+        foreign = self.base / "foreign-workspace"
+        foreign.mkdir()
+        other = CoreTemporaryLeases(
+            workspace=foreign, configuration_home=self.config,
+            locations={"system": self.base / "foreign-scratch"}, owner_id="validation",
+        ).allocate("system", "foreign")
+        catalog = ResourceCatalog(self.config)
+        rows = catalog.inventory(workspace=self.workspace)["temporary_leases"]
+        self.assertEqual([(current.lease_id, "active-or-abandoned")], [
+            (row["lease_id"], row["status"]) for row in rows
+        ])
+        self.assertEqual([other.lease_id], [
+            row["lease_id"] for row in catalog.inventory(workspace=foreign)["temporary_leases"]
+        ])
+
+        namespace = catalog.root / "temporary-leases"
+        nonce = other.lease_id.rsplit(":", 1)[1]
+        activation = namespace / "activations" / f"{nonce}.json"
+        original = activation.read_bytes()
+        changed = check_storage.read_json(activation)
+        changed["reservation_id"] = "wrong"
+        changed.pop("id")
+        activation.write_bytes(check_storage.canonical(check_storage.seal(
+            "workbench-temporary-activation-v1", changed,
+        )))
+        try:
+            with self.assertRaises(DurableResourceError) as caught:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual("resource.changed", caught.exception.code)
+        finally:
+            activation.write_bytes(original)
+        self.assertEqual([current.lease_id], [
+            row["lease_id"] for row in catalog.inventory(workspace=self.workspace)["temporary_leases"]
+        ])
+
+    def test_catalog_refuses_orphan_and_unsafe_children_globally(self) -> None:
+        current = self.host.allocate("system", "known")
+        catalog = ResourceCatalog(self.config)
+        namespace = catalog.root / "temporary-leases"
+        foreign = self.base / "foreign-workspace"
+        foreign.mkdir()
+        candidates = (
+            namespace / "activations" / ("a" * 32 + ".json"),
+            namespace / "leases" / ("b" * 32 + ".lock"),
+            namespace / "failures" / "unexpected.pending",
+        )
+        for path in candidates:
+            with self.subTest(path=path):
+                path.write_bytes(b"{}")
+                path.chmod(0o600)
+                try:
+                    with self.assertRaises(DurableResourceError) as caught:
+                        catalog.inventory(workspace=foreign)
+                    self.assertEqual("resource.changed", caught.exception.code)
+                finally:
+                    path.unlink()
+        self.assertEqual([], catalog.inventory(workspace=foreign)["temporary_leases"])
+        self.assertEqual(current.lease_id, catalog.inventory(workspace=self.workspace)["temporary_leases"][0]["lease_id"])
+
+        reservation = namespace / "reservations" / (current.lease_id.rsplit(":", 1)[1] + ".json")
+        linked = namespace / "reservations" / ("c" * 32 + ".json")
+        linked.hardlink_to(reservation)
+        try:
+            with self.assertRaises(DurableResourceError) as caught:
+                catalog.inventory(workspace=foreign)
+            self.assertEqual("resource.changed", caught.exception.code)
+        finally:
+            linked.unlink()
+        self.assertEqual([], catalog.inventory(workspace=foreign)["temporary_leases"])
+
+    def test_foreign_failure_must_bind_its_exact_disposal_intent(self) -> None:
+        current = self.host.allocate("system", "current")
+        foreign = self.base / "foreign-workspace"
+        foreign.mkdir()
+        other_host = CoreTemporaryLeases(
+            workspace=foreign, configuration_home=self.config,
+            locations={"system": self.base / "foreign-scratch"}, owner_id="validation",
+        )
+        other = other_host.allocate("system", "failed")
+        with other_host.execution(other):
+            with patch.object(other_host, "_remove_owned_tree", side_effect=OSError("fixture busy")):
+                with self.assertRaisesRegex(TemporaryLeaseError, "fixture busy"):
+                    other_host.dispose(other, drained=lambda: True)
+        catalog = ResourceCatalog(self.config)
+        self.assertEqual([current.lease_id], [
+            row["lease_id"] for row in catalog.inventory(workspace=self.workspace)["temporary_leases"]
+        ])
+        failure = next((catalog.root / "temporary-leases" / "failures").iterdir())
+        original = failure.read_bytes()
+        changed = check_storage.read_json(failure)
+        changed["intent_id"] = "wrong"
+        changed.pop("id")
+        failure.write_bytes(check_storage.canonical(check_storage.seal(
+            "workbench-temporary-disposal-failure-v1", changed,
+        )))
+        try:
+            with self.assertRaises(DurableResourceError) as caught:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual("resource.changed", caught.exception.code)
+        finally:
+            failure.write_bytes(original)
+        self.assertEqual([current.lease_id], [
+            row["lease_id"] for row in catalog.inventory(workspace=self.workspace)["temporary_leases"]
+        ])
+
+    def test_catalog_preserves_pre_activation_crash_state(self) -> None:
+        original_write = self.host._write
+
+        def interrupt_activation(name, *args, **kwargs):
+            if name == "activations":
+                raise OSError("interrupted activation")
+            return original_write(name, *args, **kwargs)
+
+        with patch.object(self.host, "_write", side_effect=interrupt_activation):
+            with self.assertRaisesRegex(OSError, "interrupted activation"):
+                self.host.allocate("system", "pre-activation")
+        rows = ResourceCatalog(self.config).inventory(workspace=self.workspace)["temporary_leases"]
+        self.assertEqual(["reserved-incomplete"], [row["status"] for row in rows])
+        self.assertTrue((self.scratch / "pre-activation").is_dir())
 
     def test_active_lease_requires_a_confirmed_drain_before_disposal(self) -> None:
         reference = self.host.allocate("system", "run-one")
@@ -96,10 +221,16 @@ class TemporaryLeaseTests(unittest.TestCase):
             owner_id="validation",
         )
         self.assertEqual(reference, restarted.inventory()[0]["reference"])
+        self.assertEqual("disposal-incomplete", ResourceCatalog(self.config).inventory(
+            workspace=self.workspace,
+        )["temporary_leases"][0]["status"])
         with self.assertRaisesRegex(TemporaryLeaseError, "not confirmed drained"):
             restarted.reconcile(reference.lease_id, drained=lambda: False)
         restarted.reconcile(reference.lease_id, drained=lambda: True)
         self.assertFalse(tombstone.exists())
+        self.assertEqual("disposed", ResourceCatalog(self.config).inventory(
+            workspace=self.workspace,
+        )["temporary_leases"][0]["status"])
         restarted.reconcile(reference.lease_id, drained=lambda: True)
 
     def test_missing_root_after_intent_remains_unknown(self) -> None:

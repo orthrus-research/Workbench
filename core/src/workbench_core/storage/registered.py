@@ -718,6 +718,7 @@ class ResourceCatalog:
         return "committed"
 
     def inventory(self, *, workspace: Path | None = None) -> dict:
+        from ..temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
         from ..working_allocations import WorkingAllocationCatalog
 
         root_state = self.verify_root()
@@ -925,6 +926,14 @@ class ResourceCatalog:
                 raise DurableResourceError(
                     "resource.changed", "managed tree check reference is unavailable or changed",
                 ) from exc
+        try:
+            temporary_leases = CoreTemporaryLeases.inventory_catalog(
+                self.configuration_home, workspace=workspace,
+            )
+        except TemporaryLeaseError as exc:
+            raise DurableResourceError(
+                "resource.changed", "temporary lease catalog is unavailable or changed",
+            ) from exc
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,
@@ -934,6 +943,7 @@ class ResourceCatalog:
             "working_allocations": WorkingAllocationCatalog(self.root.parent).inventory_rows(
                 workspace=workspace,
             ),
+            "temporary_leases": temporary_leases,
             "overlay_envelopes": overlay_envelopes,
         }
 
