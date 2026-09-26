@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from workbench_api.resources import module_root as _module_resource_root, repository_root as _repository_resource_root
+from workbench_api.working_allocations import WorkingAllocationReference, WorkingAllocations
 
 import argparse
 from contextlib import contextmanager
@@ -22,7 +23,7 @@ from .language_service import build_language_service_result
 from .ide_bridge import proxy_descriptor_stdio
 from .managed_profile import resolve_managed_session_profile
 from .managed_render import render_session_event, render_session_receipt
-from .managed_session import run_managed_language_session
+from .managed_session import run_in_core_session_allocation, run_managed_language_session
 from .model import PackProgramError
 from .profile import load_profile, resolve_named_profile
 from .render import render_report
@@ -286,7 +287,7 @@ def build_parser(*, prog: str = "workbench groovy") -> argparse.ArgumentParser:
     session.add_argument(
         "--session-storage",
         type=Path,
-        help="retained session store (default: .workbench/sessions/groovy-language-service)",
+        help="explicit retained session store under a Core-selected evidence or workspace location",
     )
     session.add_argument(
         "--port",
@@ -375,12 +376,15 @@ def run(
     candidate_git_binding: Mapping[str, Any] | None = None,
     baseline_git_binding: Mapping[str, Any] | None = None,
     result_callback: Callable[[dict[str, Any]], None] | None = None,
+    session_custody: WorkingAllocations | None = None,
 ) -> int:
     """Run a command; session callers bind Core first (as `main` does)."""
 
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.operation == "session" and session_custody is None:
+            raise PackProgramError("managed sessions require a Core working allocation")
         if args.operation == "proxy":
             proxy_descriptor_stdio(
                 args.descriptor,
@@ -475,34 +479,37 @@ def run(
                     output.write(render_session_event(event))
                     output.flush()
 
-            storage = (
-                root / ".workbench/sessions/groovy-language-service"
-                if args.session_storage is None
-                else args.session_storage
+            def execute_session(
+                allocation: WorkingAllocationReference,
+            ) -> dict[str, Any]:
+                with _session_signal_handlers(stop):
+                    return run_managed_language_session(
+                        source=args.source,
+                        pack_profile=loaded_profile,
+                        language_profile=language_profile,
+                        managed_profile=managed_profile,
+                        context=AnalysisContext(
+                            side="client",
+                            packmode=args.packmode,
+                            debug=debug,
+                            installed_mods=installed_mods,
+                        ),
+                        runtime_root=args.runtime_root,
+                        launch_receipt=args.launch_receipt,
+                        session_allocation=allocation,
+                        requested_port=args.port,
+                        readiness_timeout=args.readiness_timeout,
+                        session_timeout=args.session_timeout,
+                        connect_timeout=args.connect_timeout,
+                        diagnostic_timeout=args.diagnostic_timeout,
+                        stop_event=stop,
+                        on_event=event_callback,
+                    )
+
+            value = run_in_core_session_allocation(
+                session_custody, requested_storage=args.session_storage,
+                run_session=execute_session,
             )
-            with _session_signal_handlers(stop):
-                value = run_managed_language_session(
-                    source=args.source,
-                    pack_profile=loaded_profile,
-                    language_profile=language_profile,
-                    managed_profile=managed_profile,
-                    context=AnalysisContext(
-                        side="client",
-                        packmode=args.packmode,
-                        debug=debug,
-                        installed_mods=installed_mods,
-                    ),
-                    runtime_root=args.runtime_root,
-                    launch_receipt=args.launch_receipt,
-                    session_storage=storage,
-                    requested_port=args.port,
-                    readiness_timeout=args.readiness_timeout,
-                    session_timeout=args.session_timeout,
-                    connect_timeout=args.connect_timeout,
-                    diagnostic_timeout=args.diagnostic_timeout,
-                    stop_event=stop,
-                    on_event=event_callback,
-                )
             rendered = render_session_receipt(value)
         if result_callback is not None:
             result_callback(value)
@@ -529,7 +536,10 @@ def run(
         return 2
 
 
-def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
+def main(
+    argv: list[str] | None = None, *, root: Path | None = None,
+    session_custody: WorkingAllocations | None = None,
+) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments and arguments[0] == "session":
         # A direct module entry uses the same physical host as Core dispatch.
@@ -540,11 +550,22 @@ def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
         if root is None
         else root.expanduser().resolve()
     )
+    if (arguments[:1] == ["session"] and session_custody is None
+            and not any(item in {"-h", "--help"} for item in arguments)):
+        from workbench_core.working_allocations import resolve_direct_working_allocations
+        try:
+            session_custody = resolve_direct_working_allocations(
+                repository, owner_id="pack-program-studio",
+            )
+        except (OSError, ValueError) as exc:
+            print(f"Groovy Pack Program Studio failed: {exc}", file=sys.stderr)
+            return 2
     return run(
         arguments,
         root=repository,
         output=sys.stdout,
         error=sys.stderr,
+        session_custody=session_custody,
     )
 
 

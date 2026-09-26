@@ -46,10 +46,17 @@ from workbench_pack_program_studio.managed_session import (  # noqa: E402
     _parse_windows_processes,
     _windows_helper_environment,
     _windows_path_file_uri,
+    run_in_core_session_allocation,
 )
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core.working_allocations import CoreWorkingAllocations  # noqa: E402
+from workbench_core.working_allocations import resolve_direct_working_allocations  # noqa: E402
 from workbench_api.host_filesystem import (  # noqa: E402
     inspect_private_journal, private_path, read_private_bytes,
+)
+from workbench_api.modules import ExecutionContext  # noqa: E402
+from workbench_api.working_allocations import (  # noqa: E402
+    WorkingAllocationReference, working_allocations_scope,
 )
 
 
@@ -270,14 +277,35 @@ class ManagedLanguageSessionTests(unittest.TestCase):
             "instance": instance,
             "language_profile": language_path,
             "launch_receipt": receipt_path,
-            "session_storage": root / "sessions",
         }
 
-    def _run(self, environment: dict[str, Path], *, ready_stop: bool = True) -> dict[str, object]:
+    def _custody(self, root: Path) -> CoreWorkingAllocations:
+        return CoreWorkingAllocations(
+            workspace=root, configuration_home=root / "core-config",
+            locations={"evidence": root / "core-evidence"},
+            owner_id="pack-program-studio",
+        )
+
+    def _run(
+        self, environment: dict[str, Path], *, ready_stop: bool = True,
+        allocation: WorkingAllocationReference | None = None,
+        interrupt_on_ready: bool = False,
+    ) -> dict[str, object]:
+        if allocation is None:
+            return run_in_core_session_allocation(
+                self._custody(environment["source"].parent),
+                requested_storage=None,
+                run_session=lambda selected: self._run(
+                    environment, ready_stop=ready_stop, allocation=selected,
+                    interrupt_on_ready=interrupt_on_ready,
+                ),
+            )
         stop = threading.Event()
         events: list[dict[str, object]] = []
 
         def on_ready(_descriptor: object) -> None:
+            if interrupt_on_ready:
+                raise KeyboardInterrupt("simulated session owner interruption")
             if ready_stop:
                 stop.set()
 
@@ -289,7 +317,7 @@ class ManagedLanguageSessionTests(unittest.TestCase):
             context=AnalysisContext(side="client"),
             runtime_root=environment["runtime"],
             launch_receipt=environment["launch_receipt"],
-            session_storage=environment["session_storage"],
+            session_allocation=allocation,
             requested_port=None,
             readiness_timeout=5,
             session_timeout=0.15,
@@ -441,6 +469,94 @@ class ManagedLanguageSessionTests(unittest.TestCase):
         self.assertEqual(["terminal", "intellij", "vscode"], descriptor["clients"]["consumers"])
         self.assertEqual(result["endpoint"], descriptor["endpoint"])
 
+    def test_core_session_allocation_retains_and_reopens_exact_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment = self._environment(directory)
+            custody = self._custody(root)
+            result = run_in_core_session_allocation(
+                custody, requested_storage=None,
+                run_session=lambda allocation: self._run(
+                    environment, allocation=allocation,
+                ),
+            )
+            (description,) = custody.inventory()
+            self.assertEqual("complete", description.status)
+            self.assertTrue(description.reference.path.is_relative_to(root / "core-evidence"))
+            self.assertEqual(
+                f"workbench-groovy-language-session:{description.reference.path.name}",
+                result["session_id"],
+            )
+            self.assertEqual(
+                {"events-v1.jsonl", "session-descriptor-v1.json",
+                 "session-receipt-v1.json", "overlay-originals/instance.cfg",
+                 "overlay-originals/groovyscript.cfg"},
+                {row["relative_path"] for row in description.evidence},
+            )
+            reopened = self._custody(root).verify(description.reference.allocation_id)
+            self.assertEqual(description, reopened)
+
+    def test_interrupted_core_session_retains_reopenable_partial_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment = self._environment(directory)
+            custody = self._custody(root)
+            with self.assertRaisesRegex(KeyboardInterrupt, "owner interruption"):
+                run_in_core_session_allocation(
+                    custody, requested_storage=None,
+                    run_session=lambda allocation: self._run(
+                        environment, allocation=allocation,
+                        interrupt_on_ready=True,
+                    ),
+                )
+            (description,) = custody.inventory()
+            self.assertEqual("failed", description.status)
+            self.assertIn("KeyboardInterrupt", description.failure)
+            retained = {row["relative_path"] for row in description.evidence}
+            self.assertIn("events-v1.jsonl", retained)
+            self.assertIn("session-descriptor-v1.json", retained)
+            self.assertNotIn("session-receipt-v1.json", retained)
+            self.assertEqual(
+                description, self._custody(root).verify(description.reference.allocation_id),
+            )
+
+    def test_core_session_rejects_unselected_explicit_storage_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            custody = self._custody(root)
+            with self.assertRaisesRegex(ValueError, "outside Core-selected stores"):
+                run_in_core_session_allocation(
+                    custody, requested_storage=root / "other-session-store",
+                    run_session=lambda _allocation: self.fail("session was launched"),
+                )
+            self.assertFalse((root / "core-config").exists())
+            self.assertFalse((root / "other-session-store").exists())
+
+    def test_blocked_core_session_retains_failed_receipt_for_reopen(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment = self._environment(directory)
+            (environment["instance"] / ".workbench-groovy-language-service.lock").write_bytes(
+                b"external owner\n",
+            )
+            custody = self._custody(root)
+            result = run_in_core_session_allocation(
+                custody, requested_storage=None,
+                run_session=lambda allocation: self._run(
+                    environment, allocation=allocation,
+                ),
+            )
+            self.assertEqual("blocked", result["state"])
+            (description,) = custody.inventory()
+            self.assertEqual("failed", description.status)
+            self.assertIn(
+                "session-receipt-v1.json",
+                {row["relative_path"] for row in description.evidence},
+            )
+            self.assertEqual(
+                description, self._custody(root).verify(description.reference.allocation_id),
+            )
+
     def test_existing_lock_blocks_without_mutating_projection(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             environment = self._environment(directory)
@@ -487,6 +603,7 @@ class ManagedLanguageSessionTests(unittest.TestCase):
     def test_cli_emits_final_json_and_returns_success(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             environment = self._environment(directory)
+            custody = self._custody(Path(directory))
             output = StringIO()
             error = StringIO()
             code = cli_run(
@@ -502,8 +619,6 @@ class ManagedLanguageSessionTests(unittest.TestCase):
                     str(environment["runtime"]),
                     "--launch-receipt",
                     str(environment["launch_receipt"]),
-                    "--session-storage",
-                    str(environment["session_storage"]),
                     "--readiness-timeout",
                     "5",
                     "--session-timeout",
@@ -517,20 +632,127 @@ class ManagedLanguageSessionTests(unittest.TestCase):
                 root=ROOT,
                 output=output,
                 error=error,
+                session_custody=custody,
             )
         self.assertEqual(0, code, error.getvalue())
         self.assertEqual("complete", json.loads(output.getvalue())["state"])
 
+    def test_installed_session_cli_uses_core_selected_evidence_store(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment = self._environment(directory)
+            custody = self._custody(Path(directory))
+            output = StringIO()
+            error = StringIO()
+            code = cli_run(
+                [
+                    "session", "--profile", "supersymmetry",
+                    "--language-profile", str(environment["language_profile"]),
+                    "--source", str(environment["source"]),
+                    "--runtime-root", str(environment["runtime"]),
+                    "--launch-receipt", str(environment["launch_receipt"]),
+                    "--readiness-timeout", "5", "--session-timeout", "0.1",
+                    "--connect-timeout", "0.2", "--diagnostic-timeout", "2",
+                    "--json",
+                ],
+                root=ROOT, output=output, error=error, session_custody=custody,
+            )
+            self.assertEqual(0, code, error.getvalue())
+            result = json.loads(output.getvalue())
+            (description,) = custody.inventory()
+            self.assertEqual("complete", description.status)
+            self.assertEqual(
+                description.reference.path, Path(result["events"]["path"]).parent,
+            )
+            self.assertTrue(description.reference.path.is_relative_to(Path(directory) / "core-evidence"))
+
+    def test_installed_registration_passes_core_allocation_to_session(self) -> None:
+        from workbench_registration_pack_program_studio import groovy
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            custody = self._custody(root)
+            context = ExecutionContext(workspace=root, state_root=root)
+            with working_allocations_scope(custody), patch(
+                "workbench_pack_program_studio.cli.main", return_value=0,
+            ) as main:
+                self.assertEqual(0, groovy(["session"], context=context))
+            self.assertIs(custody, main.call_args.kwargs["session_custody"])
+
     def test_direct_session_entry_binds_core_host(self) -> None:
+        sentinel = object()
         with patch(
             "workbench_core.host_services.install_local_host_services",
             wraps=install_local_host_services,
         ) as install, patch(
+            "workbench_core.working_allocations.resolve_direct_working_allocations",
+            return_value=sentinel,
+        ) as resolve, patch(
             "workbench_pack_program_studio.cli.run", return_value=0,
         ) as run:
             self.assertEqual(0, cli_main(["session"], root=ROOT))
         install.assert_called_once_with()
+        resolve.assert_called_once_with(ROOT, owner_id="pack-program-studio")
         self.assertEqual(["session"], run.call_args.args[0])
+        self.assertIs(sentinel, run.call_args.kwargs["session_custody"])
+
+    def test_direct_session_resolves_core_workspace_and_evidence_store(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.dict("os.environ", {
+                "WORKBENCH_CONFIG_HOME": str(root / "config"),
+                "WORKBENCH_WORKSPACE": str(root),
+                "WORKBENCH_STATE_ROOT": str(root / "state"),
+            }):
+                custody = resolve_direct_working_allocations(
+                    ROOT, owner_id="pack-program-studio",
+                )
+            self.assertEqual(root, custody.workspace)
+            self.assertEqual(root / "config/resources-v1", custody.catalog.resources.root)
+            self.assertEqual(root / "state/evidence", custody.locations["evidence"])
+
+    def test_direct_session_entry_retains_through_resolved_core_store(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment = self._environment(directory)
+            output = StringIO()
+            error = StringIO()
+            with patch.dict("os.environ", {
+                "WORKBENCH_CONFIG_HOME": str(root / "config"),
+                "WORKBENCH_WORKSPACE": str(root),
+                "WORKBENCH_STATE_ROOT": str(root / "state"),
+            }), patch("sys.stdout", output), patch("sys.stderr", error):
+                code = cli_main([
+                    "session", "--profile", "supersymmetry",
+                    "--language-profile", str(environment["language_profile"]),
+                    "--source", str(environment["source"]),
+                    "--runtime-root", str(environment["runtime"]),
+                    "--launch-receipt", str(environment["launch_receipt"]),
+                    "--readiness-timeout", "5", "--session-timeout", "0.1",
+                    "--connect-timeout", "0.2", "--diagnostic-timeout", "2",
+                    "--json",
+                ], root=ROOT)
+            self.assertEqual(0, code, error.getvalue())
+            result = json.loads(output.getvalue())
+            session_dir = Path(result["events"]["path"]).parent
+            self.assertTrue(session_dir.is_relative_to(root / "state/evidence"))
+            (description,) = CoreWorkingAllocations(
+                workspace=root, configuration_home=root / "config",
+                locations={"evidence": root / "state/evidence"},
+                owner_id="pack-program-studio",
+            ).inventory()
+            self.assertEqual("complete", description.status)
+            self.assertEqual(session_dir, description.reference.path)
+
+    def test_session_api_fails_closed_without_core_allocation(self) -> None:
+        output = StringIO()
+        error = StringIO()
+        code = cli_run(
+            ["session", "--profile", "supersymmetry", "--runtime-root", "/missing",
+             "--launch-receipt", "/missing"],
+            root=ROOT, output=output, error=error,
+        )
+        self.assertEqual(2, code)
+        self.assertIn("require a Core working allocation", error.getvalue())
 
 
 if __name__ == "__main__":

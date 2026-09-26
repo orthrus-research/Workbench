@@ -36,6 +36,14 @@ the upstream TCP protocol can present. V1 therefore reports
 `managed-launch-custody; no-upstream-identity-challenge`, never cryptographic
 endpoint identity.
 
+The installed Workbench command reserves the session directory through Core's
+working-allocation service. Core selects the evidence store by default; an
+explicit `--session-storage` must be within the selected evidence store or the
+selected workspace's `.workbench` area. Core retains completed and failed
+session artifacts and can reopen their exact selected bytes. Direct module
+invocation resolves the same Core workspace and evidence store before creating
+a new session; without Core custody, session creation stops before mutation.
+
 ## Checked temporary overlay transaction
 
 Workbench reserves a free public loopback port before changing the projection.

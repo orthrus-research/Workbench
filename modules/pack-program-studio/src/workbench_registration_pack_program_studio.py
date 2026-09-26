@@ -18,4 +18,10 @@ def groovy(argv, *, context):
     context.check_cancelled()
     from workbench_pack_program_studio.cli import main
     from workbench_api.resources import repository_root
+    if argv and argv[0] == 'session':
+        from workbench_api.working_allocations import working_allocations
+        return main(
+            argv, root=repository_root(__file__),
+            session_custody=working_allocations(),
+        )
     return main(argv, root=repository_root(__file__))

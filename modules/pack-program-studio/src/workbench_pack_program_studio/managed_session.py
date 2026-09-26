@@ -26,7 +26,12 @@ import uuid
 from workbench_api.host_filesystem import (
     append_private_line,
     publish_immutable_bytes,
+    read_private_bytes,
     secure_private_path,
+)
+from workbench_api.working_allocations import (
+    WorkingAllocationReference,
+    WorkingAllocations,
 )
 
 from .analyzer import AnalysisContext, analyze_program
@@ -477,7 +482,7 @@ def run_managed_language_session(
     context: AnalysisContext,
     runtime_root: Path,
     launch_receipt: Path,
-    session_storage: Path,
+    session_allocation: WorkingAllocationReference,
     requested_port: int | None,
     readiness_timeout: float | None,
     session_timeout: float | None,
@@ -487,7 +492,7 @@ def run_managed_language_session(
     on_event: Callable[[Mapping[str, Any]], None] | None = None,
     on_ready: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
-    """Launch and close one client session with a Core filesystem host bound.
+    """Launch and close one client in its Core-allocated session directory.
 
     The first journal line is emitted immediately after session allocation,
     before endpoint reservation or any projection overlay mutation.
@@ -565,8 +570,14 @@ def run_managed_language_session(
         "launch_receipt_size": binding.receipt_size,
     }
 
-    session_id = f"workbench-groovy-language-session:{uuid.uuid4()}"
-    session_dir = _create_session_directory(session_storage, session_id)
+    if (not isinstance(session_allocation, WorkingAllocationReference)
+            or session_allocation.family != "groovy-language-session"
+            or session_allocation.owner_id != "pack-program-studio"
+            or not session_allocation.path.is_absolute()
+            or session_allocation.path.name != session_allocation.label):
+        raise PackProgramError("Core allocation is not for this Groovy language session")
+    session_id = f"workbench-groovy-language-session:{session_allocation.label}"
+    session_dir = session_allocation.path
     descriptor_path = session_dir / _DESCRIPTOR_NAME
     receipt_path = session_dir / _RECEIPT_NAME
     journal = EventJournal(session_dir / _EVENTS_NAME, session_id)
@@ -876,6 +887,103 @@ def run_managed_language_session(
     validated = validate_managed_session_receipt(receipt)
     _write_fresh_json(receipt_path, validated)
     return validated
+
+
+def run_in_core_session_allocation(
+    custody: WorkingAllocations,
+    *,
+    requested_storage: Path | None,
+    run_session: Callable[[WorkingAllocationReference], dict[str, Any]],
+) -> dict[str, Any]:
+    """Retain one managed session and its exact terminal artifacts with Core."""
+
+    leaf = str(uuid.uuid4())
+    requested = (
+        None if requested_storage is None
+        else requested_storage.expanduser().resolve() / leaf
+    )
+    allocation = custody.allocate(
+        "groovy-language-session", leaf, requested_path=requested,
+    )
+    with custody.execution(allocation):
+        try:
+            result = run_session(allocation)
+            evidence, references = _session_allocation_evidence(allocation.path)
+            if result["state"] == "complete":
+                custody.finish(
+                    allocation, outcome="complete", evidence=evidence,
+                    absolute_references=references,
+                    validate=lambda root: _validate_completed_session_allocation(
+                        root, session_id=result["session_id"],
+                    ),
+                )
+            else:
+                custody.finish(
+                    allocation, outcome="failed", evidence=evidence,
+                    absolute_references=references,
+                    failure=f"managed session {result['outcome']}"[:4096],
+                )
+            return result
+        except BaseException as exc:
+            # Preserve the original interruption or failure. A failed terminal
+            # record is best-effort; Core's reservation still protects the
+            # incomplete directory if selected evidence cannot be sealed.
+            evidence, references = _session_allocation_evidence(allocation.path)
+            try:
+                custody.finish(
+                    allocation, outcome="failed", evidence=evidence,
+                    absolute_references=references,
+                    failure=f"{type(exc).__name__}: {exc}"[:4096],
+                )
+            except Exception:
+                pass
+            raise
+
+
+def _session_allocation_evidence(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    files = (
+        _EVENTS_NAME, _DESCRIPTOR_NAME, _RECEIPT_NAME,
+        "overlay-originals/instance.cfg", "overlay-originals/groovyscript.cfg",
+    )
+    evidence = tuple(
+        root / name for name in files
+        if (root / name).exists() or (root / name).is_symlink()
+    )
+    backups = root / "overlay-originals"
+    references = (backups,) if backups.exists() or backups.is_symlink() else ()
+    return evidence, references
+
+
+def _validate_completed_session_allocation(root: Path, *, session_id: str) -> None:
+    receipt_path = root / _RECEIPT_NAME
+    value = json.loads(read_private_bytes(receipt_path, byte_limit=_MAX_CONTROL_BYTES))
+    validated = validate_managed_session_receipt(value)
+    if (validated["state"] != "complete"
+            or validated["session_id"] != session_id
+            or session_id != f"workbench-groovy-language-session:{root.name}"
+            or validated["events"]["path"] != str(root / _EVENTS_NAME)):
+        raise PackProgramError("completed session does not match its Core allocation")
+    descriptor = json.loads(read_private_bytes(
+        root / _DESCRIPTOR_NAME, byte_limit=_MAX_CONTROL_BYTES,
+    ))
+    if descriptor != validated["handoff"]:
+        raise PackProgramError("retained session descriptor differs from its receipt")
+    events = read_private_bytes(root / _EVENTS_NAME, byte_limit=_MAX_CONTROL_BYTES)
+    if (len(events) != validated["events"]["size"]
+            or hashlib.sha256(events).hexdigest() != validated["events"]["sha256"]):
+        raise PackProgramError("retained session events differ from their receipt")
+    expected_backups = {
+        "launcher-jvm": root / "overlay-originals/instance.cfg",
+        "language-server-port": root / "overlay-originals/groovyscript.cfg",
+    }
+    for overlay in validated["overlays"]:
+        backup_path = Path(overlay["original"]["backup_path"])
+        if backup_path != expected_backups.get(overlay["role"]):
+            raise PackProgramError("session backup differs from its Core allocation")
+        original = read_private_bytes(backup_path, byte_limit=_MAX_OVERLAY_BYTES)
+        if (len(original) != overlay["original"]["size"]
+                or _sha(original) != overlay["original"]["sha256"]):
+            raise PackProgramError("retained overlay backup differs from its receipt")
 
 
 def load_prism_launch_binding(
@@ -1804,21 +1912,6 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
-def _create_session_directory(storage: Path, session_id: str) -> Path:
-    requested = storage.expanduser()
-    if requested.exists() and (requested.is_symlink() or not requested.is_dir()):
-        raise PackProgramError(f"managed session storage is unsafe: {requested}")
-    requested.mkdir(parents=True, exist_ok=True)
-    resolved = requested.resolve()
-    if resolved.is_symlink() or not resolved.is_dir():
-        raise PackProgramError(f"managed session storage is unsafe: {resolved}")
-    leaf = session_id.rsplit(":", 1)[-1]
-    destination = resolved / leaf
-    destination.mkdir(mode=0o700)
-    secure_private_path(destination, directory=True)
-    return destination
-
-
 def _safe_projection_file(root: Path, relative: PurePosixPath, context: str) -> Path:
     current = root
     for part in relative.parts:
@@ -2031,5 +2124,6 @@ def _utc() -> str:
 __all__ = [
     "PrismLaunchBinding",
     "load_prism_launch_binding",
+    "run_in_core_session_allocation",
     "run_managed_language_session",
 ]

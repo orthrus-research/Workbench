@@ -668,4 +668,28 @@ def _valid_selected_rows(root: Path, evidence: list, references: list) -> bool:
     return sum(int(row["bytes"]) for row in evidence) <= _MAX_EVIDENCE_BYTES
 
 
-__all__ = ["CoreWorkingAllocations", "WorkingAllocationCatalog"]
+def resolve_direct_working_allocations(
+    suite_root: Path, *, owner_id: str,
+    environment: Mapping[str, str] | None = None,
+) -> CoreWorkingAllocations:
+    """Bind a supported direct module entry to Core's selected workspace/store."""
+
+    from .environment_resolution import resolve_environment
+
+    resolved = resolve_environment(suite_root, environment=environment)
+    return CoreWorkingAllocations(
+        workspace=resolved.workspace,
+        configuration_home=resolved.configuration_home,
+        locations=resolved.locations,
+        owner_id=owner_id,
+        policy_id=resolved.record["resolution_id"],
+        location_sources={
+            role: row["source"] for role, row in resolved.record["locations"].items()
+        },
+    )
+
+
+__all__ = [
+    "CoreWorkingAllocations", "WorkingAllocationCatalog",
+    "resolve_direct_working_allocations",
+]
