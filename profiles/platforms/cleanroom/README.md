@@ -40,6 +40,13 @@ read-only Core command plan then asks the installed Cleanroom owner to compose
 the Gradle command from that projection, the retained cleanup script and
 extracted Gradle launcher, and the preflighted Java 25 path. The command plan
 does not launch Gradle or admit build outputs.
+Core can now turn that reviewed command into one prepared, supervised attempt
+on Linux or WSL with a qualified private filesystem. It allocates a stable
+attempt directory, records the exact command and a minimal child environment,
+retains bounded stdout and stderr, and rechecks the source and Java/Gradle
+inputs around the run. An interrupted attempt remains unknown and blocks an
+automatic rerun. Even an observed exit, including exit code zero, leaves the
+generated fixture artifacts and complete environment reconstruction unadmitted.
 
 The generic-mod fixture runner accepts `--core-supervised` for a local build.
 Core holds the existing source projection lease while Gradle runs as a child,
