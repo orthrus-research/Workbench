@@ -1382,6 +1382,27 @@ def plan_package_install_preflight(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def apply_package_install(*args, **kwargs) -> dict[str, Any]:
+    """Install only Core-retained wheel bytes at the reviewed isolated path."""
+
+    from .environment_package_install import apply_package_install as operation
+    return operation(*args, **kwargs)
+
+
+def reconcile_package_install(*args, **kwargs) -> dict[str, Any]:
+    """Reconcile completed install evidence or classify an incomplete attempt."""
+
+    from .environment_package_install import reconcile_package_install as operation
+    return operation(*args, **kwargs)
+
+
+def reopen_package_install(*args, **kwargs) -> dict[str, Any]:
+    """Reopen the prepared Core install and completed evidence."""
+
+    from .environment_package_install import reopen_package_install as operation
+    return operation(*args, **kwargs)
+
+
 def plan_fixture_import(*args, **kwargs) -> dict[str, Any]:
     """Review the admitted profile fixture for separate Core custody."""
 
@@ -1414,5 +1435,6 @@ __all__ = [
     "plan_package_closure",
     "plan_package_import", "apply_package_import", "reopen_package_import",
     "plan_package_install_preflight",
+    "apply_package_install", "reconcile_package_install", "reopen_package_install",
     "plan_fixture_import", "apply_fixture_import", "reopen_fixture_import",
 ]

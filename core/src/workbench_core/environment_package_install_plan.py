@@ -269,24 +269,25 @@ def plan_package_install_preflight(
             "platform": sys.platform, "machine": platform.machine(),
     }):
         raise ReconstructionError("retained package closure targets another interpreter or host")
-    if not local.state_root.is_absolute() or any(
+    install_root = local.locations["evidence"]
+    if not install_root.is_absolute() or any(
         part.is_symlink() or getattr(part, "is_junction", lambda: False)()
-        for part in (local.state_root, *local.state_root.parents)
+        for part in (install_root, *install_root.parents)
     ):
-        raise ReconstructionError("isolated install state root traverses a redirect")
+        raise ReconstructionError("isolated install evidence root traverses a redirect")
     blockers: list[str] = []
-    if not private_path(local.state_root, directory=True):
-        blockers.append("Core state root is not an existing owner-private directory")
-    elif not os.access(local.state_root, os.W_OK | os.X_OK):
-        blockers.append("Core state root cannot create a private isolated destination")
-    filesystem = _mount_type(local.state_root) if local.state_root.is_dir() else None
+    if not private_path(install_root, directory=True):
+        blockers.append("Core evidence root is not an existing owner-private directory")
+    elif not os.access(install_root, os.W_OK | os.X_OK):
+        blockers.append("Core evidence root cannot create a private isolated destination")
+    filesystem = _mount_type(install_root) if install_root.is_dir() else None
     if filesystem not in _SUPPORTED_FILESYSTEMS:
-        blockers.append("Core state root has an unqualified Linux/WSL filesystem")
+        blockers.append("Core evidence root has an unqualified Linux/WSL filesystem")
     destination_key = sha256(_canonical({
         "closure_plan_id": reviewed["plan_id"],
         "base_interpreter": interpreter["base"],
     })).hexdigest()
-    destination = local.state_root / ("environment-" + destination_key)
+    destination = install_root / ("environment-" + destination_key)
     try:
         destination.lstat()
     except FileNotFoundError:
@@ -312,7 +313,8 @@ def plan_package_install_preflight(
         "package_tree_content_sha256": retained["tree_content_sha256"],
         "workspace": str(local.workspace),
         "environment_resolution_id": local.record["resolution_id"],
-        "state_root": str(local.state_root), "filesystem": filesystem,
+        "state_root": str(local.state_root), "install_root": str(install_root),
+        "filesystem": filesystem,
         "destination": str(destination),
         "installation_paths": {key: str(value) for key, value in paths.items()},
         "interpreter": interpreter, "targets": targets,

@@ -222,7 +222,7 @@ reviewed closure, workspace and retained package result ID. It reopens the
 managed wheelhouse, binds the executing and base Python binaries by resolved
 path, size and SHA-256, and checks the exact Python, host and virtual
 environment layout. Core derives one stable destination directly beneath its
-owner-private state root from the closure and base interpreter identities. It
+selected owner-private evidence root from the closure and base interpreter identities. It
 requires that destination to be absent; an existing file, directory or redirect
 is blocked for explicit recovery review. The future installer must create the
 environment at that final path after a prepared attempt. Renaming a populated
@@ -232,7 +232,7 @@ to the old path.
 The preflight maps every retained wheel member and console/GUI launcher to its
 prospective destination and refuses duplicate files, file/directory overlaps,
 reserved launchers, bytecode and unsupported `.data` layouts. It checks the
-Linux mount under the state root and blocks Windows-mounted WSL filesystems
+Linux mount under the selected evidence root and blocks Windows-mounted WSL filesystems
 such as 9p/DrvFS; WSL native execution still needs separate qualification.
 The result is a sealed, read-only review with `state` `reviewed` or `blocked`
 and coverage `read-only-isolated-install-preflight-only`. It creates no
@@ -240,6 +240,29 @@ directory or environment, invokes neither venv nor pip, and preserves every
 unresolved input marker, including `optional-module-packages`. Installation,
 restart reconciliation, dependency checks, module/profile and fixture-owner
 admission remain separate work and evidence.
+
+`apply_package_install` requires that exact reviewed preflight ID. It publishes
+a prepared Core evidence resource before asking Core's working-allocation
+service to reserve and activate the stable destination. The allocation's own
+catalog and marker establish custody of the mutable directory. Core then adds
+an immutable attempt binding and creates the virtual environment at its final
+path. Pip bootstraps from the retained, hash-locked wheelhouse with no index,
+and `pip check` runs inside that environment. Both child commands use Core's
+process supervisor with process-group closure, timeouts and bounded private
+stdout/stderr captures. Core verifies the retained input again after execution,
+then records selected completion evidence and a result. A failed or interrupted
+destination stays protected by the working-allocation catalog; a later attempt
+does not overwrite it.
+
+`reconcile_package_install` checks the Core allocation and prepared binding
+after restart. If pip completion and its captures were retained but allocation
+terminal or Core result publication was interrupted, it can finish that exact
+evidence and return a result. If the attempt marker or completion is missing,
+it reports `incomplete-review-required` and preserves the directory for an
+explicit recovery decision. `reopen_package_install` verifies the retained
+result and selected current files. This slice records isolated pip completion,
+not installed module/profile or fixture-owner admission; every unresolved
+input marker, including `optional-module-packages`, remains.
 
 `plan_environment_input_composition` is a V2 linked review of five separately
 completed Core results: workspace selection, exact project checkout, managed

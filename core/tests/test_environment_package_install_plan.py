@@ -65,7 +65,7 @@ class EnvironmentPackageInstallPlanTests(TestCase):
         self.assertIn("optional-module-packages", plan["unresolved_inputs"])
         self.assertEqual(len(self.closure["wheels"]), plan["targets"]["wheel_count"])
         self.assertFalse(Path(plan["destination"]).exists())
-        self.assertEqual(Path(plan["state_root"]), Path(plan["destination"]).parent)
+        self.assertEqual(Path(plan["install_root"]), Path(plan["destination"]).parent)
         self.assertTrue(plan["interpreter"]["base"]["sha256"].startswith("sha256:"))
 
     def test_occupied_destination_and_redirect_require_review(self) -> None:
@@ -91,11 +91,11 @@ class EnvironmentPackageInstallPlanTests(TestCase):
         with patch.object(preflight, "_mount_type", return_value="9p"):
             plan = self._plan()
         self.assertEqual("blocked", plan["state"])
-        self.assertIn("Core state root has an unqualified Linux/WSL filesystem", plan["blockers"])
+        self.assertIn("Core evidence root has an unqualified Linux/WSL filesystem", plan["blockers"])
         with patch.object(preflight, "private_path", return_value=False):
             plan = self._plan()
         self.assertEqual("blocked", plan["state"])
-        self.assertIn("Core state root is not an existing owner-private directory", plan["blockers"])
+        self.assertIn("Core evidence root is not an existing owner-private directory", plan["blockers"])
 
     def test_changed_retained_wheel_and_interpreter_refuse(self) -> None:
         path = Path(self.package["tree_path"]) / "wheels/helper-1.0-py3-none-any.whl"
