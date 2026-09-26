@@ -643,6 +643,7 @@ class ResourceCatalog:
         root_state = self.verify_root()
         rows = []
         resource_states: dict[str, tuple[str, str]] = {}
+        resource_references: list[tuple[str, list[str]]] = []
         if self.root.exists() or self.root.is_symlink():
             check_storage.ordinary(self.root, directory=True)
             if any(
@@ -701,13 +702,14 @@ class ResourceCatalog:
             for path in sorted(directory.iterdir()):
                 resource_id = f"workbench-resource-v1:{path.stem}"
                 reservation = self._reservation(resource_id)
-                if workspace is not None and reservation["workspace"] != str(workspace):
+                has_intent = self._path("intents", path.stem).exists()
+                record = self._intent(resource_id) if has_intent else reservation
+                resource_references.append((str(record["workspace"]), record["references"]))
+                if workspace is not None and record["workspace"] != str(workspace):
                     continue
-                if self._path("intents", path.stem).exists():
-                    record = self._intent(resource_id)
+                if has_intent:
                     status = self._status(record)
                 else:
-                    record = reservation
                     if self._path("aborts", path.stem).is_file():
                         status = "failed"
                     else:
@@ -731,6 +733,32 @@ class ResourceCatalog:
                 }
                 rows.append(row)
                 resource_states[resource_id] = (str(record["workspace"]), status)
+
+        def require_committed_reference(resource_id: str, owner_workspace: str) -> None:
+            state = resource_states.get(resource_id)
+            if state is None:
+                try:
+                    intent = self._intent(resource_id)
+                    state = (str(intent["workspace"]), self._status(intent))
+                except DurableResourceError as exc:
+                    raise DurableResourceError(
+                        "resource.changed", "referenced resource is unavailable or changed",
+                    ) from exc
+                resource_states[resource_id] = state
+            if state != (owner_workspace, "committed"):
+                raise DurableResourceError(
+                    "resource.changed", "referenced resource is unavailable, changed, or in another workspace",
+                )
+
+        for owner_workspace, references in resource_references:
+            for reference in references:
+                require_committed_reference(reference, owner_workspace)
+
+        def verify_tree_resource_references(owner_workspace: str, references: tuple[str, ...]) -> None:
+            for reference in references:
+                if reference.startswith("workbench-resource-v1:"):
+                    require_committed_reference(reference, owner_workspace)
+
         record_stores = self._registered_record_stores(workspace)
         overlay_envelopes: list[dict[str, object]] = []
         for store in record_stores:
@@ -763,16 +791,9 @@ class ResourceCatalog:
                 if not private_path(path, directory=True):
                     raise DurableResourceError("resource.changed", "unregistered overlay attempt root is unsafe")
                 overlay_envelopes.append({"path": str(path), "status": "unregistered-store"})
-        trees = self.trees.inventory(workspace=workspace)
-        for tree in trees:
-            for reference in tree["references"]:
-                if not reference.startswith("workbench-resource-v1:"):
-                    continue
-                state = resource_states.get(reference)
-                if state is None or state[0] != tree["workspace"] or state[1] != "committed":
-                    raise DurableResourceError(
-                        "resource.changed", "managed tree resource reference is unavailable or changed",
-                    )
+        trees = self.trees.inventory(
+            workspace=workspace, validate_references=verify_tree_resource_references,
+        )
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,

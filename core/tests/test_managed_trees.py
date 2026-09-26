@@ -458,6 +458,32 @@ with host.stage("evidence", "recovered", requested_path=Path(os.environ["W3_OUTP
             ResourceCatalog(self.config).inventory(workspace=self.workspace)
         self.assertEqual("resource.changed", failure.exception.code)
 
+    def test_foreign_tree_resource_reference_is_checked_before_workspace_filter(self) -> None:
+        own_tree = self._publish()
+        foreign_workspace = self.home / "foreign-workspace"
+        foreign_workspace.mkdir()
+        foreign_evidence = self.home / "foreign-evidence"
+        foreign_resource = CoreDurableResources(
+            workspace=foreign_workspace, configuration_home=self.config,
+            locations={"evidence": foreign_evidence}, owner_id="atlas",
+        ).publish_bytes("evidence", "source.json", b"source\n")
+        foreign_host = CoreManagedTrees(
+            workspace=foreign_workspace, configuration_home=self.config,
+            locations={"evidence": foreign_evidence}, owner_id="atlas",
+        )
+        with foreign_host.stage("evidence", "foreign") as stage:
+            stage.path.mkdir()
+            (stage.path / "payload.txt").write_bytes(b"foreign\n")
+            stage.publish(validate=lambda _: None, references=(foreign_resource.resource_id,))
+
+        catalog = ResourceCatalog(self.config)
+        self.assertEqual([own_tree.tree_id], [row["tree_id"] for row in
+                                              catalog.inventory(workspace=self.workspace)["trees"]])
+        foreign_resource.path.write_bytes(b"broken\n")
+        with self.assertRaises(DurableResourceError) as failure:
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual("resource.changed", failure.exception.code)
+
     def test_tree_dependency_is_recorded_and_cross_workspace_reference_is_refused(self) -> None:
         source = self._publish()
         dependent = self._publish(references=(source.tree_id,))

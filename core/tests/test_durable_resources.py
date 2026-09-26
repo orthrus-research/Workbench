@@ -17,9 +17,12 @@ from unittest.mock import patch
 
 from workbench_api import Capability, DurableResourceError, ExecutionContext, Module, ModuleError
 from workbench_api.record_stores import open_target_record_store, record_store_scope
+from workbench_core import check_storage
 from workbench_core.durable_files import StagedFile
 from workbench_core.modules import InstalledModule, dispatch
-from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
+from workbench_core.storage.registered import (
+    COMMIT_KIND, INTENT_KIND, RESERVATION_KIND, CoreDurableResources, ResourceCatalog,
+)
 from workbench_core.storage.record_stores import CoreRecordStores
 
 
@@ -432,7 +435,83 @@ provider.publish_bytes('evidence', 'result.json', b'incomplete\\n')
                 references=(source.resource_id,),
             )
         self.assertEqual(caught.exception.code, "resource.changed")
+        with self.assertRaises(DurableResourceError) as inventory_error:
+            ResourceCatalog(self.config).inventory(workspace=self.workspace)
+        self.assertEqual(inventory_error.exception.code, "resource.changed")
+        source.path.write_bytes(b"source\n")
         self.assertEqual(len(ResourceCatalog(self.config).inventory(workspace=self.workspace)["resources"]), 2)
+
+    def test_foreign_resource_dependency_is_checked_before_workspace_filter(self) -> None:
+        own = self.resources.publish_bytes("evidence", "own.json", b"own\n")
+        foreign_workspace = self.home / "foreign-workspace"
+        foreign_workspace.mkdir()
+        foreign = CoreDurableResources(
+            workspace=foreign_workspace, configuration_home=self.config,
+            locations={"evidence": self.home / "foreign-evidence"}, owner_id="sample",
+        )
+        source = foreign.publish_bytes("evidence", "source.json", b"source\n")
+        foreign.publish_bytes("evidence", "dependent.json", b"dependent\n",
+                              references=(source.resource_id,))
+        catalog = ResourceCatalog(self.config)
+        self.assertEqual([own.resource_id], [row["resource_id"] for row in
+                                            catalog.inventory(workspace=self.workspace)["resources"]])
+
+        nonce = source.resource_id.rsplit(":", 1)[1]
+        commit = self.config / "resources-v1" / "commits" / f"{nonce}.json"
+        held = self.home / "held-foreign-resource-commit.json"
+        commit.rename(held)
+        try:
+            with self.assertRaises(DurableResourceError) as failure:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual("resource.changed", failure.exception.code)
+            self.assertFalse(commit.exists())
+        finally:
+            held.rename(commit)
+        inventory = catalog.inventory(workspace=self.workspace)
+        self.assertEqual("ready-unproven", inventory["root_state"])
+        self.assertEqual([own.resource_id], [row["resource_id"] for row in inventory["resources"]])
+
+    def test_inventory_rejects_coherent_cross_workspace_resource_records(self) -> None:
+        own = self.resources.publish_bytes("evidence", "own.json", b"own\n")
+        dependent = self.resources.publish_bytes("evidence", "dependent.json", b"dependent\n",
+                                                references=(own.resource_id,))
+        foreign_workspace = self.home / "foreign-workspace"
+        foreign_workspace.mkdir()
+        foreign = CoreDurableResources(
+            workspace=foreign_workspace, configuration_home=self.config,
+            locations={"evidence": self.home / "foreign-evidence"}, owner_id="sample",
+        ).publish_bytes("evidence", "foreign.json", b"foreign\n")
+        catalog = ResourceCatalog(self.config)
+        nonce = dependent.resource_id.rsplit(":", 1)[1]
+        reservation_path = catalog._path("reservations", nonce)
+        intent_path = catalog._path("intents", nonce)
+        commit_path = catalog._path("commits", nonce)
+
+        reservation = json.loads(reservation_path.read_bytes())
+        reservation["references"] = [foreign.resource_id]
+        reservation = check_storage.seal(
+            RESERVATION_KIND, {key: value for key, value in reservation.items() if key != "id"},
+        )
+        reservation_path.write_bytes(check_storage.canonical(reservation) + b"\n")
+        intent = json.loads(intent_path.read_bytes())
+        intent["references"] = [foreign.resource_id]
+        intent["reservation_id"] = reservation["id"]
+        intent = check_storage.seal(
+            INTENT_KIND, {key: value for key, value in intent.items() if key != "id"},
+        )
+        intent_path.write_bytes(check_storage.canonical(intent) + b"\n")
+        commit = json.loads(commit_path.read_bytes())
+        commit["intent_id"] = intent["id"]
+        commit = check_storage.seal(
+            COMMIT_KIND, {key: value for key, value in commit.items() if key != "id"},
+        )
+        commit_path.write_bytes(check_storage.canonical(commit) + b"\n")
+
+        self.assertEqual("committed", catalog._status(catalog._intent(dependent.resource_id)))
+        self.assertEqual("committed", catalog._status(catalog._intent(foreign.resource_id)))
+        with self.assertRaises(DurableResourceError) as failure:
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual("resource.changed", failure.exception.code)
 
     def test_bound_port_refuses_another_workspace_resource(self) -> None:
         reference = self.resources.publish_bytes("evidence", "result.json", b"private workspace\n")

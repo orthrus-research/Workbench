@@ -511,7 +511,10 @@ class TreeCatalog:
                 })
             return self._reference(intent, derived_status=derived_status)
 
-    def inventory(self, *, workspace: Path | None = None) -> list[dict[str, object]]:
+    def inventory(
+        self, *, workspace: Path | None = None,
+        validate_references: Callable[[str, tuple[str, ...]], None] | None = None,
+    ) -> list[dict[str, object]]:
         if not self.root.exists() and not self.root.is_symlink():
             return []
         names = ("reservations", "intents", "commits", "aborts", "leases")
@@ -545,13 +548,20 @@ class TreeCatalog:
         for path in sorted(self._directory("reservations").glob("*.json")):
             tree_id = f"workbench-tree-v1:{path.stem}"
             reservation = self.reservation(tree_id)
-            if workspace is not None and reservation["workspace"] != str(workspace):
+            selected = workspace is None or reservation["workspace"] == str(workspace)
+            intent_path = self._path("intents", path.stem)
+            intent = (
+                self.intent(tree_id)
+                if intent_path.is_file() and (selected or validate_references is not None)
+                else None
+            )
+            if intent is not None and validate_references is not None:
+                validate_references(str(reservation["workspace"]), tuple(intent["references"]))
+            if not selected:
                 continue
             target = self._target(reservation)
             stage = target.parent / reservation["staging"] / "payload"
-            intent_path = self._path("intents", path.stem)
-            if intent_path.is_file():
-                intent = self.intent(tree_id)
+            if intent is not None:
                 try:
                     derived_status = self._verify(intent)
                     try:
