@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from workbench_project_intelligence.working_tree import copy_tracked_workspace
 
+from contextlib import contextmanager
 from hashlib import sha256
 import hashlib
 import json
@@ -34,6 +35,9 @@ from workbench_api.host_filesystem import (
     promote_prepared_directory,
 )
 from workbench_api.processes import ProcessError, execute_logged_process
+from workbench_api.temporary_leases import (
+    TemporaryScratchError, packwiz_source_scratch,
+)
 from workbench_core.artifact_store import DOWNLOAD_CHUNK_BYTES, sha256_file
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
@@ -69,6 +73,17 @@ PACKWIZ_V2_POLICY_VERSION = 1
 
 class PackwizMaterializationError(ValueError):
     """Raised when a Packwiz payload cannot be materialized safely."""
+
+
+@contextmanager
+def _source_scratch(*, workspace: Path, state: Path, plan_digest: str):
+    try:
+        with packwiz_source_scratch(
+            workspace=workspace, state_root=state, plan_digest=plan_digest,
+        ) as path:
+            yield path
+    except TemporaryScratchError as exc:
+        raise PackwizMaterializationError(str(exc)) from exc
 
 
 def _canonical_bytes(value: Any) -> bytes:
@@ -1793,16 +1808,7 @@ def materialize_packwiz_workspace_v2(
         plan_digest[:16],
         "packwiz-materialization-v2",
     )
-    staging_parent = _ensure_state_subdirectory(
-        state,
-        "staging",
-        "packwiz-v2",
-    )
-    staging = Path(tempfile.mkdtemp(
-        prefix=f".{plan_digest[:16]}.",
-        dir=staging_parent,
-    ))
-    try:
+    with _source_scratch(workspace=workspace, state=state, plan_digest=plan_digest) as staging:
         staged_source = staging / "source"
         source, exclusions = copy_tracked_workspace(
             workspace,
@@ -2026,9 +2032,6 @@ def materialize_packwiz_workspace_v2(
             "outcome": "installed",
             "receipt": reopened["receipt"],
         }
-    finally:
-        if staging.exists():
-            shutil.rmtree(staging)
 
 
 def _installer_lock(

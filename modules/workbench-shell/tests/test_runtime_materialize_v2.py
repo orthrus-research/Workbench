@@ -29,6 +29,9 @@ from workbench_shell import (  # noqa: E402
     verify_packwiz_materialization_receipt_identity,
 )
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core.packwiz_scratch import CorePackwizScratch  # noqa: E402
+from workbench_api.temporary_leases import temporary_scratch_scope  # noqa: E402
+from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
 
 
 JAVA_IDENTITY = {
@@ -488,19 +491,22 @@ def _materialize(
     *,
     seed_roots: tuple[Path, ...] = (),
 ) -> dict[str, object]:
-    return materialize_packwiz_workspace_v2(
-        case["plan"],
-        workspace_root=case["workspace"],
-        state_root=Path(case["root"]) / "state",
-        packwiz_executable=case["packwiz"],
-        java_executable=case["java"],
-        java_identity=JAVA_IDENTITY,
-        installer_path=case["installer"],
-        installer_lock=case["lock"],
-        seed_roots=seed_roots,
-        refresh_timeout_seconds=10,
-        install_timeout_seconds=10,
-    )
+    with temporary_scratch_scope(CorePackwizScratch(
+        configuration_home=Path(case["root"]) / "config",
+    )):
+        return materialize_packwiz_workspace_v2(
+            case["plan"],
+            workspace_root=case["workspace"],
+            state_root=Path(case["root"]) / "state",
+            packwiz_executable=case["packwiz"],
+            java_executable=case["java"],
+            java_identity=JAVA_IDENTITY,
+            installer_path=case["installer"],
+            installer_lock=case["lock"],
+            seed_roots=seed_roots,
+            refresh_timeout_seconds=10,
+            install_timeout_seconds=10,
+        )
 
 
 class RuntimeMaterializeV2Test(unittest.TestCase):
@@ -796,7 +802,16 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                 _materialize(case)
             self.assertEqual(prepared, list(variants.iterdir()))
             staging = Path(case["root"]) / "state/staging/packwiz-v2"
-            self.assertEqual(list(staging.iterdir()), [])
+            retained = list(staging.iterdir())
+            self.assertEqual(2, len(retained))
+            self.assertTrue(all(
+                (path / ".workbench-temporary-retained.json").is_file()
+                for path in retained
+            ))
+            catalog = ResourceCatalog(Path(case["root"]) / "config")
+            self.assertEqual(["retained-unproven", "retained-unproven"], [
+                row["status"] for row in catalog.inventory(workspace=Path(case["workspace"]))["temporary_leases"]
+            ])
             self.assertEqual(
                 _tree_bytes(bootstrap_fixture),
                 bootstrap_before,

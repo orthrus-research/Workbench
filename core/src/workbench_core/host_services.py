@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Iterator, Mapping
 
 from workbench_api.working_allocations import WorkingAllocations
+from workbench_api.temporary_leases import (
+    temporary_scratch_bound, temporary_scratch_scope,
+)
 
 from workbench_api.host_filesystem import bind_host_filesystem
 from workbench_api.processes import bind_process_host
@@ -44,6 +47,25 @@ def install_local_host_services() -> None:
     bind_derived_indexes(CoreDerivedIndexes(configuration_home=default_user_config_home()))
     from .feature_exports import HOST as feature_export_host
     bind_feature_export_host(feature_export_host)
+
+
+@contextmanager
+def direct_packwiz_scratch_scope(
+    *, configuration_home: Path | None = None,
+) -> Iterator[None]:
+    """Bind direct Shell runtime commands to the selected Core lease catalog."""
+
+    if temporary_scratch_bound():
+        yield
+        return
+    from .packwiz_scratch import CorePackwizScratch
+    from .user_config_home import default_user_config_home
+
+    selected = configuration_home or default_user_config_home()
+    with temporary_scratch_scope(CorePackwizScratch(
+        configuration_home=selected, owner_id="workbench-shell",
+    )):
+        yield
 
 
 @contextmanager

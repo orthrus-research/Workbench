@@ -40,7 +40,9 @@ _MARKER = "workbench-temporary-marker-v1"
 _DISPOSAL_INTENT = "workbench-temporary-disposal-intent-v1"
 _DISPOSAL = "workbench-temporary-disposal-v1"
 _FAILURE = "workbench-temporary-disposal-failure-v1"
+_RETENTION = "workbench-temporary-retention-v1"
 _MARKER_NAME = ".workbench-temporary-lease.json"
+_RETENTION_NAME = ".workbench-temporary-retained.json"
 _RECORD_LIMIT = 1024 * 1024
 _CATALOG_CHILDREN = frozenset({
     "reservations", "activations", "disposal-intents", "disposals", "failures", "leases",
@@ -228,6 +230,43 @@ class CoreTemporaryLeases:
             raise TemporaryLeaseError("temporary.changed", "temporary lease disposal intent changed")
         return row
 
+    def _retention(self, lease_id: str) -> dict | None:
+        reservation = self._reservation(lease_id)
+        activation = self._activation(lease_id)
+        marker = Path(reservation["path"]) / _RETENTION_NAME
+        if not marker.exists() and not marker.is_symlink():
+            return None
+        try:
+            parent = check_storage.ordinary(marker.parent.parent, directory=True)
+            directory = check_storage.ordinary(marker.parent, directory=True)
+            parent_info, info = parent.stat(), directory.stat()
+            if ((parent_info.st_dev, parent_info.st_ino)
+                    != (reservation["parent_device"], reservation["parent_inode"])
+                    or (info.st_dev, info.st_ino)
+                    != (activation["device"], activation["inode"])
+                    or not private_path(directory, directory=True)):
+                raise TemporaryLeaseError("temporary.changed", "temporary lease retention root changed")
+        except (OSError, ValueError) as exc:
+            if isinstance(exc, TemporaryLeaseError):
+                raise
+            raise TemporaryLeaseError("temporary.changed", "temporary lease retention root changed") from exc
+        try:
+            row = json.loads(read_private_single_link_bytes(marker, byte_limit=_RECORD_LIMIT))
+        except (OSError, ValueError) as exc:
+            raise TemporaryLeaseError("temporary.changed", "temporary lease retention changed") from exc
+        if (not isinstance(row, dict)
+                or row != _sealed(_RETENTION, {key: value for key, value in row.items() if key != "id"})
+                or set(row) != {"id", "format", "lease_id", "activation_id", "outcome",
+                                "reason", "retained_at"}
+                or row["format"] != _RETENTION or row["lease_id"] != lease_id
+                or row["activation_id"] != activation["id"]
+                or type(row["outcome"]) is not str
+                or row["outcome"] not in {"completed", "failed"}
+                or row["reason"] != "process-absence-unproven"
+                or not isinstance(row["retained_at"], str) or not row["retained_at"]):
+            raise TemporaryLeaseError("temporary.changed", "temporary lease retention changed")
+        return row
+
     @staticmethod
     def _inventory_directory(path: Path) -> Path:
         try:
@@ -318,7 +357,8 @@ class CoreTemporaryLeases:
                         path.exists() or path.is_symlink() for path in (target, tombstone)
                     ) else "disposal-unknown")
                 elif (root / "activations" / f"{nonce}.json").exists():
-                    status = "active-or-abandoned"
+                    status = ("retained-unproven" if host._retention(lease_id) is not None
+                              else "active-or-abandoned")
                 else:
                     status = "reserved-incomplete"
                 if workspace is None or reservation["workspace"] == str(workspace):
@@ -356,7 +396,8 @@ class CoreTemporaryLeases:
                     for candidate in (target, tombstone)
                 ) else "disposal-unknown")
             elif self._path("activations", nonce).exists():
-                state = "active-or-abandoned"
+                state = ("retained-unproven" if self._retention(lease_id) is not None
+                         else "active-or-abandoned")
             else:
                 state = "reserved-incomplete"
             rows.append({"reference": self._reference(reservation), "state": state})
@@ -435,11 +476,34 @@ class CoreTemporaryLeases:
                 "reservation_id": reservation["id"],
             })):
                 raise TemporaryLeaseError("temporary.changed", "temporary lease marker changed")
+            self._retention(lease_id)
         except (OSError, ValueError) as exc:
             if isinstance(exc, TemporaryLeaseError):
                 raise
             raise TemporaryLeaseError("temporary.changed", "temporary lease path is unavailable or changed") from exc
         return self._reference(reservation)
+
+    def retain(self, reference: TemporaryLeaseReference, *, outcome: str) -> None:
+        """Mark a completed call as protected until independent drain proof."""
+
+        if reference.lease_id not in _active.get():
+            raise TemporaryLeaseError("temporary.lease", "retention requires the active Core temporary lease")
+        if outcome not in {"completed", "failed"}:
+            raise TemporaryLeaseError("temporary.policy", "temporary lease outcome is invalid")
+        if reference != self.open(reference.lease_id):
+            raise TemporaryLeaseError("temporary.policy", "temporary lease reference changed")
+        activation = self._activation(reference.lease_id)
+        marker = reference.path / _RETENTION_NAME
+        record = _sealed(_RETENTION, {
+            "format": _RETENTION, "lease_id": reference.lease_id,
+            "activation_id": activation["id"], "outcome": outcome,
+            "reason": "process-absence-unproven", "retained_at": _now(),
+        })
+        publish_immutable_bytes(
+            marker, check_storage.canonical(record) + b"\n", byte_limit=_RECORD_LIMIT,
+        )
+        fsync_directory(reference.path)
+        self._retention(reference.lease_id)
 
     @contextmanager
     def execution(self, reference: TemporaryLeaseReference) -> Iterator[None]:

@@ -3276,17 +3276,19 @@ def main(
                 args.workspace,
                 args.seed,
             )
-            result = materialize_project_runtime(
-                suite_root,
-                args.workspace,
-                launcher=args.launcher,
-                packwiz_executable=args.packwiz,
-                seed_roots=args.seed,
-                state_root=runtime_state_root,
-                configuration=active_configuration,
-                managed_java_service=runtime_java_service,
-                managed_config_path=args.config_path,
-            )
+            from workbench_core.host_services import direct_packwiz_scratch_scope
+            with direct_packwiz_scratch_scope(configuration_home=runtime_configuration_home):
+                result = materialize_project_runtime(
+                    suite_root,
+                    args.workspace,
+                    launcher=args.launcher,
+                    packwiz_executable=args.packwiz,
+                    seed_roots=args.seed,
+                    state_root=runtime_state_root,
+                    configuration=active_configuration,
+                    managed_java_service=runtime_java_service,
+                    managed_config_path=args.config_path,
+                )
         elif args.command == "runtime-launch":
             assert active_configuration is not None
             _require_manual_artifact_preflight(
@@ -3294,26 +3296,28 @@ def main(
                 args.workspace,
                 args.seed,
             )
-            result = launch_project_runtime(
-                suite_root,
-                args.workspace,
-                launcher=args.launcher,
-                launcher_executable=args.launcher_executable,
-                launcher_root=args.launcher_root,
-                launcher_profile=args.launcher_profile,
-                launcher_java=args.launcher_java,
-                launcher_java_state=args.launcher_java_state,
-                packwiz_executable=args.packwiz,
-                seed_roots=args.seed,
-                memory_mib=args.memory_mib,
-                offline_name=args.offline_name,
-                compatibility_patches=args.compatibility_patch,
-                timeout_seconds=args.timeout,
-                state_root=runtime_state_root,
-                configuration=active_configuration,
-                managed_java_service=runtime_java_service,
-                managed_config_path=args.config_path,
-            )
+            from workbench_core.host_services import direct_packwiz_scratch_scope
+            with direct_packwiz_scratch_scope(configuration_home=runtime_configuration_home):
+                result = launch_project_runtime(
+                    suite_root,
+                    args.workspace,
+                    launcher=args.launcher,
+                    launcher_executable=args.launcher_executable,
+                    launcher_root=args.launcher_root,
+                    launcher_profile=args.launcher_profile,
+                    launcher_java=args.launcher_java,
+                    launcher_java_state=args.launcher_java_state,
+                    packwiz_executable=args.packwiz,
+                    seed_roots=args.seed,
+                    memory_mib=args.memory_mib,
+                    offline_name=args.offline_name,
+                    compatibility_patches=args.compatibility_patch,
+                    timeout_seconds=args.timeout,
+                    state_root=runtime_state_root,
+                    configuration=active_configuration,
+                    managed_java_service=runtime_java_service,
+                    managed_config_path=args.config_path,
+                )
         elif args.command == "runtime-observe":
             assert active_configuration is not None
             _require_manual_artifact_preflight(
@@ -3321,25 +3325,27 @@ def main(
                 args.workspace,
                 args.seed,
             )
-            result = observe_project_runtime(
-                suite_root,
-                args.workspace,
-                launcher=args.launcher,
-                launcher_executable=args.launcher_executable,
-                launcher_root=args.launcher_root,
-                launcher_profile=args.launcher_profile,
-                launcher_java=args.launcher_java,
-                launcher_java_state=args.launcher_java_state,
-                packwiz_executable=args.packwiz,
-                seed_roots=args.seed,
-                memory_mib=args.memory_mib,
-                offline_name=args.offline_name,
-                compatibility_patches=args.compatibility_patch,
-                timeout_seconds=args.launch_timeout,
-                attach_timeout=args.attach_timeout,
-                session_timeout=args.session_timeout,
-                configuration=active_configuration,
-            )
+            from workbench_core.host_services import direct_packwiz_scratch_scope
+            with direct_packwiz_scratch_scope(configuration_home=runtime_configuration_home):
+                result = observe_project_runtime(
+                    suite_root,
+                    args.workspace,
+                    launcher=args.launcher,
+                    launcher_executable=args.launcher_executable,
+                    launcher_root=args.launcher_root,
+                    launcher_profile=args.launcher_profile,
+                    launcher_java=args.launcher_java,
+                    launcher_java_state=args.launcher_java_state,
+                    packwiz_executable=args.packwiz,
+                    seed_roots=args.seed,
+                    memory_mib=args.memory_mib,
+                    offline_name=args.offline_name,
+                    compatibility_patches=args.compatibility_patch,
+                    timeout_seconds=args.launch_timeout,
+                    attach_timeout=args.attach_timeout,
+                    session_timeout=args.session_timeout,
+                    configuration=active_configuration,
+                )
         elif args.command == "runtime-diagnose":
             assert active_configuration is not None
             if args.recipe_invalidations and args.recipe_reload:

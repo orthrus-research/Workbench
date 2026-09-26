@@ -165,6 +165,38 @@ class TemporaryLeaseTests(unittest.TestCase):
         self._host().reconcile(reference.lease_id, drained=lambda: True)
         self.assertEqual("disposed", self._host().inventory()[0]["state"])
 
+    def test_retained_unproven_lease_is_visible_after_restart(self) -> None:
+        reference = self.host.allocate("system", "retained-run")
+        (reference.path / "source.txt").write_bytes(b"source copy")
+        with self.host.execution(reference):
+            self.host.retain(reference, outcome="completed")
+        restarted = self._host()
+        self.assertEqual("retained-unproven", restarted.inventory()[0]["state"])
+        rows = ResourceCatalog(self.config).inventory(workspace=self.workspace)["temporary_leases"]
+        self.assertEqual("retained-unproven", rows[0]["status"])
+        self.assertEqual(b"source copy", (reference.path / "source.txt").read_bytes())
+        with self.assertRaisesRegex(TemporaryLeaseError, "not confirmed drained"):
+            restarted.reconcile(reference.lease_id, drained=lambda: False)
+        self.assertTrue(reference.path.exists())
+
+        marker = reference.path / ".workbench-temporary-retained.json"
+        original = marker.read_bytes()
+        marker.write_bytes(b"{}")
+        try:
+            with self.assertRaises(DurableResourceError) as caught:
+                ResourceCatalog(self.config).inventory(workspace=self.workspace)
+            self.assertEqual("resource.changed", caught.exception.code)
+        finally:
+            marker.write_bytes(original)
+
+        displaced = reference.path.with_name("displaced-retained")
+        reference.path.rename(displaced)
+        reference.path.mkdir()
+        (reference.path / marker.name).write_bytes(original)
+        with self.assertRaises(DurableResourceError) as caught:
+            ResourceCatalog(self.config).inventory(workspace=self.workspace)
+        self.assertEqual("resource.changed", caught.exception.code)
+
     def test_changed_root_is_never_deleted(self) -> None:
         reference = self.host.allocate("system", "run-two")
         displaced = self.scratch / "displaced"

@@ -46,7 +46,11 @@ import workbench_shell.susy_server_materialize as server_materialize  # noqa: E4
 from workbench_api.verified_artifacts import VerifiedArtifact  # noqa: E402
 from workbench_api.state_paths import default_suite_state_root  # noqa: E402
 from workbench_api.managed_trees import managed_trees  # noqa: E402
-from workbench_core.host_services import suite_managed_tree_scope  # noqa: E402
+from workbench_core.host_services import (  # noqa: E402
+    install_local_host_services, suite_managed_tree_scope,
+)
+from workbench_core.packwiz_scratch import CorePackwizScratch  # noqa: E402
+from workbench_api.temporary_leases import temporary_scratch_scope  # noqa: E402
 
 
 RUN_ID = "susy-mod-20260820T120000000000Z-abcdef123456"
@@ -738,25 +742,28 @@ class _MaterializationFixture:
             "sha256": sha256(raw_installer).hexdigest(),
             "size": len(raw_installer),
         }
-        self.client_materialization = materialize_packwiz_workspace_v2(
-            self.client_plan,
-            workspace_root=self.pack,
-            state_root=self.suite / ".workbench",
-            packwiz_executable=self.packwiz,
-            java_executable=self.java,
-            java_identity={
-                "source": "explicit",
-                "runtime_id": "sha256:" + "8" * 64,
-                "runtime_identity": "eclipse-temurin-25.0.4+7",
-                "runtime_version": "25.0.4+7-LTS",
-                "vendor": "Eclipse Adoptium",
-            },
-            installer_path=self.packwiz_installer,
-            installer_lock=lock,
-            seed_roots=[self.client_seed],
-            refresh_timeout_seconds=10,
-            install_timeout_seconds=10,
-        )
+        with temporary_scratch_scope(CorePackwizScratch(
+            configuration_home=self.suite / ".config",
+        )):
+            self.client_materialization = materialize_packwiz_workspace_v2(
+                self.client_plan,
+                workspace_root=self.pack,
+                state_root=self.suite / ".workbench",
+                packwiz_executable=self.packwiz,
+                java_executable=self.java,
+                java_identity={
+                    "source": "explicit",
+                    "runtime_id": "sha256:" + "8" * 64,
+                    "runtime_identity": "eclipse-temurin-25.0.4+7",
+                    "runtime_version": "25.0.4+7-LTS",
+                    "vendor": "Eclipse Adoptium",
+                },
+                installer_path=self.packwiz_installer,
+                installer_lock=lock,
+                seed_roots=[self.client_seed],
+                refresh_timeout_seconds=10,
+                install_timeout_seconds=10,
+            )
         self.client_receipt = self.client_materialization["receipt"]
         self.canonical_instance = _uri_path(
             self.client_receipt["target"]["instance_root_uri"]
@@ -1007,6 +1014,7 @@ class _MaterializationFixture:
 
 class SusyServerMaterializationTests(unittest.TestCase):
     def setUp(self) -> None:
+        install_local_host_services()
         self.temporary = tempfile.TemporaryDirectory()
         self.fixture = _MaterializationFixture(Path(self.temporary.name))
 

@@ -125,6 +125,7 @@ def dispatch(
         working_stores = nullcontext()
         fixture_stores = nullcontext()
         source_stores = nullcontext()
+        temporary_scratch = nullcontext()
         policy_stores = nullcontext()
         registration_stores = registration_attempts_scope(None)
         if owner.id == "atlas":
@@ -147,6 +148,8 @@ def dispatch(
             from workbench_api.fixture_selections import fixture_selections_scope
             from .source_transactions import CoreSourceTransactions
             from workbench_api.source_transactions import source_transactions_scope
+            from .packwiz_scratch import CorePackwizScratch
+            from workbench_api.temporary_leases import temporary_scratch_scope
             from .state_root_selection import CoreStateRootPolicies
             from workbench_api.state_root_policies import state_root_policies_scope
             from .derived_indexes import CoreDerivedIndexes
@@ -200,6 +203,11 @@ def dispatch(
                 owner_id=owner.id,
                 check_cancelled=context.check_cancelled,
             ))
+            if owner.id == "workbench-shell":
+                temporary_scratch = temporary_scratch_scope(CorePackwizScratch(
+                    configuration_home=context.configuration_home,
+                    owner_id=owner.id,
+                ))
             policy_stores = state_root_policies_scope(CoreStateRootPolicies(
                 suite_root=context.workspace if suite_root is None else suite_root,
                 configuration_home=context.configuration_home,
@@ -232,7 +240,7 @@ def dispatch(
         try:
             from workbench_api.archive_exchange import archive_exchange_scope
             from .archive_port import CoreArchiveExchange
-            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, source_stores, policy_stores, registration_stores, derived_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
+            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, source_stores, temporary_scratch, policy_stores, registration_stores, derived_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
                 handler = getattr(import_module(package), name)
                 result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:
