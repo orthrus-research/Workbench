@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Protocol
 
 
 FORMAT_VERSION = "workbench-live-console-session-v1"
@@ -23,6 +23,32 @@ _INTENTS = {"execute", "preview", "inert", "inspect"}
 
 class SessionError(RuntimeError):
     """Retained console session state is invalid or unsafe."""
+
+
+class RetainedSessionReader(Protocol):
+    def resolve(self, workspace: Path, session_id: str) -> Path: ...
+
+
+_reader: RetainedSessionReader | None = None
+
+
+def bind_retained_session_reader(reader: RetainedSessionReader) -> None:
+    """Bind Core's exact retained-session lookup at the process entry."""
+
+    global _reader
+    if not callable(getattr(reader, "resolve", None)):
+        raise SessionError("retained session reader has no resolver")
+    if _reader is not None and _reader is not reader:
+        raise SessionError("a different retained session reader is already bound")
+    _reader = reader
+
+
+def resolve_retained_session(workspace: Path, session_id: str) -> Path:
+    """Resolve one exact session ID under Core custody for a selected workspace."""
+
+    if _reader is None:
+        raise SessionError("no retained session reader is bound; start through Workbench Core")
+    return _reader.resolve(workspace, session_id)
 
 @dataclass(frozen=True)
 class RawLocator:

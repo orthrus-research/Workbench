@@ -21,6 +21,10 @@ workbench explore
 The final form opens the terminal omnibox. The live console exposes the same
 single-query operation as `explorer.search`.
 
+A `--session` ID resolves through Core under the selected workspace. An
+explicit session directory or event file path remains available for historical
+records and is validated by Explorer after selection.
+
 Use `--json` for the complete content-addressed V1 result, `--details` for
 facets and relationships, `--sources` for coverage, and `--require-observed`
 when automation must reject static-only answers.

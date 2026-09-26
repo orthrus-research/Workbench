@@ -11,6 +11,7 @@ import sys
 from typing import Iterable, TextIO
 
 from workbench_api.events import sanitize_terminal
+from workbench_api.sessions import SessionError, resolve_retained_session
 
 from .model import ExplorerError, ExplorerRecord, ExplorerSource
 from .providers import (
@@ -134,13 +135,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _session_path(root: Path, value: Path) -> Path:
+def _session_path(workspace: Path, value: Path) -> Path:
     if value.exists() or value.is_absolute() or len(value.parts) != 1:
         return value
     session_id = value.name
     if re.fullmatch(r"[A-Za-z0-9._-]{8,120}", session_id) is None:
         return value
-    return root / ".workbench/sessions/live-console" / session_id
+    try:
+        return resolve_retained_session(workspace, session_id)
+    except SessionError as exc:
+        raise ExplorerError(f"retained console session is unavailable: {exc}") from exc
 
 
 def _extend_unique(
@@ -162,7 +166,9 @@ def _extend_unique(
     records.extend(result.records)
 
 
-def _base_inputs(args: argparse.Namespace, *, root: Path) -> tuple[list[ExplorerSource], list[ExplorerRecord]]:
+def _base_inputs(
+    args: argparse.Namespace, *, root: Path, workspace: Path,
+) -> tuple[list[ExplorerSource], list[ExplorerRecord]]:
     for label in ("artifact", "receipt", "session", "log"):
         if len(getattr(args, label)) > MAX_INPUTS_PER_KIND:
             raise ExplorerError(
@@ -182,7 +188,7 @@ def _base_inputs(args: argparse.Namespace, *, root: Path) -> tuple[list[Explorer
         _extend_unique(
             sources,
             records,
-            console_session_provider(_session_path(root, session)),
+            console_session_provider(_session_path(workspace, session)),
         )
     for log in args.log:
         _extend_unique(
@@ -378,6 +384,7 @@ def main(
     argv: list[str] | None = None,
     *,
     root: Path | None = None,
+    workspace: Path | None = None,
     input_stream: TextIO | None = None,
     output: TextIO | None = None,
     error: TextIO | None = None,
@@ -385,13 +392,16 @@ def main(
     parser = build_parser()
     args = parser.parse_args(argv)
     repository_root = Path.cwd() if root is None else root
+    selected_workspace = repository_root if workspace is None else workspace
     stdin = sys.stdin if input_stream is None else input_stream
     stdout = sys.stdout if output is None else output
     stderr = sys.stderr if error is None else error
     raw = " ".join(args.query).strip()
     option_filter_query = _filter_only_query(args)
     try:
-        base_sources, base_records = _base_inputs(args, root=repository_root)
+        base_sources, base_records = _base_inputs(
+            args, root=repository_root, workspace=selected_workspace,
+        )
         if args.interactive or (not raw and not option_filter_query):
             return _interactive(
                 args,

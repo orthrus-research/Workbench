@@ -18,4 +18,4 @@ def explore(argv, *, context):
     context.check_cancelled()
     from workbench_runtime_explorer.cli import main
     from workbench_api.resources import repository_root
-    return main(argv, root=repository_root(__file__))
+    return main(argv, root=repository_root(__file__), workspace=context.workspace)

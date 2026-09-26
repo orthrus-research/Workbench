@@ -10,6 +10,9 @@ import time
 import unittest
 from unittest import mock
 
+from workbench_api.sessions import resolve_retained_session
+from workbench_core.host_services import install_local_host_services
+
 from workbench_core.sessions import (
     EVENTS_NAME,
     MANIFEST_NAME,
@@ -107,6 +110,29 @@ def start_bound_zero_exit_process(
 
 
 class SessionTests(unittest.TestCase):
+    def test_core_reader_resolves_exact_id_and_rejects_changed_manifest(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            session = RetainedSession(
+                root=root, command_id="test.command", argv=["fixture"],
+                cwd=root, intent="inspect", session_id="session-reader-001",
+            )
+            session.finish(
+                state="complete", process_exit_code=None,
+                effective_exit_code=0, outcome="complete",
+            )
+            install_local_host_services()
+            self.assertEqual(
+                session.directory,
+                resolve_retained_session(root, "session-reader-001"),
+            )
+            with self.assertRaisesRegex(SessionError, "invalid exact"):
+                resolve_retained_session(root, "../session-reader-001")
+            manifest = session.directory / MANIFEST_NAME
+            manifest.write_bytes(manifest.read_bytes() + b" ")
+            with self.assertRaises(SessionError):
+                resolve_retained_session(root, "session-reader-001")
+
     def test_packaged_suite_sessions_use_external_runtime_state_only_at_suite_boundary(
         self,
     ) -> None:

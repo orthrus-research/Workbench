@@ -6,10 +6,13 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
 for source in (
+    ROOT / "api/src",
+    ROOT / "core/src",
     ROOT / "modules/runtime-explorer/src",
     ROOT / "modules/project-intelligence/src",
     ROOT / "modules/workbench-shell/src",
@@ -18,6 +21,9 @@ for source in (
     sys.path.insert(0, str(source))
 
 from workbench_runtime_explorer.cli import main  # noqa: E402
+from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core.sessions import RetainedSession  # noqa: E402
+from workbench_api import sessions as session_port  # noqa: E402
 
 
 def _write(path: Path, text: str) -> None:
@@ -41,6 +47,41 @@ def _project(base: Path) -> Path:
 
 
 class CliTests(unittest.TestCase):
+    def test_selected_workspace_session_id_and_explicit_historical_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "selected-workspace"
+            workspace.mkdir()
+            session = RetainedSession(
+                root=workspace, command_id="test.command", argv=["fixture"],
+                cwd=workspace, intent="inspect", session_id="explorer-session-001",
+            )
+            session.finish(
+                state="complete", process_exit_code=None,
+                effective_exit_code=0, outcome="complete",
+            )
+            install_local_host_services()
+            output = StringIO()
+            error = StringIO()
+            code = main(
+                ["--no-project", "--no-manuals", "--session", session.session_id,
+                 "example:missing", "--json"],
+                root=ROOT, workspace=workspace, output=output, error=error,
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", error.getvalue())
+            self.assertEqual(1, len(json.loads(output.getvalue())["sources"]))
+            with patch.object(session_port, "_reader", None):
+                output = StringIO()
+                error = StringIO()
+                code = main(
+                    ["--no-project", "--no-manuals", "--session", str(session.directory),
+                     "example:missing", "--json"],
+                    root=ROOT, workspace=workspace, output=output, error=error,
+                )
+                self.assertEqual(1, code)
+                self.assertEqual("", error.getvalue())
+                self.assertEqual(1, len(json.loads(output.getvalue())["sources"]))
+
     def test_json_search_and_require_observed_exit_semantics(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             project = _project(Path(temporary))
