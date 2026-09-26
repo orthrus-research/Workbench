@@ -185,6 +185,32 @@ still need their own owner locks and reviewed acquisition before a complete
 rebuild can be claimed. Linux exact-tree support is required; WSL storage on
 Windows mounts still needs native qualification.
 
+`plan_package_closure` can review a local `workbench-native-wheelhouse-v1`
+assembly after Core has retained the candidate's optional wheels. The caller
+supplies its exact V3 share, input candidate, workspace, wheel import result ID
+and an absolute wheelhouse path. Core reopens the retained wheel tree; checks
+the assembly's complete manifest, hash lock and wheel bytes; and requires the
+native selection to name Core, the fixture owner and any selected optional
+package whose distribution is Workbench named. It compares each retained
+optional wheel's exact bytes with the assembly. It matches the fixture owner's
+packaged Python code and extension entry point to the candidate's admitted
+code identity. It then checks all
+wheel tags, Python requirements, archive members and CRCs, and evaluates the
+complete `Requires-Dist` closure for the executing Python and host. Direct URL
+dependencies, missing or extra wheels, and target mismatches are refused.
+WSL uses a Linux Python/wheelhouse target; Windows wheels cannot satisfy it.
+
+This is a read-only, identity-bound review record. Its `state` is `reviewed`
+and its coverage is `reviewed-offline-dependency-closure-only`. The native
+manifest's hashes detect byte changes but do not authenticate its publisher.
+No wheels are copied into new Core custody, no environment is created, and no
+package is installed. The `optional-module-packages` marker remains unresolved.
+The next operation must independently reopen the exact plan and source bytes,
+retain the complete closure under Core, install into a new private environment,
+check installation target/launcher collisions, and verify installed dependency,
+module/profile and fixture-owner admission.
+Native installation and WSL filesystem qualification remain separate evidence.
+
 `plan_environment_input_composition` is a V2 linked review of five separately
 completed Core results: workspace selection, exact project checkout, managed
 tools, retained optional wheel bytes and retained profile fixture sources. It

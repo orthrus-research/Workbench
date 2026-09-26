@@ -1347,6 +1347,13 @@ def reopen_wheel_import(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def plan_package_closure(*args, **kwargs) -> dict[str, Any]:
+    """Review an exact offline dependency closure without installing it."""
+
+    from .environment_package_closure import plan_package_closure as operation
+    return operation(*args, **kwargs)
+
+
 def plan_fixture_import(*args, **kwargs) -> dict[str, Any]:
     """Review the admitted profile fixture for separate Core custody."""
 
@@ -1376,5 +1383,6 @@ __all__ = [
     "plan_environment_input_composition", "apply_environment_input_composition",
     "reopen_environment_input_composition",
     "plan_wheel_import", "apply_wheel_import", "reopen_wheel_import",
+    "plan_package_closure",
     "plan_fixture_import", "apply_fixture_import", "reopen_fixture_import",
 ]
