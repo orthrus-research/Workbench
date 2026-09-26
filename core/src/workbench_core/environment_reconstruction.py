@@ -1,9 +1,10 @@
 """Portable environment choices with exact profile locks and local binding.
 
-The share document contains no machine path. Core binds it to an existing,
-matching Configuration V1 manifest and workspace only on the receiving host.
-Project bytes, optional packages, fixtures and Java archives are outside this
-first reconstruction slice and remain visible as unresolved inputs.
+The share document contains no machine path. Core binds it to a matching
+Configuration V1 manifest and workspace only on the receiving host. When the
+manifest is missing, Core can generate an immutable local one from the exact
+intent after checking the target suite's profile documents. Project bytes,
+optional packages, fixtures and Java archives remain unresolved inputs.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import re
 import stat
 from typing import Any, Mapping
 
+from . import configuration as configuration_source
 from .configuration import (
     CONFIGURATION_PATH,
     SCHEMA as CONFIGURATION_SCHEMA,
@@ -31,6 +33,7 @@ from .runtime_java import (
 )
 from .setup_cli import _workspace
 from .storage.registered import CoreDurableResources
+from .storage.registered import ResourceCatalog
 from .user_preferences import (
     UserPreferencesError,
     bind_workspace_selection,
@@ -340,6 +343,138 @@ def _resource_host(suite_root: Path, workspace: Path, environment: Mapping[str, 
     )
 
 
+def _configuration_bytes(selection: Mapping[str, str]) -> bytes:
+    """Encode only the selected portable authority; no local binding defaults."""
+
+    quoted = lambda value: json.dumps(value, ensure_ascii=False)
+    return (
+        f'schema = {quoted(CONFIGURATION_SCHEMA)}\n\n'
+        '[selection]\n'
+        f'pack_document = {quoted(selection["pack_document"])}\n'
+        f'pack_variant = {quoted(selection["pack_variant"])}\n'
+        f'platform_document = {quoted(selection["platform_document"])}\n\n'
+        '[bindings]\n'
+    ).encode("utf-8")
+
+
+def _configuration_from_intent(
+    suite: Path, path: Path, payload: bytes, selection: Mapping[str, str],
+) -> configuration_source.WorkbenchConfiguration:
+    """Inspect profile authority in memory before publishing a manifest."""
+
+    source = configuration_source
+    pack_relative = source._profile_relative_path(selection["pack_document"], "/selection/pack_document")
+    platform_relative = source._profile_relative_path(selection["platform_document"], "/selection/platform_document")
+    pack_source = source._source_snapshot(
+        source._suite_profile_path(suite, pack_relative, "/selection/pack_document"),
+        maximum=source.MAX_PROFILE_BYTES, label="pack profile", relative_path=pack_relative,
+    )
+    platform_source = source._source_snapshot(
+        source._suite_profile_path(suite, platform_relative, "/selection/platform_document"),
+        maximum=source.MAX_PROFILE_BYTES, label="platform profile", relative_path=platform_relative,
+    )
+    pack_values = source._yaml_object(pack_source, "pack profile")
+    platform_values = source._yaml_object(platform_source, "platform profile")
+    pack_schema = source._profile_schema(pack_values, "/pack_document/schema_version")
+    platform_schema = source._profile_schema(platform_values, "/platform_document/schema_version")
+    pack_id = source._embedded_id(
+        pack_values, "profile_family_id", source._PACK_PROFILE_ID,
+        "/pack_document/profile_family_id",
+    )
+    platform_id = source._embedded_id(
+        platform_values, "profile_id", source._PLATFORM_PROFILE_ID,
+        "/platform_document/profile_id",
+    )
+    variants = pack_values.get("profiles")
+    if type(variants) is not dict:
+        raise WorkbenchConfigurationError("/pack_document/profiles: must be a table")
+    variant = variants.get(selection["pack_variant"])
+    if type(variant) is not dict:
+        raise WorkbenchConfigurationError("/selection/pack_variant: must name a variant in the selected pack document")
+    if variant.get("platform_profile_id") != platform_id:
+        raise WorkbenchConfigurationError("selected pack variant does not bind the selected platform profile")
+    pack = source.ProfileSnapshot(
+        pack_source, pack_id, pack_schema, source._freeze(pack_values),
+    )
+    platform = source.ProfileSnapshot(
+        platform_source, platform_id, platform_schema, source._freeze(platform_values),
+    )
+    manifest = source.SourceSnapshot(
+        path=path,
+        relative_path=path.relative_to(suite).as_posix() if path.is_relative_to(suite) else None,
+        source_bytes=payload,
+        sha256=sha256(payload).hexdigest(),
+    )
+    return source.WorkbenchConfiguration(
+        schema=CONFIGURATION_SCHEMA,
+        manifest=manifest,
+        pack_document=pack,
+        pack_variant=selection["pack_variant"],
+        platform_document=platform,
+        selection_digest=source._selection_digest(
+            pack=pack, pack_variant=selection["pack_variant"], platform=platform,
+        ),
+        binding_declarations=(),
+    )
+
+
+def _configuration_blockers(
+    suite: Path, configuration: configuration_source.WorkbenchConfiguration,
+    portable: Mapping[str, Any],
+) -> list[str]:
+    intent = portable["intent"]["selection"]
+    lock = portable["lock"]
+    blockers: list[str] = []
+    if (
+        configuration.selection_digest != lock["selection_digest"]
+        or configuration.pack_document.source.relative_path != intent["pack_document"]
+        or configuration.pack_variant != intent["pack_variant"]
+        or configuration.platform_document.source.relative_path != intent["platform_document"]
+        or configuration.pack_profile_id != lock["pack_profile"]["profile_id"]
+        or configuration.pack_document.source.sha256 != lock["pack_profile"]["sha256"]
+        or configuration.platform_profile_id != lock["platform_profile"]["profile_id"]
+        or configuration.platform_document.source.sha256 != lock["platform_profile"]["sha256"]
+    ):
+        blockers.append("target suite profile selection or document bytes differ from the exact lock")
+    try:
+        default_policy = load_java_runtime_policy(suite, configuration=configuration)
+        feature = portable["intent"]["java"]["feature_version"]
+        selected_policy = (
+            None if portable["intent"]["java"]["mode"] == "local-binding-required"
+            else select_managed_java_policy(default_policy, feature)
+        )
+        policy_lock = lock["java_policy"]
+        if (
+            default_policy["policy_sha256"] != policy_lock["profile_policy_sha256"]
+            or (selected_policy["policy_sha256"] if selected_policy else None)
+            != policy_lock["selected_policy_sha256"]
+            or (selected_policy["feature_version"] if selected_policy else None)
+            != policy_lock["feature_version"]
+            or (selected_policy["runtime_identity"] if selected_policy else None)
+            != policy_lock["runtime_identity"]
+            or (selected_policy["release_name"] if selected_policy else None)
+            != policy_lock["release_name"]
+        ):
+            blockers.append("target Java policy differs from the exact lock")
+    except JavaRuntimeError as exc:
+        blockers.append(f"target Java policy is unavailable: {exc}")
+    return blockers
+
+
+def _generated_manifest_resource(
+    catalog: ResourceCatalog, workspace: Path, path: Path, digest: str,
+) -> str | None:
+    """Reopen only a committed Core publication at the reserved local path."""
+
+    rows = [
+        row for row in catalog.inventory(workspace=workspace)["resources"]
+        if row["path"] == str(path) and row["status"] == "committed"
+        and row["owner_id"] == "workbench-core" and row["role"] == "artifacts"
+        and row["sha256"] == "sha256:" + digest
+    ]
+    return rows[0]["resource_id"] if len(rows) == 1 else None
+
+
 def export_share(
     suite_root: Path, workspace_name: str, *, environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
@@ -399,47 +534,64 @@ def plan_import(
         raise ReconstructionError(f"local workspace is invalid: {exc}") from exc
     if not selected_workspace.is_dir():
         blockers.append("local workspace directory is missing; create or acquire it before import")
-    try:
-        target_configuration = load_workbench_configuration(suite, config_path)
-    except WorkbenchConfigurationError as exc:
-        target_configuration = None
-        blockers.append(f"matching local Configuration V1 manifest is unavailable: {exc}")
-    if target_configuration is not None:
-        intent = portable["intent"]["selection"]
-        lock = portable["lock"]
-        if (
-            target_configuration.selection_digest != lock["selection_digest"]
-            or target_configuration.pack_document.source.relative_path != intent["pack_document"]
-            or target_configuration.pack_variant != intent["pack_variant"]
-            or target_configuration.platform_document.source.relative_path != intent["platform_document"]
-            or target_configuration.pack_profile_id != lock["pack_profile"]["profile_id"]
-            or target_configuration.pack_document.source.sha256 != lock["pack_profile"]["sha256"]
-            or target_configuration.platform_profile_id != lock["platform_profile"]["profile_id"]
-            or target_configuration.platform_document.source.sha256 != lock["platform_profile"]["sha256"]
-        ):
-            blockers.append("target suite profile selection or document bytes differ from the exact lock")
+    registry = load_workspaces(environment=values)
+    resolution = resolve_environment(suite, workspace=selected_workspace, environment=values)
+    if resolution.record["workspaces"]["record_id"] != registry["record_id"]:
+        raise ReconstructionError("user workspaces changed during import planning")
+    selection = portable["intent"]["selection"]
+    manifest_payload = _configuration_bytes(selection)
+    manifest_digest = sha256(manifest_payload).hexdigest()
+    requested_path = configuration_source._manifest_path(suite, config_path)
+    generated_path = (
+        Path(resolution.locations["artifacts"])
+        / "environment-configurations"
+        / sha256(os.fsencode(selected_workspace)).hexdigest()
+        / f"{manifest_digest}.toml"
+    )
+    target_configuration = None
+    manifest_action = "unavailable"
+    manifest_resource_id = None
+    requested_present = requested_path.exists() or requested_path.is_symlink()
+    generate = not requested_present
+    if requested_present:
         try:
-            default_policy = load_java_runtime_policy(suite, configuration=target_configuration)
-            feature = portable["intent"]["java"]["feature_version"]
-            selected_policy = (
-                None if portable["intent"]["java"]["mode"] == "local-binding-required"
-                else select_managed_java_policy(default_policy, feature)
-            )
-            policy_lock = lock["java_policy"]
+            target_configuration = load_workbench_configuration(suite, requested_path)
+            manifest_action = "existing"
             if (
-                default_policy["policy_sha256"] != policy_lock["profile_policy_sha256"]
-                or (selected_policy["policy_sha256"] if selected_policy else None)
-                != policy_lock["selected_policy_sha256"]
-                or (selected_policy["feature_version"] if selected_policy else None)
-                != policy_lock["feature_version"]
-                or (selected_policy["runtime_identity"] if selected_policy else None)
-                != policy_lock["runtime_identity"]
-                or (selected_policy["release_name"] if selected_policy else None)
-                != policy_lock["release_name"]
+                Path(config_path) == CONFIGURATION_PATH
+                and _configuration_blockers(suite, target_configuration, portable)
             ):
-                blockers.append("target Java policy differs from the exact lock")
-        except JavaRuntimeError as exc:
-            blockers.append(f"target Java policy is unavailable: {exc}")
+                # Keep the suite's valid default for its existing users. The
+                # import may select a separate reviewed local manifest.
+                target_configuration = None
+                generate = True
+        except WorkbenchConfigurationError as exc:
+            blockers.append(f"matching local Configuration V1 manifest is unavailable: {exc}")
+    if generate:
+        if generated_path.exists() or generated_path.is_symlink():
+            try:
+                target_configuration = load_workbench_configuration(suite, generated_path)
+                if target_configuration.manifest.sha256 != manifest_digest:
+                    raise ReconstructionError("generated Configuration V1 manifest bytes changed")
+                manifest_resource_id = _generated_manifest_resource(
+                    ResourceCatalog(resolution.configuration_home),
+                    selected_workspace, generated_path, manifest_digest,
+                )
+                if manifest_resource_id is None:
+                    raise ReconstructionError("generated Configuration V1 manifest is outside Core custody")
+                manifest_action = "reuse-generated"
+            except (WorkbenchConfigurationError, ReconstructionError) as exc:
+                blockers.append(f"matching local Configuration V1 manifest is unavailable: {exc}")
+        else:
+            try:
+                target_configuration = _configuration_from_intent(
+                    suite, generated_path, manifest_payload, selection,
+                )
+                manifest_action = "create"
+            except WorkbenchConfigurationError as exc:
+                blockers.append(f"matching target profile documents are unavailable: {exc}")
+    if target_configuration is not None:
+        blockers.extend(_configuration_blockers(suite, target_configuration, portable))
     try:
         selected_host = _host_variant(host_platform() if host is None else host)
     except (JavaRuntimeError, ReconstructionError) as exc:
@@ -462,10 +614,6 @@ def plan_import(
         if java_home is not None:
             raise ReconstructionError("a managed Java choice cannot include a local Java path")
         selected_java = None
-    registry = load_workspaces(environment=values)
-    resolution = resolve_environment(suite, workspace=selected_workspace, environment=values)
-    if resolution.record["workspaces"]["record_id"] != registry["record_id"]:
-        raise ReconstructionError("user workspaces changed during import planning")
     old = next((entry for entry in registry["entries"] if entry["name"] == workspace_name), None)
     for entry in registry["entries"]:
         registered = resolve_expression(entry["path"], environment=values)
@@ -473,7 +621,7 @@ def plan_import(
             blockers.append("another named workspace already uses this directory")
     if old is not None and resolve_expression(old["path"], environment=values) != selected_workspace:
         blockers.append("workspace name is already bound to another directory")
-    local_config = str(target_configuration.manifest.path) if target_configuration else str(Path(config_path))
+    local_config = str(target_configuration.manifest.path) if target_configuration else str(requested_path)
     same = (
         old is not None
         and registry["schema_version"] == 3
@@ -489,10 +637,16 @@ def plan_import(
         "lock_id": portable["lock"]["lock_id"],
         "workspace_name": workspace_name,
         "workspace": str(selected_workspace),
+        "requested_profile_config": str(requested_path),
         "profile_config": local_config,
         "profile_selection_digest": (
             target_configuration.selection_digest if target_configuration else None
         ),
+        "configuration_manifest_action": manifest_action,
+        "configuration_manifest_sha256": (
+            target_configuration.manifest.sha256 if target_configuration else None
+        ),
+        "configuration_manifest_resource_id": manifest_resource_id,
         "java_home": selected_java,
         "managed_java_feature": portable["intent"]["java"]["feature_version"],
         "host_variant": selected_host,
@@ -532,6 +686,8 @@ def apply_import(
     if plan["state"] != "ready":
         raise ReconstructionError("environment import is blocked: " + "; ".join(plan["blockers"]))
     service = _resource_host(Path(suite_root), Path(plan["workspace"]), values)
+    if service.policy_id != plan["environment_resolution_id"]:
+        raise ReconstructionError("environment import resolution changed after review")
     prepared = {
         "format": "workbench-environment-import-attempt-v1",
         "schema_version": 1,
@@ -540,6 +696,12 @@ def apply_import(
         "plan_id": plan["plan_id"],
         "expected_workspaces_record_id": plan["expected_workspaces_record_id"],
         "workspace_name": workspace_name,
+        "configuration_manifest": {
+            "action": plan["configuration_manifest_action"],
+            "path": plan["profile_config"],
+            "sha256": plan["configuration_manifest_sha256"],
+            "resource_id": plan["configuration_manifest_resource_id"],
+        },
     }
     prepared_payload = _canonical(prepared) + b"\n"
     prepared_ref = service.publish_bytes(
@@ -553,6 +715,45 @@ def apply_import(
     )
     if admitted["plan_id"] != plan["plan_id"] or admitted["state"] != "ready":
         raise ReconstructionError("environment inputs changed after the prepared attempt")
+    manifest_resource_id = plan["configuration_manifest_resource_id"]
+    if plan["configuration_manifest_action"] == "create":
+        manifest_payload = _configuration_bytes(portable["intent"]["selection"])
+        manifest_path = Path(plan["profile_config"])
+        if (
+            sha256(manifest_payload).hexdigest() != plan["configuration_manifest_sha256"]
+            or not manifest_path.is_relative_to(service.locations["artifacts"])
+        ):
+            raise ReconstructionError("generated Configuration V1 manifest differs from the reviewed plan")
+        manifest_ref = service.publish_bytes(
+            "artifacts", manifest_path.name, manifest_payload,
+            requested_path=manifest_path, domain_id=portable["intent"]["intent_id"],
+            references=(prepared_ref.resource_id,),
+        )
+        if manifest_ref.path != manifest_path or service.read_bytes(manifest_ref.resource_id) != manifest_payload:
+            raise ReconstructionError("generated Configuration V1 manifest did not reopen exactly")
+        manifest_resource_id = manifest_ref.resource_id
+    elif plan["configuration_manifest_action"] == "reuse-generated":
+        if (
+            manifest_resource_id is None
+            or service.read_bytes(manifest_resource_id)
+            != _configuration_bytes(portable["intent"]["selection"])
+        ):
+            raise ReconstructionError("generated Configuration V1 manifest is unavailable under Core custody")
+    try:
+        verified_configuration = load_workbench_configuration(
+            Path(suite_root), plan["profile_config"],
+        )
+    except WorkbenchConfigurationError as exc:
+        raise ReconstructionError(f"Configuration V1 manifest changed before binding: {exc}") from exc
+    if (
+        verified_configuration.manifest.sha256 != plan["configuration_manifest_sha256"]
+        or _configuration_blockers(Path(suite_root), verified_configuration, portable)
+    ):
+        raise ReconstructionError("Configuration V1 manifest or target profiles changed before binding")
+    if resolve_environment(
+        suite_root, workspace=Path(plan["workspace"]), environment=values,
+    ).record["resolution_id"] != plan["environment_resolution_id"]:
+        raise ReconstructionError("environment inputs changed before binding")
     registry = bind_workspace_selection(
         workspace_name, plan["workspace"],
         profile_config=plan["profile_config"],
@@ -565,21 +766,33 @@ def apply_import(
     receipt = {
         "format": RESULT_FORMAT,
         "schema_version": 1,
-        "outcome": "reused" if plan["action"] == "reuse" else "bound",
+        "outcome": (
+            "reused"
+            if plan["action"] == "reuse" and plan["configuration_manifest_action"] != "create"
+            else "bound"
+        ),
         "share": portable,
         "plan_id": plan["plan_id"],
         "attempt_resource_id": prepared_ref.resource_id,
         "workspace_id": entry["workspace_id"],
         "workspaces_record_id": registry["record_id"],
         "profile_selection_digest": plan["profile_selection_digest"],
+        "configuration_manifest": {
+            "path": plan["profile_config"],
+            "sha256": plan["configuration_manifest_sha256"],
+            "resource_id": manifest_resource_id,
+        },
         "unresolved_inputs": plan["unresolved_inputs"],
         "scope": "Local selections only; project bytes and managed dependencies require separate acquisition.",
     }
     payload = _canonical(receipt) + b"\n"
     complete_service = _resource_host(Path(suite_root), Path(plan["workspace"]), values)
+    references = (prepared_ref.resource_id,)
+    if manifest_resource_id is not None:
+        references += (manifest_resource_id,)
     reference = complete_service.publish_bytes(
         "evidence", "environment-reconstruction.json", payload,
-        domain_id=portable["share_id"], references=(prepared_ref.resource_id,),
+        domain_id=portable["share_id"], references=references,
     )
     if complete_service.read_bytes(reference.resource_id) != payload:
         raise ReconstructionError("environment reconstruction receipt did not reopen exactly")

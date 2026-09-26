@@ -1,8 +1,8 @@
 # Portable environment selections V1
 
-Status: Core export, read-only plan and local selection import are implemented.
-This is the first reconstruction slice. It binds a compatible Workbench suite
-and an existing local workspace; it does not acquire project, fixture, tool or
+Status: Core export, read-only plan, local Configuration V1 generation and
+selection import are implemented. This binds a compatible Workbench suite and
+an existing local workspace; it does not acquire project, fixture, tool or
 Java bytes.
 
 ## Share and local authority
@@ -28,16 +28,29 @@ path is not exported. The lock lists inputs absent from the file, including
 project bytes, optional module packages, profile fixture/tool bytes and either
 the Java archive or a local Java binding.
 
-The receiving machine supplies an existing workspace directory and a local
-Configuration V1 manifest in a compatible Workbench suite. Core reloads that
-manifest and the selected profile documents. Their exact selection, IDs and
-hashes must match the share. The local manifest path and any supplied Java path
-live only in the Core `workspaces.json` V3 row. The import updates that row under
-the existing lock with a reviewed prior record ID; a repeat import reuses it.
+The receiving machine supplies an existing workspace directory and matching
+profile documents in a compatible Workbench suite. Core accepts an existing
+Configuration V1 manifest when its selection, IDs and hashes match the share.
+If the requested manifest is absent, a read-only plan validates the target
+profile documents and Java policy, then proposes a minimal local manifest from
+the portable selection. Its `[bindings]` table is empty; Core does not copy
+source-machine paths or insert a product default. If the suite's valid default
+manifest selects something else, Core keeps it and proposes a separate local
+manifest. An explicitly selected mismatched `--config` blocks import. Neither
+case overwrites an existing file.
+
+Core publishes a generated manifest through its registered artifacts store at
+a stable, workspace-specific content path. It reopens the exact bytes and
+selected profiles before binding the manifest path in the Core `workspaces.json`
+V3 row. Any supplied Java path also lives only in that local row. The registry
+update requires the reviewed prior record ID; a repeat import reuses the
+registered manifest and matching choice. A generated file without a committed
+Core resource cannot be silently adopted.
 Core publishes a reconstruction receipt under the selected `evidence` role.
 It first retains a prepared attempt that contains the reviewed share and plan.
-If binding or final receipt publication is interrupted, that attempt remains
-identifiable and a repeated import can recheck or reuse the local binding.
+If manifest publication, binding or final receipt publication is interrupted,
+that attempt remains identifiable. A published manifest with failed binding
+can be reopened under Core custody; a new plan is required before retry.
 
 ## Commands
 
@@ -47,8 +60,9 @@ workbench settings environment plan SHARE.json --name LOCAL_NAME --workspace /lo
 workbench settings environment import SHARE.json --name LOCAL_NAME --workspace /local/workspace --plan-id PLAN_ID
 ```
 
-Add `--config /local/workbench.toml` to plan and import when the target suite's
-default manifest is not the matching local manifest. A share with
+Add `--config /local/workbench.toml` to plan and import to select an existing
+matching local manifest. When the requested manifest is absent, the plan names
+the generated artifact path and its digest. A share with
 `local-binding-required` also needs `--java-home /local/jdk`. Core accepts that
 path as a user choice without inventory or version admission; a consuming
 operation handles execution failures. Managed Java 8 is explicit. With the
@@ -56,12 +70,14 @@ Cleanroom provisional profile and no override, the selected managed policy is
 Java 25. Use `workbench settings workspace acquire LOCAL_NAME` after import to
 acquire the saved managed choice.
 
-Plan is read-only. It reports missing workspace/configuration inputs, profile
-drift, unsupported host variant and an unbound Java path as blockers. Import
+Plan is read-only. It reports missing workspace/profile inputs, profile drift,
+unsupported host variant and an unbound Java path as blockers. Import
 recomputes the exact plan and refuses a stale plan ID before writing local
-choices. A fresh configuration home and state root are supported when a
-compatible checked-out suite and workspace directory already exist. The
-project source and external dependency bytes must be obtained separately.
+choices. It retains a prepared attempt before publishing a generated manifest
+and binds the workspace only after verifying the published bytes and profiles.
+A fresh configuration home and state root are supported when a compatible
+checked-out suite and workspace directory already exist. The project source
+and external dependency bytes must be obtained separately.
 
 WSL is a Linux managed-Java host. A `/mnt/c/...` path is a local binding and
 never enters the share. Windows execution from WSL is a different host variant;
@@ -70,9 +86,11 @@ runtime receipt across the boundary.
 
 ## Remaining reconstruction work
 
-The next slice can generate a local Configuration V1 manifest from a validated
-intent when the target suite lacks a matching one. It must then keep that
-manifest and the workspace registry reference together under Core custody.
+Core's read-only intent admission reuses Configuration V1's profile validators
+but still repeats its pack-variant/platform binding check. A later Core cleanup
+should expose one pure profile-snapshot parser for both manifest loading and
+intent admission.
+
 Provisioning must connect the exact lock to managed Java, project source,
 fixtures and tool receipts, preserving incomplete outcomes and reporting
 unavailable inputs. Textual will present this Core plan and import operation;

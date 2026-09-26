@@ -27,7 +27,8 @@ from workbench_core.environment_reconstruction import (
     plan_import,
 )
 from workbench_core.environment_resolution import resolve_environment
-from workbench_core.storage.registered import CoreDurableResources
+from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
+from workbench_core.configuration import load_workbench_configuration
 from workbench_core.user_preferences import (
     UserPreferencesError,
     bind_workspace_selection,
@@ -90,6 +91,224 @@ class EnvironmentReconstructionTests(TestCase):
             java_home=java_home, managed_java_feature=feature,
             environment=self.source_environment,
         )
+
+    def test_missing_manifest_is_generated_under_core_custody_and_reused(self) -> None:
+        self._source_choice(feature=8)
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        (self.target_suite / "workbench.toml").unlink()
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        manifest_path = Path(plan["profile_config"])
+        self.assertEqual((plan["state"], plan["configuration_manifest_action"]), ("ready", "create"))
+        self.assertTrue(manifest_path.is_relative_to(self.target_root / "state/artifacts"))
+        self.assertFalse(manifest_path.exists())
+        self.assertFalse((self.target_root / "config").exists())
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+
+        result = apply_import(
+            self.target_suite, share, expected_plan_id=plan["plan_id"],
+            workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        payload = manifest_path.read_bytes()
+        self.assertEqual(
+            payload,
+            b'schema = "workbench/config/v1"\n\n[selection]\n'
+            b'pack_document = "profiles/packs/supersymmetry/profile.yaml"\n'
+            b'pack_variant = "cleanroom-provisional"\n'
+            b'platform_document = "profiles/platforms/cleanroom/provisional.yaml"\n\n'
+            b'[bindings]\n',
+        )
+        self.assertNotIn(str(self.source_suite).encode(), payload)
+        self.assertNotIn(str(self.source_workspace).encode(), payload)
+        self.assertEqual(share["lock"]["selection_digest"], load_workbench_configuration(
+            self.target_suite, manifest_path,
+        ).selection_digest)
+        self.assertEqual(str(manifest_path), load_workspaces(
+            environment=self.target_environment,
+        )["entries"][0]["profile_config"])
+        resource_id = result["configuration_manifest"]["resource_id"]
+        self.assertIsNotNone(resource_id)
+        catalog = ResourceCatalog(self.target_root / "config")
+        resources = catalog.inventory(workspace=self.target_workspace)["resources"]
+        self.assertEqual(
+            [(row["resource_id"], row["status"]) for row in resources if row["path"] == str(manifest_path)],
+            [(resource_id, "committed")],
+        )
+        self.assertIn(resource_id, next(
+            row["references"] for row in resources
+            if row["resource_id"] == result["resource"]["resource_id"]
+        ))
+        repeat = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual((repeat["state"], repeat["action"], repeat["configuration_manifest_action"]),
+                         ("ready", "reuse", "reuse-generated"))
+        second = apply_import(
+            self.target_suite, share, expected_plan_id=repeat["plan_id"],
+            workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual("reused", second["outcome"])
+        self.assertEqual(resource_id, second["configuration_manifest"]["resource_id"])
+
+    def test_missing_manifest_requires_exact_profile_bytes_and_reviewed_plan(self) -> None:
+        self._source_choice()
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        (self.target_suite / "workbench.toml").unlink()
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        platform = self.target_suite / share["intent"]["selection"]["platform_document"]
+        platform.write_bytes(platform.read_bytes() + b"\n")
+        changed = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual("blocked", changed["state"])
+        self.assertIn("differ", " ".join(changed["blockers"]))
+        with self.assertRaisesRegex(ReconstructionError, "changed after review"):
+            apply_import(
+                self.target_suite, share, expected_plan_id=plan["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                environment=self.target_environment,
+            )
+        self.assertFalse(Path(plan["profile_config"]).exists())
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+
+    def test_different_suite_default_is_preserved_and_explicit_config_blocks(self) -> None:
+        self._source_choice()
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        default = self.target_suite / "workbench.toml"
+        alternate = self.target_suite / "profiles/packs/alternate/profile.yaml"
+        alternate.parent.mkdir(parents=True)
+        copy2(self.target_suite / "profiles/packs/supersymmetry/profile.yaml", alternate)
+        default.write_text(default.read_text(encoding="utf-8").replace(
+            "profiles/packs/supersymmetry/profile.yaml",
+            "profiles/packs/alternate/profile.yaml",
+        ), encoding="utf-8")
+        before = default.read_bytes()
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual((plan["state"], plan["configuration_manifest_action"]), ("ready", "create"))
+        explicit = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            config_path=default, environment=self.target_environment,
+        )
+        self.assertEqual("blocked", explicit["state"])
+        self.assertIn("differ", " ".join(explicit["blockers"]))
+        apply_import(
+            self.target_suite, share, expected_plan_id=plan["plan_id"],
+            workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual(before, default.read_bytes())
+
+    def test_unregistered_generated_manifest_cannot_be_adopted(self) -> None:
+        self._source_choice()
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        (self.target_suite / "workbench.toml").unlink()
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        generated = Path(plan["profile_config"])
+        generated.parent.mkdir(parents=True)
+        generated.write_text(
+            'schema = "workbench/config/v1"\n\n[selection]\n'
+            'pack_document = "profiles/packs/supersymmetry/profile.yaml"\n'
+            'pack_variant = "cleanroom-provisional"\n'
+            'platform_document = "profiles/platforms/cleanroom/provisional.yaml"\n\n'
+            '[bindings]\n', encoding="utf-8",
+        )
+        blocked = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual("blocked", blocked["state"])
+        self.assertIn("outside Core custody", " ".join(blocked["blockers"]))
+        with self.assertRaisesRegex(ReconstructionError, "changed after review"):
+            apply_import(
+                self.target_suite, share, expected_plan_id=plan["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                environment=self.target_environment,
+            )
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+
+    def test_core_cli_plans_and_imports_generated_manifest(self) -> None:
+        self._source_choice()
+        exported = export_share(self.source_suite, "pack", environment=self.source_environment)
+        share_path = exported["resource"]["path"]
+        (self.target_suite / "workbench.toml").unlink()
+        with patch.dict(os.environ, self.target_environment, clear=False), redirect_stdout(StringIO()) as stream:
+            self.assertEqual(0, settings_cli.main([
+                "environment", "plan", share_path, "--name", "shared",
+                "--workspace", str(self.target_workspace), "--json",
+            ], suite_root=self.target_suite))
+        plan = json.loads(stream.getvalue())
+        self.assertEqual((plan["state"], plan["configuration_manifest_action"]), ("ready", "create"))
+        with patch.dict(os.environ, self.target_environment, clear=False), redirect_stdout(StringIO()) as stream:
+            self.assertEqual(0, settings_cli.main([
+                "environment", "import", share_path, "--name", "shared",
+                "--workspace", str(self.target_workspace), "--plan-id", plan["plan_id"],
+                "--json",
+            ], suite_root=self.target_suite))
+        result = json.loads(stream.getvalue())
+        self.assertEqual("bound", result["outcome"])
+        self.assertEqual(plan["profile_config"], result["configuration_manifest"]["path"])
+        self.assertIsNotNone(result["configuration_manifest"]["resource_id"])
+
+    def test_generated_manifest_survives_failed_binding_with_prepared_evidence(self) -> None:
+        self._source_choice()
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        (self.target_suite / "workbench.toml").unlink()
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        with patch(
+            "workbench_core.environment_reconstruction.bind_workspace_selection",
+            side_effect=UserPreferencesError("injected binding failure"),
+        ):
+            with self.assertRaisesRegex(UserPreferencesError, "injected binding failure"):
+                apply_import(
+                    self.target_suite, share, expected_plan_id=plan["plan_id"],
+                    workspace_name="shared", workspace=self.target_workspace,
+                    environment=self.target_environment,
+                )
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+        self.assertTrue(Path(plan["profile_config"]).is_file())
+        attempts = list((self.target_root / "state/evidence/outputs/workbench-core").glob(
+            "*-environment-import-attempt.json"
+        ))
+        self.assertEqual(len(attempts), 1)
+        attempted = json.loads(attempts[0].read_text(encoding="utf-8"))
+        self.assertEqual(attempted["state"], "prepared")
+        self.assertEqual(attempted["configuration_manifest"]["sha256"], plan["configuration_manifest_sha256"])
+        retry = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual((retry["state"], retry["configuration_manifest_action"]),
+                         ("ready", "reuse-generated"))
+        with self.assertRaisesRegex(ReconstructionError, "changed after review"):
+            apply_import(
+                self.target_suite, share, expected_plan_id=plan["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                environment=self.target_environment,
+            )
+        completed = apply_import(
+            self.target_suite, share, expected_plan_id=retry["plan_id"],
+            workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        self.assertEqual("bound", completed["outcome"])
 
     def test_clean_root_import_reopens_exact_selection_and_reuses_registry(self) -> None:
         self._source_choice(feature=8)
