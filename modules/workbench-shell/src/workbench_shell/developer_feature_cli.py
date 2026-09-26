@@ -10,22 +10,21 @@ from contextlib import nullcontext
 import json
 from pathlib import Path
 import sys
-from typing import Any, ContextManager, Mapping, Sequence
+from typing import Any, Callable, ContextManager, Mapping, Sequence
 
 from .bootstrap import inspect_project
 from .developer_feature import (
     DeveloperFeatureError,
+    _workspace_from_uri,
     apply_material_fluid_recipe_plan,
     build_material_fluid_recipe_plan,
     default_feature_state_root,
-    material_fluid_recipe_workspace,
     material_fluid_recipe_options,
     recover_material_fluid_recipe,
     resolve_feature_record,
     retain_feature_record,
     rollback_material_fluid_recipe,
     transaction_state_root,
-    validate_material_fluid_recipe_plan,
     verify_material_fluid_recipe_plan,
     workspace_transaction_lock_path,
     workspace_transaction_lock_path_for_uri,
@@ -86,8 +85,9 @@ def _add_state_root(parser: argparse.ArgumentParser) -> None:
         "--state-root",
         type=Path,
         help=(
-            "retained developer-feature state (defaults to stable per-user state; "
-            "WORKBENCH_STATE_ROOT overrides it)"
+            "retained developer-feature state (Core route defaults to the active "
+            "workspace's selected feature root; direct Shell calls use the "
+            "stable per-user default)"
         ),
     )
 
@@ -95,7 +95,7 @@ def _add_state_root(parser: argparse.ArgumentParser) -> None:
 def _add_state_root_policy_id(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--expected-state-root-policy-id",
-        help="Core feature state-root policy ID reviewed before plan retention",
+        help="Core feature state-root policy ID reviewed by the caller",
     )
 
 
@@ -396,10 +396,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--attach-timeout", type=float, default=120.0)
     run.add_argument("--session-timeout", type=float, default=21_600.0)
     _add_state_root(run)
-    run.add_argument(
-        "--expected-state-root-policy-id",
-        help="Core feature state-root policy ID reviewed by the caller",
-    )
+    _add_state_root_policy_id(run)
     _add_json(run)
 
     compare_runtime = actions.add_parser(
@@ -443,6 +440,7 @@ def build_parser() -> argparse.ArgumentParser:
     compare_runtime.add_argument("--attach-timeout", type=float, default=120.0)
     compare_runtime.add_argument("--session-timeout", type=float, default=21_600.0)
     _add_state_root(compare_runtime)
+    _add_state_root_policy_id(compare_runtime)
     _add_json(compare_runtime)
 
     apply = actions.add_parser("apply", help="apply one exact reviewed plan locally")
@@ -454,6 +452,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="exact reviewed plan ID authorizing this local application",
     )
     _add_state_root(apply)
+    _add_state_root_policy_id(apply)
     _add_json(apply)
 
     rollback = actions.add_parser(
@@ -463,6 +462,7 @@ def build_parser() -> argparse.ArgumentParser:
     rollback.add_argument("plan", help="retained plan ID or record path")
     rollback.add_argument("receipt", help="retained application receipt ID or path")
     _add_state_root(rollback)
+    _add_state_root_policy_id(rollback)
     _add_json(rollback)
 
     recover = actions.add_parser(
@@ -472,6 +472,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_family(recover)
     recover.add_argument("plan", help="retained plan ID or record path")
     _add_state_root(recover)
+    _add_state_root_policy_id(recover)
     _add_json(recover)
     return parser
 
@@ -489,13 +490,154 @@ def _state_root(args: argparse.Namespace, suite_root: Path) -> Path:
     )
 
 
+def _action_state_root(
+    args: argparse.Namespace, suite_root: Path, *, core_workspace: Path | None,
+) -> tuple[Path, str | None]:
+    """Use Core's workspace choice when this invocation has no direct path."""
+
+    if args.state_root is None and core_workspace is not None:
+        policy = state_root_policies().resolve(core_workspace, "feature")
+        return Path(policy["state_root"]), policy["policy_id"]
+    return _state_root(args, suite_root), None
+
+
+def _require_action_workspace(
+    plan: Mapping[str, Any], *, core_workspace: Path | None, guarded: bool,
+) -> Path:
+    """Bind a Core-selected action to the target recorded by its owner plan."""
+
+    workspace = _workspace_from_uri(plan.get("workspace_uri"))
+    if guarded and core_workspace is not None and workspace != core_workspace.resolve(strict=True):
+        raise DeveloperFeatureError("retained feature plan targets another Core-selected workspace")
+    return workspace
+
+
+def _action_policy_scope(
+    args: argparse.Namespace, *, workspace: Path, state_root: Path,
+    selected_policy_id: str | None,
+) -> ContextManager[None]:
+    expected = (
+        args.expected_state_root_policy_id
+        if args.expected_state_root_policy_id is not None
+        else selected_policy_id
+    )
+    if expected is None:
+        return nullcontext()
+    return state_root_policies().hold(workspace, "feature", state_root, expected)
+
+
+def _apply_action(
+    args: argparse.Namespace, suite: Path, state_root: Path,
+    plan: Mapping[str, Any],
+    retain_committed_receipt: Callable[[Path, Mapping[str, Any]], None],
+) -> tuple[dict[str, Any], Path]:
+    if args.consent != plan.get("id"):
+        raise DeveloperFeatureError("apply requires consent to the exact retained plan ID")
+    retain_feature_record(state_root, "plans", plan)
+    transaction = transaction_state_root(state_root, plan.get("id", ""))
+    if args.family == FAMILY:
+        result = apply_material_fluid_recipe_plan(
+            suite, plan, transaction, consent_plan_id=args.consent,
+            transaction_lock=workspace_transaction_lock_path(plan),
+            commit_receipt=lambda receipt: retain_committed_receipt(state_root, receipt),
+        )
+    elif args.family == RECIPE_FAMILY:
+        result = recipe_change_authority("supersymmetry").apply_recipe_change_plan(
+            suite, plan, transaction, consent_plan_id=args.consent,
+            transaction_lock=workspace_transaction_lock_path_for_uri(
+                plan.get("workspace_uri", "")),
+            commit_receipt=lambda receipt: retain_committed_receipt(state_root, receipt),
+        )
+    else:
+        result = apply_source_feature_plan(
+            suite, plan, transaction, consent_plan_id=args.consent,
+            transaction_lock=workspace_transaction_lock_path_for_uri(
+                plan.get("workspace_uri", "")),
+            commit_receipt=lambda receipt: retain_committed_receipt(state_root, receipt),
+        )
+    return result, retain_feature_record(state_root, "receipts", result)
+
+
+def _rollback_action(
+    args: argparse.Namespace, suite: Path, state_root: Path,
+    plan: Mapping[str, Any],
+) -> tuple[dict[str, Any], Path]:
+    retain_feature_record(state_root, "plans", plan)
+    receipt = resolve_feature_record(state_root, "receipts", args.receipt)
+    transaction = transaction_state_root(
+        state_root, plan.get("id", ""), create=False,
+    )
+    if args.family == FAMILY:
+        result = rollback_material_fluid_recipe(
+            plan, transaction, application_receipt=receipt,
+            transaction_lock=workspace_transaction_lock_path(plan),
+        )
+    elif args.family == RECIPE_FAMILY:
+        result = recipe_change_authority("supersymmetry").rollback_recipe_change(
+            plan, transaction, application_receipt=receipt,
+            transaction_lock=workspace_transaction_lock_path_for_uri(
+                plan.get("workspace_uri", "")),
+        )
+    else:
+        result = rollback_source_feature(
+            plan, transaction, suite_root=suite, application_receipt=receipt,
+            transaction_lock=workspace_transaction_lock_path_for_uri(
+                plan.get("workspace_uri", "")),
+        )
+    return result, retain_feature_record(state_root, "rollbacks", result)
+
+
+def _recover_action(
+    args: argparse.Namespace, suite: Path, state_root: Path,
+    plan: Mapping[str, Any],
+    retain_committed_receipt: Callable[[Path, Mapping[str, Any]], None],
+) -> tuple[dict[str, Any], Path]:
+    retain_feature_record(state_root, "plans", plan)
+    transaction = transaction_state_root(
+        state_root, plan.get("id", ""), create=False,
+    )
+    if args.family == FAMILY:
+        result = recover_material_fluid_recipe(
+            plan, transaction,
+            transaction_lock=workspace_transaction_lock_path(plan),
+            commit_receipt=lambda receipt: retain_committed_receipt(state_root, receipt),
+        )
+    elif args.family == RECIPE_FAMILY:
+        result = recipe_change_authority("supersymmetry").recover_recipe_change(
+            plan, transaction,
+            transaction_lock=workspace_transaction_lock_path_for_uri(
+                plan.get("workspace_uri", "")),
+            commit_receipt=lambda receipt: retain_committed_receipt(state_root, receipt),
+        )
+    else:
+        result = recover_source_feature(
+            plan, transaction, suite_root=suite,
+            transaction_lock=workspace_transaction_lock_path_for_uri(
+                plan.get("workspace_uri", "")),
+            commit_receipt=lambda receipt: retain_committed_receipt(state_root, receipt),
+        )
+    if result.get("application_receipt") is not None:
+        retain_feature_record(
+            state_root, "receipts", result["application_receipt"],
+        )
+    return result, retain_feature_record(state_root, "recoveries", result)
+
+
 def _plan_state_root_scope(
-    args: argparse.Namespace, suite_root: Path, *, core_policy_selection: bool,
+    args: argparse.Namespace, suite_root: Path, *,
+    core_policy_selection: bool, core_workspace: Path | None,
 ) -> tuple[Path, ContextManager[None]]:
     """Resolve Core's choice and hold it while the owner retains a plan."""
 
     expected = args.expected_state_root_policy_id
     if args.state_root is None and core_policy_selection:
+        if (
+            core_workspace is not None
+            and args.workspace.resolve(strict=True) != core_workspace.resolve(strict=True)
+        ):
+            raise DeveloperFeatureError(
+                "feature plan target differs from the Core-selected workspace"
+            )
         policy = state_root_policies().resolve(args.workspace, "feature")
         state_root = Path(policy["state_root"])
         if expected is None:
@@ -1015,6 +1157,7 @@ def main(
     *,
     suite_root: Path | str | None = None,
     core_policy_selection: bool = False,
+    core_workspace: Path | None = None,
 ) -> int:
     args = build_parser().parse_args(
         _normalized_arguments(sys.argv[1:] if argv is None else argv)
@@ -1048,7 +1191,9 @@ def main(
             result = load_feature_examples(suite, selector=args.selector)
             retained = None
         elif args.action == "records":
-            state_root = _state_root(args, suite)
+            state_root, _selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
+            )
             result = discover_feature_records(
                 suite,
                 state_root,
@@ -1057,7 +1202,9 @@ def main(
             )
             retained = None
         elif args.action == "present":
-            state_root = _state_root(args, suite)
+            state_root, _selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
+            )
             result = present_feature_record(
                 suite,
                 state_root,
@@ -1067,7 +1214,9 @@ def main(
             )
             retained = None
         elif args.action == "transaction":
-            state_root = _state_root(args, suite)
+            state_root, _selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
+            )
             result = build_feature_transaction_view(
                 suite,
                 state_root,
@@ -1111,6 +1260,7 @@ def main(
         elif args.action == "plan":
             state_root, plan_retention_scope = _plan_state_root_scope(
                 args, suite, core_policy_selection=core_policy_selection,
+                core_workspace=core_workspace,
             )
             if args.family == "example":
                 result, owner_plan = _build_example_plan(
@@ -1194,8 +1344,12 @@ def main(
                     example_result=result if args.family == "example" else None,
                 )
         elif args.action == "check":
-            state_root = _state_root(args, suite)
+            state_root, _selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
+            )
             plan = resolve_feature_record(state_root, "plans", args.plan)
+            if args.state_root is None and core_workspace is not None:
+                _require_action_workspace(plan, core_workspace=core_workspace, guarded=True)
             if args.family == FAMILY:
                 result = verify_material_fluid_recipe_plan(suite, plan)
             elif args.family == RECIPE_FAMILY:
@@ -1204,16 +1358,18 @@ def main(
                 result = verify_source_feature_plan(suite, plan)
             retained = None
         elif args.action == "run":
-            state_root = _state_root(args, suite)
+            state_root, selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
+            )
             plan = resolve_feature_record(state_root, "plans", args.plan)
-            allocation_scope = nullcontext()
-            if args.expected_state_root_policy_id is not None:
-                reviewed = validate_material_fluid_recipe_plan(plan)
-                workspace = material_fluid_recipe_workspace(reviewed)
-                allocation_scope = state_root_policies().hold(
-                    workspace, "feature", state_root,
-                    args.expected_state_root_policy_id,
-                )
+            workspace = _require_action_workspace(
+                plan, core_workspace=core_workspace,
+                guarded=selected_id is not None or args.expected_state_root_policy_id is not None,
+            )
+            allocation_scope = _action_policy_scope(
+                args, workspace=workspace, state_root=state_root,
+                selected_policy_id=selected_id,
+            )
 
             def retain_run_plan() -> None:
                 retain_feature_record(state_root, "plans", plan)
@@ -1241,9 +1397,22 @@ def main(
             )
             retained = retain_feature_record(state_root, "runs", result)
         elif args.action == "compare-runtime":
-            state_root = _state_root(args, suite)
+            state_root, selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
+            )
             plan = resolve_feature_record(state_root, "plans", args.plan)
-            retain_feature_record(state_root, "plans", plan)
+            workspace = _require_action_workspace(
+                plan, core_workspace=core_workspace,
+                guarded=selected_id is not None or args.expected_state_root_policy_id is not None,
+            )
+            allocation_scope = _action_policy_scope(
+                args, workspace=workspace, state_root=state_root,
+                selected_policy_id=selected_id,
+            )
+
+            def retain_comparison_plan() -> None:
+                retain_feature_record(state_root, "plans", plan)
+
             result = run_recipe_change_runtime_comparison(
                 suite,
                 plan,
@@ -1263,147 +1432,56 @@ def main(
                 timeout_seconds=args.timeout,
                 attach_timeout=args.attach_timeout,
                 session_timeout=args.session_timeout,
+                allocation_scope=allocation_scope,
+                before_allocation=retain_comparison_plan,
             )
             retained = retain_feature_record(state_root, "runs", result)
         elif args.action == "apply":
-            state_root = _state_root(args, suite)
+            state_root, selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
+            )
             plan = resolve_feature_record(state_root, "plans", args.plan)
-            retain_feature_record(state_root, "plans", plan)
-            if args.consent != plan.get("id"):
-                raise DeveloperFeatureError(
-                    "apply requires consent to the exact retained plan ID"
+            workspace = _require_action_workspace(
+                plan, core_workspace=core_workspace,
+                guarded=selected_id is not None or args.expected_state_root_policy_id is not None,
+            )
+            with _action_policy_scope(
+                args, workspace=workspace, state_root=state_root,
+                selected_policy_id=selected_id,
+            ):
+                result, retained = _apply_action(
+                    args, suite, state_root, plan, retain_committed_receipt,
                 )
-
-            transaction = transaction_state_root(state_root, plan.get("id", ""))
-            if args.family == FAMILY:
-                result = apply_material_fluid_recipe_plan(
-                    suite,
-                    plan,
-                    transaction,
-                    consent_plan_id=args.consent,
-                    transaction_lock=workspace_transaction_lock_path(plan),
-                    commit_receipt=lambda receipt: retain_committed_receipt(
-                        state_root,
-                        receipt,
-                    ),
-                )
-            elif args.family == RECIPE_FAMILY:
-                result = recipe_change_authority("supersymmetry").apply_recipe_change_plan(
-                    suite,
-                    plan,
-                    transaction,
-                    consent_plan_id=args.consent,
-                    transaction_lock=workspace_transaction_lock_path_for_uri(
-                        plan.get("workspace_uri", "")
-                    ),
-                    commit_receipt=lambda receipt: retain_committed_receipt(
-                        state_root,
-                        receipt,
-                    ),
-                )
-            else:
-                result = apply_source_feature_plan(
-                    suite,
-                    plan,
-                    transaction,
-                    consent_plan_id=args.consent,
-                    transaction_lock=workspace_transaction_lock_path_for_uri(
-                        plan.get("workspace_uri", "")
-                    ),
-                    commit_receipt=lambda receipt: retain_committed_receipt(
-                        state_root,
-                        receipt,
-                    ),
-                )
-            retained = retain_feature_record(state_root, "receipts", result)
         elif args.action == "rollback":
-            state_root = _state_root(args, suite)
-            plan = resolve_feature_record(state_root, "plans", args.plan)
-            retain_feature_record(state_root, "plans", plan)
-            receipt = resolve_feature_record(state_root, "receipts", args.receipt)
-            transaction = transaction_state_root(
-                state_root,
-                plan.get("id", ""),
-                create=False,
+            state_root, selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
             )
-            if args.family == FAMILY:
-                result = rollback_material_fluid_recipe(
-                    plan,
-                    transaction,
-                    application_receipt=receipt,
-                    transaction_lock=workspace_transaction_lock_path(plan),
-                )
-            elif args.family == RECIPE_FAMILY:
-                result = recipe_change_authority("supersymmetry").rollback_recipe_change(
-                    plan,
-                    transaction,
-                    application_receipt=receipt,
-                    transaction_lock=workspace_transaction_lock_path_for_uri(
-                        plan.get("workspace_uri", "")
-                    ),
-                )
-            else:
-                result = rollback_source_feature(
-                    plan,
-                    transaction,
-                    suite_root=suite,
-                    application_receipt=receipt,
-                    transaction_lock=workspace_transaction_lock_path_for_uri(
-                        plan.get("workspace_uri", "")
-                    ),
-                )
-            retained = retain_feature_record(state_root, "rollbacks", result)
+            plan = resolve_feature_record(state_root, "plans", args.plan)
+            workspace = _require_action_workspace(
+                plan, core_workspace=core_workspace,
+                guarded=selected_id is not None or args.expected_state_root_policy_id is not None,
+            )
+            with _action_policy_scope(
+                args, workspace=workspace, state_root=state_root,
+                selected_policy_id=selected_id,
+            ):
+                result, retained = _rollback_action(args, suite, state_root, plan)
         else:
-            state_root = _state_root(args, suite)
-            plan = resolve_feature_record(state_root, "plans", args.plan)
-            retain_feature_record(state_root, "plans", plan)
-            transaction = transaction_state_root(
-                state_root,
-                plan.get("id", ""),
-                create=False,
+            state_root, selected_id = _action_state_root(
+                args, suite, core_workspace=core_workspace,
             )
-            if args.family == FAMILY:
-                result = recover_material_fluid_recipe(
-                    plan,
-                    transaction,
-                    transaction_lock=workspace_transaction_lock_path(plan),
-                    commit_receipt=lambda receipt: retain_committed_receipt(
-                        state_root,
-                        receipt,
-                    ),
+            plan = resolve_feature_record(state_root, "plans", args.plan)
+            workspace = _require_action_workspace(
+                plan, core_workspace=core_workspace,
+                guarded=selected_id is not None or args.expected_state_root_policy_id is not None,
+            )
+            with _action_policy_scope(
+                args, workspace=workspace, state_root=state_root,
+                selected_policy_id=selected_id,
+            ):
+                result, retained = _recover_action(
+                    args, suite, state_root, plan, retain_committed_receipt,
                 )
-            elif args.family == RECIPE_FAMILY:
-                result = recipe_change_authority("supersymmetry").recover_recipe_change(
-                    plan,
-                    transaction,
-                    transaction_lock=workspace_transaction_lock_path_for_uri(
-                        plan.get("workspace_uri", "")
-                    ),
-                    commit_receipt=lambda receipt: retain_committed_receipt(
-                        state_root,
-                        receipt,
-                    ),
-                )
-            else:
-                result = recover_source_feature(
-                    plan,
-                    transaction,
-                    suite_root=suite,
-                    transaction_lock=workspace_transaction_lock_path_for_uri(
-                        plan.get("workspace_uri", "")
-                    ),
-                    commit_receipt=lambda receipt: retain_committed_receipt(
-                        state_root,
-                        receipt,
-                    ),
-                )
-            if result.get("application_receipt") is not None:
-                retain_feature_record(
-                    state_root,
-                    "receipts",
-                    result["application_receipt"],
-                )
-            retained = retain_feature_record(state_root, "recoveries", result)
     except (DeveloperFeatureError, DeveloperFeatureRuntimeError, OSError, ValueError) as exc:
         print(f"Workbench feature failed: {exc}", file=sys.stderr)
         return 2

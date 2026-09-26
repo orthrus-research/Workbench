@@ -11,7 +11,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from test_developer_feature import ROOT, _checkout
+from test_developer_feature import ROOT, _bytes, _checkout
+from test_developer_source_feature import _checkout as _recipe_checkout
 from workbench_core import cli as core_cli
 from workbench_core.state_root_selection import effective_state_root, select_state_root
 from workbench_shell.developer_feature import (
@@ -19,9 +20,199 @@ from workbench_shell.developer_feature import (
 )
 from workbench_shell import developer_feature_runtime as runtime
 from workbench_shell import developer_feature_cli
+from workbench_blueprints.profile_construction import recipe_change_authority
 
 
 class FeatureRunPolicyTests(unittest.TestCase):
+    def test_core_selected_actions_bind_workspace_and_direct_override(self) -> None:
+        temporary_parent = ROOT / ".workbench/test-tmp"
+        temporary_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=temporary_parent) as temporary:
+            home = Path(temporary)
+            workspace = _checkout(home)
+            other_parent = home / "other"
+            other_parent.mkdir()
+            other_workspace = _checkout(other_parent)
+            first_root = home / "first-state"
+            second_root = home / "second-state"
+            plan = build_material_fluid_recipe_plan(
+                ROOT, workspace, name="Policy Solvent", color="0x425d73",
+                recipe_script="groovy/postInit/chemistry/Probe.groovy",
+                recipe_map="MIXER", input_fluid="steam", input_amount=750,
+                output_amount=250, duration=320, voltage_tier="MV",
+            )
+            other_plan = build_material_fluid_recipe_plan(
+                ROOT, other_workspace, name="Other Solvent", color="0x425d73",
+                recipe_script="groovy/postInit/chemistry/Probe.groovy",
+                recipe_map="MIXER", input_fluid="steam", input_amount=750,
+                output_amount=250, duration=320, voltage_tier="MV",
+            )
+            environment = dict(os.environ)
+            environment.update({
+                "HOME": str(home), "USERPROFILE": str(home),
+                "WORKBENCH_CONFIG_HOME": str(home / "config"),
+                "WORKBENCH_WORKSPACE": str(workspace),
+            })
+            environment.pop("WORKBENCH_STATE_ROOT", None)
+            initial = effective_state_root(
+                workspace, "feature", suite_root=ROOT, environment=environment,
+            )
+            first = select_state_root(
+                workspace, "feature", str(first_root), suite_root=ROOT,
+                expected_policy_id=initial["policy_id"], environment=environment,
+            )
+            retain_feature_record(first_root, "plans", plan)
+            before = _bytes(workspace)
+            other_before = _bytes(other_workspace)
+            second = select_state_root(
+                workspace, "feature", str(second_root), suite_root=ROOT,
+                expected_policy_id=first["policy_id"], environment=environment,
+            )
+
+            def invoke(*arguments: str) -> tuple[int, str, str]:
+                stdout = StringIO()
+                stderr = StringIO()
+                with patch.dict(os.environ, environment, clear=True), patch(
+                    "workbench_core.package_guard.account_home", return_value=home,
+                ), redirect_stdout(stdout), redirect_stderr(stderr):
+                    status = core_cli._main(["feature", *arguments, "--json"])
+                return status, stdout.getvalue(), stderr.getvalue()
+
+            status, _stdout, stderr = invoke(
+                "apply", "material-fluid-recipe", plan["id"],
+                "--consent", plan["id"], "--state-root", str(first_root),
+                "--expected-state-root-policy-id", first["policy_id"],
+            )
+            self.assertEqual(2, status, stderr)
+            self.assertIn("state-root policy changed after review", stderr)
+            self.assertEqual(before, _bytes(workspace))
+            self.assertFalse((first_root / "receipts").exists())
+
+            status, _stdout, stderr = invoke(
+                "apply", "material-fluid-recipe", plan["id"],
+                "--consent", plan["id"], "--state-root", str(first_root),
+                "--expected-state-root-policy-id", second["policy_id"],
+            )
+            self.assertEqual(2, status, stderr)
+            self.assertIn("owner state root differs from the reviewed Core policy", stderr)
+            self.assertEqual(before, _bytes(workspace))
+
+            retain_feature_record(second_root, "plans", other_plan)
+            status, _stdout, stderr = invoke(
+                "apply", "material-fluid-recipe", other_plan["id"],
+                "--consent", other_plan["id"],
+            )
+            self.assertEqual(2, status, stderr)
+            self.assertIn("targets another Core-selected workspace", stderr)
+            self.assertEqual(other_before, _bytes(other_workspace))
+            self.assertFalse((second_root / "receipts").exists())
+
+            status, stdout, stderr = invoke(
+                "apply", "material-fluid-recipe", plan["id"],
+                "--consent", plan["id"], "--state-root", str(first_root),
+            )
+            self.assertEqual(0, status, stderr)
+            applied = json.loads(stdout)
+            self.assertEqual("applied", applied["state"])
+            self.assertNotEqual(before, _bytes(workspace))
+            status, stdout, stderr = invoke(
+                "rollback", "material-fluid-recipe", plan["id"], applied["id"],
+                "--state-root", str(first_root),
+            )
+            self.assertEqual(0, status, stderr)
+            self.assertEqual("restored", json.loads(stdout)["state"])
+            self.assertEqual(before, _bytes(workspace))
+
+            retain_feature_record(second_root, "plans", plan)
+            status, stdout, stderr = invoke(
+                "apply", "material-fluid-recipe", plan["id"],
+                "--consent", plan["id"],
+            )
+            self.assertEqual(0, status, stderr)
+            selected_application = json.loads(stdout)
+            self.assertEqual("applied", selected_application["state"])
+            self.assertTrue((second_root / "receipts").is_dir())
+            applied_bytes = _bytes(workspace)
+            select_state_root(
+                workspace, "feature", str(home / "third-state"), suite_root=ROOT,
+                expected_policy_id=second["policy_id"], environment=environment,
+            )
+            for action, arguments, collection in (
+                ("rollback", (selected_application["id"],), "rollbacks"),
+                ("recover", (), "recoveries"),
+            ):
+                with self.subTest(action=action):
+                    status, _stdout, stderr = invoke(
+                        action, "material-fluid-recipe", plan["id"], *arguments,
+                        "--state-root", str(second_root),
+                        "--expected-state-root-policy-id", second["policy_id"],
+                    )
+                    self.assertEqual(2, status, stderr)
+                    self.assertIn("state-root policy changed after review", stderr)
+                    self.assertEqual(applied_bytes, _bytes(workspace))
+                    self.assertFalse((second_root / collection).exists())
+
+    def test_compare_runtime_rejects_changed_selection_before_retained_writes(self) -> None:
+        temporary_parent = ROOT / ".workbench/test-tmp"
+        temporary_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=temporary_parent) as temporary:
+            home = Path(temporary)
+            workspace = _recipe_checkout(home)
+            first_root = home / "first-state"
+            second_root = home / "second-state"
+            plan = recipe_change_authority("supersymmetry").build_recipe_change_plan(
+                ROOT, workspace, mutation="add",
+                recipe_script="groovy/postInit/chemistry/Probe.groovy",
+                recipe_map="batch_reactor",
+                fluid_inputs=[{"name": "steam", "amount": 1000}],
+                fluid_outputs=[{"name": "water", "amount": 1000}],
+                duration=100, voltage_tier="LV",
+            )
+            environment = dict(os.environ)
+            environment.update({
+                "HOME": str(home), "USERPROFILE": str(home),
+                "WORKBENCH_CONFIG_HOME": str(home / "config"),
+                "WORKBENCH_WORKSPACE": str(workspace),
+            })
+            environment.pop("WORKBENCH_STATE_ROOT", None)
+            original = effective_state_root(
+                workspace, "feature", suite_root=ROOT, environment=environment,
+            )
+            first = select_state_root(
+                workspace, "feature", str(first_root), suite_root=ROOT,
+                expected_policy_id=original["policy_id"], environment=environment,
+            )
+            retain_feature_record(first_root, "plans", plan)
+
+            def change_before_allocation(*_args, **kwargs):
+                select_state_root(
+                    workspace, "feature", str(second_root), suite_root=ROOT,
+                    expected_policy_id=first["policy_id"], environment=environment,
+                )
+                with kwargs["allocation_scope"]:
+                    kwargs["before_allocation"]()
+                self.fail("stale Core policy unexpectedly allowed comparison allocation")
+
+            stdout = StringIO()
+            stderr = StringIO()
+            with patch.dict(os.environ, environment, clear=True), patch(
+                "workbench_core.package_guard.account_home", return_value=home,
+            ), patch.object(
+                developer_feature_cli, "run_recipe_change_runtime_comparison",
+                side_effect=change_before_allocation,
+            ), redirect_stdout(stdout), redirect_stderr(stderr):
+                status = core_cli._main([
+                    "feature", "compare-runtime", "recipe-change", plan["id"],
+                    "--consent", plan["id"],
+                    "--launcher-executable", str(home / "launcher.exe"),
+                    "--launcher-root", str(home / "launcher"), "--json",
+                ])
+            self.assertEqual(2, status, stderr.getvalue())
+            self.assertIn("state-root policy changed after review", stderr.getvalue())
+            self.assertFalse((first_root / "runtime").exists())
+            self.assertFalse((first_root / "runs").exists())
+            self.assertFalse((second_root / "runtime").exists())
+
     def test_plan_uses_core_selected_root_and_guards_the_retained_write(self) -> None:
         temporary_parent = ROOT / ".workbench/test-tmp"
         temporary_parent.mkdir(parents=True, exist_ok=True)
@@ -34,6 +225,7 @@ class FeatureRunPolicyTests(unittest.TestCase):
             environment.update({
                 "HOME": str(home), "USERPROFILE": str(home),
                 "WORKBENCH_CONFIG_HOME": str(home / "config"),
+                "WORKBENCH_WORKSPACE": str(workspace),
             })
             environment.pop("WORKBENCH_STATE_ROOT", None)
             original = effective_state_root(
@@ -44,9 +236,11 @@ class FeatureRunPolicyTests(unittest.TestCase):
                 expected_policy_id=original["policy_id"], environment=environment,
             )
 
-            def invoke(name: str, *extra: str) -> tuple[int, str, str]:
+            def invoke_target(
+                target: Path, name: str, *extra: str,
+            ) -> tuple[int, str, str]:
                 arguments = [
-                    "feature", "plan", "material-fluid-recipe", str(workspace),
+                    "feature", "plan", "material-fluid-recipe", str(target),
                     "--name", name, "--color", "0x425d73",
                     "--recipe-script", "groovy/postInit/chemistry/Probe.groovy",
                     "--recipe-map", "MIXER", "--input-fluid", "steam",
@@ -59,6 +253,26 @@ class FeatureRunPolicyTests(unittest.TestCase):
                 ), redirect_stdout(stdout), redirect_stderr(stderr):
                     status = core_cli._main(arguments)
                 return status, stdout.getvalue(), stderr.getvalue()
+
+            def invoke(name: str, *extra: str) -> tuple[int, str, str]:
+                return invoke_target(workspace, name, *extra)
+
+            other_parent = home / "other"
+            other_parent.mkdir()
+            other_workspace = _checkout(other_parent)
+            with patch.object(
+                developer_feature_cli, "build_material_fluid_recipe_plan",
+            ) as build, patch.object(
+                developer_feature_cli, "retain_feature_record",
+            ) as retain:
+                status, _stdout, stderr = invoke_target(
+                    other_workspace, "Wrong Core Workspace",
+                )
+            self.assertEqual(2, status, stderr)
+            self.assertIn("plan target differs from the Core-selected workspace", stderr)
+            build.assert_not_called()
+            retain.assert_not_called()
+            self.assertFalse((first_root / "plans").exists())
 
             status, stdout, stderr = invoke("Core Selected Plan")
             self.assertEqual(0, status, stderr)
@@ -93,6 +307,16 @@ class FeatureRunPolicyTests(unittest.TestCase):
             override_id = json.loads(stdout)["id"]
             self.assertTrue((first_root / "plans" / override_id.rsplit(":", 1)[1] / "record.json").is_file())
             self.assertFalse((second_root / "plans").exists())
+
+            status, stdout, stderr = invoke_target(
+                other_workspace, "Direct Other Workspace",
+                "--state-root", str(first_root),
+            )
+            self.assertEqual(0, status, stderr)
+            other_override_id = json.loads(stdout)["id"]
+            self.assertTrue(
+                (first_root / "plans" / other_override_id.rsplit(":", 1)[1] / "record.json").is_file()
+            )
 
             builder = developer_feature_cli.build_material_fluid_recipe_plan
 
@@ -131,6 +355,7 @@ class FeatureRunPolicyTests(unittest.TestCase):
             environment.update({
                 "HOME": str(home), "USERPROFILE": str(home),
                 "WORKBENCH_CONFIG_HOME": str(home / "config"),
+                "WORKBENCH_WORKSPACE": str(workspace),
             })
             environment.pop("WORKBENCH_STATE_ROOT", None)
             initial = effective_state_root(

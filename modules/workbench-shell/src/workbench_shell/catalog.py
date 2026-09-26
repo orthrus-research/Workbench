@@ -3287,13 +3287,13 @@ def _developer_feature_commands() -> list[CommandSpec]:
     )
     state_root = _f(
         "state_root",
-        "Retained developer-feature state root; defaults to stable per-user state.",
+        "Retained developer-feature state root; Core defaults to the active workspace's selected feature root.",
         flags=("--state-root",),
         kind="path",
     )
-    plan_policy_id = _f(
+    feature_policy_id = _f(
         "expected_state_root_policy_id",
-        "Optional reviewed Core Feature state-root policy ID; stale choices are refused before retaining a plan.",
+        "Optional reviewed Core Feature state-root policy ID; stale choices are refused before owner writes.",
         flags=("--expected-state-root-policy-id",),
     )
     json_output = _f(
@@ -3352,7 +3352,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
         _f("translation", "English label; defaults to the developer name.", flags=("--translation",)),
         _f("symbol", "Optional exact Groovy static-field symbol.", flags=("--symbol",)),
         state_root,
-        plan_policy_id,
+        feature_policy_id,
         _f("show_diff", "Show the reviewed unified diff in human output.", flags=("--show-diff",), kind="boolean"),
         plan_json_output,
         compact_plan_output,
@@ -3369,7 +3369,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
         _f("duration", "Recipe duration in ticks.", flags=("--duration",), kind="integer", required=True),
         _f("voltage_tier", "Existing voltage-tier symbol.", flags=("--voltage-tier",), required=True),
         state_root,
-        plan_policy_id,
+        feature_policy_id,
         _f("show_diff", "Show the reviewed unified diff in human output.", flags=("--show-diff",), kind="boolean"),
         plan_json_output,
         compact_plan_output,
@@ -3382,7 +3382,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
         _f("title", "Replacement text for the quest's existing title key.", flags=("--title",)),
         _f("description", "Replacement text for the quest's existing description key.", flags=("--description",)),
         state_root,
-        plan_policy_id,
+        feature_policy_id,
         _f("show_diff", "Show the reviewed unified diff in human output.", flags=("--show-diff",), kind="boolean"),
         plan_json_output,
         compact_plan_output,
@@ -3411,6 +3411,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
         )
 
     lifecycle_fields = (family, plan_record, state_root, json_output)
+    mutation_fields = (family, plan_record, state_root, feature_policy_id, json_output)
     return [
         CommandSpec(
             "developer-features.examples",
@@ -3509,7 +3510,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
                 ),
                 workspace,
                 state_root,
-                plan_policy_id,
+                feature_policy_id,
                 _f("show_diff", "Show the owner-validated unified diff in human output.", flags=("--show-diff",), kind="boolean"),
                 plan_json_output,
                 compact_plan_output,
@@ -3589,6 +3590,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
                 _f("attach_timeout", "Projected-process attachment timeout seconds.", flags=("--attach-timeout",), default=120.0),
                 _f("session_timeout", "Maximum observed session seconds per side.", flags=("--session-timeout",), default=21600.0),
                 state_root,
+                feature_policy_id,
                 json_output,
             ),
             document,
@@ -3614,6 +3616,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
                 plan_record,
                 _f("consent", "Exact reviewed plan ID authorizing local application.", flags=("--consent",), required=True),
                 state_root,
+                feature_policy_id,
                 json_output,
             ),
             document,
@@ -3637,6 +3640,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
                 plan_record,
                 _f("receipt", "Retained application receipt ID or exact record path.", positional=True, required=True),
                 state_root,
+                feature_policy_id,
                 json_output,
             ),
             document,
@@ -3655,7 +3659,7 @@ def _developer_feature_commands() -> list[CommandSpec]:
             "mutating",
             "inert-only",
             _workbench_template("feature", "recover"),
-            lifecycle_fields,
+            mutation_fields,
             document,
             availability="experimental",
             limitations=(

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -408,10 +408,53 @@ class RecipeRuntimeComparisonTests(unittest.TestCase):
             source_before,
             (self.checkout / "groovy/postInit/chemistry/Probe.groovy").read_bytes(),
         )
-        receipt = Path(
-            record["target"]["receipt_uri"].removeprefix("file://")
-        )
+        receipt = Path(record["target"]["receipt_uri"].removeprefix("file://"))
         self.assertTrue(receipt.is_file())
+
+    def test_policy_scope_covers_first_allocation_then_releases_before_staging(self) -> None:
+        events: list[str] = []
+        active = False
+
+        @contextmanager
+        def allocation_scope():
+            nonlocal active
+            active = True
+            events.append("entered")
+            try:
+                yield
+            finally:
+                attempts = self.state / "runtime/recipe-change-comparisons/attempts"
+                self.assertEqual(1, len(list(attempts.iterdir())))
+                active = False
+                events.append("released")
+
+        def before_allocation() -> None:
+            self.assertTrue(active)
+            events.append("retained")
+
+        original_stage = runtime.stage_reviewed_feature_plan
+
+        def stage(*args, **kwargs):
+            self.assertFalse(active)
+            events.append("staged")
+            return original_stage(*args, **kwargs)
+
+        with ExitStack() as stack:
+            for patcher in self._patches():
+                stack.enter_context(patcher)
+            stack.enter_context(
+                patch.object(runtime, "stage_reviewed_feature_plan", side_effect=stage)
+            )
+            record = run_recipe_change_runtime_comparison(
+                ROOT, self.plan, self.state,
+                consent_plan_id=self.plan["id"],
+                launcher_executable=self.root / "launcher.exe",
+                launcher_root=self.root / "launcher",
+                allocation_scope=allocation_scope(),
+                before_allocation=before_allocation,
+            )
+        self.assertEqual("complete", record["state"])
+        self.assertEqual(["entered", "retained", "released", "staged", "staged"], events)
 
     def test_public_parser_exposes_explicit_pair_order_and_client_inputs(self) -> None:
         arguments = build_parser().parse_args(

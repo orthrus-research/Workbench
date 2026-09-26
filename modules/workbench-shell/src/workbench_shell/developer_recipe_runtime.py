@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from hashlib import sha256
 import json
 import os
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
-from typing import Any, Mapping, NoReturn, Sequence, cast
+from typing import Any, Callable, ContextManager, Mapping, NoReturn, Sequence, cast
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 from uuid import uuid4
@@ -1284,6 +1285,8 @@ def run_recipe_change_runtime_comparison(
     timeout_seconds: float = 600.0,
     attach_timeout: float = 120.0,
     session_timeout: float = 21_600.0,
+    allocation_scope: ContextManager[None] | None = None,
+    before_allocation: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     """Run one unchanged and one reviewed candidate disposable client."""
 
@@ -1313,12 +1316,15 @@ def run_recipe_change_runtime_comparison(
         )
     except RuntimeObserveError as exc:
         raise RecipeRuntimeComparisonError(str(exc)) from exc
-    parent = prepare_feature_runtime_attempt_parent(
-        state, workspace, lane="recipe-change-comparisons"
-    )
-    token = uuid4().hex
-    destination = parent / token
-    destination.mkdir(mode=0o700)
+    with nullcontext() if allocation_scope is None else allocation_scope:
+        if before_allocation is not None:
+            before_allocation()
+        parent = prepare_feature_runtime_attempt_parent(
+            state, workspace, lane="recipe-change-comparisons"
+        )
+        token = uuid4().hex
+        destination = parent / token
+        destination.mkdir(mode=0o700)
     contract = authority.build_recipe_observation_contract(
         reviewed, physical_side="client"
     )
