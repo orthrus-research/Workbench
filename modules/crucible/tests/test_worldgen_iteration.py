@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 
@@ -39,6 +40,9 @@ from workbench_crucible_worldgen_iteration.cli import (  # noqa: E402
     _passthrough_integrations,
     _reproduction_command,
 )
+from workbench_api.working_allocations import working_allocations_scope  # noqa: E402
+from workbench_core.working_allocations import CoreWorkingAllocations  # noqa: E402
+from workbench_crucible_worldgen_iteration import cli as iteration_cli  # noqa: E402
 
 
 def write_mod(path: Path, mod_id: str, payload: bytes = b"fixture") -> None:
@@ -76,6 +80,67 @@ class WorldgenIterationTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name) / "Workbench"
         self.root.mkdir()
+
+    def test_entry_uses_core_fixed_allocation_and_retains_terminal_evidence(self) -> None:
+        selected_workspace = self.root / "selected-workspace"
+        selected_workspace.mkdir()
+        custody = CoreWorkingAllocations(
+            workspace=selected_workspace, configuration_home=self.root / "config",
+            locations={"evidence": self.root / "evidence"}, owner_id="crucible",
+        )
+
+        def complete(_argv, *, root: Path, iteration_root: Path) -> int:
+            self.assertEqual(self.root, root)
+            self.assertEqual(selected_workspace / ".workbench/iterations/worldgen/trial", iteration_root)
+            (iteration_root / "runtime").mkdir()
+            report = {"format": FORMAT, "status": "complete", "label": "trial"}
+            (iteration_root / "iteration-report-v1.json").write_text(json.dumps(report))
+            return 0
+
+        with working_allocations_scope(custody), patch.object(iteration_cli, "_run_in_allocation", side_effect=complete):
+            self.assertEqual(0, iteration_cli.run(
+                ["--label", "trial"], root=self.root, workspace=selected_workspace,
+            ))
+        allocation = custody.inventory()[0]
+        self.assertEqual("complete", allocation.status)
+        self.assertEqual(selected_workspace / ".workbench/iterations/worldgen/trial", allocation.reference.path)
+        self.assertEqual({"iteration-report-v1.json"},
+                         {row["relative_path"] for row in allocation.evidence})
+        self.assertEqual({"iteration-report-v1.json", "runtime"},
+                         {row["relative_path"] for row in allocation.absolute_references})
+        self.assertEqual(allocation, custody.verify(allocation.reference.allocation_id))
+
+    def test_failed_entry_retains_partial_report_under_core(self) -> None:
+        custody = CoreWorkingAllocations(
+            workspace=self.root, configuration_home=self.root / "config",
+            locations={"evidence": self.root / "evidence"}, owner_id="crucible",
+        )
+
+        def fail(_argv, *, root: Path, iteration_root: Path) -> int:
+            (iteration_root / "iteration-report-v1.json").write_text(
+                json.dumps({"format": FORMAT, "status": "failed", "label": "trial"}),
+            )
+            raise WorldgenIterationError("simulated stage failure")
+
+        with working_allocations_scope(custody), patch.object(iteration_cli, "_run_in_allocation", side_effect=fail):
+            with self.assertRaisesRegex(WorldgenIterationError, "simulated stage failure"):
+                iteration_cli.run(["--label", "trial"], root=self.root)
+        allocation = custody.inventory()[0]
+        self.assertEqual("failed", allocation.status)
+        self.assertEqual({"iteration-report-v1.json"},
+                         {row["relative_path"] for row in allocation.evidence})
+        self.assertEqual(allocation, custody.verify(allocation.reference.allocation_id))
+
+    def test_invalid_label_is_rejected_before_core_allocation(self) -> None:
+        custody = CoreWorkingAllocations(
+            workspace=self.root, configuration_home=self.root / "config",
+            locations={"evidence": self.root / "evidence"}, owner_id="crucible",
+        )
+        with working_allocations_scope(custody):
+            with self.assertRaisesRegex(WorldgenIterationError, "label must match"):
+                iteration_cli.run(["--label", "bad/label"], root=self.root)
+        self.assertFalse((self.root / "config").exists())
+        self.assertFalse((self.root / ".workbench").exists())
 
     def test_checked_in_profile_resolves_exact_cleanroom_slice(self) -> None:
         profile = load_profile(

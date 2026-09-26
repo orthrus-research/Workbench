@@ -20,6 +20,7 @@ from typing import Any, Mapping, Sequence
 import webbrowser
 
 from workbench_api.canonical import canonical_json_bytes
+from workbench_api.working_allocations import working_allocations
 from workbench_crucible_worldgen import (
     audit_population_capture,
     extract_causal_trace,
@@ -29,6 +30,7 @@ from workbench_crucible_worldgen import (
 )
 
 from .iteration import (
+    LABEL_RE,
     IterationReport,
     WorldgenIterationError,
     configure_runtime,
@@ -382,15 +384,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run(argv: Sequence[str], *, root: Path) -> int:
+def _run_in_allocation(
+    argv: Sequence[str], *, root: Path, iteration_root: Path,
+) -> int:
     parser = build_parser()
     args = parser.parse_args(list(argv))
-    iteration_root = root / ".workbench/iterations/worldgen" / args.label
-    if iteration_root.exists():
-        raise WorldgenIterationError(
-            f"iteration label already exists; choose a fresh --label: {iteration_root}"
-        )
-    iteration_root.mkdir(parents=True)
     report = IterationReport.start(
         iteration_root / "iteration-report-v1.json",
         root,
@@ -1223,7 +1221,63 @@ def run(argv: Sequence[str], *, root: Path) -> int:
     return 0
 
 
-def main(argv: Sequence[str] | None = None, *, root: Path | None = None) -> int:
+def _iteration_evidence(iteration_root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    report = iteration_root / "iteration-report-v1.json"
+    evidence = (report,) if report.is_file() and not report.is_symlink() else ()
+    references = tuple(
+        path for path in (report, iteration_root / "runtime", iteration_root / "artifacts", iteration_root / "logs")
+        if path.exists() and not path.is_symlink()
+    )
+    return evidence, references
+
+
+def _validate_completed_iteration(iteration_root: Path) -> None:
+    report = iteration_root / "iteration-report-v1.json"
+    try:
+        value = json.loads(report.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise WorldgenIterationError("completed iteration report is unavailable") from exc
+    if (not isinstance(value, dict) or value.get("format") != "workbench-worldgen-iteration-report-v1"
+            or value.get("status") != "complete" or value.get("label") != iteration_root.name):
+        raise WorldgenIterationError("completed iteration report does not describe this allocation")
+
+
+def run(argv: Sequence[str], *, root: Path, workspace: Path | None = None) -> int:
+    args = build_parser().parse_args(list(argv))
+    if not LABEL_RE.fullmatch(args.label):
+        raise WorldgenIterationError("label must match [A-Za-z0-9][A-Za-z0-9_.-]{0,95}")
+    selected_workspace = root if workspace is None else workspace
+    requested = selected_workspace / ".workbench/iterations/worldgen" / args.label
+    custody = working_allocations()
+    allocation = custody.allocate("worldgen-iteration", args.label, requested_path=requested)
+    with custody.execution(allocation):
+        try:
+            result = _run_in_allocation(argv, root=root, iteration_root=allocation.path)
+            evidence, references = _iteration_evidence(allocation.path)
+            custody.finish(
+                allocation, outcome="complete", evidence=evidence,
+                absolute_references=references, validate=_validate_completed_iteration,
+            )
+            return result
+        except BaseException as exc:
+            evidence, references = _iteration_evidence(allocation.path)
+            try:
+                custody.finish(
+                    allocation, outcome="failed", evidence=evidence,
+                    absolute_references=references,
+                    failure=f"{type(exc).__name__}: {exc}"[:4096],
+                )
+            except Exception:
+                # Keep the original failure and the Core reservation visible for
+                # a later investigation if selected evidence cannot be sealed.
+                pass
+            raise
+
+
+def main(
+    argv: Sequence[str] | None = None, *, root: Path | None = None,
+    workspace: Path | None = None,
+) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     workbench_root = (
         root.resolve()
@@ -1231,7 +1285,7 @@ def main(argv: Sequence[str] | None = None, *, root: Path | None = None) -> int:
         else _repository_resource_root(__file__)
     )
     try:
-        return run(arguments, root=workbench_root)
+        return run(arguments, root=workbench_root, workspace=workspace)
     except (OSError, ValueError, WorldgenIterationError) as exc:
         print(f"Worldgen iteration failed: {exc}", file=sys.stderr)
         return 1
