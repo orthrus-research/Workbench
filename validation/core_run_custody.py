@@ -183,6 +183,27 @@ def promote_ide_toolchain_directory(payload: Path, target: Path, marker: bytes) 
         raise OSError(f"Core IDE toolchain promotion needs review: {exc}") from exc
 
 
+def verify_ide_toolchain_directory(
+    archive: Path, target: Path, *, archive_sha256: str,
+    archive_size: int, extracted_root: str, archive_format: str,
+) -> int:
+    """Reopen and compare the exact locked archive with its historical tree."""
+
+    _source_core()
+    from workbench_core.ide_toolchain_reader import (
+        IdeToolchainReadError, verify_ide_toolchain_tree,
+    )
+
+    try:
+        return verify_ide_toolchain_tree(
+            archive, target, archive_sha256=archive_sha256,
+            archive_size=archive_size, expected_root=extracted_root,
+            archive_format=archive_format,
+        )
+    except IdeToolchainReadError as exc:
+        raise OSError(f"Core IDE toolchain read needs review: {exc}") from exc
+
+
 def publish_ci_plan(
     root: Path, output: Path, payload: bytes, *,
     configuration_home: Path | None = None,
@@ -241,4 +262,5 @@ def publish_ci_plan(
 __all__ = [
     "allocate_validation_run", "allocate_validation_scratch", "publish_ci_plan",
     "publish_validation_timing", "open_validation_invocation", "promote_ide_toolchain_directory",
+    "verify_ide_toolchain_directory",
 ]

@@ -17,7 +17,7 @@ import tempfile
 from typing import Any
 import zipfile
 
-from core_run_custody import promote_ide_toolchain_directory
+from core_run_custody import promote_ide_toolchain_directory, verify_ide_toolchain_directory
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -131,6 +131,7 @@ def provision_entry(
         raise ProvisionFailure("IDE toolchain lock has an invalid extraction root or archive digest")
     destination = TOOLCHAIN_ROOT / archive_root
     marker = destination / ".workbench-provisioned-sha256"
+    archive_format = "zip" if suffix.endswith(".zip") else "tar"
     for component in (TOOLCHAIN_ROOT, *TOOLCHAIN_ROOT.parents):
         if component.is_symlink() or getattr(component, "is_junction", lambda: False)():
             raise ProvisionFailure("IDE toolchain destination traverses a redirect")
@@ -144,6 +145,19 @@ def provision_entry(
                     stat.S_ISREG(marker_info.st_mode)
                     and marker.read_text(encoding="ascii").strip() == entry["archive_sha256"]
                 ):
+                    archive = download(entry, suffix)
+                    try:
+                        verify_ide_toolchain_directory(
+                            archive.absolute(), destination.absolute(),
+                            archive_sha256=entry["archive_sha256"],
+                            archive_size=entry["archive_size"],
+                            extracted_root=expected_root,
+                            archive_format=archive_format,
+                        )
+                    except OSError as exc:
+                        raise ProvisionFailure(
+                            f"existing IDE toolchain needs exact readback; retain for review: {destination}: {exc}"
+                        ) from exc
                     return destination
             except (OSError, UnicodeError):
                 pass
@@ -170,8 +184,14 @@ def provision_entry(
         promote_ide_toolchain_directory(
             extracted, destination, (entry["archive_sha256"] + "\n").encode("ascii"),
         )
+        verify_ide_toolchain_directory(
+            archive.absolute(), destination.absolute(),
+            archive_sha256=entry["archive_sha256"],
+            archive_size=entry["archive_size"],
+            extracted_root=expected_root, archive_format=archive_format,
+        )
     except OSError as exc:
-        raise ProvisionFailure(str(exc)) from exc
+        raise ProvisionFailure(f"IDE toolchain publication needs review: {exc}") from exc
     return destination
 
 

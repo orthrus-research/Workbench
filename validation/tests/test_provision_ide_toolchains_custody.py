@@ -2,10 +2,12 @@
 
 from hashlib import sha256
 from pathlib import Path
+import stat
 import sys
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
+import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -79,10 +81,14 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.toolchains = self.root / "toolchains"
         self.archive = self.root / "locked.zip"
-        self.archive.write_bytes(b"locked archive")
+        with zipfile.ZipFile(self.archive, "w") as bundle:
+            member = zipfile.ZipInfo("locked-tool/bin")
+            member.external_attr = (stat.S_IFREG | 0o644) << 16
+            bundle.writestr(member, b"exact installed bytes")
         self.entry = {
             "archive_root": "locked-tool",
             "archive_sha256": sha256(self.archive.read_bytes()).hexdigest(),
+            "archive_size": self.archive.stat().st_size,
         }
         selected = patch.object(provision, "TOOLCHAIN_ROOT", self.toolchains)
         selected.start()
@@ -114,7 +120,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         self.assertEqual(published, again)
         self.assertEqual(published, after_interruption)
         self.assertTrue(interrupted_tail.is_dir())
-        download.assert_called_once()
+        self.assertEqual(3, download.call_count)
 
     def test_invalid_lock_root_refuses_before_download_or_stage(self) -> None:
         for archive_root, extracted_root in (
@@ -154,6 +160,18 @@ class IdeExtractionPreservationTests(unittest.TestCase):
                 self.assertEqual(b"historical installation", sentinel.read_bytes())
                 self.assertEqual(marker_bytes, marker.read_bytes() if marker.exists() else None)
 
+    def test_matching_marker_without_archive_members_refuses_and_retains_tree(self) -> None:
+        destination = self.toolchains / self.entry["archive_root"]
+        destination.mkdir(parents=True)
+        marker = destination / ".workbench-provisioned-sha256"
+        marker.write_text(self.entry["archive_sha256"] + "\n", encoding="ascii")
+        with patch.object(provision, "download", return_value=self.archive) as download:
+            with self.assertRaisesRegex(provision.ProvisionFailure, "exact readback"):
+                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+            download.assert_called_once()
+        self.assertEqual(self.entry["archive_sha256"] + "\n", marker.read_text(encoding="ascii"))
+        self.assertEqual([marker], list(destination.iterdir()))
+
     def test_redirected_destination_or_marker_refuses_without_replacing_tree(self) -> None:
         destination = self.toolchains / self.entry["archive_root"]
         real = self.root / "real"
@@ -181,12 +199,13 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         source_marker = self.root / "shared-marker"
         source_marker.write_text(self.entry["archive_sha256"] + "\n", encoding="ascii")
         marker.hardlink_to(source_marker)
-        with patch.object(provision, "download") as download:
+        (destination / "bin").write_bytes(b"exact installed bytes")
+        with patch.object(provision, "download", return_value=self.archive) as download:
             self.assertEqual(
                 destination,
                 provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract),
             )
-            download.assert_not_called()
+            download.assert_called_once()
         self.assertEqual(2, marker.stat().st_nlink)
 
     def test_destination_created_during_extraction_is_retained(self) -> None:
