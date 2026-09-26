@@ -455,6 +455,44 @@ class PublicExportHardeningTests(unittest.TestCase):
         ):
             PUBLIC_EXPORT.verify_export(first)
 
+    def test_export_accepts_more_than_4096_source_members(self) -> None:
+        self.add_public_authority()
+        source = self.repository / "source"
+        source.mkdir()
+        for number in range(4097):
+            (source / f"{number:04}.txt").write_bytes(b"reviewed\n")
+        commit = self.commit()
+        plan = PUBLIC_EXPORT.public_export_plan(commit, root=self.repository)
+        self.assertGreater(plan["file_count"], 4096)
+        self.assertEqual(["secret-scan-receipt-required"], plan["blockers"])
+
+        scan_input = self.base / "scan-input"
+        staged = PUBLIC_EXPORT.stage_secret_scan_input(
+            scan_input, commit, root=self.repository
+        )
+        self.assertEqual(plan["tree_sha256"], staged["tree_sha256"])
+
+        receipt = self.base / "secret-scan-receipt.json"
+        receipt.write_bytes(
+            PUBLIC_EXPORT._canonical_pretty_json(plan["secret_scan"]["template"])
+        )
+        output = self.base / "export"
+        result = PUBLIC_EXPORT.build_export(
+            output, commit, receipt, root=self.repository
+        )
+        self.assertEqual(plan["file_count"], result["file_count"])
+        self.assertEqual(plan["tree_sha256"], result["tree_sha256"])
+        self.assertEqual(result, PUBLIC_EXPORT.verify_export(output))
+        expected_manifest = {
+            **PUBLIC_EXPORT.public_export_plan(commit, receipt, root=self.repository),
+            "format": "workbench-public-export-manifest-v1",
+            "tree_directory": "tree",
+        }
+        self.assertEqual(
+            PUBLIC_EXPORT._canonical_pretty_json(expected_manifest),
+            (output / "export-manifest.json").read_bytes(),
+        )
+
     def test_receipt_for_another_tree_is_rejected(self) -> None:
         self.add_public_authority()
         (self.repository / "README.md").write_text("reviewed\n", encoding="utf-8")
