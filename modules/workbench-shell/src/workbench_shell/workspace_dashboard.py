@@ -17,7 +17,6 @@ import json
 import os
 from pathlib import Path
 import re
-import secrets
 import stat
 import subprocess
 import sys
@@ -28,9 +27,13 @@ from workbench_api.profile_extensions import (
     require_profile_extension,
 )
 from workbench_api.host_filesystem import (
+    DurableRecordError,
     HostFilesystemError,
+    count_interrupted_create_once_stages,
     fsync_directory,
     private_path,
+    publish_create_once_bytes,
+    read_private_single_link_bytes,
     secure_private_path,
 )
 
@@ -2387,68 +2390,29 @@ def _exclusive_state_lease(path: Path, *, create: bool):
         ) from exc
 
 
-def _interrupted_adoption_count(bindings: Path, binding_path: Path) -> int:
-    prefix = f".{binding_path.name}."
-    observed = 0
+def _interrupted_adoption_count(binding_path: Path) -> int:
     try:
-        candidates = sorted(bindings.iterdir(), key=lambda path: path.name)
-    except OSError as exc:
+        return count_interrupted_create_once_stages(binding_path)
+    except HostFilesystemError as exc:
         raise WorkspaceHomeV2Error(
             "cannot inspect interrupted Workspace Home adoptions"
         ) from exc
-    for candidate in candidates:
-        if not candidate.name.startswith(prefix) or not candidate.name.endswith(".tmp"):
-            continue
-        try:
-            metadata = candidate.lstat()
-        except OSError as exc:
-            raise WorkspaceHomeV2Error(
-                "cannot inspect interrupted Workspace Home adoption"
-            ) from exc
-        if not stat.S_ISREG(metadata.st_mode):
-            raise WorkspaceHomeV2Error(
-                "interrupted Workspace Home adoption is not a regular file"
-            )
-        observed += 1
-    return observed
 
 
 def _atomic_private_json(path: Path, value: Mapping[str, Any]) -> None:
     payload = _canonical_bytes(value)
     if len(payload) > MAX_STATE_RECORD_BYTES:
         raise WorkspaceHomeV2Error("Workspace Home state record exceeds its bound")
-    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor: int | None = None
     try:
-        descriptor = os.open(temporary, flags, 0o600)
-        with os.fdopen(descriptor, "wb") as stream:
-            descriptor = None
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        try:
-            secure_private_path(temporary, directory=False)
-            os.link(temporary, path, follow_symlinks=False)
-        except FileExistsError as exc:
+        publish_create_once_bytes(path, payload, byte_limit=MAX_STATE_RECORD_BYTES)
+    except DurableRecordError as exc:
+        if exc.code == "collision":
             raise WorkspaceHomeV2Error(
                 "Workspace Home is already adopted; use reopen"
             ) from exc
-        except HostFilesystemError as exc:
-            raise WorkspaceHomeV2Error(
-                "cannot secure Workspace Home adoption temporary"
-            ) from exc
-        fsync_directory(path.parent)
-    except WorkspaceHomeV2Error:
-        raise
-    except OSError as exc:
         raise WorkspaceHomeV2Error("cannot publish Workspace Home adoption") from exc
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
-        temporary.unlink(missing_ok=True)
+    except HostFilesystemError as exc:
+        raise WorkspaceHomeV2Error("cannot publish Workspace Home adoption") from exc
 
 
 def _adoption_state_revision(value: Mapping[str, Any]) -> str:
@@ -2520,63 +2484,21 @@ def _validate_adoption(value: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _read_adoption(path: Path) -> dict[str, Any]:
-    descriptor: int | None = None
     try:
-        flags = os.O_RDONLY | (os.O_NOFOLLOW if hasattr(os, "O_NOFOLLOW") else 0)
-        before = os.stat(path, follow_symlinks=False)
-        descriptor = os.open(path, flags | getattr(os, "O_BINARY", 0))
-        opened = os.fstat(descriptor)
-        if (
-            not stat.S_ISREG(before.st_mode)
-            or stat.S_ISLNK(before.st_mode)
-            or not stat.S_ISREG(opened.st_mode)
-            or opened.st_nlink != 1
-        ):
-            raise WorkspaceHomeV2Error(
-                "Workspace Home adoption must be a regular file"
-            )
-        if os.name != "nt" and (
-            opened.st_mode & 0o077
-            or (hasattr(os, "geteuid") and opened.st_uid != os.geteuid())
-        ):
-            raise WorkspaceHomeV2Error(
-                "Workspace Home adoption is not owner-private"
-            )
-        if opened.st_size < 2 or opened.st_size > MAX_STATE_RECORD_BYTES:
-            raise WorkspaceHomeV2Error(
-                "Workspace Home adoption is outside its byte bound"
-            )
-        raw = b""
-        while len(raw) <= MAX_STATE_RECORD_BYTES:
-            chunk = os.read(
-                descriptor,
-                min(65536, MAX_STATE_RECORD_BYTES + 1 - len(raw)),
-            )
-            if not chunk:
-                break
-            raw += chunk
-        closed = os.fstat(descriptor)
-        if not private_path(path, directory=False):
-            raise WorkspaceHomeV2Error(
-                "Workspace Home adoption is not owner-private"
-            )
-        current = os.stat(path, follow_symlinks=False)
-        if (
-            len(raw) > MAX_STATE_RECORD_BYTES
-            or len(raw) != opened.st_size
-            or not _stable_file_custody(before, opened, closed, current)
-        ):
-            raise WorkspaceHomeV2Error(
-                "Workspace Home adoption changed while being read"
-            )
+        raw = read_private_single_link_bytes(path, byte_limit=MAX_STATE_RECORD_BYTES)
+        if len(raw) < 2:
+            raise WorkspaceHomeV2Error("Workspace Home adoption is outside its byte bound")
         value = json.loads(raw.decode("utf-8", "strict"))
+    except DurableRecordError as exc:
+        if exc.code == "unsafe":
+            raise WorkspaceHomeV2Error(
+                "Workspace Home adoption must be a regular owner-private file"
+            ) from exc
+        raise WorkspaceHomeV2Error("Workspace Home adoption is corrupt") from exc
     except WorkspaceHomeV2Error:
         raise
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise WorkspaceHomeV2Error("Workspace Home adoption is corrupt") from exc
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
     if not isinstance(value, dict):
         raise WorkspaceHomeV2Error("Workspace Home adoption is not an object")
     validated = _validate_adoption(value)
@@ -2679,10 +2601,7 @@ def adopt_workspace_home_v2(
     binding_path = bindings / _binding_filename(binding_id)
     lock_path = _lock_path(locks, binding_id)
     with _exclusive_state_lease(lock_path, create=True):
-        interrupted_write_count = _interrupted_adoption_count(
-            bindings,
-            binding_path,
-        )
+        interrupted_write_count = _interrupted_adoption_count(binding_path)
         owner_revisions = _retained_owner_revisions(home["owner_records"])
         adoption_record: dict[str, Any] = {
             "format": ADOPTION_FORMAT,
@@ -2748,10 +2667,7 @@ def reopen_workspace_home_v2(
     lock_path = _lock_path(locks, binding_id)
     with _exclusive_state_lease(lock_path, create=False):
         adoption_record = _read_adoption(binding_path)
-        interrupted_write_count = _interrupted_adoption_count(
-            bindings,
-            binding_path,
-        )
+        interrupted_write_count = _interrupted_adoption_count(binding_path)
         if adoption_record["binding_id"] != binding_id:
             raise WorkspaceHomeV2Error(
                 "Workspace Home adoption names another binding"

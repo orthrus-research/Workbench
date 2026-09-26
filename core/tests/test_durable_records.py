@@ -14,9 +14,10 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api.host_filesystem import (
-    DurableRecordError, append_private_line, inspect_private_journal,
-    private_record_lock, publish_immutable_bytes, read_bounded_bytes,
-    read_private_bytes, remove_private_bytes, replace_private_bytes,
+    DurableRecordError, append_private_line, count_interrupted_create_once_stages,
+    inspect_private_journal, private_record_lock, publish_create_once_bytes,
+    publish_immutable_bytes, read_bounded_bytes, read_private_bytes,
+    read_private_single_link_bytes, remove_private_bytes, replace_private_bytes,
     update_preference_bytes,
 )
 from workbench_core.host_services import install_local_host_services
@@ -65,6 +66,58 @@ class DurableRecordTests(unittest.TestCase):
         reopened = subprocess.run([sys.executable, "-c", code, str(self.path)],
                                   env=environment, capture_output=True, text=True, check=True)
         self.assertEqual('{"current":1}', reopened.stdout.strip())
+
+    def test_create_once_keeps_historical_crash_stage_visible(self) -> None:
+        orphan = self.root / ".current.json.interrupted.tmp"
+        orphan.write_bytes(b"partial")
+        orphan.chmod(0o600)
+        self.assertEqual(1, count_interrupted_create_once_stages(self.path))
+        linked_stages: list[str] = []
+        original_link = os.link
+
+        def observe_link(source: Path, target: Path, **kwargs: object) -> None:
+            linked_stages.append(source.name)
+            original_link(source, target, **kwargs)
+
+        with patch.object(durable_records.os, "link", side_effect=observe_link):
+            publish_create_once_bytes(self.path, b'{}\n', byte_limit=1024)
+        self.assertEqual(1, len(linked_stages))
+        self.assertRegex(linked_stages[0], r"^\.current\.json\.[0-9a-f]{16}\.tmp$")
+        self.assertFalse((self.root / linked_stages[0]).exists())
+        self.assertTrue(orphan.exists())
+        self.assertEqual(1, count_interrupted_create_once_stages(self.path))
+        self.assertEqual(b'{}\n', read_private_single_link_bytes(self.path, byte_limit=1024))
+        with self.assertRaises(DurableRecordError) as collision:
+            publish_create_once_bytes(self.path, b'{"other":true}\n', byte_limit=1024)
+        self.assertEqual("collision", collision.exception.code)
+        self.assertEqual(b'{}\n', self.path.read_bytes())
+
+    def test_interrupted_stage_inventory_rejects_redirect(self) -> None:
+        stage = self.root / ".current.json.redirect.tmp"
+        stage.symlink_to(self.path)
+        with self.assertRaises(DurableRecordError) as unsafe:
+            count_interrupted_create_once_stages(self.path)
+        self.assertEqual("unsafe", unsafe.exception.code)
+
+    def test_create_once_stage_name_collision_preserves_existing_residue(self) -> None:
+        stage = self.root / ".current.json.0000000000000000.tmp"
+        stage.write_bytes(b"recoverable")
+        stage.chmod(0o600)
+        with patch.object(durable_records.secrets, "token_hex", return_value="0" * 16):
+            with self.assertRaises(DurableRecordError) as collision:
+                publish_create_once_bytes(self.path, b'{}\n', byte_limit=1024)
+        self.assertEqual("write", collision.exception.code)
+        self.assertEqual(b"recoverable", stage.read_bytes())
+        self.assertFalse(self.path.exists())
+
+    def test_single_link_private_read_rejects_hardlink(self) -> None:
+        replace_private_bytes(self.path, b'{}\n', byte_limit=1024, require_absent=True)
+        other = self.root / "other.json"
+        os.link(self.path, other)
+        with self.assertRaises(DurableRecordError) as unsafe:
+            read_private_single_link_bytes(self.path, byte_limit=1024)
+        self.assertEqual("unsafe", unsafe.exception.code)
+        self.assertEqual(b'{}\n', other.read_bytes())
 
     def test_private_read_rejects_ordinary_external_file_and_symlink(self) -> None:
         self.path.write_bytes(b"input\n")
@@ -148,7 +201,13 @@ class DurableRecordTests(unittest.TestCase):
         with patch.object(durable_records, "private_path", side_effect=simulated_mount):
             with self.assertRaises(DurableRecordError) as unsafe:
                 publish_immutable_bytes(self.path, b"private\n", byte_limit=1024)
+            with self.assertRaises(DurableRecordError) as create_once:
+                publish_create_once_bytes(self.path, b"private\n", byte_limit=1024)
+            with self.assertRaises(DurableRecordError) as inventory:
+                count_interrupted_create_once_stages(self.path)
         self.assertEqual("unsafe", unsafe.exception.code)
+        self.assertEqual("unsafe", create_once.exception.code)
+        self.assertEqual("unsafe", inventory.exception.code)
         self.assertFalse(self.path.exists())
         self.assertEqual([], list(self.root.iterdir()))
 

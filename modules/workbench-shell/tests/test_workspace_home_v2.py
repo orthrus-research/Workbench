@@ -35,6 +35,7 @@ from workbench_api.state_paths import (  # noqa: E402
 )
 from workbench_api.profiles import profile_scope  # noqa: E402
 from workbench_core.human_presentation import human_command  # noqa: E402
+from workbench_core.host_services import install_local_host_services  # noqa: E402
 from workbench_shell.work_session import WorkSessionStore  # noqa: E402
 from workbench_shell.workspace_dashboard import (  # noqa: E402
     OwnerRecordPort,
@@ -95,6 +96,10 @@ def _tree_snapshot(root: Path) -> list[tuple[str, str, int]]:
 
 
 class WorkspaceHomeV2Tests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        install_local_host_services()
+
     def _workspace(self, base: Path, *, searchable: bool = False) -> Path:
         workspace = base / "workspace"
         workspace.mkdir()
@@ -1540,7 +1545,7 @@ class WorkspaceHomeV2Tests(unittest.TestCase):
                 "workbench_shell.workspace_dashboard.os.name",
                 "nt",
             ), mock.patch(
-                "workbench_shell.workspace_dashboard.private_path",
+                "workbench_core.durable_records.private_path",
                 return_value=True,
             ):
                 self.assertEqual(expected, _read_adoption(binding_path))
@@ -1549,7 +1554,7 @@ class WorkspaceHomeV2Tests(unittest.TestCase):
                 "workbench_shell.workspace_dashboard.os.name",
                 "nt",
             ), mock.patch(
-                "workbench_shell.workspace_dashboard.private_path",
+                "workbench_core.durable_records.private_path",
                 return_value=False,
             ):
                 with self.assertRaisesRegex(WorkspaceHomeV2Error, "owner-private"):
@@ -1559,7 +1564,7 @@ class WorkspaceHomeV2Tests(unittest.TestCase):
                 "workbench_shell.workspace_dashboard.os.name",
                 "posix",
             ), mock.patch(
-                "workbench_shell.workspace_dashboard.private_path",
+                "workbench_core.durable_records.private_path",
                 return_value=True,
             ):
                 with self.assertRaisesRegex(WorkspaceHomeV2Error, "owner-private"):

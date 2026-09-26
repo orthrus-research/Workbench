@@ -11,6 +11,7 @@ from hashlib import sha256
 import os
 from pathlib import Path
 import re
+import secrets
 import stat
 import tempfile
 from time import monotonic, sleep
@@ -43,7 +44,10 @@ def _identity(info: os.stat_result) -> tuple[int, int, int, int]:
     return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
 
 
-def _ordinary(path: Path, *, byte_limit: int, private: bool = True) -> os.stat_result:
+def _ordinary(
+    path: Path, *, byte_limit: int, private: bool = True,
+    single_link: bool = False,
+) -> os.stat_result:
     try:
         info = path.lstat()
     except FileNotFoundError as exc:
@@ -54,19 +58,29 @@ def _ordinary(path: Path, *, byte_limit: int, private: bool = True) -> os.stat_r
         not stat.S_ISREG(info.st_mode)
         or info.st_size > byte_limit
         or (private and not private_path(path, directory=False))
+        or (single_link and info.st_nlink != 1)
+        or (
+            private and os.name != "nt" and (
+                info.st_mode & 0o077
+                or (hasattr(os, "geteuid") and info.st_uid != os.geteuid())
+            )
+        )
     ):
         raise DurableRecordError("unsafe", "private record is not a bounded owner-private file")
     return info
 
 
-def _read_bytes(path: Path, *, byte_limit: int, private: bool) -> bytes:
+def _read_bytes(
+    path: Path, *, byte_limit: int, private: bool,
+    single_link: bool = False,
+) -> bytes:
     if private:
         _parent(path)
     elif not isinstance(path, Path) or not path.is_absolute():
         raise DurableRecordError("path", "bounded record needs an absolute file path")
     if type(byte_limit) is not int or byte_limit < 0:
         raise DurableRecordError("bounds", "private record byte limit is invalid")
-    visible = _ordinary(path, byte_limit=byte_limit, private=private)
+    visible = _ordinary(path, byte_limit=byte_limit, private=private, single_link=single_link)
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
     try:
         descriptor = os.open(path, flags)
@@ -85,7 +99,7 @@ def _read_bytes(path: Path, *, byte_limit: int, private: bool) -> bytes:
             after = os.fstat(descriptor)
         finally:
             os.close(descriptor)
-        final = _ordinary(path, byte_limit=byte_limit, private=private)
+        final = _ordinary(path, byte_limit=byte_limit, private=private, single_link=single_link)
     except DurableRecordError:
         raise
     except OSError as exc:
@@ -93,11 +107,31 @@ def _read_bytes(path: Path, *, byte_limit: int, private: bool) -> bytes:
     data = b"".join(chunks)
     if len(data) != opened.st_size or _identity(opened) != _identity(after) or _identity(after) != _identity(final):
         raise DurableRecordError("changed", "private record changed during reading")
+    if single_link and (
+        opened.st_nlink != 1
+        or any(
+            getattr(visible, field) != getattr(final, field)
+            or getattr(opened, field) != getattr(after, field)
+            for field in ("st_mode", "st_nlink", "st_ctime_ns")
+        )
+        or any(
+            getattr(visible, field) != getattr(opened, field)
+            or getattr(after, field) != getattr(final, field)
+            for field in ("st_mode", "st_nlink")
+        )
+    ):
+        raise DurableRecordError("changed", "private record custody changed during reading")
     return data
 
 
 def read_private_bytes(path: Path, *, byte_limit: int) -> bytes:
     return _read_bytes(path, byte_limit=byte_limit, private=True)
+
+
+def read_private_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
+    """Read one owner-private binding with singular, stable file custody."""
+
+    return _read_bytes(path, byte_limit=byte_limit, private=True, single_link=True)
 
 
 def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
@@ -107,11 +141,24 @@ def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
 
 
 @contextmanager
-def _prepared(path: Path, data: bytes) -> Iterator[tuple[Path, os.stat_result]]:
-    descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    temporary = Path(name)
-    opened = True
+def _prepared(
+    path: Path, data: bytes, *, create_once_stage: bool = False,
+) -> Iterator[tuple[Path, os.stat_result]]:
+    descriptor = -1
+    temporary: Path | None = None
+    opened = False
+    created = False
     try:
+        if create_once_stage:
+            # The historical adoption recovery reader sees this exact shape.
+            temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+            descriptor = os.open(temporary, flags | getattr(os, "O_BINARY", 0), 0o600)
+        else:
+            descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+            temporary = Path(name)
+        opened = True
+        created = True
         os.chmod(temporary, 0o600)
         stream = os.fdopen(descriptor, "wb")
         opened = False
@@ -136,7 +183,8 @@ def _prepared(path: Path, data: bytes) -> Iterator[tuple[Path, os.stat_result]]:
     finally:
         if opened:
             os.close(descriptor)
-        temporary.unlink(missing_ok=True)
+        if created and temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _check_data(data: bytes, byte_limit: int) -> None:
@@ -166,6 +214,49 @@ def publish_immutable_bytes(
             if _identity(published) != _identity(secured) or read_private_bytes(path, byte_limit=byte_limit) != data:
                 raise DurableRecordError("changed", "published immutable record changed")
     fsync_directory(path.parent)
+
+
+def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:
+    """Publish under the historical visible-stage create-once convention."""
+
+    _parent(path)
+    _check_data(data, byte_limit)
+    if path.exists() or path.is_symlink():
+        raise DurableRecordError("collision", "create-once private record already exists")
+    with _prepared(path, data, create_once_stage=True) as (temporary, secured):
+        try:
+            os.link(temporary, path, follow_symlinks=False)
+        except FileExistsError as exc:
+            raise DurableRecordError("collision", "create-once private record raced") from exc
+        except OSError as exc:
+            raise DurableRecordError("write", f"cannot publish create-once record: {exc}") from exc
+        published = _ordinary(path, byte_limit=byte_limit)
+        if _identity(published) != _identity(secured) or read_private_bytes(path, byte_limit=byte_limit) != data:
+            raise DurableRecordError("changed", "published create-once record changed")
+        # Keep the visible stage until the destination directory is durable.
+        # A process crash before that flush must remain observable on reopen.
+        fsync_directory(path.parent)
+
+
+def count_interrupted_create_once_stages(path: Path) -> int:
+    """Inventory visible crash stages without opening, changing or removing them."""
+
+    _parent(path)
+    prefix = f".{path.name}."
+    try:
+        candidates = sorted(path.parent.iterdir(), key=lambda item: item.name)
+        count = 0
+        for candidate in candidates:
+            if not candidate.name.startswith(prefix) or not candidate.name.endswith(".tmp"):
+                continue
+            if not stat.S_ISREG(candidate.lstat().st_mode):
+                raise DurableRecordError("unsafe", "interrupted create-once stage is not a regular file")
+            count += 1
+        return count
+    except DurableRecordError:
+        raise
+    except OSError as exc:
+        raise DurableRecordError("unavailable", f"cannot inspect interrupted create-once stages: {exc}") from exc
 
 
 @contextmanager

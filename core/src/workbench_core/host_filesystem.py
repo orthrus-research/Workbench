@@ -354,6 +354,11 @@ def read_private_bytes(path: Path, *, byte_limit: int) -> bytes:
     return read(path, byte_limit=byte_limit)
 
 
+def read_private_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
+    from .durable_records import read_private_single_link_bytes as read
+    return read(path, byte_limit=byte_limit)
+
+
 def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
     from .durable_records import read_bounded_bytes as read
     return read(path, byte_limit=byte_limit)
@@ -371,6 +376,16 @@ def publish_immutable_bytes(
 ) -> None:
     from .durable_records import publish_immutable_bytes as publish
     publish(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+
+def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:
+    from .durable_records import publish_create_once_bytes as publish
+    publish(path, data, byte_limit=byte_limit)
+
+
+def count_interrupted_create_once_stages(path: Path) -> int:
+    from .durable_records import count_interrupted_create_once_stages as count
+    return count(path)
 
 
 def replace_private_bytes(

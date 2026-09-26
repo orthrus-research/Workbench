@@ -22,12 +22,15 @@ class HostFilesystem(Protocol):
     def secure_private_endpoint(self, path: Path) -> None: ...
     def fsync_directory(self, path: Path) -> None: ...
     def read_private_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
+    def read_private_single_link_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
     def read_bounded_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
     def update_preference_bytes(
         self, path: Path, transform: Callable[[bytes | None], bytes],
         *, byte_limit: int,
     ) -> bytes: ...
     def publish_immutable_bytes(self, path: Path, data: bytes, *, byte_limit: int, idempotent: bool = False) -> None: ...
+    def publish_create_once_bytes(self, path: Path, data: bytes, *, byte_limit: int) -> None: ...
+    def count_interrupted_create_once_stages(self, path: Path) -> int: ...
     def replace_private_bytes(
         self, path: Path, data: bytes, *, byte_limit: int,
         expected_sha256: str | None = None, require_absent: bool = False,
@@ -99,6 +102,15 @@ def read_private_bytes(path: Path, *, byte_limit: int) -> bytes:
     return operation(path, byte_limit=byte_limit)
 
 
+def read_private_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
+    """Read a private binding while rejecting alternate links and custody drift."""
+
+    operation = getattr(_filesystem(), "read_private_single_link_bytes", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide single-link private reads")
+    return operation(path, byte_limit=byte_limit)
+
+
 def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
     operation = getattr(_filesystem(), "read_bounded_bytes", None)
     if not callable(operation):
@@ -130,6 +142,29 @@ def publish_immutable_bytes(
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide immutable record publication")
     operation(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+
+def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:
+    """Publish one private binding while retaining visible legacy crash stages.
+
+    The Core host chooses the stage name and creates the destination once.
+    Callers may inspect interrupted stages before or after publication under
+    their existing physical lease; Core never silently discards old residue.
+    """
+
+    operation = getattr(_filesystem(), "publish_create_once_bytes", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide create-once publication")
+    operation(path, data, byte_limit=byte_limit)
+
+
+def count_interrupted_create_once_stages(path: Path) -> int:
+    """Count historical ``.<name>.<nonce>.tmp`` stages without changing them."""
+
+    operation = getattr(_filesystem(), "count_interrupted_create_once_stages", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide create-once stage inventory")
+    return operation(path)
 
 
 def replace_private_bytes(
