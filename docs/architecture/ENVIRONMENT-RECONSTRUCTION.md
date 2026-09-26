@@ -205,11 +205,23 @@ and its coverage is `reviewed-offline-dependency-closure-only`. The native
 manifest's hashes detect byte changes but do not authenticate its publisher.
 No wheels are copied into new Core custody, no environment is created, and no
 package is installed. The `optional-module-packages` marker remains unresolved.
-The next operation must independently reopen the exact plan and source bytes,
-retain the complete closure under Core, install into a new private environment,
-check installation target/launcher collisions, and verify installed dependency,
-module/profile and fixture-owner admission.
-Native installation and WSL filesystem qualification remain separate evidence.
+`plan_package_import` reviews that closure plan for an exact private Core tree.
+`apply_package_import` repeats the source review, records a prepared attempt,
+copies only the manifest, hash lock and named wheels through pinned source
+directories, and publishes the tree with no-replace semantics and exact Linux
+inventory. `reopen_package_import` verifies the retained tree and result
+without the original wheelhouse path. A committed tree can be reused; an
+interrupted publication with a complete intent can be reconciled. A failed
+stage or a foreign target is preserved for review. The 32 GiB exact-tree bound
+is enforced before copy. On WSL the destination must support owner-private
+Linux tree custody; Windows-mounted storage remains unqualified.
+
+The retained wheelhouse still has no installed-package authority. The next
+operation must separately review installation target and launcher collisions,
+install into a new private environment, and verify installed dependency,
+module/profile and fixture-owner admission. The `optional-module-packages`
+marker stays unresolved until that evidence exists. Native installation and
+WSL filesystem qualification remain separate evidence.
 
 `plan_environment_input_composition` is a V2 linked review of five separately
 completed Core results: workspace selection, exact project checkout, managed

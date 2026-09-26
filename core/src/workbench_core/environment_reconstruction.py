@@ -1354,6 +1354,27 @@ def plan_package_closure(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def plan_package_import(*args, **kwargs) -> dict[str, Any]:
+    """Review Core custody of an exact offline package wheelhouse."""
+
+    from .environment_package_import import plan_package_import as operation
+    return operation(*args, **kwargs)
+
+
+def apply_package_import(*args, **kwargs) -> dict[str, Any]:
+    """Retain a reviewed package closure without installing it."""
+
+    from .environment_package_import import apply_package_import as operation
+    return operation(*args, **kwargs)
+
+
+def reopen_package_import(*args, **kwargs) -> dict[str, Any]:
+    """Reopen the exact Core-managed package closure tree."""
+
+    from .environment_package_import import reopen_package_import as operation
+    return operation(*args, **kwargs)
+
+
 def plan_fixture_import(*args, **kwargs) -> dict[str, Any]:
     """Review the admitted profile fixture for separate Core custody."""
 
@@ -1384,5 +1405,6 @@ __all__ = [
     "reopen_environment_input_composition",
     "plan_wheel_import", "apply_wheel_import", "reopen_wheel_import",
     "plan_package_closure",
+    "plan_package_import", "apply_package_import", "reopen_package_import",
     "plan_fixture_import", "apply_fixture_import", "reopen_fixture_import",
 ]
