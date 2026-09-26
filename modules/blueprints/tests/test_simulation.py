@@ -584,5 +584,105 @@ assert not cache._path(new['sha256']).exists()
             self.assertEqual(0, result.returncode, result.stderr)
 
 
+class SimulationEvidenceCustodyTests(unittest.TestCase):
+    @staticmethod
+    def _evidence(*, gates: int = 1) -> dict[str, Any]:
+        digest = "a" * 64
+        return {
+            "schema_version": 1,
+            "format": "susy-blueprints-simulation-evidence-v1",
+            "contract_id": simulation.ENGINE_CONTRACT_ID,
+            "candidate_id": "blueprints-candidate:sha256:" + digest,
+            "plan_id": "blueprints-plan:sha256:" + digest,
+            "target_state_id": "blueprints-target-state:sha256:" + digest,
+            "environment_lock_sha256": digest,
+            "authority_state_sha256": digest,
+            "baseline_manifest_sha256": digest,
+            "result_manifest_sha256": digest,
+            "gates": [simulation.Simulator._private_gate(
+                index, f"stage-{index}-" + "x" * 2048, "passed", "BPX000_FIXTURE",
+            ) for index in range(gates)],
+            "disposable_worktrees_removed": True,
+        }
+
+    def test_v1_shape_publishes_without_an_invented_gate_or_stage_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            evidence = self._evidence(gates=257)
+            store = simulation.SimulationEvidenceStore(root / "simulation-evidence")
+            with sealed_store_scope(workspace, root / "config"):
+                locator = store.put(evidence)
+                self.assertEqual(evidence, store.read(locator))
+                self.assertEqual(locator, store.put(evidence))
+            content = standards.canonical_json(evidence).encode("utf-8")
+            digest = hashlib.sha256(content).hexdigest()
+            self.assertEqual("local-simulation-evidence:sha256:" + digest, locator)
+            stored = store.root / "objects" / digest[:2] / f"{digest}.json"
+            self.assertEqual(content, stored.read_bytes())
+            if os.name != "nt":
+                self.assertEqual(0o700, stat.S_IMODE(store.root.stat().st_mode))
+                self.assertEqual(0o600, stat.S_IMODE(stored.stat().st_mode))
+            registrations = [json.loads(path.read_text(encoding="utf-8")) for path in
+                             (root / "config/resources-v1/stores").glob("*.json")]
+            self.assertEqual([str(store.root)], [row["root"] for row in registrations
+                              if row["family"] == "blueprints-simulation-evidence-v1"])
+
+    def test_historical_v1_locator_reopens_without_and_with_core(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence = self._evidence()
+            content = standards.canonical_json(evidence).encode("utf-8")
+            digest = hashlib.sha256(content).hexdigest()
+            locator = "local-simulation-evidence:sha256:" + digest
+            store = simulation.SimulationEvidenceStore(root / "historical/simulation-evidence")
+            historical = store.root / "objects" / digest[:2] / f"{digest}.json"
+            historical.parent.mkdir(mode=0o700, parents=True)
+            historical.write_bytes(content)
+            historical.chmod(0o600)
+            self.assertEqual(evidence, store.read(locator))
+            workspace = root / "workspace"
+            workspace.mkdir()
+            with sealed_store_scope(workspace, root / "config"):
+                self.assertEqual(evidence, store.read(locator))
+                self.assertEqual(locator, store.put(evidence))
+            self.assertEqual(content, historical.read_bytes())
+            historical.write_bytes(b"X" + content[1:])
+            with self.assertRaises(simulation.SimulationDiagnostic) as rejected:
+                store.read(locator)
+            self.assertEqual("BPX151_EVIDENCE_DIGEST", rejected.exception.code)
+
+    def test_racing_collision_does_not_replace_existing_evidence(self) -> None:
+        from workbench_api.host_filesystem import publish_immutable_bytes as core_publish
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            evidence = self._evidence()
+            store = simulation.SimulationEvidenceStore(root / "simulation-evidence")
+            raced = []
+            def collide(path, data, **options):
+                path.write_bytes(b"racing different evidence")
+                path.chmod(0o600)
+                raced.append(path)
+                core_publish(path, data, **options)
+            with sealed_store_scope(workspace, root / "config"):
+                with patch.object(simulation, "publish_immutable_bytes", side_effect=collide):
+                    with self.assertRaises(simulation.SimulationDiagnostic) as rejected:
+                        store.put(evidence)
+            self.assertEqual("BPX116_EVIDENCE_COLLISION", rejected.exception.code)
+            self.assertEqual(b"racing different evidence", raced[0].read_bytes())
+
+    def test_new_evidence_requires_core_store(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "simulation-evidence"
+            with self.assertRaises(simulation.SimulationDiagnostic) as rejected:
+                simulation.SimulationEvidenceStore(root).put(self._evidence())
+            self.assertEqual("BPX115_EVIDENCE_ROOT", rejected.exception.code)
+            self.assertFalse(root.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -38,6 +38,10 @@ class CoreRecordStores:
             # The environment lock owns each digest key below the selected
             # historical cache root; Core registers custody of that root.
             root = selected
+        elif self.owner_id == "blueprints" and family == "blueprints-simulation-evidence-v1":
+            # Keep the V1 evidence locator's exact selected CAS root while
+            # registering its physical custody with Core.
+            root = selected
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

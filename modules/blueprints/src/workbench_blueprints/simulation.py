@@ -382,42 +382,42 @@ class SimulationEvidenceStore:
         content = standards.canonical_json(evidence).encode("utf-8")
         digest = _digest_bytes(content)
         path = self.root / "objects" / digest[:2] / f"{digest}.json"
-        self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        if self.root.is_symlink() or path.parent.is_symlink():
+        try:
+            managed = open_record_store("blueprints-simulation-evidence-v1", self.root)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPX115_EVIDENCE_ROOT", str(self.root), str(exc))
+        if managed is None or managed.root != self.root:
+            _fail("BPX115_EVIDENCE_ROOT", str(self.root), "simulation evidence requires its Core store")
+        objects = self.root / "objects"
+        if any(row.is_symlink() for row in (self.root, objects, path.parent)):
             _fail(
                 "BPX115_EVIDENCE_ROOT",
                 str(path.parent),
                 "evidence path contains a symlink",
             )
-        if path.exists():
-            if _read_regular(path, "BPX116_EVIDENCE_COLLISION") != content:
-                _fail(
-                    "BPX116_EVIDENCE_COLLISION",
-                    str(path),
-                    "content-addressed evidence collision",
-                )
-        else:
-            temporary: str | None = None
-            try:
-                with tempfile.NamedTemporaryFile(
-                    mode="wb",
-                    dir=path.parent,
-                    prefix=".evidence.",
-                    delete=False,
-                ) as handle:
-                    temporary = handle.name
-                    os.fchmod(handle.fileno(), 0o600)
-                    handle.write(content)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(temporary, path)
-                temporary = None
-            finally:
-                if temporary is not None:
-                    Path(temporary).unlink(missing_ok=True)
-        os.chmod(self.root, 0o700)
-        os.chmod(path, 0o600)
+        try:
+            secure_private_path(objects, directory=True)
+            secure_private_path(path.parent, directory=True)
+        except (HostFilesystemError, OSError) as exc:
+            _fail("BPX115_EVIDENCE_ROOT", str(path.parent), str(exc))
+        if path.is_symlink():
+            _fail("BPX116_EVIDENCE_COLLISION", str(path), "evidence path is a symlink")
+        try:
+            # V1 has no fixed record-size ceiling. The admitted canonical
+            # bytes provide the exact bound for this Core publication.
+            publish_immutable_bytes(path, content, byte_limit=len(content), idempotent=True)
+            observed = read_private_bytes(path, byte_limit=len(content))
+        except DurableRecordError as exc:
+            code = (
+                "BPX116_EVIDENCE_COLLISION"
+                if exc.code in {"collision", "changed", "unavailable", "unsafe"}
+                else "BPX115_EVIDENCE_ROOT"
+            )
+            _fail(code, str(path), str(exc))
+        except (HostFilesystemError, OSError) as exc:
+            _fail("BPX115_EVIDENCE_ROOT", str(path), str(exc))
+        if observed != content:
+            _fail("BPX116_EVIDENCE_COLLISION", str(path), "content-addressed evidence collision")
         return "local-simulation-evidence:sha256:" + digest
 
     def read(self, locator: str) -> dict[str, Any]:
@@ -430,6 +430,7 @@ class SimulationEvidenceStore:
         path = self.root / "objects" / digest[:2] / f"{digest}.json"
         if (
             self.root.is_symlink()
+            or (self.root / "objects").is_symlink()
             or path.parent.is_symlink()
             or path.is_symlink()
         ):
@@ -438,7 +439,26 @@ class SimulationEvidenceStore:
                 str(path),
                 "evidence path contains a symlink",
             )
-        content = _read_regular(path, "BPX150_EVIDENCE_MISSING")
+        if not path.is_file():
+            _fail("BPX150_EVIDENCE_MISSING", str(path), "evidence file is missing")
+        try:
+            managed = open_record_store("blueprints-simulation-evidence-v1", self.root)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPX115_EVIDENCE_ROOT", str(self.root), str(exc))
+        try:
+            # Historical V1 evidence had no fixed size cap. Bound this read
+            # to the selected file's observed size; Core checks its identity.
+            size = path.lstat().st_size
+            if managed is None:
+                content = _read_regular(path, "BPX150_EVIDENCE_MISSING", byte_limit=size)
+            else:
+                if managed.root != self.root:
+                    _fail("BPX115_EVIDENCE_ROOT", str(self.root), "Core selected a different evidence root")
+                content = read_private_bytes(path, byte_limit=size)
+        except DurableRecordError as exc:
+            _fail("BPX150_EVIDENCE_MISSING", str(path), str(exc))
+        except (HostFilesystemError, OSError) as exc:
+            _fail("BPX150_EVIDENCE_MISSING", str(path), str(exc))
         if _digest_bytes(content) != digest:
             _fail(
                 "BPX151_EVIDENCE_DIGEST",
