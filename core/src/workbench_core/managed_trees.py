@@ -1,0 +1,357 @@
+"""Core staging, no-replace publication and custody for directory resources."""
+
+from __future__ import annotations
+
+from contextlib import ExitStack, contextmanager
+import ctypes
+from datetime import datetime, timezone
+import errno
+import os
+from pathlib import Path
+import re
+import stat
+import sys
+from typing import Callable, Iterator, Mapping
+from uuid import uuid4
+
+from workbench_api.managed_trees import ManagedTreeError, ManagedTreeReference
+
+from . import check_storage
+from .durable_files import _directory as pinned_directory, read_verified
+from .host_filesystem import fsync_directory, secure_private_path
+from .output_routing import _WINDOWS_RESERVED
+from .storage.registered import ResourceCatalog
+from .storage.tree_catalog import (
+    COMMIT_KIND, INTENT_KIND, RESERVATION_KIND,
+    _content_sha256, _store_id, inventory_members,
+)
+
+
+_OWNER = re.compile(r"[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*\Z")
+_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_FILE_ID = re.compile(r"workbench-resource-v1:[0-9a-f]{32}\Z")
+_TREE_ID = re.compile(r"workbench-tree-v1:[0-9a-f]{32}\Z")
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def _ensure_parent(path: Path) -> None:
+    if os.name == "posix":
+        descriptor = pinned_directory(path, create=True)
+        os.close(descriptor)
+    else:  # Windows directory publication uses native no-replace rename.
+        path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    check_storage.ordinary(path, directory=True)
+
+
+def _sync_members(root: Path, members: list[dict[str, object]]) -> None:
+    """Flush staged payload bytes before recording a recoverable publication intent."""
+    directories = [root]
+    for row in members:
+        selected = root / str(row["path"])
+        if row["kind"] == "directory":
+            directories.append(selected)
+            continue
+        descriptor = os.open(
+            selected, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_BINARY", 0)
+        )
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise ManagedTreeError("tree.changed", "managed tree member changed before flush")
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    for directory in sorted(directories, key=lambda item: len(item.parts), reverse=True):
+        fsync_directory(directory)
+
+
+def _rename_no_replace(
+    payload: Path, target: Path, *, parent_identity: tuple[int, int],
+    payload_identity: tuple[int, int],
+) -> None:
+    """Use the destination filesystem's atomic no-replace directory operation."""
+    check_storage.ordinary(payload, directory=True)
+    check_storage.ordinary(target.parent, directory=True)
+    visible_parent = target.parent.stat()
+    if (visible_parent.st_dev, visible_parent.st_ino) != parent_identity:
+        raise ManagedTreeError("output.changed", "managed tree destination parent changed")
+    visible_payload = payload.stat()
+    if (visible_payload.st_dev, visible_payload.st_ino) != payload_identity:
+        raise ManagedTreeError("tree.changed", "managed tree payload changed identity")
+    if os.name == "nt":  # pragma: no cover - exercised on Windows qualification
+        try:
+            os.rename(payload, target)
+        except FileExistsError as exc:
+            raise ManagedTreeError("output.exists", "managed tree destination already exists") from exc
+        except OSError as exc:
+            raise ManagedTreeError("output.filesystem", f"managed tree directory publication failed: {exc}") from exc
+        return
+    if not sys.platform.startswith("linux"):
+        raise ManagedTreeError("output.filesystem", "atomic no-replace directory publication is unavailable on this host")
+    libc = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(libc, "renameat2", None)
+    if rename is None:
+        raise ManagedTreeError("output.filesystem", "this Linux host lacks renameat2 directory publication")
+    rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+    rename.restype = ctypes.c_int
+    try:
+        source_fd = pinned_directory(payload.parent, create=False)
+    except (OSError, ValueError) as exc:
+        raise ManagedTreeError("tree.changed", "managed tree staging directory changed") from exc
+    try:
+        try:
+            target_fd = pinned_directory(target.parent, create=False)
+        except (OSError, ValueError) as exc:
+            raise ManagedTreeError("output.changed", "managed tree destination parent changed") from exc
+        try:
+            parent = os.fstat(target_fd)
+            if (parent.st_dev, parent.st_ino) != parent_identity:
+                raise ManagedTreeError("output.changed", "managed tree destination parent changed")
+            staged = os.stat(payload.name, dir_fd=source_fd, follow_symlinks=False)
+            if (not stat.S_ISDIR(staged.st_mode)
+                    or (staged.st_dev, staged.st_ino) != payload_identity):
+                raise ManagedTreeError("tree.changed", "managed tree payload changed identity")
+            if rename(source_fd, os.fsencode(payload.name), target_fd, os.fsencode(target.name), 1):
+                code = ctypes.get_errno()
+                if code in {errno.EEXIST, errno.ENOTEMPTY}:
+                    raise ManagedTreeError("output.exists", "managed tree destination already exists")
+                if code in {errno.ENOSYS, errno.EINVAL, errno.EOPNOTSUPP, errno.ENOTSUP}:
+                    raise ManagedTreeError("output.filesystem", "the selected filesystem lacks atomic no-replace directory publication")
+                raise ManagedTreeError("output.write", f"managed tree publication failed: {os.strerror(code)}")
+        finally:
+            os.close(target_fd)
+    finally:
+        os.close(source_fd)
+
+
+class _CoreTreeStage:
+    def __init__(self, host: CoreManagedTrees, *, tree_id: str, target: Path, store_root: Path,
+                 staging_root: Path, reservation: dict):
+        self.host = host
+        self.tree_id = tree_id
+        self.path = staging_root / "payload"
+        self.target = target
+        self.store_root = store_root
+        self.staging_root = staging_root
+        self.reservation = reservation
+        self.renamed = False
+        self.committed = False
+
+    def publish(
+        self, *, validate: Callable[[Path], object], domain_id: str | None = None,
+        references: tuple[str, ...] = (), derived_members: tuple[str, ...] = (),
+    ) -> ManagedTreeReference:
+        if self.committed or self.renamed:
+            raise ManagedTreeError("tree.state", "managed tree publication was already attempted")
+        if not callable(validate):
+            raise ManagedTreeError("tree.validator", "managed tree publication requires an owner validator")
+        if domain_id is not None and (type(domain_id) is not str or not 0 < len(domain_id) <= 512):
+            raise ManagedTreeError("tree.domain", "managed tree domain identity is invalid")
+        self.host.check_cancelled()
+        check_storage.ordinary(self.path, directory=True)
+        with self.host._references(references):
+            before = inventory_members(self.path, derived_members=derived_members,
+                                       cancelled=self.host._cancelled)
+            validate(self.path)
+            self.host.check_cancelled()
+            after = inventory_members(self.path, derived_members=derived_members,
+                                      cancelled=self.host._cancelled)
+            if after != before:
+                raise ManagedTreeError("tree.changed", "managed tree changed during owner validation")
+            _sync_members(self.path, after)
+            if inventory_members(self.path, derived_members=derived_members,
+                                 cancelled=self.host._cancelled) != after:
+                raise ManagedTreeError("tree.changed", "managed tree changed while flushing members")
+            selected = check_storage.ordinary(self.path, directory=True)
+            info = selected.stat()
+            nonce = self.tree_id.rsplit(":", 1)[-1]
+            intent = self.host.catalog.trees._write("intents", nonce, INTENT_KIND, {
+                "format": INTENT_KIND, "tree_id": self.tree_id,
+                "reservation_id": self.reservation["id"],
+                "store_id": self.reservation["store_id"],
+                "store_root": self.reservation["store_root"],
+                "relative_path": self.reservation["relative_path"],
+                "workspace": self.reservation["workspace"],
+                "owner_id": self.reservation["owner_id"],
+                "role": self.reservation["role"],
+                "role_source": self.reservation["role_source"],
+                "policy_id": self.reservation["policy_id"],
+                "parent_device": self.reservation["parent_device"],
+                "parent_inode": self.reservation["parent_inode"],
+                "staging": self.reservation["staging"],
+                "device": info.st_dev, "inode": info.st_ino,
+                "members": before, "content_sha256": _content_sha256(before),
+                "domain_id": domain_id, "references": list(references),
+                "prepared_at": _now(),
+            })
+            self.host.check_cancelled()
+            parent_before = check_storage.ordinary(self.target.parent, directory=True).stat()
+            expected_parent = (self.reservation["parent_device"], self.reservation["parent_inode"])
+            if (parent_before.st_dev, parent_before.st_ino) != expected_parent:
+                raise ManagedTreeError("output.changed", "managed tree destination parent changed")
+            _rename_no_replace(
+                self.path, self.target, parent_identity=expected_parent,
+                payload_identity=(info.st_dev, info.st_ino),
+            )
+            self.renamed = True
+            parent_after = check_storage.ordinary(self.target.parent, directory=True).stat()
+            if (parent_before.st_dev, parent_before.st_ino) != (parent_after.st_dev, parent_after.st_ino):
+                raise ManagedTreeError("output.changed", "managed tree destination parent changed during publication")
+            fsync_directory(self.target.parent)
+            derived_status = self.host.catalog.trees._verify(intent)
+            self.host.catalog.trees._write("commits", nonce, COMMIT_KIND, {
+                "format": COMMIT_KIND, "tree_id": self.tree_id,
+                "intent_id": intent["id"], "committed_at": _now(),
+            })
+            self.committed = True
+            try:
+                self.staging_root.rmdir()
+            except OSError:
+                pass
+            return self.host.catalog.trees._reference(intent, derived_status=derived_status)
+
+
+class CoreManagedTrees:
+    def __init__(
+        self, *, workspace: Path, configuration_home: Path,
+        locations: Mapping[str, Path], owner_id: str,
+        policy_id: str | None = None, location_sources: Mapping[str, str] | None = None,
+        check_cancelled=lambda: None,
+    ):
+        if not workspace.is_absolute() or not configuration_home.is_absolute():
+            raise ManagedTreeError("tree.policy", "managed tree context requires absolute roots")
+        if not isinstance(owner_id, str) or _OWNER.fullmatch(owner_id) is None:
+            raise ManagedTreeError("tree.policy", "managed tree owner is invalid")
+        self.workspace = workspace
+        self.locations = dict(locations)
+        self.owner_id = owner_id
+        self.policy_id = policy_id
+        self.location_sources = dict(location_sources or {})
+        self.check_cancelled = check_cancelled
+        self.catalog = ResourceCatalog(configuration_home)
+
+    def _cancelled(self) -> bool:
+        try:
+            self.check_cancelled()
+        except Exception:
+            return True
+        return False
+
+    def _destination(self, role: str, name: str, requested_path: Path | None,
+                     nonce: str) -> tuple[Path, Path, str]:
+        if role not in {"evidence", "artifacts"} or role not in self.locations:
+            raise ManagedTreeError("output.role", "unsupported managed tree role")
+        if (type(name) is not str or _NAME.fullmatch(name) is None
+                or name.split(".", 1)[0].upper() in _WINDOWS_RESERVED):
+            raise ManagedTreeError("output.path", "managed tree name must be one portable filename")
+        selected_root = Path(self.locations[role])
+        if not selected_root.is_absolute():
+            raise ManagedTreeError("tree.policy", "managed tree role root must be absolute")
+        if requested_path is None:
+            target = selected_root / "outputs" / self.owner_id / f"{nonce}-{name}"
+            return target, selected_root, self.location_sources.get(role, "context")
+        if not isinstance(requested_path, Path) or requested_path.name != name:
+            raise ManagedTreeError("output.path", "managed tree output path is invalid")
+        if any(part in {".", ".."} for part in requested_path.parts):
+            raise ManagedTreeError("output.path", "managed tree output path is unsafe")
+        target = requested_path if requested_path.is_absolute() else self.workspace / requested_path
+        if target.is_relative_to(selected_root):
+            return target, selected_root, self.location_sources.get(role, "context")
+        if target.is_relative_to(self.workspace):
+            return target, self.workspace, "explicit-workspace"
+        # An explicit absolute destination is user intent. Core catalogs only
+        # that exact tree; the parent and unrelated siblings remain outside custody.
+        if requested_path.is_absolute():
+            return target, target.parent, "explicit-path"
+        raise ManagedTreeError("output.path", "managed tree output is outside the selected workspace")
+
+    @contextmanager
+    def _references(self, references: tuple[str, ...]) -> Iterator[None]:
+        if (not isinstance(references, tuple) or len(references) > 128
+                or any(not isinstance(value, str) or not (_FILE_ID.fullmatch(value) or _TREE_ID.fullmatch(value))
+                       for value in references)
+                or len(set(references)) != len(references)):
+            raise ManagedTreeError("tree.references", "managed tree references must be unique Core resources")
+        with ExitStack() as stack:
+            for reference in sorted(references):
+                if _FILE_ID.fullmatch(reference):
+                    stack.enter_context(self.catalog.lease(reference))
+                    intent = self.catalog._intent(reference)
+                    self.catalog._commit(reference, intent)
+                    if intent["workspace"] != str(self.workspace):
+                        raise ManagedTreeError("tree.references", "referenced resource belongs to another workspace")
+                    read_verified(
+                        self.catalog._target(intent), expected_size=int(intent["bytes"]),
+                        expected_sha256=str(intent["sha256"]),
+                    )
+                else:
+                    stack.enter_context(self.catalog.trees.lease(reference))
+                    intent = self.catalog.trees.intent(reference)
+                    self.catalog.trees.commit(reference, intent)
+                    if intent["workspace"] != str(self.workspace):
+                        raise ManagedTreeError("tree.references", "referenced tree belongs to another workspace")
+                    self.catalog.trees._verify(intent)
+            yield
+
+    @contextmanager
+    def stage(self, role: str, name: str, *, requested_path: Path | None = None) -> Iterator[_CoreTreeStage]:
+        nonce = uuid4().hex
+        tree_id = f"workbench-tree-v1:{nonce}"
+        target, store_root, source = self._destination(role, name, requested_path, nonce)
+        self.check_cancelled()
+        _ensure_parent(target.parent)
+        if target.exists() or target.is_symlink():
+            raise ManagedTreeError("output.exists", "managed tree destination already exists")
+        parent = check_storage.ordinary(target.parent, directory=True).stat()
+        self.catalog._ensure()
+        self.catalog.trees.ensure()
+        with self.catalog.trees.lease(tree_id, exclusive=True, create=True):
+            reservation = self.catalog.trees.reserve({
+                "format": RESERVATION_KIND, "tree_id": tree_id,
+                "store_id": _store_id(store_root), "store_root": str(store_root),
+                "relative_path": target.relative_to(store_root).as_posix(),
+                "workspace": str(self.workspace), "owner_id": self.owner_id,
+                "role": role, "role_source": source, "policy_id": self.policy_id,
+                "parent_device": parent.st_dev, "parent_inode": parent.st_ino,
+                "staging": f".workbench-tree-{nonce}.pending", "allocated_at": _now(),
+            })
+            staging_root = target.parent / reservation["staging"]
+            stage = _CoreTreeStage(
+                self, tree_id=tree_id, target=target, store_root=store_root,
+                staging_root=staging_root, reservation=reservation,
+            )
+            try:
+                staging_root.mkdir(mode=0o700)
+                secure_private_path(staging_root, directory=True)
+                yield stage
+            except BaseException as exc:
+                if not stage.renamed:
+                    self.catalog.trees.abort(tree_id, type(exc).__name__)
+                raise
+            else:
+                if not stage.committed and not stage.renamed:
+                    self.catalog.trees.abort(tree_id, "unpublished")
+
+    def describe(self, tree_id: str) -> ManagedTreeReference:
+        return self.catalog.trees.describe(tree_id, workspace=self.workspace)
+
+    def reconcile(self, tree_id: str) -> ManagedTreeReference:
+        def publish(staged: Path, target: Path, intent: Mapping[str, object]) -> None:
+            with self._references(tuple(intent["references"])):
+                self.check_cancelled()
+                _rename_no_replace(
+                    staged, target,
+                    parent_identity=(intent["parent_device"], intent["parent_inode"]),
+                    payload_identity=(intent["device"], intent["inode"]),
+                )
+                fsync_directory(target.parent)
+
+        return self.catalog.trees.reconcile(
+            tree_id, workspace=self.workspace, publish_prepared=publish,
+        )
+
+
+__all__ = ["CoreManagedTrees"]

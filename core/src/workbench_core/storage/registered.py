@@ -87,6 +87,12 @@ class ResourceCatalog:
     def _path(self, name: str, nonce: str) -> Path:
         return self._directory(name) / f"{nonce}.json"
 
+    @property
+    def trees(self):
+        """Directory resources share this catalog root and workspace scope."""
+        from .tree_catalog import TreeCatalog
+        return TreeCatalog(self.root)
+
     def _ensure(self) -> None:
         for path in (self.root, *(self._directory(name) for name in ("reservations", "intents", "commits", "aborts", "leases", "stores"))):
             _private_directory(path)
@@ -428,6 +434,7 @@ class ResourceCatalog:
             "format": CATALOG_FORMAT, "schema_version": 1,
             "workspace": str(workspace) if workspace is not None else None,
             "resources": rows, "record_stores": self._registered_record_stores(workspace),
+            "trees": self.trees.inventory(workspace=workspace),
         }
 
     def reconcile(self, resource_id: str) -> ResourceReference:

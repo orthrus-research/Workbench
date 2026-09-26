@@ -113,11 +113,14 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         durable_resources = None
         record_stores = nullcontext()
         attempt_stores = nullcontext()
+        tree_stores = nullcontext()
         if context.configuration_home is not None:
             from .storage.registered import CoreDurableResources
             from .storage.record_stores import CoreRecordStores
             from .managed_attempts import CoreManagedAttempts
             from workbench_api.managed_attempts import managed_attempts_scope
+            from .managed_trees import CoreManagedTrees
+            from workbench_api.managed_trees import managed_trees_scope
             durable_resources = CoreDurableResources(
                 workspace=context.workspace,
                 configuration_home=context.configuration_home,
@@ -139,6 +142,15 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
                 locations=context.locations,
                 owner_id=owner.id,
             ))
+            tree_stores = managed_trees_scope(CoreManagedTrees(
+                workspace=context.workspace,
+                configuration_home=context.configuration_home,
+                locations=context.locations,
+                owner_id=owner.id,
+                policy_id=context.environment_resolution_id,
+                location_sources=context.location_sources,
+                check_cancelled=context.check_cancelled,
+            ))
         operation_context = replace(
             context,
             output_resolver=invocation.output_path if invocation is not None else None,
@@ -155,7 +167,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         try:
             from workbench_api.archive_exchange import archive_exchange_scope
             from .archive_port import CoreArchiveExchange
-            with record_stores, attempt_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
+            with record_stores, attempt_stores, tree_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
                 handler = getattr(import_module(package), name)
                 result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:

@@ -1305,9 +1305,11 @@ def _protect_registered_resources(workspace: Path, items: list[dict[str, Any]]) 
         registered = catalog.inventory(workspace=workspace)
         records = registered["resources"]
         record_stores = registered["record_stores"]
+        trees = registered["trees"]
     except Exception as exc:
         records = None
         record_stores = None
+        trees = None
         limitation = f"Core resource catalog is unavailable; workspace cleanup is protected: {type(exc).__name__}"
     else:
         limitation = None
@@ -1319,6 +1321,9 @@ def _protect_registered_resources(workspace: Path, items: list[dict[str, Any]]) 
         ) or any(
             Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
             for row in record_stores
+        ) or any(
+            selected == item_path or _inside(selected, item_path)
+            for row in trees for selected in (Path(row["path"]), Path(row["staging"]))
         ):
             deletion = item["deletion"]
             deletion["state"] = "protected"
