@@ -119,6 +119,8 @@ class ReusableProjectionTests(unittest.TestCase):
             row["projection_id"] for row in inventory["reusable_projections"]
         ])
         self.assertEqual("catalog-only", inventory["reusable_projections"][0]["status"])
+        self.assertEqual("absent", inventory["reusable_projections"][0]["parent_store_registration"])
+        self.assertIsNone(inventory["reusable_projections"][0]["parent_store_id"])
         self.assertEqual([other.projection_id], [
             row["projection_id"] for row in catalog.inventory(workspace=foreign)["reusable_projections"]
         ])
@@ -147,6 +149,26 @@ class ReusableProjectionTests(unittest.TestCase):
         self.assertEqual([selected.projection_id], [
             row["projection_id"] for row in catalog.inventory(workspace=self.workspace)["reusable_projections"]
         ])
+
+    def test_parent_store_declaration_is_observed_without_repairing_missing_history(self) -> None:
+        reference = self._create()
+        catalog = ResourceCatalog(self.home / "config")
+        first = catalog.inventory(workspace=self.workspace)
+        row = first["reusable_projections"][0]
+        self.assertEqual(reference.projection_id, row["projection_id"])
+        self.assertEqual("present", row["parent_store_registration"])
+        self.assertEqual("ready-unproven", first["root_state"])
+        store_id = row["parent_store_id"]
+        self.assertIsInstance(store_id, str)
+
+        registration = catalog.root / "stores" / f"{store_id.rsplit(':', 1)[1]}.json"
+        registration.unlink()
+        with patch("workbench_core.reusable_projections._scan", side_effect=AssertionError("owner scan")):
+            after = catalog.inventory(workspace=self.workspace)
+        self.assertEqual("ready-unproven", after["root_state"])
+        self.assertEqual(reference.projection_id, after["reusable_projections"][0]["projection_id"])
+        self.assertEqual("absent", after["reusable_projections"][0]["parent_store_registration"])
+        self.assertIsNone(after["reusable_projections"][0]["parent_store_id"])
 
     def test_resource_catalog_preserves_pre_record_locks_and_refuses_unknown_children(self) -> None:
         selected = self._adopt()

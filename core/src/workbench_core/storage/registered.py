@@ -884,7 +884,11 @@ class ResourceCatalog:
                 else:
                     check_edges.setdefault(owner_workspace, set()).add((tree_id, reference))
 
-        record_stores = self._registered_record_stores(workspace)
+        all_record_stores = self._registered_record_stores(None)
+        record_stores = [
+            store for store in all_record_stores
+            if workspace is None or store["workspace"] == str(workspace)
+        ]
         overlay_envelopes: list[dict[str, object]] = []
         for store in record_stores:
             if store["family"] != "overlay-envelope-inputs":
@@ -904,7 +908,7 @@ class ResourceCatalog:
             except (OSError, ValueError, TypeError) as exc:
                 raise DurableResourceError("resource.changed", "overlay attempt inventory changed") from exc
         registered_overlay_roots = {
-            store["path"] for store in self._registered_record_stores(None)
+            store["path"] for store in all_record_stores
             if store["family"] == "overlay-envelope-inputs"
         }
         if self.configuration_home.is_dir():
@@ -952,6 +956,20 @@ class ResourceCatalog:
             raise DurableResourceError(
                 "resource.changed", "reusable projection catalog is unavailable or changed",
             ) from exc
+        store_by_binding = {
+            (store["family"], store["owner_id"], store["workspace"], store["path"]): store
+            for store in all_record_stores
+        }
+        for projection in reusable_projections:
+            parent = store_by_binding.get((
+                f"{projection['family']}.source-projections",
+                projection["owner_id"], projection["workspace"],
+                str(Path(projection["path"]).parent),
+            ))
+            # A missing row is valid for historical direct adoption, and could
+            # also mean the declaration was lost. Presence proves no ordering.
+            projection["parent_store_registration"] = "present" if parent else "absent"
+            projection["parent_store_id"] = parent["store_id"] if parent else None
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,
