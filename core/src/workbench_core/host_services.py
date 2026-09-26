@@ -75,6 +75,35 @@ def direct_module_custody_scope(
 
 
 @contextmanager
+def suite_managed_tree_scope(
+    *, workspace: Path, configuration_home: Path | None = None,
+) -> Iterator[None]:
+    """Bind Shell's suite-owned trees without changing other dispatch ports.
+
+    Work Session contexts live under the Workbench suite root, which can differ
+    from dispatch's selected target workspace. The caller passes dispatch's
+    configuration home so both entry routes reopen the same Core catalog.
+    """
+
+    if not isinstance(workspace, Path) or not workspace.is_absolute():
+        raise ValueError("suite managed tree workspace must be absolute")
+    from .managed_trees import CoreManagedTrees
+    from .user_config_home import default_user_config_home
+
+    selected_home = configuration_home or default_user_config_home()
+    if not isinstance(selected_home, Path) or not selected_home.is_absolute():
+        raise ValueError("suite managed tree configuration home must be absolute")
+    with managed_trees_scope(CoreManagedTrees(
+        workspace=workspace,
+        configuration_home=selected_home,
+        locations={"artifacts": workspace},
+        owner_id="workbench-shell",
+        location_sources={"artifacts": "suite-workspace"},
+    )):
+        yield
+
+
+@contextmanager
 def direct_atlas_derived_index_scope() -> Iterator[None]:
     """Compose the supported direct Atlas index command when dispatch did not."""
 

@@ -5,8 +5,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from workbench_api.managed_trees import ManagedTreeError, managed_trees
-from workbench_core.host_services import direct_module_custody_scope
+from workbench_api.managed_trees import ManagedTreeError, managed_trees, managed_trees_scope
+from workbench_core.host_services import direct_module_custody_scope, suite_managed_tree_scope
+from workbench_core.managed_trees import CoreManagedTrees
 
 
 class DirectModuleManagedTreesTests(unittest.TestCase):
@@ -29,6 +30,26 @@ class DirectModuleManagedTreesTests(unittest.TestCase):
                 with self.assertRaises(ManagedTreeError) as unbound:
                     managed_trees()
                 self.assertEqual(unbound.exception.code, "tree.host")
+
+    def test_suite_scope_uses_suite_workspace_and_dispatch_catalog_home(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            suite = root / "suite"
+            target = root / "target"
+            home = root / "config"
+            suite.mkdir()
+            target.mkdir()
+            outer = CoreManagedTrees(
+                workspace=target, configuration_home=home,
+                locations={"artifacts": target}, owner_id="workbench-shell",
+            )
+            with managed_trees_scope(outer):
+                with suite_managed_tree_scope(workspace=suite, configuration_home=home):
+                    provider = managed_trees()
+                    self.assertEqual(provider.workspace, suite)
+                    self.assertEqual(provider.catalog.configuration_home, home)
+                    self.assertEqual(provider.locations, {"artifacts": suite})
+                self.assertIs(managed_trees(), outer)
 
 
 if __name__ == "__main__":
