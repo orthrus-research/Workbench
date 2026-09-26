@@ -26,6 +26,7 @@ from urllib.parse import urlparse
 import zipfile
 
 from workbench_api.profile_extensions import ProfileExtensionError, require_profile_extension
+from workbench_api.working_allocations import WorkingAllocationError, working_allocations
 from workbench_core.render import Renderer
 from workbench_core.runner import RunResult, RunnerError, supervise_process
 from workbench_core.sessions import (
@@ -715,15 +716,21 @@ def materialize_cleanroom_dev_loop_workspace_pair_v2(
     suite_root: Path | str,
     plan: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Create baseline/candidate fixture workspaces without changing authority.
+    """Create baseline/candidate fixture workspaces in a Core allocation.
 
     The profile-owned V1 plan continues to bind the installed suite, exact
     fixture lock, toolchain, and commands.  V2 copies that already materialized
     source projection into ignored disposable workspaces and applies one
     bounded candidate-only Java string edit there.  It never treats the copy
     as an installed suite and never changes the checkout or package tree.
+    Generated Gradle files remain mutable beneath the retained allocation;
+    Core verifies the selected source witnesses and protects the whole root.
     """
 
+    try:
+        allocations = working_allocations()
+    except WorkingAllocationError as exc:
+        raise CleanroomDevLoopError(f"Core fixture workspace custody is unavailable: {exc}") from exc
     suite = Path(suite_root).resolve()
     reviewed = validate_cleanroom_dev_loop_plan(plan)
     state = _local_uri(reviewed["state_root_uri"], "dev-loop state root")
@@ -761,24 +768,10 @@ def materialize_cleanroom_dev_loop_workspace_pair_v2(
     )
     baseline = pair_root / "baseline" / relative_project
     candidate = pair_root / "candidate" / relative_project
-    baseline.parent.mkdir(mode=0o700, parents=True)
-    candidate.parent.mkdir(mode=0o700, parents=True)
-    shutil.copytree(source, baseline, symlinks=False)
-    shutil.copytree(source, candidate, symlinks=False)
-    before = _d01_source_tree_sha256(baseline)
-    if before != _d01_source_tree_sha256(candidate):
-        _fail("D01 baseline and candidate source copies differ before the edit")
     relative_edit = Path("src/main/java/dev/workbench/dailyloop/DailyLoopProbe.java")
     edit_path = candidate / relative_edit
-    raw = edit_path.read_text(encoding="utf-8")
     old = "fixture=1.0.0"
     new = "fixture=1.0.0-d01-candidate"
-    if raw.count(old) != 1 or new in raw:
-        _fail("D01 bounded candidate source token changed")
-    edit_path.write_text(raw.replace(old, new), encoding="utf-8", newline="")
-    after = _d01_source_tree_sha256(candidate)
-    if after == before:
-        _fail("D01 candidate source edit did not change its disposable tree")
 
     def variant(name: str, project: Path) -> dict[str, Any]:
         argv = list(build)
@@ -794,17 +787,66 @@ def materialize_cleanroom_dev_loop_workspace_pair_v2(
             "source_sha256": _d01_source_tree_sha256(project),
         }
 
+    try:
+        allocation = allocations.allocate(
+            "cleanroom-fixture-pair", token, requested_path=pair_root,
+        )
+        with allocations.execution(allocation):
+            try:
+                baseline.parent.mkdir(mode=0o700, parents=True)
+                candidate.parent.mkdir(mode=0o700, parents=True)
+                shutil.copytree(source, baseline, symlinks=False)
+                shutil.copytree(source, candidate, symlinks=False)
+                before = _d01_source_tree_sha256(baseline)
+                if before != _d01_source_tree_sha256(candidate):
+                    _fail("D01 baseline and candidate source copies differ before the edit")
+                raw = edit_path.read_text(encoding="utf-8")
+                if raw.count(old) != 1 or new in raw:
+                    _fail("D01 bounded candidate source token changed")
+                edit_path.write_text(raw.replace(old, new), encoding="utf-8", newline="")
+                after = _d01_source_tree_sha256(candidate)
+                if after == before:
+                    _fail("D01 candidate source edit did not change its disposable tree")
+                baseline_variant = variant("baseline", baseline)
+                candidate_variant = variant("candidate", candidate)
+
+                def validate_pair(root: Path) -> None:
+                    if root != pair_root or _d01_source_tree_sha256(baseline) != before:
+                        _fail("D01 baseline source changed before Core retained it")
+                    if _d01_source_tree_sha256(candidate) != after:
+                        _fail("D01 candidate source changed before Core retained it")
+
+                allocations.finish(
+                    allocation, outcome="complete",
+                    evidence=(
+                        baseline / "fixture-lock-v1.json",
+                        candidate / "fixture-lock-v1.json",
+                        edit_path,
+                    ),
+                    absolute_references=(baseline, candidate),
+                    validate=validate_pair,
+                )
+            except Exception as exc:
+                allocations.finish(
+                    allocation, outcome="failed",
+                    failure=f"{type(exc).__name__}: {exc}"[:4096],
+                )
+                raise
+    except WorkingAllocationError as exc:
+        raise CleanroomDevLoopError(f"Core fixture workspace custody failed: {exc}") from exc
+
     return {
         "format": "workbench-cleanroom-dev-loop-workspace-pair-v2",
         "schema_version": 2,
+        "allocation_id": allocation.allocation_id,
         "authority": {
             "installed_suite_uri": suite.as_uri(),
             "fixture_owner_uri": authority_owner.as_uri(),
             "fixture_digest": reviewed["fixture"]["digest"],
             "source_projection_uri": source.as_uri(),
         },
-        "baseline": variant("baseline", baseline),
-        "candidate": variant("candidate", candidate),
+        "baseline": baseline_variant,
+        "candidate": candidate_variant,
         "candidate_edit": {
             "path": relative_edit.as_posix(),
             "before_sha256": before,

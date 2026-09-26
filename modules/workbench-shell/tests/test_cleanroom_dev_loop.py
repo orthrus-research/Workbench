@@ -41,7 +41,14 @@ from workbench_shell.cleanroom_dev_loop import (  # noqa: E402
     validate_cleanroom_dev_loop_jar_only_classpath_v2,
     validate_cleanroom_dev_loop_plan,
 )
+from workbench_shell import cleanroom_dev_loop as fixture_module  # noqa: E402
 from workbench_core.sessions import resolve_live_console_owner_reference  # noqa: E402
+from workbench_core.working_allocations import CoreWorkingAllocations  # noqa: E402
+from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
+from workbench_api.working_allocations import (  # noqa: E402
+    WorkingAllocationError,
+    working_allocations_scope,
+)
 
 
 SCHEMA_ROOT = ROOT / "modules/workbench-shell/schemas"
@@ -156,6 +163,11 @@ class CleanroomDevLoopTests(unittest.TestCase):
         self.state = self.root / "state"
         _fake_gradle(self.gradle)
         _java(self.java)
+        self.allocation_host = CoreWorkingAllocations(
+            workspace=ROOT.resolve(), configuration_home=self.root / "config",
+            locations={"evidence": self.state}, owner_id="workbench-shell",
+        )
+        self.enterContext(working_allocations_scope(self.allocation_host))
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -229,6 +241,23 @@ class CleanroomDevLoopTests(unittest.TestCase):
     def test_jar_only_v2_stages_exact_bytes_and_rejects_dev_output_origin(self) -> None:
         plan = self.plan()
         pair = materialize_cleanroom_dev_loop_workspace_pair_v2(ROOT, plan)
+        retained = self.allocation_host.verify(pair["allocation_id"])
+        self.assertEqual("complete", retained.status)
+        self.assertEqual(3, len(retained.evidence))
+        self.assertEqual(2, len(retained.absolute_references))
+        self.assertEqual(
+            str(self.state / "dev-loop-v2/workspaces" / plan["plan_id"].rsplit(":", 1)[-1]),
+            str(retained.reference.path),
+        )
+        cataloged = ResourceCatalog(self.root / "config").inventory(workspace=ROOT.resolve())
+        self.assertEqual(pair["allocation_id"], cataloged["working_allocations"][0]["allocation_id"])
+        built_pair = subprocess.run(pair["baseline"]["build_argv"], check=False, capture_output=True)
+        self.assertEqual(0, built_pair.returncode, built_pair.stderr)
+        self.assertTrue(
+            Path(pair["baseline"]["expected_artifact_uri"].removeprefix("file://"))
+            .is_relative_to(retained.reference.path),
+        )
+        self.assertEqual("complete", self.allocation_host.verify(pair["allocation_id"]).status)
         self.assertEqual(
             ROOT.resolve().as_uri(), pair["authority"]["installed_suite_uri"]
         )
@@ -299,6 +328,54 @@ class CleanroomDevLoopTests(unittest.TestCase):
             f"-PworkbenchD01ProbeCapture={capture}", argv
         )
         self.assertIn("-PworkbenchD01DebugPort=5005", argv)
+
+    def test_v2_pair_failure_retains_core_allocation_for_review(self) -> None:
+        plan = self.plan()
+        with patch(
+            "workbench_shell.cleanroom_dev_loop._d01_source_tree_sha256",
+            side_effect=CleanroomDevLoopError("forced source check failure"),
+        ):
+            with self.assertRaisesRegex(CleanroomDevLoopError, "forced source check failure"):
+                materialize_cleanroom_dev_loop_workspace_pair_v2(ROOT, plan)
+        pair_root = self.state / "dev-loop-v2/workspaces" / plan["plan_id"].rsplit(":", 1)[-1]
+        rows = self.allocation_host.catalog.inventory_rows(workspace=ROOT.resolve())
+        self.assertEqual(1, len(rows))
+        self.assertEqual(str(pair_root), rows[0]["path"])
+        self.assertEqual("failed", rows[0]["status"])
+        self.assertTrue(pair_root.is_dir())
+
+    def test_v2_pair_owner_validation_failure_is_terminal(self) -> None:
+        plan = self.plan()
+        source_digest = fixture_module._d01_source_tree_sha256
+        calls = 0
+
+        def fail_during_owner_validation(root: Path) -> str:
+            nonlocal calls
+            calls += 1
+            if calls == 6:
+                raise CleanroomDevLoopError("forced owner validation failure")
+            return source_digest(root)
+
+        with patch.object(
+            fixture_module, "_d01_source_tree_sha256",
+            side_effect=fail_during_owner_validation,
+        ):
+            with self.assertRaisesRegex(CleanroomDevLoopError, "forced owner validation failure"):
+                materialize_cleanroom_dev_loop_workspace_pair_v2(ROOT, plan)
+        rows = self.allocation_host.catalog.inventory_rows(workspace=ROOT.resolve())
+        self.assertEqual(1, len(rows))
+        self.assertEqual("failed", rows[0]["status"])
+        self.assertIn("forced owner validation failure", rows[0]["failure"])
+
+    def test_v2_pair_requires_core_host_before_projection(self) -> None:
+        plan = self.plan()
+        with patch(
+            "workbench_shell.cleanroom_dev_loop.working_allocations",
+            side_effect=WorkingAllocationError("working.host", "no Core host"),
+        ):
+            with self.assertRaisesRegex(CleanroomDevLoopError, "Core fixture workspace custody"):
+                materialize_cleanroom_dev_loop_workspace_pair_v2(ROOT, plan)
+        self.assertFalse(self.state.exists())
 
     def test_owned_stop_v2_targets_only_exact_live_runtime_group(self) -> None:
         program = (
