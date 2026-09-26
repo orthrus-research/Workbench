@@ -54,6 +54,7 @@ const { invokeResult } = require("./featureServiceClient");
 const { invokeRun } = require("./developerFeatureClient");
 const {
   invokeStateRootPolicy,
+  legacyFeatureDecision,
   legacyProductSpineDecision,
   selectStateRootPolicy,
 } = require("./stateRootPolicyClient");
@@ -145,6 +146,10 @@ function activate(context) {
       "workbench.core.configureProductSpineStateRoot",
       () => configureProductSpineStateRoot(workspaceHome),
     ),
+    vscode.commands.registerCommand(
+      "workbench.core.configureFeatureStateRoot",
+      () => configureFeatureStateRoot(records),
+    ),
     vscode.commands.registerCommand("workbench.core.checkInstallation", () => refreshCoreStatus(true)),
     vscode.commands.registerCommand(
       "workbench.core.openInstallationGuide",
@@ -221,6 +226,7 @@ function activate(context) {
       prReviewView.description = undefined;
       void vscode.commands.executeCommand("setContext", "workbench.prReviewHasReport", false);
       workspaceHome.reset();
+      records.reset();
     }),
   );
   void vscode.commands.executeCommand("setContext", "workbench.coreChecked", false);
@@ -1001,13 +1007,88 @@ async function inspectLiveConsoleOwner(reference, sessionId) {
   });
 }
 
-function retainedStateRoot() {
-  const value = vscode.workspace.getConfiguration("workbench").get("feature.stateRoot", "");
-  if (typeof value !== "string" || value.includes("\0")
-      || Buffer.byteLength(value, "utf8") > 32 * 1024) {
-    throw new Error("workbench.feature.stateRoot is invalid");
+let legacyFeatureWarningShown = false;
+
+function legacyFeatureStateRoot() {
+  return vscode.workspace.getConfiguration("workbench").get("feature.stateRoot", "");
+}
+
+async function selectedFeaturePolicy(workspacePath) {
+  const policy = await invokeStateRootPolicy(
+    selectedCore(), workspacePath || localWorkspace().uri.fsPath, "feature",
+    { cwd: currentWorkingDirectory() },
+  );
+  const legacyDecision = legacyFeatureDecision(policy, legacyFeatureStateRoot());
+  if (legacyDecision === "migration-required") {
+    throw new Error(
+      "The earlier VS Code Feature state-root setting needs review. "
+      + "Run Workbench: Configure Feature State Root to save it in Core.",
+    );
   }
-  return value.trim();
+  if (legacyDecision === "historical-hint" && !legacyFeatureWarningShown) {
+    legacyFeatureWarningShown = true;
+    void vscode.window.showWarningMessage(
+      "Workbench now uses Core's Feature state-root selection. "
+      + "The earlier VS Code setting remains available for review in Configure Feature State Root.",
+    );
+  }
+  return policy;
+}
+
+async function retainedStateRoot(workspacePath) {
+  return (await selectedFeaturePolicy(workspacePath)).stateRoot;
+}
+
+async function configureFeatureStateRoot(records) {
+  if (!requireTrustedWorkspace(
+    "Workbench Feature state-root selection requires a trusted local workspace.",
+  )) return undefined;
+  try {
+    const workspace = localWorkspace().uri.fsPath;
+    const executable = selectedCore();
+    const policy = await invokeStateRootPolicy(executable, workspace, "feature", {
+      cwd: workspace,
+    });
+    const legacy = legacyFeatureStateRoot();
+    legacyFeatureDecision(policy, legacy);
+    const selected = await vscode.window.showInputBox({
+      title: "Feature State Root",
+      prompt: "Choose the retained Feature state directory seen by Core. Leave empty to use Core's default.",
+      value: legacy.trim() || (policy.source === "user-selection" ? policy.stateRoot : ""),
+      ignoreFocusOut: true,
+      validateInput: (value) => value.includes("\0") || Buffer.byteLength(value, "utf8") > 32 * 1024
+        ? "Enter one bounded state-root path." : undefined,
+    });
+    if (selected === undefined) return undefined;
+    const result = await selectStateRootPolicy(
+      executable, workspace, "feature", selected.trim() || null,
+      policy.policyId, { cwd: workspace },
+    );
+    if (legacy.trim()) {
+      try {
+        await vscode.workspace.getConfiguration("workbench").update(
+          "feature.stateRoot", undefined, vscode.ConfigurationTarget.Global,
+        );
+      } catch (error) {
+        records.reset();
+        void vscode.window.showWarningMessage(
+          "Core saved the Feature state root, but VS Code could not clear its earlier setting. "
+          + `Clear workbench.feature.stateRoot before reopening records: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return result;
+      }
+    }
+    records.reset();
+    void vscode.window.showInformationMessage(
+      `Core selected the Feature state root: ${result.stateRoot}`,
+    );
+    return result;
+  } catch (error) {
+    void vscode.window.showErrorMessage(
+      `Could not save the Feature state root: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
+  }
 }
 
 async function loadRetainedRecordCatalog() {
@@ -1015,7 +1096,7 @@ async function loadRetainedRecordCatalog() {
     throw new Error("Retained Workbench records are unavailable in an untrusted workspace");
   }
   const executable = selectedCore();
-  return invokeRecordCatalog(executable, { stateRoot: retainedStateRoot() }, {
+  return invokeRecordCatalog(executable, { stateRoot: await retainedStateRoot() }, {
     cwd: currentWorkingDirectory(),
   });
 }
@@ -1030,7 +1111,7 @@ async function loadRetainedRecordPresentation(record) {
     reference: record.reference,
     record,
     allowVerificationRefresh: record.collection === "plans",
-    stateRoot: retainedStateRoot(),
+    stateRoot: await retainedStateRoot(),
   }, { cwd: currentWorkingDirectory() });
 }
 
@@ -1045,7 +1126,7 @@ async function loadRetainedRecordTransaction(record) {
     family: record.family,
     planId: record.plan_id,
     record,
-    stateRoot: retainedStateRoot(),
+    stateRoot: await retainedStateRoot(),
   }, { cwd: currentWorkingDirectory() });
 }
 
@@ -1507,6 +1588,15 @@ async function runMaterialFluidRecipe(context) {
     void vscode.window.showErrorMessage("Open one local filesystem workspace before running a Workbench developer feature.");
     return;
   }
+  let statePolicy;
+  try {
+    statePolicy = await selectedFeaturePolicy(folders[0].uri.fsPath);
+  } catch (error) {
+    void vscode.window.showErrorMessage(
+      `Could not select the Feature state root: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return;
+  }
   const configuration = vscode.workspace.getConfiguration("workbench");
   const plan = await vscode.window.showInputBox({
     title: "Run Reviewed Material/Fluid Recipe",
@@ -1535,6 +1625,10 @@ async function runMaterialFluidRecipe(context) {
   await context.workspaceState.update("workbench.feature.lastPlanId", planId);
   const executable = discoverExecutable(configuration.get("coreExecutable", ""));
   try {
+    const currentPolicy = await invokeStateRootPolicy(
+      executable, folders[0].uri.fsPath, "feature",
+      { cwd: folders[0].uri.fsPath, expectedPolicyId: statePolicy.policyId },
+    );
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -1551,7 +1645,7 @@ async function runMaterialFluidRecipe(context) {
         launcherJavaState: configuration.get("feature.launcherJavaState", ""),
         packwizExecutable: configuration.get("feature.packwizExecutable", ""),
         seedRoots: configuration.get("feature.seedRoots", []),
-        stateRoot: configuration.get("feature.stateRoot", ""),
+        stateRoot: currentPolicy.stateRoot,
         memoryMiB: configuration.get("feature.memoryMiB", 8192),
         offlineName: configuration.get("feature.offlineName", "Workbench"),
         timeoutSeconds: configuration.get("feature.timeoutSeconds", 600),

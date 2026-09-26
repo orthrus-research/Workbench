@@ -267,7 +267,7 @@ assert.doesNotMatch(
 );
 assert.match(qualificationActionSource, /not source, recipe, construction, runtime, Home, or release approval/);
 const liveConsoleStart = extensionSource.indexOf("async function inspectLiveConsoleOwner");
-const liveConsoleEnd = extensionSource.indexOf("\nfunction retainedStateRoot", liveConsoleStart);
+const liveConsoleEnd = extensionSource.indexOf("\nlet legacyFeatureWarningShown", liveConsoleStart);
 assert.ok(liveConsoleStart >= 0 && liveConsoleEnd > liveConsoleStart);
 const liveConsoleSource = extensionSource.slice(liveConsoleStart, liveConsoleEnd);
 assert.match(liveConsoleSource, /stateRoot: await selectedProductSpineStateRoot\(\)/);
@@ -279,6 +279,11 @@ assert.match(
 );
 assert.doesNotMatch(extensionSource, /workbench\.workspaceHome\.runJob/);
 assert.match(extensionSource, /registerCommand\("workbench\.feature\.records\.openEvidence"/);
+assert.match(extensionSource, /registerCommand\(\s*"workbench\.core\.configureFeatureStateRoot"/);
+assert.match(extensionSource, /invokeStateRootPolicy\(\s*selectedCore\(\), workspacePath \|\| localWorkspace\(\)\.uri\.fsPath, "feature"/);
+assert.match(extensionSource, /stateRoot: currentPolicy\.stateRoot/);
+assert.doesNotMatch(extensionSource, /stateRoot: configuration\.get\("feature\.stateRoot"/);
+assert.equal((extensionSource.match(/get\("feature\.stateRoot", ""\)/g) || []).length, 1);
 assert.match(extensionSource, /workbench\.feature\.currentContextAction/);
 assert.match(extensionSource, /invokeTransaction/);
 assert.match(extensionSource, /Inspecting CURRENT Workbench transaction/);
@@ -305,6 +310,7 @@ assert.deepEqual(
     "workbench.commandCenter.open",
     "workbench.core.checkInstallation",
     "workbench.core.configureExecutable",
+    "workbench.core.configureFeatureStateRoot",
     "workbench.core.configureProductSpineStateRoot",
     "workbench.core.openInstallationGuide",
     "workbench.feature.browseExamples",

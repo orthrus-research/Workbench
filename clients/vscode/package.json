@@ -79,6 +79,12 @@
         "enablement": "isWorkspaceTrusted"
       },
       {
+        "command": "workbench.core.configureFeatureStateRoot",
+        "title": "Configure Feature State Root",
+        "category": "Workbench",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
         "command": "workbench.core.checkInstallation",
         "title": "Check CLI Installation",
         "category": "Workbench"
@@ -577,7 +583,7 @@
           "type": "string",
           "default": "",
           "scope": "machine",
-          "description": "Optional retained developer-feature state root containing the reviewed plan."
+          "description": "Earlier Feature state-root selection. Use Workbench: Configure Feature State Root to review and save this choice in Core; this setting no longer selects the effective root."
         },
         "workbench.feature.memoryMiB": {
           "type": "integer",

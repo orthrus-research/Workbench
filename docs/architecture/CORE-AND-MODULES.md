@@ -151,6 +151,13 @@ is bound to the old identity, `settings show --json` exposes the selections
 record ID; `state-root clear-stale WORKSPACE ROLE --expected-record-id ID`
 removes only that stale role after review.
 
+VS Code reads the `feature` policy for retained Feature records and runs. Its
+earlier editor setting is a migration hint. A Feature run rechecks the policy
+after user consent, then passes Core's selected path to the owner. The Feature
+owner command has no policy-ID guard yet, so a later policy change can race
+with that mutation. Catalog, presentation and transaction inspection use the
+selected Feature path.
+
 On Linux, private record directories must enforce owner-only access. On WSL,
 the Linux filesystem meets that condition in the tested configuration. The
 tested Windows-mounted 9p location did not preserve Unix mode bits and is

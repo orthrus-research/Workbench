@@ -42,13 +42,21 @@ function hostStateRoot(corePath, launch) {
   return hostPath;
 }
 
-function legacyProductSpineDecision(policy, configured) {
+function legacyStateRootDecision(policy, configured, setting) {
   if (typeof configured !== "string" || configured.includes("\0")
       || Buffer.byteLength(configured, "utf8") > 32 * 1024) {
-    throw new Error("workbench.productSpine.stateRoot is invalid");
+    throw new Error(`${setting} is invalid`);
   }
   if (!configured.trim()) return "ready";
   return policy.source === "platform-default" ? "migration-required" : "historical-hint";
+}
+
+function legacyProductSpineDecision(policy, configured) {
+  return legacyStateRootDecision(policy, configured, "workbench.productSpine.stateRoot");
+}
+
+function legacyFeatureDecision(policy, configured) {
+  return legacyStateRootDecision(policy, configured, "workbench.feature.stateRoot");
 }
 
 function validateStateRootPolicy(value, expectedWorkspace, role, launch) {
@@ -121,6 +129,7 @@ async function selectStateRootPolicy(executable, workspace, role, selectedRoot, 
 module.exports = {
   hostStateRoot,
   invokeStateRootPolicy,
+  legacyFeatureDecision,
   legacyProductSpineDecision,
   selectStateRootPolicy,
   validateStateRootPolicy,

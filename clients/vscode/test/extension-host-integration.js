@@ -19,6 +19,7 @@ const REQUIRED_COMMANDS = [
   "workbench.commandCenter.open",
   "workbench.core.configureExecutable",
   "workbench.core.configureProductSpineStateRoot",
+  "workbench.core.configureFeatureStateRoot",
   "workbench.core.openInstallationGuide",
   "workbench.core.checkInstallation",
   "workbench.setup.open",

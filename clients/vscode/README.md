@@ -166,10 +166,14 @@ Core choice with `workbench settings state-root resolve WORKSPACE product-spine
 --json`. Project qualification sends the reviewed Core policy ID to its owner
 command, which checks the current selection and destination before writing.
 A configured Core executable remains a machine-local bootstrap choice
-so the extension can find Core before reading its policy. The developer-feature
-state-root setting has not yet moved to this Core selection route. When Core
-runs in WSL, explicit Windows paths must be UNC paths for the same configured
-distribution.
+so the extension can find Core before reading its policy. **Configure Feature
+State Root** saves the separate `feature` role through Core for retained Feature
+records and runs. The earlier `workbench.feature.stateRoot` setting remains a
+migration suggestion and no longer selects the active directory. A Feature run
+rechecks the selected policy after consent, but its owner command currently
+accepts only a state-root path; a policy change after that check can still
+reach the owner until it accepts the policy ID. When Core runs in WSL, explicit
+Windows paths must be UNC paths for the same configured distribution.
 
 ## Development and packaging
 

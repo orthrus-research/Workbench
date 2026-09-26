@@ -7,6 +7,7 @@ const test = require("node:test");
 
 const {
   invokeStateRootPolicy,
+  legacyFeatureDecision,
   legacyProductSpineDecision,
   selectStateRootPolicy,
   validateStateRootPolicy,
@@ -15,14 +16,14 @@ const { resolveCoreLaunch } = require("../coreLaunch");
 
 const RECORD_ID = `workbench-state-root-selections:sha256:${"b".repeat(64)}`;
 
-function fixture(workspace = "/home/dev/project", stateRoot = "/home/dev/retained") {
+function fixture(workspace = "/home/dev/project", stateRoot = "/home/dev/retained", role = "product-spine") {
   const body = {
     format: "workbench-state-root-policy-v1",
     schema_version: 1,
     configuration_home: "/home/dev/.workbench",
     workspace,
     workspace_id: null,
-    role: "product-spine",
+    role,
     state_root: stateRoot,
     source: "user-selection",
     selections_record_id: RECORD_ID,
@@ -76,6 +77,44 @@ test("installed-like Windows/WSL route maps the Core policy into the same host p
   }
 });
 
+test("Feature policy selection uses the configured WSL distribution", async () => {
+  const feature = fixture("/home/dev/project", "/home/dev/feature-state", "feature");
+  const original = childProcess.execFile;
+  const calls = [];
+  try {
+    childProcess.execFile = (executable, arguments_, options, callback) => {
+      calls.push({ executable, arguments_, options });
+      callback(null, JSON.stringify(feature), "");
+      return { pid: 999999, exitCode: 0 };
+    };
+    const executable = "\\\\wsl.localhost\\Ubuntu\\opt\\workbench\\workbench";
+    const workspace = "\\\\wsl.localhost\\Ubuntu\\home\\dev\\project";
+    const options = { platform: "win32", environment: { SystemRoot: "C:\\Windows" } };
+    const selected = await invokeStateRootPolicy(executable, workspace, "feature", options);
+    assert.equal(selected.stateRoot, "\\\\wsl.localhost\\Ubuntu\\home\\dev\\feature-state");
+    assert.deepEqual(calls[0].arguments_.slice(-6), [
+      "settings", "state-root", "resolve", "/home/dev/project", "feature", "--json",
+    ]);
+    await selectStateRootPolicy(
+      executable, workspace, "feature", selected.stateRoot, selected.policyId, options,
+    );
+    assert.deepEqual(calls[1].arguments_.slice(-9), [
+      "settings", "state-root", "select", "/home/dev/project", "feature",
+      "/home/dev/feature-state", "--expected-policy-id", selected.policyId, "--json",
+    ]);
+    await assert.rejects(
+      selectStateRootPolicy(
+        executable, workspace, "feature",
+        "\\\\wsl.localhost\\Other\\home\\dev\\feature-state", selected.policyId, options,
+      ),
+      /configured WSL distribution/,
+    );
+    assert.equal(calls.length, 2);
+  } finally {
+    childProcess.execFile = original;
+  }
+});
+
 test("policy read refuses a missing installed Core and a changed workspace scope", async () => {
   const original = childProcess.execFile;
   try {
@@ -85,6 +124,10 @@ test("policy read refuses a missing installed Core and a changed workspace scope
     };
     await assert.rejects(
       invokeStateRootPolicy("/missing/workbench", "/project", "product-spine"),
+      /missing Core/,
+    );
+    await assert.rejects(
+      invokeStateRootPolicy("/missing/workbench", "/project", "feature"),
       /missing Core/,
     );
   } finally {
@@ -116,5 +159,18 @@ test("earlier VS Code setting requires an explicit Core migration choice", () =>
   assert.throws(
     () => legacyProductSpineDecision({ source: "platform-default" }, "bad\0path"),
     /invalid/,
+  );
+  assert.equal(
+    legacyFeatureDecision({ source: "platform-default" }, earlier),
+    "migration-required",
+  );
+  assert.equal(
+    legacyFeatureDecision({ source: "user-selection" }, earlier),
+    "historical-hint",
+  );
+  assert.equal(legacyFeatureDecision({ source: "platform-default" }, ""), "ready");
+  assert.throws(
+    () => legacyFeatureDecision({ source: "platform-default" }, "bad\0path"),
+    /workbench\.feature\.stateRoot is invalid/,
   );
 });
