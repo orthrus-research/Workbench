@@ -579,6 +579,48 @@ provider.publish_bytes('evidence', 'interrupted.json', b'pending\\n')
             owner_id="sample", target=issued_under_legacy.path,
         ))
 
+    def test_record_store_inventory_refuses_hard_link_even_for_foreign_workspace(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        store = self.home / "registered-store"
+        store.mkdir(mode=0o700)
+        catalog.register_record_store(
+            family="sample", owner_id="sample", workspace=self.workspace, root=store,
+        )
+        registration = next((catalog.root / "stores").glob("*.json"))
+        foreign = self.home / "foreign-workspace"
+        foreign.mkdir()
+        self.assertEqual([], catalog.inventory(workspace=foreign)["record_stores"])
+
+        link = self.home / "linked-registration.json"
+        os.link(registration, link)
+        try:
+            with self.assertRaises(DurableResourceError) as changed:
+                catalog.inventory(workspace=foreign)
+            self.assertEqual("resource.changed", changed.exception.code)
+        finally:
+            link.unlink()
+        self.assertEqual([], catalog.inventory(workspace=foreign)["record_stores"])
+
+    def test_record_store_inventory_refuses_noncanonical_sealed_bytes(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        store = self.home / "registered-store"
+        store.mkdir(mode=0o700)
+        catalog.register_record_store(
+            family="sample", owner_id="sample", workspace=self.workspace, root=store,
+        )
+        registration = next((catalog.root / "stores").glob("*.json"))
+        original = registration.read_bytes()
+        foreign = self.home / "foreign-workspace"
+        foreign.mkdir()
+        registration.write_bytes(json.dumps(json.loads(original), indent=2, sort_keys=True).encode() + b"\n")
+        try:
+            with self.assertRaises(DurableResourceError) as changed:
+                catalog.inventory(workspace=foreign)
+            self.assertEqual("resource.changed", changed.exception.code)
+        finally:
+            registration.write_bytes(original)
+        self.assertEqual([], catalog.inventory(workspace=foreign)["record_stores"])
+
     def test_missing_or_split_root_binding_never_initializes_empty_catalog(self) -> None:
         reference = self.resources.publish_bytes("evidence", "retained.json", b"retained\n")
         catalog = ResourceCatalog(self.config)

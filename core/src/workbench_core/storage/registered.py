@@ -20,6 +20,7 @@ import unicodedata
 from uuid import uuid4
 
 from workbench_api.durable_resources import DurableResourceError, ResourceReference
+from workbench_api.host_filesystem import DurableRecordError
 from workbench_api.managed_trees import ManagedTreeError
 
 from .. import check_lifecycle, check_storage
@@ -505,7 +506,22 @@ class ResourceCatalog:
                 or re.fullmatch(r"[0-9a-f]{64}\.json", path.name) is None
             ):
                 raise DurableResourceError("resource.changed", "record store catalog has an invalid entry")
-            row = _read_sealed(path, RECORD_STORE_KIND)
+            try:
+                raw = read_private_single_link_bytes(path, byte_limit=1024 * 1024)
+            except DurableRecordError as exc:
+                code = "resource.unavailable" if exc.code == "unavailable" else "resource.changed"
+                raise DurableResourceError(code, "record store registration lost private custody") from exc
+            try:
+                row = json.loads(raw)
+                sealed = (
+                    isinstance(row, dict)
+                    and row == _sealed(RECORD_STORE_KIND, {key: value for key, value in row.items() if key != "id"})
+                    and raw == check_storage.canonical(row) + b"\n"
+                )
+            except (TypeError, ValueError) as exc:
+                raise DurableResourceError("resource.changed", "record store registration bytes changed") from exc
+            if not sealed:
+                raise DurableResourceError("resource.changed", "record store registration bytes changed")
             if set(row) != {"id", "format", "store_id", "family", "owner_id", "workspace", "root", "retention"}:
                 raise DurableResourceError("resource.changed", "record store registration has invalid fields")
             identity = {key: row[key] for key in ("family", "owner_id", "workspace", "root")}
