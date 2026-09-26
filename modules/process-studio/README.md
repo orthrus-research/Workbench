@@ -40,6 +40,14 @@ workbench process effects compare \
   --output .workbench/evidence/comparison.json
 ```
 
+Workbench asks Core to publish `--output` as a fresh, retained file. A bare
+filename uses the selected `evidence` location; a relative path containing
+directories is resolved beneath the selected workspace. An absolute path must
+remain beneath that workspace or the selected evidence location. Core reports
+the retained resource ID on stderr while the comparison JSON on stdout keeps
+its existing shape. `workbench storage resources list` shows the registered
+output, including files in a selected location outside the workspace.
+
 The built-in GT finite-recipe and Forge crafting adapters are synthetic
 fixtures and require `--fixture-adapters`. No live family adapter, capture
 authentication, or temporal admission is implied.
@@ -50,7 +58,9 @@ Baseline and candidate snapshots must bind the same profile, platform, side,
 lifecycle stage, scope, coverage, adapter owner, semantic encoder,
 correspondence policy, and bounds. Input is strict UTF-8 JSON. Symlinks,
 replacement during read, duplicate keys, floating-point values, and unsafe or
-oversized structures are rejected. Output is create-new.
+oversized structures are rejected. Output is create-new and protected from
+cleanup until a reviewed retention policy covers it. Retained output requires
+a Core-bound Workbench invocation.
 
 Adapters own correlation and semantic fingerprints. Process Studio treats
 both as opaque and classifies each exact group as `added`, `removed`,

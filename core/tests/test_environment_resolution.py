@@ -15,7 +15,9 @@ from jsonschema import Draft202012Validator
 
 from workbench_core import cli, setup_cli
 from workbench_core.environment_resolution import resolve_environment
-from workbench_core.user_preferences import choose_default_workspace, register_workspace
+from workbench_core.user_preferences import (
+    choose_default_workspace, register_workspace, set_workspace_selection,
+)
 
 
 def _selection(home: Path, *, profile: Path | None = None) -> dict[str, str | None]:
@@ -58,7 +60,7 @@ class EnvironmentResolutionTests(unittest.TestCase):
             self.assertFalse((base / "home").exists())
             self.assertFalse((base / "state").exists())
 
-    def test_saved_workspace_and_explicit_state_do_not_activate_profile(self) -> None:
+    def test_explicit_workspace_does_not_inherit_another_workspaces_profile(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             suite = base / "suite"
@@ -72,11 +74,12 @@ class EnvironmentResolutionTests(unittest.TestCase):
                 "WORKBENCH_STATE_ROOT": str(base / "explicit-state"),
             }
             context = resolve_environment(suite, environment=environment)
-            self.assertEqual(base / "saved", context.workspace)
-            self.assertEqual("setup-v1", context.record["workspace"]["source"])
+            self.assertEqual(base / "bootstrap", context.workspace)
+            self.assertEqual("environment", context.record["workspace"]["source"])
             self.assertEqual(base / "explicit-state", context.state_root)
             self.assertEqual("environment", context.record["state_root"]["source"])
-            self.assertEqual(str(profile), context.record["profile_configuration_reference"])
+            self.assertIsNone(context.record["profile_configuration_reference"])
+            self.assertEqual("none", context.record["choice_sources"]["java_home"])
             self.assertFalse(profile.exists())
             explicit = resolve_environment(suite, workspace=base / "explicit", environment=environment)
             self.assertEqual(base / "explicit", explicit.workspace)
@@ -136,7 +139,31 @@ class EnvironmentResolutionTests(unittest.TestCase):
                 self.assertEqual(base / "project", context.workspace)
                 self.assertEqual(base / "state", context.state_root)
                 self.assertIn("logs", context.locations)
+                self.assertEqual(context.environment_resolution_id, context.selection.resolution_id)
             self.assertFalse((suite / ".workbench").exists())
+
+    def test_operation_selection_keeps_two_workspaces_and_sources_separate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            environment = {"WORKBENCH_CONFIG_HOME": str(base / "config"), "HOME": str(base)}
+            for name in ("first", "second"):
+                register_workspace(name, str(base / name), environment=environment)
+                set_workspace_selection(
+                    name,
+                    profile_config=str(base / f"{name}.toml"),
+                    java_home=str(base / f"{name}-jdk"),
+                    environment=environment,
+                )
+            selections = [
+                resolve_environment(base, workspace=base / name, environment=environment).operation_selection()
+                for name in ("first", "second")
+            ]
+            self.assertNotEqual(selections[0].workspace_id, selections[1].workspace_id)
+            self.assertEqual(base / "first.toml", selections[0].profile_configuration)
+            self.assertEqual(base / "second-jdk", selections[1].java_home)
+            self.assertEqual("user-workspaces-v2", selections[0].java_source)
+            self.assertEqual("user-workspaces-v2", selections[1].profile_source)
+            self.assertNotEqual(selections[0].resolution_id, selections[1].resolution_id)
 
     def test_state_override_rejects_symlink_without_creating_store(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -219,7 +246,7 @@ class EnvironmentResolutionTests(unittest.TestCase):
                 [
                     (str(home / "first"), None),
                     (None, None),
-                    (str(home / "second"), str(home / "caller")),
+                    (str(home / "caller"), str(home / "caller")),
                 ],
                 observed,
             )

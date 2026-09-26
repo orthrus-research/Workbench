@@ -8,7 +8,9 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import stat
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -16,6 +18,8 @@ from unittest.mock import patch
 from jsonschema import Draft202012Validator
 
 from workbench_core import cli, setup_cli
+from workbench_core import settings_cli
+from workbench_core.dispatch_setup import user_setup_environment
 from workbench_core.fixture_selection import register_recipe_fixture
 from workbench_core.environment_resolution import resolve_environment
 from workbench_core.user_config_home import default_user_config_home, default_user_record_path
@@ -32,6 +36,7 @@ from workbench_core.user_preferences import (
     register_workspace,
     remove_workspace,
     set_location,
+    set_workspace_selection,
 )
 from workbench_core.fixture_selection import default_fixture_registry_path
 
@@ -49,6 +54,217 @@ def _selection(home: Path) -> dict[str, str | None]:
 
 
 class UserPreferencesTests(unittest.TestCase):
+    def test_settings_json_selection_round_trip_for_textual(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            environment = {"HOME": str(home)}
+            initial = register_workspace("alpha", str(home / "alpha"), environment=environment)
+            with patch.dict(os.environ, environment, clear=True):
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(0, cli._main(["settings", "workspace", "list", "--json"]))
+                self.assertEqual(initial, json.loads(output.getvalue()))
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(0, cli._main([
+                        "settings", "workspace", "select", "alpha",
+                        "--profile-config", str(home / "workbench.toml"),
+                        "--java-home", str(home / "jdk-25"),
+                        "--expected-record-id", initial["record_id"], "--json",
+                    ]))
+                selected = json.loads(output.getvalue())
+                self.assertEqual("workbench-user-workspaces-v2", selected["format"])
+                self.assertEqual(str(home / "jdk-25"), selected["entries"][0]["java_home"])
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(0, cli._main([
+                        "settings", "workspace", "select", "alpha", "--clear-java",
+                        "--expected-record-id", selected["record_id"], "--json",
+                    ]))
+                cleared = json.loads(output.getvalue())
+                self.assertIsNone(cleared["entries"][0]["java_home"])
+                self.assertEqual(str(home / "workbench.toml"), cleared["entries"][0]["profile_config"])
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(0, cli._main([
+                        "settings", "workspace", "select", "alpha", "--java-feature", "8",
+                        "--expected-record-id", cleared["record_id"], "--json",
+                    ]))
+                managed = json.loads(output.getvalue())
+                self.assertEqual("workbench-user-workspaces-v3", managed["format"])
+                self.assertEqual(8, managed["entries"][0]["managed_java_feature"])
+
+    def test_named_workspaces_cannot_share_one_physical_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            workspace = home / "source"
+            workspace.mkdir()
+            environment = {"HOME": str(home)}
+            register_workspace("first", str(workspace), environment=environment)
+            with self.assertRaisesRegex(UserPreferencesError, "another named workspace"):
+                register_workspace("second", str(workspace), environment=environment)
+
+    def test_two_workspaces_retain_independent_profile_and_java_choices_after_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            suite = home / "suite"
+            suite.mkdir()
+            config = home / "config"
+            environment = {"HOME": str(home), "WORKBENCH_CONFIG_HOME": str(config)}
+            for name in ("alpha", "beta"):
+                (home / name).mkdir()
+                (home / f"{name}.toml").write_text("profile = 'fixture'\n", encoding="utf-8")
+                (home / f"jdk-{name}").mkdir()
+            initial = register_workspace("alpha", str(home / "alpha"), make_default=True, environment=environment)
+            register_workspace("beta", str(home / "beta"), environment=environment)
+            self.assertEqual(1, initial["schema_version"])
+            selected = set_workspace_selection(
+                "alpha", profile_config=str(home / "alpha.toml"), java_home=str(home / "jdk-alpha"),
+                environment=environment,
+            )
+            self.assertEqual(2, selected["schema_version"])
+            first_id = next(row["workspace_id"] for row in selected["entries"] if row["name"] == "alpha")
+            with self.assertRaisesRegex(UserPreferencesError, "changed after review"):
+                set_workspace_selection("beta", java_home=str(home / "jdk-beta"),
+                                        environment=environment, expected_record_id=initial["record_id"])
+            selected = set_workspace_selection(
+                "beta", profile_config=str(home / "beta.toml"), java_home=str(home / "jdk-beta"),
+                environment=environment, expected_record_id=selected["record_id"],
+            )
+            self.assertEqual(first_id, next(row["workspace_id"] for row in selected["entries"] if row["name"] == "alpha"))
+            schema = json.loads((Path(__file__).resolve().parents[1] / "src/workbench_core/schemas/workbench-user-workspaces-v2.schema.json").read_text())
+            Draft202012Validator.check_schema(schema)
+            Draft202012Validator(schema).validate(selected)
+            for name in ("alpha", "beta"):
+                resolved = resolve_environment(suite, workspace=home / name, environment=environment)
+                self.assertEqual(str(home / f"{name}.toml"), resolved.record["profile_configuration_reference"])
+                self.assertEqual(str(home / f"jdk-{name}"), resolved.record["tool_candidates"]["java_home"])
+                self.assertEqual("user-workspaces-v2", resolved.record["choice_sources"]["java_home"])
+            process_environment = {**os.environ, **environment, "WORKBENCH_WORKSPACE": str(home / "beta")}
+            process_environment["PYTHONPATH"] = str(Path(__file__).resolve().parents[2] / "api/src") + os.pathsep + str(Path(__file__).resolve().parents[1] / "src")
+            reopened = subprocess.run(
+                [sys.executable, "-c", "import json; from pathlib import Path; from workbench_core.environment_resolution import resolve_environment; print(json.dumps(resolve_environment(Path.cwd()).record))"],
+                cwd=suite, env=process_environment, capture_output=True, text=True, check=True,
+            )
+            self.assertEqual(str(home / "jdk-beta"), json.loads(reopened.stdout)["tool_candidates"]["java_home"])
+
+    def test_setup_java_is_not_activated_for_another_named_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            config = home / "config"
+            environment = {"HOME": str(home), "WORKBENCH_CONFIG_HOME": str(config)}
+            setup = _selection(home)
+            setup["java_home"] = str(home / "jdk-legacy")
+            setup_cli._write_setup_record(config / "setup-v1.json", setup)
+            register_workspace("other", str(home / "other"), make_default=True, environment=environment)
+            selected = set_workspace_selection("other", java_home=str(home / "jdk-selected"), environment=environment)
+            with patch.dict(os.environ, environment, clear=True):
+                with user_setup_environment(["sample"]) as activated:
+                    self.assertTrue(activated)
+                    self.assertEqual(str(home / "other"), os.environ["WORKBENCH_WORKSPACE"])
+                    self.assertEqual(str(home / "jdk-selected"), os.environ["WORKBENCH_JAVA_HOME"])
+                self.assertNotIn("WORKBENCH_JAVA_HOME", os.environ)
+                with user_setup_environment(["sample"]) as activated:
+                    self.assertTrue(activated)
+                    self.assertEqual(str(home / "jdk-selected"), os.environ["WORKBENCH_JAVA_HOME"])
+                set_workspace_selection("other", java_home=None, environment=environment,
+                                        expected_record_id=selected["record_id"])
+                with user_setup_environment(["sample"]) as activated:
+                    self.assertTrue(activated)
+                    self.assertNotIn("WORKBENCH_JAVA_HOME", os.environ)
+
+    def test_managed_java_8_choice_round_trips_without_a_java_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            environment = {"HOME": str(home), "WORKBENCH_CONFIG_HOME": str(home / "config")}
+            register_workspace("first", str(home / "first"), environment=environment)
+            register_workspace("second", str(home / "second"), environment=environment)
+            selected = set_workspace_selection("first", managed_java_feature=8, environment=environment)
+            self.assertEqual("workbench-user-workspaces-v3", selected["format"])
+            first = next(row for row in selected["entries"] if row["name"] == "first")
+            self.assertIsNone(first["java_home"])
+            self.assertEqual(8, first["managed_java_feature"])
+            self.assertEqual(selected, load_workspaces(environment=environment))
+            schema = json.loads((Path(__file__).resolve().parents[1] / "src/workbench_core/schemas/workbench-user-workspaces-v3.schema.json").read_text())
+            Draft202012Validator.check_schema(schema)
+            Draft202012Validator(schema).validate(selected)
+            resolved = resolve_environment(home, workspace=home / "first", environment=environment)
+            self.assertEqual(8, resolved.operation_selection().managed_java_feature)
+            self.assertIsNone(resolved.operation_selection().java_home)
+            self.assertEqual("workbench-environment-resolution-v2", resolved.record["format"])
+            resolution_schema = json.loads((Path(__file__).resolve().parents[1] / "src/workbench_core/schemas/workbench-environment-resolution-v2.schema.json").read_text())
+            Draft202012Validator.check_schema(resolution_schema)
+            Draft202012Validator(resolution_schema).validate(resolved.record)
+            other = resolve_environment(home, workspace=home / "second", environment=environment)
+            self.assertIsNone(other.operation_selection().managed_java_feature)
+            with self.assertRaisesRegex(UserPreferencesError, "changed after review"):
+                set_workspace_selection("first", java_home=str(home / "jdk"), environment=environment,
+                                        expected_record_id="old")
+            replaced = set_workspace_selection("first", java_home=str(home / "jdk"), environment=environment,
+                                               expected_record_id=selected["record_id"])
+            first = next(row for row in replaced["entries"] if row["name"] == "first")
+            self.assertEqual(str(home / "jdk"), first["java_home"])
+            self.assertIsNone(first["managed_java_feature"])
+            with self.assertRaisesRegex(UserPreferencesError, "choose a managed Java feature or a Java path"):
+                set_workspace_selection("first", java_home=str(home / "jdk"), managed_java_feature=8,
+                                        environment=environment)
+
+    def test_supplied_java_symlink_is_retained_without_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            actual = home / "real-jdk"
+            actual.mkdir()
+            alias = home / "selected-jdk"
+            alias.symlink_to(actual, target_is_directory=True)
+            environment = {"HOME": str(home)}
+            register_workspace("chosen", str(home / "project"), environment=environment)
+            set_workspace_selection("chosen", java_home=str(alias), environment=environment)
+            operation = resolve_environment(
+                home, workspace=home / "project", environment=environment,
+            ).operation_selection()
+            self.assertEqual(alias, operation.java_home)
+
+    def test_acquire_named_workspace_uses_core_managed_choice_and_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            environment = {"HOME": str(home), "WORKBENCH_CONFIG_HOME": str(home / "config")}
+            register_workspace("chosen", str(home / "chosen"), environment=environment)
+            saved = set_workspace_selection("chosen", managed_java_feature=8, environment=environment)
+            result = {"format": "workbench-java-runtime-result-v2", "source": "managed",
+                      "outcome": "provisioned", "receipt": {"policy": {"feature_version": 8}}}
+            with patch.dict(os.environ, environment, clear=True), patch(
+                "workbench_core.managed_java.CoreManagedJava"
+            ) as core_java:
+                core_java.return_value.ensure.return_value = result
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(0, settings_cli.main([
+                        "workspace", "acquire", "chosen", "--expected-record-id",
+                        saved["record_id"], "--json",
+                    ], suite_root=home))
+            self.assertEqual(result, json.loads(output.getvalue()))
+            self.assertEqual(8, core_java.call_args.kwargs["selection"].managed_java_feature)
+            self.assertIsNone(core_java.call_args.kwargs["selection"].java_home)
+            self.assertEqual(home, core_java.return_value.ensure.call_args.args[0])
+            with patch.dict(os.environ, environment, clear=True), patch(
+                "workbench_core.managed_java.CoreManagedJava.ensure"
+            ) as acquire:
+                with redirect_stderr(io.StringIO()):
+                    with self.assertRaises(SystemExit):
+                        settings_cli.main([
+                            "workspace", "acquire", "chosen", "--expected-record-id", "stale",
+                        ], suite_root=home)
+            acquire.assert_not_called()
+            set_workspace_selection("chosen", java_home=str(home / "uninspected-jdk"),
+                                    environment=environment)
+            with patch.dict(os.environ, environment, clear=True), patch(
+                "workbench_core.managed_java.CoreManagedJava.ensure"
+            ) as acquire:
+                with redirect_stderr(io.StringIO()):
+                    with self.assertRaises(SystemExit):
+                        settings_cli.main(["workspace", "acquire", "chosen"], suite_root=home)
+            acquire.assert_not_called()
+
     def test_versioned_schemas_accept_resolved_and_saved_records(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
@@ -400,7 +616,7 @@ class UserPreferencesTests(unittest.TestCase):
 
             old_umask = os.umask(0)
             try:
-                with patch("workbench_core.user_preferences.os.replace", side_effect=inspect_temporary):
+                with patch("workbench_core.durable_records.os.replace", side_effect=inspect_temporary):
                     set_location("logs", "~/logs", environment=environment)
             finally:
                 os.umask(old_umask)

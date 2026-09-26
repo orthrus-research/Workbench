@@ -47,6 +47,10 @@ WINDOWS_UNICODE_CDS_TRANSFORM_ID = (
 GIT_RELEASE_RE = re.compile(
     r"^jdk-(?P<version>(?P<feature>[1-9][0-9]*)(?:\.0\.\d+)?\+\d+)$"
 )
+JAVA8_RELEASE_RE = re.compile(r"^jdk8u(?P<update>[1-9][0-9]*)-b(?P<build>[0-9]+)$")
+# Exact optional release; the selected platform profile remains the default.
+# https://github.com/adoptium/temurin8-binaries/releases/tag/jdk8u504-b01
+OPTIONAL_MANAGED_RELEASES = {8: "jdk8u504-b01"}
 
 
 class JavaRuntimeError(ValueError):
@@ -175,9 +179,10 @@ def load_java_runtime_policy(
             "Java runtime provision policy lacks a positive feature_version"
         )
     release_match = GIT_RELEASE_RE.fullmatch(policy["release_name"])
-    if (
-        release_match is None
-        or int(release_match.group("feature")) != feature_version
+    java8_match = JAVA8_RELEASE_RE.fullmatch(policy["release_name"])
+    if not (
+        release_match is not None and int(release_match.group("feature")) == feature_version
+        or feature_version == 8 and java8_match is not None
     ):
         raise JavaRuntimeError(
             "Temurin release_name must be an exact tag for feature_version"
@@ -197,9 +202,7 @@ def load_java_runtime_policy(
         raise JavaRuntimeError(
             "unsupported Java runtime provider-adapter policy"
         )
-    expected_identity = (
-        "eclipse-temurin-" + release_match.group("version")
-    )
+    expected_identity = "eclipse-temurin-" + policy["release_name"].removeprefix("jdk").lstrip("-")
     if runtime_identity != expected_identity:
         raise JavaRuntimeError(
             "selected Java runtime identity and Temurin release differ"
@@ -207,6 +210,29 @@ def load_java_runtime_policy(
     policy["policy_sha256"] = sha256(
         _canonical_bytes(policy)
     ).hexdigest()
+    return policy
+
+
+def select_managed_java_policy(
+    profile_policy: Mapping[str, Any], feature_version: int | None,
+) -> dict[str, Any]:
+    """Bind an explicit managed release without changing the profile default."""
+
+    if feature_version is None or feature_version == profile_policy["feature_version"]:
+        return dict(profile_policy)
+    if type(feature_version) is not int or feature_version not in OPTIONAL_MANAGED_RELEASES:
+        raise JavaRuntimeError("unsupported managed Java feature")
+    release = OPTIONAL_MANAGED_RELEASES[feature_version]
+    policy = dict(profile_policy)
+    policy.update(
+        feature_version=feature_version,
+        release_name=release,
+        runtime_identity="eclipse-temurin-" + release.removeprefix("jdk").lstrip("-"),
+        selection_kind="explicit-managed-feature",
+        profile_runtime_identity=profile_policy["runtime_identity"],
+    )
+    policy.pop("policy_sha256", None)
+    policy["policy_sha256"] = sha256(_canonical_bytes(policy)).hexdigest()
     return policy
 
 
@@ -251,7 +277,7 @@ def _target_root(
     policy: Mapping[str, Any],
     host: Mapping[str, str],
 ) -> Path:
-    version = str(policy["release_name"]).removeprefix("jdk-")
+    version = str(policy["release_name"]).removeprefix("jdk").lstrip("-")
     return (
         state_root
         / "jdks"
@@ -542,9 +568,15 @@ def probe_java(
         # fail as soon as Java loads a main class: native DLL lookup expands
         # the real Unicode home and loses characters outside the active code
         # page. Test the selected JDK's own compiler main before admitting it.
+        java8 = properties["java.version"].startswith("1.8.")
+        class_command = (
+            [str(java.with_name("javac.exe")), "-version"]
+            if java8 else
+            [str(java), "-Xshare:off", "-m", "jdk.compiler/com.sun.tools.javac.Main", "-version"]
+        )
         try:
             class_probe = subprocess.run(
-                [str(java), "-Xshare:off", "-m", "jdk.compiler/com.sun.tools.javac.Main", "-version"],
+                class_command,
                 check=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -586,6 +618,9 @@ def _probe_mismatch(
     host: Mapping[str, str],
 ) -> str | None:
     version = str(policy["release_name"]).removeprefix("jdk-")
+    java8_match = JAVA8_RELEASE_RE.fullmatch(str(policy["release_name"]))
+    if java8_match is not None:
+        version = f"1.8.0_{java8_match.group('update')}-b{java8_match.group('build')}"
     runtime_version = probe.get("runtime_version", "")
     if runtime_version != version and not runtime_version.startswith(version + "-"):
         return (
@@ -621,6 +656,7 @@ def _probe_mismatch(
 def _normalize_managed_probe(
     probe: Mapping[str, str],
     *,
+    policy: Mapping[str, Any],
     host: Mapping[str, str],
     java_home: Path,
     extracted_root: Path,
@@ -655,14 +691,17 @@ def _normalize_managed_probe(
     else:
         reported_home = Path(reported_home_text).resolve()
     expected_home = java_home.resolve()
-    if reported_home != expected_home:
+    compatible_homes = {expected_home}
+    if policy["feature_version"] == 8:
+        compatible_homes.add(expected_home / "jre")
+    if reported_home not in compatible_homes:
         raise JavaRuntimeError(
             "Java reported a home outside the selected archive layout"
         )
     normalized = dict(probe)
     normalized["java_home"] = (
         "@runtime/"
-        + expected_home.relative_to(extracted_root.resolve()).as_posix()
+        + reported_home.relative_to(extracted_root.resolve()).as_posix()
     )
     return normalized
 
@@ -1064,11 +1103,23 @@ def _find_java_home(
         for path in extracted_root.rglob(executable_name)
         if path.parent.name == "bin" and path.is_file()
     ]
-    if len(candidates) != 1:
-        raise JavaRuntimeError(
-            "Temurin archive must contain one Java executable"
-        )
-    executable = candidates[0]
+    if len(candidates) == 1:
+        executable = candidates[0]
+    else:
+        # Java 8 JDK archives include both bin/java and jre/bin/java. The
+        # compiler identifies the JDK home; the nested JRE stays in its tree.
+        compiler_name = "javac.exe" if host["os"] == "windows" else "javac"
+        jdk_candidates = [
+            path for path in candidates
+            if (path.parent / compiler_name).is_file()
+        ]
+        if len(jdk_candidates) != 1 or any(
+            path != jdk_candidates[0]
+            and path.parent.parent != jdk_candidates[0].parent.parent / "jre"
+            for path in candidates
+        ):
+            raise JavaRuntimeError("Temurin archive must contain one JDK executable")
+        executable = jdk_candidates[0]
     resolved_executable = executable.resolve()
     if not resolved_executable.is_relative_to(extracted_root.resolve()):
         raise JavaRuntimeError(
@@ -1568,6 +1619,7 @@ def _reuse_managed_runtime_v2(
         ) from exc
     probe = _normalize_managed_probe(
         probe_java(executable),
+        policy=policy,
         host=host,
         java_home=canonical_home,
         extracted_root=extracted,
@@ -1720,6 +1772,7 @@ def materialize_temurin_runtime(
             )
         probe = _normalize_managed_probe(
             raw_probe,
+            policy=policy,
             host=host,
             java_home=java_home,
             extracted_root=extracted,
@@ -1773,6 +1826,7 @@ def materialize_temurin_runtime(
             ) from exc
         final_probe = _normalize_managed_probe(
             probe_java(final_execution["java"]),
+            policy=policy,
             host=host,
             java_home=final_home,
             extracted_root=target_root / "extracted",
@@ -1837,6 +1891,8 @@ def ensure_java_runtime(
     configuration: WorkbenchConfiguration | None = None,
     config_path: Path | str | None = None,
     resolved_bindings: ResolvedBindings | None = None,
+    require_candidate: bool = False,
+    managed_feature_version: int | None = None,
 ) -> dict[str, Any]:
     """Discover or provision exact Java for one executable host.
 
@@ -1866,9 +1922,9 @@ def ensure_java_runtime(
         if state_root is None
         else Path(state_root).expanduser().resolve()
     )
-    policy = load_java_runtime_policy(
-        suite,
-        configuration=active_configuration,
+    policy = select_managed_java_policy(
+        load_java_runtime_policy(suite, configuration=active_configuration),
+        managed_feature_version,
     )
     selected_host = host_platform() if host is None else dict(host)
     required_host_fields = {
@@ -1890,7 +1946,8 @@ def ensure_java_runtime(
     ):
         raise JavaRuntimeError("Java host identity is invalid")
     selected_candidates = candidates
-    candidates_from_configuration = selected_candidates is None
+    if managed_feature_version is not None and (candidates is None or candidates):
+        raise JavaRuntimeError("managed Java feature cannot be combined with a local Java candidate")
     if selected_candidates is None:
         operation_bindings = resolved_bindings
         if operation_bindings is None:
@@ -1929,8 +1986,7 @@ def ensure_java_runtime(
 
     target = _target_root(selected_state, policy, selected_host)
     if (
-        candidates_from_configuration
-        and len(selected_candidates) == 1
+        len(selected_candidates) == 1
         and (target.exists() or target.is_symlink())
     ):
         receipt_path = _current_managed_receipt_path(target)
@@ -1978,6 +2034,15 @@ def ensure_java_runtime(
             "runtime": selected,
             "discovery": discovery,
         }
+
+    if require_candidate and selected_candidates and selected is None:
+        failures = "; ".join(
+            f"{row['origin']}: {row.get('reason', row['state'])}"
+            for row in discovery["candidates"]
+        )
+        raise JavaRuntimeError(
+            "selected Java does not satisfy the active profile policy: " + failures
+        )
 
     if target.exists() or target.is_symlink():
         return _reuse_managed_runtime(

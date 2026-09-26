@@ -38,7 +38,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
         if not activated:
             return 2
         try:
-            if arguments[:1] == ["settings"] or arguments[:2] == ["environment", "resolve"]:
+            if (arguments[:1] == ["settings"]
+                    or arguments[:2] in (["environment", "resolve"], ["storage", "resources"])):
                 return _dispatch(arguments, root, caller_environment=caller_environment)
             from .module_cli import disabled_profiles, main as package_main
             from .package_guard import PackageActivity
@@ -76,8 +77,12 @@ def _dispatch(
         return tooling(arguments[1:])
     if arguments[:1] == ["settings"]:
         from .settings_cli import main as settings
-        return settings(arguments[1:])
+        from workbench_api.resources import repository_root
+        resources = root if (root / "core/pyproject.toml").is_file() else repository_root(__file__)
+        return settings(arguments[1:], suite_root=resources)
     if arguments[:2] == ["environment", "resolve"]:
+        return _dispatch_available(arguments, root, (), caller_environment=caller_environment)
+    if arguments[:2] == ["storage", "resources"]:
         return _dispatch_available(arguments, root, (), caller_environment=caller_environment)
     if arguments[:2] == ["sandbox", "recover"]:
         from .axiom_sandbox import recover_axiom
@@ -98,13 +103,25 @@ def _dispatch(
 def _dispatch_available(
     arguments: list[str], root: Path, modules, *, caller_environment: dict[str, str] | None = None
 ) -> int:
+    resolution_environment = os.environ if caller_environment is None else dict(caller_environment)
+    if caller_environment is not None:
+        # Setup may replace a bootstrap workspace for module dispatch. Keep
+        # every other caller override, including an explicit Java candidate.
+        activated_workspace = os.environ.get("WORKBENCH_WORKSPACE")
+        if activated_workspace is None:
+            resolution_environment.pop("WORKBENCH_WORKSPACE", None)
+        else:
+            resolution_environment["WORKBENCH_WORKSPACE"] = activated_workspace
     if arguments[:2] == ["runtime", "preflight"]:
         from .manual_artifacts import main as preflight
         from workbench_api.profiles import profile_resources
         return preflight(arguments[2:], profiles=profile_resources("manual-artifacts"))
+    if arguments[:2] == ["storage", "resources"]:
+        from .storage.cli import main as storage
+        return storage(arguments, root=root)
     if arguments[:1] in (["storage"], ["runtime"], ["world"]):
         from .storage.cli import main as storage
-        resolved = resolve_environment(root, environment=caller_environment)
+        resolved = resolve_environment(root, environment=resolution_environment)
         return storage(arguments, root=root, workspace_root=resolved.state_root)
     if arguments[:1] == ["environment"]:
         parser = argparse.ArgumentParser(prog="workbench environment")
@@ -118,7 +135,7 @@ def _dispatch_available(
             resolved = resolve_environment(
                 root,
                 workspace=selected.workspace,
-                environment=caller_environment,
+                environment=resolution_environment,
             )
             if selected.json:
                 print(json.dumps(resolved.record, indent=2, sort_keys=True))
@@ -153,7 +170,7 @@ def _dispatch_available(
     if "--help" in arguments or "-h" in arguments:
         from .setup_cli import _state_root, _workspace
 
-        values = os.environ if caller_environment is None else caller_environment
+        values = resolution_environment
         context = ExecutionContext(
             _workspace(values.get("WORKBENCH_WORKSPACE") or Path.cwd()),
             _state_root(
@@ -162,11 +179,15 @@ def _dispatch_available(
             ),
         )
     else:
-        resolved = resolve_environment(root, environment=caller_environment)
+        resolved = resolve_environment(root, environment=resolution_environment)
         context = ExecutionContext(
             resolved.workspace,
             resolved.state_root,
             locations=resolved.locations,
+            configuration_home=resolved.configuration_home,
+            environment_resolution_id=resolved.record["resolution_id"],
+            location_sources={role: value["source"] for role, value in resolved.record["locations"].items()},
+            selection=resolved.operation_selection(),
         )
     return dispatch(arguments, context, modules)
 

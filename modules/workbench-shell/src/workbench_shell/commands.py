@@ -277,14 +277,28 @@ def runtime_java(argv, *, context):
     context.check_cancelled()
     from .cli import main
     arguments = ['runtime-java', *argv]
-    return main(arguments)
+    selected = context.selection
+    if (
+        selected is not None
+        and selected.profile_configuration is not None
+        and not any(value == '--config' or value.startswith('--config=') for value in argv)
+    ):
+        arguments.extend(['--config', str(selected.profile_configuration)])
+    return main(arguments, runtime_java_service=context.managed_java)
 
 
 def runtime_materialize(argv, *, context):
     context.check_cancelled()
     from .cli import main
     arguments = ['runtime-materialize', *argv]
-    return main(arguments)
+    selected = context.selection
+    if (
+        selected is not None and selected.profile_configuration is not None
+        and not any(value == '--config' or value.startswith('--config=') for value in argv)
+    ):
+        arguments.extend(['--config', str(selected.profile_configuration)])
+    return main(arguments, runtime_java_service=context.managed_java,
+                runtime_state_root=context.state_root)
 
 
 def runtime_launch(argv, *, context):
@@ -293,7 +307,14 @@ def runtime_launch(argv, *, context):
     arguments = ['runtime-launch', *argv]
     from .launcher_setup import launcher_defaults_for_runtime
     arguments = launcher_defaults_for_runtime(arguments)
-    return main(arguments)
+    selected = context.selection
+    if (
+        selected is not None and selected.profile_configuration is not None
+        and not any(value == '--config' or value.startswith('--config=') for value in argv)
+    ):
+        arguments.extend(['--config', str(selected.profile_configuration)])
+    return main(arguments, runtime_java_service=context.managed_java,
+                runtime_state_root=context.state_root)
 
 
 def runtime_observe(argv, *, context):

@@ -1333,7 +1333,13 @@ class ProductCommandSurfaceTests(unittest.TestCase):
         activate_setup.assert_called_once_with(
             ["process", "effects", "compare", *forwarded]
         )
-        delegated.assert_called_once_with(forwarded, root=ROOT)
+        delegated.assert_called_once()
+        self.assertEqual((forwarded,), delegated.call_args.args)
+        self.assertEqual(ROOT, delegated.call_args.kwargs["root"])
+        execution = delegated.call_args.kwargs["context"]
+        self.assertEqual(ROOT, execution.workspace)
+        self.assertIsNotNone(execution.environment_resolution_id)
+        self.assertIsNotNone(execution.durable_resources)
 
     def test_process_effects_compare_help_uses_the_real_owner_parser(self) -> None:
         result = self._run("process", "effects", "compare", "--help")

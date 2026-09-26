@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import argparse
-import errno
 import json
 import os
 from pathlib import Path
-import secrets
 import stat
 import sys
 from typing import Any, Mapping, NoReturn, Sequence
 
 from workbench_api.canonical import CanonicalJsonError, parse_json_strict
+from workbench_api.durable_resources import DurableResourceError, ResourceReference
+from workbench_api.modules import ExecutionContext, ModuleError
 
 from .adapters import SYNTHETIC_FIXTURE_ADAPTERS
 from .comparator import (
@@ -27,10 +27,6 @@ _FD_RELATIVE_READ_AVAILABLE = (
     and hasattr(os, "O_NOFOLLOW")
     and {os.open, os.stat}.issubset(os.supports_dir_fd)
     and os.stat in os.supports_follow_symlinks
-)
-_FD_RELATIVE_PUBLICATION_AVAILABLE = (
-    _FD_RELATIVE_READ_AVAILABLE
-    and {os.link, os.mkdir, os.unlink}.issubset(os.supports_dir_fd)
 )
 
 
@@ -52,14 +48,6 @@ def _resolve(path: Path, *, root: Path) -> Path:
     return Path(os.path.abspath(os.fspath(selected)))
 
 
-def _fd_relative_custody_available(*, publication: bool) -> bool:
-    return (
-        _FD_RELATIVE_PUBLICATION_AVAILABLE
-        if publication
-        else _FD_RELATIVE_READ_AVAILABLE
-    )
-
-
 def _directory_flags() -> int:
     return (
         os.O_RDONLY
@@ -74,17 +62,10 @@ def _directory_identity(metadata: os.stat_result) -> tuple[int, int]:
 
 
 def _path_error(
-    *,
-    output: bool,
-    label: str,
-    selected: Path,
-    message: str,
-    code: str | None = None,
+    *, label: str, selected: Path, message: str, code: str | None = None,
 ) -> BoundedEffectComparisonError:
     return BoundedEffectComparisonError(
-        code or ("output.write" if output else "input.unavailable"),
-        "/output" if output else f"/{label}",
-        f"{message}: {selected}",
+        code or "input.unavailable", f"/{label}", f"{message}: {selected}",
     )
 
 
@@ -103,38 +84,25 @@ class _RootCustody:
             os.close(descriptor)
 
 
-def _pin_root(
-    root: Path,
-    *,
-    output: bool,
-    label: str,
-) -> _RootCustody:
-    if not _fd_relative_custody_available(publication=output):
+def _pin_root(root: Path, *, label: str) -> _RootCustody:
+    if not _FD_RELATIVE_READ_AVAILABLE:
         raise _path_error(
-            output=output,
-            label=label,
-            selected=root,
+            label=label, selected=root,
             message="fd-relative POSIX filesystem custody is unavailable",
-            code="output.filesystem" if output else "input.filesystem",
+            code="input.filesystem",
         )
     descriptor = -1
     try:
         visible = os.stat(root, follow_symlinks=False)
         if stat.S_ISLNK(visible.st_mode):
             raise _path_error(
-                output=output,
-                label=label,
-                selected=root,
-                message="symbolic-link CLI root is refused",
-                code="output.symlink" if output else "input.symlink",
+                label=label, selected=root,
+                message="symbolic-link CLI root is refused", code="input.symlink",
             )
         if not stat.S_ISDIR(visible.st_mode):
             raise _path_error(
-                output=output,
-                label=label,
-                selected=root,
-                message="CLI root is not a directory",
-                code="output.write" if output else "input.type",
+                label=label, selected=root,
+                message="CLI root is not a directory", code="input.type",
             )
         descriptor = os.open(root, _directory_flags())
         opened = os.fstat(descriptor)
@@ -144,11 +112,8 @@ def _pin_root(
         if descriptor >= 0:
             os.close(descriptor)
         raise _path_error(
-            output=output,
-            label=label,
-            selected=root,
-            message=f"cannot pin the CLI root: {exc}",
-            code="output.changed" if output else "input.changed",
+            label=label, selected=root,
+            message=f"cannot pin the CLI root: {exc}", code="input.changed",
         ) from exc
     if (
         not stat.S_ISDIR(opened.st_mode)
@@ -156,32 +121,22 @@ def _pin_root(
     ):
         os.close(descriptor)
         raise _path_error(
-            output=output,
-            label=label,
-            selected=root,
-            message="CLI root identity changed while being pinned",
-            code="output.changed" if output else "input.changed",
+            label=label, selected=root,
+            message="CLI root identity changed while being pinned", code="input.changed",
         )
     return _RootCustody(root, descriptor, _directory_identity(opened))
 
 
 def _open_pinned_parent(
-    selected: Path,
-    *,
-    custody: _RootCustody,
-    create: bool,
-    output: bool,
-    label: str,
+    selected: Path, *, custody: _RootCustody, label: str,
 ) -> tuple[int, tuple[int, int]]:
-    """Pin ``root`` and traverse one descendant parent without symlinks."""
+    """Pin an input's descendant parent without following symlinks."""
 
-    if not _fd_relative_custody_available(publication=output):
+    if not _FD_RELATIVE_READ_AVAILABLE:
         raise _path_error(
-            output=output,
-            label=label,
-            selected=selected,
+            label=label, selected=selected,
             message="fd-relative POSIX filesystem custody is unavailable",
-            code="output.filesystem" if output else "input.filesystem",
+            code="input.filesystem",
         )
     root = custody.path
     if (
@@ -191,21 +146,16 @@ def _open_pinned_parent(
         or selected.name in {"", ".", ".."}
     ):
         raise _path_error(
-            output=output,
-            label=label,
-            selected=selected,
-            message="path has no safe final filename component",
-            code="output.write" if output else "input.type",
+            label=label, selected=selected,
+            message="path has no safe final filename component", code="input.type",
         )
     try:
         relative = selected.relative_to(root)
     except ValueError:
         raise _path_error(
-            output=output,
-            label=label,
-            selected=selected,
+            label=label, selected=selected,
             message=f"path is outside the pinned CLI root {root}",
-            code="output.write" if output else "input.unavailable",
+            code="input.unavailable",
         ) from None
 
     descriptor = -1
@@ -216,81 +166,35 @@ def _open_pinned_parent(
             or _directory_identity(pinned_root) != custody.identity
         ):
             raise _path_error(
-                output=output,
-                label=label,
-                selected=root,
-                message="pinned CLI root capability changed",
-                code="output.changed" if output else "input.changed",
+                label=label, selected=root,
+                message="pinned CLI root capability changed", code="input.changed",
             )
         descriptor = os.dup(custody.descriptor)
-
         walked = root
         for component in relative.parent.parts:
             walked /= component
-            created = False
             try:
-                visible = os.stat(
-                    component,
-                    dir_fd=descriptor,
-                    follow_symlinks=False,
-                )
+                visible = os.stat(component, dir_fd=descriptor, follow_symlinks=False)
             except FileNotFoundError:
-                if not create:
-                    raise _path_error(
-                        output=output,
-                        label=label,
-                        selected=walked,
-                        message="path ancestor is unavailable",
-                    ) from None
-                try:
-                    os.mkdir(component, 0o777, dir_fd=descriptor)
-                    created = True
-                    _fsync_directory_descriptor(descriptor)
-                except FileExistsError:
-                    pass
-                except OSError as exc:
-                    raise _path_error(
-                        output=output,
-                        label=label,
-                        selected=walked,
-                        message=f"cannot create path ancestor: {exc}",
-                    ) from exc
-                try:
-                    visible = os.stat(
-                        component,
-                        dir_fd=descriptor,
-                        follow_symlinks=False,
-                    )
-                except OSError as exc:
-                    raise _path_error(
-                        output=output,
-                        label=label,
-                        selected=walked,
-                        message=f"cannot inspect created path ancestor: {exc}",
-                    ) from exc
+                raise _path_error(
+                    label=label, selected=walked,
+                    message="path ancestor is unavailable",
+                ) from None
             except OSError as exc:
                 raise _path_error(
-                    output=output,
-                    label=label,
-                    selected=walked,
+                    label=label, selected=walked,
                     message=f"cannot inspect path ancestor: {exc}",
                 ) from exc
-
             if stat.S_ISLNK(visible.st_mode):
                 raise _path_error(
-                    output=output,
-                    label=label,
-                    selected=walked,
+                    label=label, selected=walked,
                     message="symbolic-link path ancestor is refused",
-                    code="output.symlink" if output else "input.symlink",
+                    code="input.symlink",
                 )
             if not stat.S_ISDIR(visible.st_mode):
                 raise _path_error(
-                    output=output,
-                    label=label,
-                    selected=walked,
-                    message="path ancestor is not a directory",
-                    code="output.write" if output else "input.type",
+                    label=label, selected=walked,
+                    message="path ancestor is not a directory", code="input.type",
                 )
             child = -1
             try:
@@ -299,15 +203,10 @@ def _open_pinned_parent(
             except OSError as exc:
                 if child >= 0:
                     os.close(child)
-                changed = not created or exc.errno in {errno.ELOOP, errno.ENOTDIR}
                 raise _path_error(
-                    output=output,
-                    label=label,
-                    selected=walked,
+                    label=label, selected=walked,
                     message=f"path ancestor changed while being pinned: {exc}",
-                    code=("output.changed" if output else "input.changed")
-                    if changed
-                    else None,
+                    code="input.changed",
                 ) from exc
             if (
                 not stat.S_ISDIR(opened.st_mode)
@@ -315,22 +214,17 @@ def _open_pinned_parent(
             ):
                 os.close(child)
                 raise _path_error(
-                    output=output,
-                    label=label,
-                    selected=walked,
+                    label=label, selected=walked,
                     message="path ancestor identity changed while being pinned",
-                    code="output.changed" if output else "input.changed",
+                    code="input.changed",
                 )
             os.close(descriptor)
             descriptor = child
         opened_parent = os.fstat(descriptor)
         if not stat.S_ISDIR(opened_parent.st_mode):
             raise _path_error(
-                output=output,
-                label=label,
-                selected=selected.parent,
-                message="pinned parent is not a directory",
-                code="output.changed" if output else "input.changed",
+                label=label, selected=selected.parent,
+                message="pinned parent is not a directory", code="input.changed",
             )
         return descriptor, _directory_identity(opened_parent)
     except BaseException:
@@ -340,52 +234,33 @@ def _open_pinned_parent(
 
 
 def _require_visible_parent(
-    selected: Path,
-    expected: tuple[int, int],
-    *,
-    custody: _RootCustody,
-    output: bool,
-    label: str,
+    selected: Path, expected: tuple[int, int], *, custody: _RootCustody, label: str,
 ) -> None:
     visible_custody: _RootCustody | None = None
     descriptor = -1
     try:
         try:
-            visible_custody = _pin_root(
-                custody.path,
-                output=output,
-                label=label,
-            )
+            visible_custody = _pin_root(custody.path, label=label)
             if visible_custody.identity != custody.identity:
                 raise _path_error(
-                    output=output,
-                    label=label,
-                    selected=custody.path,
+                    label=label, selected=custody.path,
                     message="CLI root namespace identity changed during access",
-                    code="output.changed" if output else "input.changed",
+                    code="input.changed",
                 )
             descriptor, observed = _open_pinned_parent(
-                selected,
-                custody=visible_custody,
-                create=False,
-                output=output,
-                label=label,
+                selected, custody=visible_custody, label=label,
             )
         except BoundedEffectComparisonError as exc:
             raise _path_error(
-                output=output,
-                label=label,
-                selected=selected.parent,
+                label=label, selected=selected.parent,
                 message=f"parent namespace changed during access ({exc.message})",
-                code="output.changed" if output else "input.changed",
+                code="input.changed",
             ) from exc
         if observed != expected:
             raise _path_error(
-                output=output,
-                label=label,
-                selected=selected.parent,
+                label=label, selected=selected.parent,
                 message="parent namespace identity changed during access",
-                code="output.changed" if output else "input.changed",
+                code="input.changed",
             )
     finally:
         if descriptor >= 0:
@@ -416,11 +291,10 @@ def _read_json(
     owned_custody: _RootCustody | None = None
     active_custody = custody
     if active_custody is None:
-        owned_custody = _pin_root(root, output=False, label=label)
+        owned_custody = _pin_root(root, label=label)
         active_custody = owned_custody
     elif active_custody.path != root:
         raise _path_error(
-            output=False,
             label=label,
             selected=root,
             message="CLI root does not match its pinned custody",
@@ -432,8 +306,6 @@ def _read_json(
         parent, parent_identity = _open_pinned_parent(
             selected,
             custody=active_custody,
-            create=False,
-            output=False,
             label=label,
         )
         try:
@@ -535,7 +407,6 @@ def _read_json(
             selected,
             parent_identity,
             custody=active_custody,
-            output=False,
             label=label,
         )
         if data.startswith(b"\xef\xbb\xbf"):
@@ -564,161 +435,14 @@ def _read_json(
             owned_custody.close()
 
 
-def _write_all(descriptor: int, value: bytes) -> None:
-    offset = 0
-    while offset < len(value):
-        written = os.write(descriptor, value[offset:])
-        if written <= 0:
-            raise OSError("short output write")
-        offset += written
-
-
-def _write_json(
-    path: Path,
-    value: Mapping[str, Any],
-    *,
-    root: Path,
-    custody: _RootCustody | None = None,
-) -> None:
-    selected = _resolve(path, root=root)
-    encoded = (
-        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    ).encode("utf-8", errors="strict")
-    owned_custody: _RootCustody | None = None
-    active_custody = custody
-    if active_custody is None:
-        owned_custody = _pin_root(root, output=True, label="output")
-        active_custody = owned_custody
-    elif active_custody.path != root:
-        raise _path_error(
-            output=True,
-            label="output",
-            selected=root,
-            message="CLI root does not match its pinned custody",
-            code="output.changed",
-        )
-    parent = -1
-    descriptor = -1
-    temporary: str | None = None
-    try:
-        parent, parent_identity = _open_pinned_parent(
-            selected,
-            custody=active_custody,
-            create=True,
-            output=True,
-            label="output",
-        )
-        flags = (
-            os.O_WRONLY
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_BINARY", 0)
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0)
-        )
-        for _attempt in range(128):
-            temporary = ".workbench-process-studio-" + secrets.token_hex(16) + ".tmp"
-            try:
-                descriptor = os.open(
-                    temporary,
-                    flags,
-                    0o600,
-                    dir_fd=parent,
-                )
-            except FileExistsError:
-                continue
-            break
-        else:
-            raise BoundedEffectComparisonError(
-                "output.write",
-                "/output",
-                f"cannot allocate a fresh temporary output name: {selected}",
-            )
-        _write_all(descriptor, encoded)
-        os.fsync(descriptor)
-        _require_visible_parent(
-            selected,
-            parent_identity,
-            custody=active_custody,
-            output=True,
-            label="output",
-        )
-        try:
-            os.link(
-                temporary,
-                selected.name,
-                src_dir_fd=parent,
-                dst_dir_fd=parent,
-                follow_symlinks=False,
-            )
-        except FileExistsError as exc:
-            raise BoundedEffectComparisonError(
-                "output.exists",
-                "/output",
-                f"output path must be fresh: {selected}",
-            ) from exc
-        os.unlink(temporary, dir_fd=parent)
-        temporary = None
-        _fsync_directory_descriptor(parent)
-        _require_visible_parent(
-            selected,
-            parent_identity,
-            custody=active_custody,
-            output=True,
-            label="output",
-        )
-        retained = os.stat(
-            selected.name,
-            dir_fd=parent,
-            follow_symlinks=False,
-        )
-        opened = os.fstat(descriptor)
-        if (
-            not stat.S_ISREG(retained.st_mode)
-            or _file_identity(retained) != _file_identity(opened)
-        ):
-            raise BoundedEffectComparisonError(
-                "output.changed",
-                "/output",
-                f"published output identity changed: {selected}",
-            )
-    except BoundedEffectComparisonError:
-        raise
-    except OSError as exc:
-        raise BoundedEffectComparisonError(
-            "output.write", "/output", f"cannot write {selected}: {exc}"
-        ) from exc
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        if temporary is not None and parent >= 0:
-            try:
-                os.unlink(temporary, dir_fd=parent)
-            except FileNotFoundError:
-                pass
-            except OSError:
-                pass
-        if parent >= 0:
-            os.close(parent)
-        if owned_custody is not None:
-            owned_custody.close()
-
-
-def _fsync_directory_descriptor(descriptor: int) -> None:
-    try:
-        os.fsync(descriptor)
-    except OSError:
-        if os.name != "nt":
-            raise
-
 
 def build_parser(*, prog: str = "workbench process effects compare") -> argparse.ArgumentParser:
     parser = _Parser(
         prog=prog,
         description=(
             "Compare two aligned Crucible stage snapshots through exact family-owned "
-            "correspondence and fingerprint policies. All file paths must stay beneath "
-            "the pinned CLI root."
+            "correspondence and fingerprint policies. Input paths stay beneath "
+            "the pinned workspace root; Core manages retained output."
         ),
     )
     parser.add_argument(
@@ -743,7 +467,7 @@ def build_parser(*, prog: str = "workbench process effects compare") -> argparse
     parser.add_argument(
         "--output",
         type=Path,
-        help="optional fresh retained JSON path beneath the CLI root",
+        help="optional fresh retained JSON; a bare filename uses Core's evidence location",
     )
     parser.add_argument("--json", action="store_true", help="emit canonical comparison JSON")
     return parser
@@ -788,12 +512,16 @@ def _error_payload(exc: BoundedEffectComparisonError) -> dict[str, Any]:
     }
 
 
-def main(argv: Sequence[str] | None = None, *, root: Path | None = None) -> int:
-    """Run comparison; ``root`` supports the Workbench Shell router."""
+def main(
+    argv: Sequence[str] | None = None, *, root: Path | None = None,
+    context: ExecutionContext | None = None,
+) -> int:
+    """Run comparison with workspace inputs and Core-managed retained output."""
 
     selected_root = Path(os.path.abspath(os.fspath(root or Path.cwd())))
     args = build_parser().parse_args(argv)
     custody: _RootCustody | None = None
+    reference: ResourceReference | None = None
     try:
         if not args.fixture_adapters:
             raise BoundedEffectComparisonError(
@@ -801,7 +529,7 @@ def main(argv: Sequence[str] | None = None, *, root: Path | None = None) -> int:
                 "/adapters",
                 "this incomplete slice has no production adapters; use --fixture-adapters only for synthetic fixtures",
             )
-        custody = _pin_root(selected_root, output=False, label="baseline")
+        custody = _pin_root(selected_root, label="baseline")
         baseline = _read_json(
             args.baseline,
             root=selected_root,
@@ -831,12 +559,22 @@ def main(argv: Sequence[str] | None = None, *, root: Path | None = None) -> int:
             change_envelope=envelope,
         )
         if args.output is not None:
-            _write_json(
-                args.output,
-                result,
-                root=selected_root,
-                custody=custody,
-            )
+            if context is None:
+                raise BoundedEffectComparisonError(
+                    "output.unavailable", "/output",
+                    "retained output requires a Core-bound Workbench invocation",
+                )
+            encoded = (json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8", errors="strict")
+            try:
+                reference = context.publish_bytes(
+                    "evidence", args.output.name, encoded,
+                    requested_path=args.output,
+                    domain_id=result["comparison_id"],
+                )
+            except DurableResourceError as exc:
+                raise BoundedEffectComparisonError(exc.code, "/output", str(exc)) from exc
+            except ModuleError as exc:
+                raise BoundedEffectComparisonError("output.unavailable", "/output", str(exc)) from exc
     except BoundedEffectComparisonError as exc:
         error = _error_payload(exc)
         if args.json:
@@ -854,6 +592,8 @@ def main(argv: Sequence[str] | None = None, *, root: Path | None = None) -> int:
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
     else:
         print(_render(result), end="")
+    if reference is not None:
+        print(f"Retained output: {reference.path} ({reference.resource_id})", file=sys.stderr)
     return 1 if result["summary"]["state"] in {"mismatch", "unresolved"} else 0
 
 

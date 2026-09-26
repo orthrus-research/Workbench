@@ -28,6 +28,7 @@ from workbench_core.runtime_java import (  # noqa: E402
     ensure_java_runtime,
     load_java_runtime_policy,
     materialize_temurin_runtime,
+    select_managed_java_policy,
 )
 from workbench_core import runtime_java as runtime_java_module  # noqa: E402
 
@@ -119,6 +120,29 @@ def _archive(
         )
 
 
+def _archive8(path: Path) -> None:
+    script = b'''#!/bin/sh
+jdk_home_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cat >&2 <<EOF
+Property settings:
+    java.version = 1.8.0_504
+    java.runtime.version = 1.8.0_504-b01
+    java.vendor = Eclipse Adoptium
+    java.vendor.version = Temurin-8u504-b01
+    java.home = $jdk_home_dir/jre
+    java.vm.name = OpenJDK 64-Bit Server VM
+    java.vm.version = 25.504-b01
+    os.arch = amd64
+EOF
+exit 0
+'''
+    with tarfile.open(path, "w:gz") as archive:
+        _add_tar_file(archive, "jdk8u504-b01/bin/java", script, mode=0o755)
+        _add_tar_file(archive, "jdk8u504-b01/bin/javac", b"#!/bin/sh\nexit 0\n", mode=0o755)
+        _add_tar_file(archive, "jdk8u504-b01/jre/bin/java", script, mode=0o755)
+        _add_tar_file(archive, "jdk8u504-b01/release", b'JAVA_VERSION="1.8.0_504"\n')
+
+
 def _asset(
     archive: Path,
     *,
@@ -155,6 +179,61 @@ class JavaRuntimeTest(unittest.TestCase):
         self.assertEqual(policy["release_type"], "ga")
         self.assertEqual(policy["image_type"], "jdk")
         self.assertRegex(policy["policy_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_explicit_java_8_policy_is_pinned_and_distinct_from_default(self) -> None:
+        default = load_java_runtime_policy(REPOSITORY_ROOT)
+        selected = select_managed_java_policy(default, 8)
+        self.assertEqual(25, default["feature_version"])
+        self.assertEqual("jdk8u504-b01", selected["release_name"])
+        self.assertEqual("eclipse-temurin-8u504-b01", selected["runtime_identity"])
+        self.assertEqual(default["runtime_identity"], selected["profile_runtime_identity"])
+        self.assertNotEqual(default["policy_sha256"], selected["policy_sha256"])
+        self.assertIsNone(runtime_java_module._probe_mismatch({
+            "runtime_version": "1.8.0_504-b01", "vendor": "Eclipse Adoptium",
+            "os_arch": "amd64",
+        }, selected, HOST))
+        self.assertIsNotNone(runtime_java_module._probe_mismatch({
+            "runtime_version": "1.8.0_502-b07", "vendor": "Eclipse Adoptium",
+            "os_arch": "amd64",
+        }, selected, HOST))
+
+    def test_explicit_java_8_acquisition_uses_exact_release_without_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            state = Path(temporary) / "state"
+            asset = {"release_name": "jdk8u504-b01"}
+            with patch.object(runtime_java_module, "discover_java_runtime") as discover, patch.object(
+                runtime_java_module, "resolve_temurin_asset", return_value=asset
+            ) as resolve, patch.object(
+                runtime_java_module, "materialize_temurin_runtime", return_value={"outcome": "provisioned"}
+            ) as materialize:
+                discover.return_value = {"selected": None, "candidates": []}
+                result = ensure_java_runtime(
+                    REPOSITORY_ROOT, state_root=state, host=deepcopy(HOST),
+                    candidates=(), managed_feature_version=8,
+                )
+            self.assertEqual("provisioned", result["outcome"])
+            self.assertEqual((), discover.call_args.kwargs["candidates"])
+            self.assertEqual("jdk8u504-b01", resolve.call_args.args[0]["release_name"])
+            self.assertEqual(state, materialize.call_args.kwargs["state_root"])
+
+    def test_java_8_archive_with_nested_jre_materializes_and_reuses(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "temurin8.tar.gz"
+            _archive8(archive)
+            policy = select_managed_java_policy(load_java_runtime_policy(REPOSITORY_ROOT), 8)
+            asset = _asset(archive)
+            asset["release_name"] = "jdk8u504-b01"
+            asset["package_name"] = "OpenJDK8U-jdk_x64_linux_hotspot_8u504b01.tar.gz"
+            state = root / "state"
+            created = materialize_temurin_runtime(policy, deepcopy(HOST), asset, state_root=state)
+            self.assertEqual("provisioned", created["outcome"])
+            receipt = created["receipt"]
+            self.assertIn("/jre", receipt["probe"]["java_home"])
+            self.assertIn("/bin/java", receipt["target"]["java_uri"])
+            reused = materialize_temurin_runtime(policy, deepcopy(HOST), asset, state_root=state)
+            self.assertEqual("reused", reused["outcome"])
+            self.assertEqual(receipt["runtime_id"], reused["receipt"]["runtime_id"])
 
     def test_policy_version_comes_from_the_selected_platform_profile(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -677,6 +756,25 @@ class JavaRuntimeTest(unittest.TestCase):
                 "explicit",
                 selected["runtime"]["origin"],
             )
+
+    def test_incompatible_selected_jdk_fails_before_acquisition(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            java = root / "jdk-8/bin/java"
+            java.parent.mkdir(parents=True)
+            java.write_bytes(_java_script(runtime_version="8.0.0"))
+            java.chmod(0o755)
+            with patch.object(runtime_java_module, "resolve_temurin_asset") as acquire:
+                with self.assertRaisesRegex(JavaRuntimeError, "selected Java does not satisfy"):
+                    ensure_java_runtime(
+                        REPOSITORY_ROOT,
+                        state_root=root / "state",
+                        host=deepcopy(HOST),
+                        candidates=(("user-workspaces-v2", java),),
+                        require_candidate=True,
+                    )
+            acquire.assert_not_called()
+            self.assertFalse((root / "state").exists())
 
     def test_saved_managed_binding_reopens_receipt_and_rejects_tree_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

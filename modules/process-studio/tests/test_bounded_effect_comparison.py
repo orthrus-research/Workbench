@@ -1579,120 +1579,142 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("input.changed", stderr.getvalue())
 
-    def test_cli_output_publication_never_clobbers_concurrent_winner(self) -> None:
-        baseline = _snapshot(capture_id="output-race-before")
-        candidate = _snapshot(capture_id="output-race-after")
-        winner = b"concurrent-winner-must-remain\n"
+    def test_cli_requires_core_for_retained_output(self) -> None:
+        baseline = _snapshot(capture_id="output-before")
+        candidate = _snapshot(capture_id="output-after")
         with tempfile.TemporaryDirectory(dir=MODULE_ROOT) as temporary:
             root = Path(temporary)
-            (root / "baseline.json").write_text(
-                json.dumps(baseline), encoding="utf-8"
-            )
-            (root / "candidate.json").write_text(
-                json.dumps(candidate), encoding="utf-8"
-            )
-            output_path = root / "comparison.json"
-            original_link = os.link
-            raced = False
-
-            def racing_link(source: object, destination: object, *args: object, **kwargs: object) -> None:
-                nonlocal raced
-                if not raced:
-                    raced = True
-                    output_path.write_bytes(winner)
-                original_link(source, destination, *args, **kwargs)
-
+            (root / "baseline.json").write_text(json.dumps(baseline), encoding="utf-8")
+            (root / "candidate.json").write_text(json.dumps(candidate), encoding="utf-8")
             stderr = io.StringIO()
-            with mock.patch.object(cli_module.os, "link", side_effect=racing_link):
-                with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
-                    code = cli_main(
-                        [
-                            "--baseline",
-                            "baseline.json",
-                            "--candidate",
-                            "candidate.json",
-                            "--fixture-adapters",
-                            "--output",
-                            "comparison.json",
-                        ],
-                        root=root,
-                    )
+            with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+                code = cli_main([
+                    "--baseline", "baseline.json", "--candidate", "candidate.json",
+                    "--fixture-adapters", "--output", "reports/comparison.json",
+                ], root=root)
+            self.assertEqual(2, code)
+            self.assertIn("output.unavailable", stderr.getvalue())
+            self.assertFalse((root / "reports/comparison.json").exists())
 
-            self.assertTrue(raced)
-            self.assertEqual(code, 2)
-            self.assertIn("output.exists", stderr.getvalue())
-            self.assertEqual(output_path.read_bytes(), winner)
-            self.assertEqual(list(root.glob(".comparison.json.*.tmp")), [])
+    def test_cli_delegates_retained_result_to_core_port(self) -> None:
+        from workbench_api import ExecutionContext, ResourceReference
 
-    @unittest.skipUnless(
-        cli_module._FD_RELATIVE_PUBLICATION_AVAILABLE
-        and hasattr(os, "symlink"),
-        "fd-relative publication custody unavailable",
-    )
-    def test_cli_rejects_output_parent_swap_without_publishing_attacker_bytes(self) -> None:
-        baseline = _snapshot(capture_id="output-parent-swap-before")
-        candidate = _snapshot(capture_id="output-parent-swap-after")
-        attacker_bytes = b"attacker-controlled-output\n"
+        baseline = _snapshot(capture_id="delegated-before")
+        candidate = _snapshot(capture_id="delegated-after")
         with tempfile.TemporaryDirectory(dir=MODULE_ROOT) as temporary:
             root = Path(temporary)
-            reports = root / "reports"
-            retired = root / "retired-reports"
-            attacker = root / "attacker"
-            reports.mkdir()
-            attacker.mkdir()
-            (root / "baseline.json").write_text(
-                json.dumps(baseline), encoding="utf-8"
-            )
-            (root / "candidate.json").write_text(
-                json.dumps(candidate), encoding="utf-8"
-            )
-            original_link = os.link
-            swapped = False
+            (root / "baseline.json").write_text(json.dumps(baseline), encoding="utf-8")
+            (root / "candidate.json").write_text(json.dumps(candidate), encoding="utf-8")
+            calls = []
 
-            def racing_link(
-                source: object,
-                destination: object,
-                *args: object,
-                **kwargs: object,
-            ) -> None:
-                nonlocal swapped
-                if not swapped:
-                    swapped = True
-                    reports.rename(retired)
-                    reports.symlink_to(attacker, target_is_directory=True)
-                    (attacker / Path(os.fspath(source)).name).write_bytes(
-                        attacker_bytes
-                    )
-                original_link(source, destination, *args, **kwargs)
-
-            stderr = io.StringIO()
-            with mock.patch.object(cli_module.os, "link", side_effect=racing_link):
-                with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
-                    code = cli_main(
-                        [
-                            "--baseline",
-                            "baseline.json",
-                            "--candidate",
-                            "candidate.json",
-                            "--fixture-adapters",
-                            "--output",
-                            "reports/comparison.json",
-                        ],
-                        root=root,
+            class FakeResources:
+                def publish_bytes(self, role, name, data, **keywords):
+                    calls.append((role, name, data, keywords))
+                    return ResourceReference(
+                        "workbench-resource-v1:" + "a" * 32,
+                        "workbench-resource-store:sha256:" + "b" * 64,
+                        "process-studio", role, root / "reports/comparison.json",
+                        len(data), "sha256:" + hashlib.sha256(data).hexdigest(),
+                        "fixture-policy",
                     )
 
-            self.assertTrue(swapped)
-            self.assertEqual(code, 2)
-            self.assertIn("output.changed", stderr.getvalue())
-            self.assertFalse((attacker / "comparison.json").exists())
-            self.assertNotEqual(
-                (retired / "comparison.json").read_bytes(),
-                attacker_bytes,
+            context = ExecutionContext(root, root / "state", durable_resources=FakeResources())
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                code = cli_main([
+                    "--baseline", "baseline.json", "--candidate", "candidate.json",
+                    "--fixture-adapters", "--output", "reports/comparison.json", "--json",
+                ], root=root, context=context)
+            self.assertEqual(0, code)
+            self.assertEqual(len(calls), 1)
+            role, name, data, keywords = calls[0]
+            self.assertEqual((role, name), ("evidence", "comparison.json"))
+            self.assertEqual(keywords["requested_path"], Path("reports/comparison.json"))
+            self.assertEqual(keywords["domain_id"], json.loads(stdout.getvalue())["comparison_id"])
+            self.assertEqual(json.loads(data)["comparison_id"], keywords["domain_id"])
+            self.assertIn("workbench-resource-v1:", stderr.getvalue())
+            self.assertFalse((root / "reports").exists())
+
+    def test_core_publishes_to_configured_external_evidence_root(self) -> None:
+        from workbench_api import ExecutionContext
+        from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
+
+        baseline = _snapshot(capture_id="external-before")
+        candidate = _snapshot(capture_id="external-after")
+        with tempfile.TemporaryDirectory(dir=MODULE_ROOT) as temporary:
+            home = Path(temporary)
+            root = home / "workspace"
+            root.mkdir()
+            evidence = home / "chosen-evidence"
+            config = home / "config"
+            (root / "baseline.json").write_text(json.dumps(baseline), encoding="utf-8")
+            (root / "candidate.json").write_text(json.dumps(candidate), encoding="utf-8")
+            resources = CoreDurableResources(
+                workspace=root, configuration_home=config,
+                locations={"evidence": evidence}, owner_id="process-studio",
+                policy_id="fixture-resolution", location_sources={"evidence": "user-settings"},
             )
-            self.assertEqual(
-                list(retired.glob(".workbench-process-studio-*.tmp")),
-                [],
+            context = ExecutionContext(root, home / "state", locations={"evidence": evidence},
+                                       configuration_home=config, durable_resources=resources)
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                code = cli_main([
+                    "--baseline", "baseline.json", "--candidate", "candidate.json",
+                    "--fixture-adapters", "--output", "comparison.json", "--json",
+                ], root=root, context=context)
+            self.assertEqual(0, code)
+            inventory = ResourceCatalog(config).inventory(workspace=root)
+            self.assertEqual(len(inventory["resources"]), 1)
+            row = inventory["resources"][0]
+            self.assertEqual(row["status"], "committed")
+            self.assertEqual(row["role_source"], "user-settings")
+            self.assertEqual(row["policy_id"], "fixture-resolution")
+            self.assertTrue(Path(row["path"]).is_relative_to(evidence))
+            self.assertEqual(json.loads(resources.read_bytes(row["resource_id"])), json.loads(stdout.getvalue()))
+            self.assertIn(row["resource_id"], stderr.getvalue())
+
+    def test_workbench_dispatch_binds_process_studio_to_core(self) -> None:
+        from workbench_api import Capability, ExecutionContext, Module
+        from workbench_core.modules import InstalledModule, dispatch
+        from workbench_core.storage.registered import ResourceCatalog
+
+        baseline = _snapshot(capture_id="dispatch-before")
+        candidate = _snapshot(capture_id="dispatch-after")
+        with tempfile.TemporaryDirectory(dir=MODULE_ROOT) as temporary:
+            home = Path(temporary)
+            root = home / "workspace"
+            root.mkdir()
+            evidence = home / "external-evidence"
+            config = home / "config"
+            (root / "baseline.json").write_text(json.dumps(baseline), encoding="utf-8")
+            (root / "candidate.json").write_text(json.dumps(candidate), encoding="utf-8")
+            context = ExecutionContext(
+                root, home / "state", configuration_home=config,
+                environment_resolution_id="dispatch-selection",
+                locations={"evidence": evidence, "logs": home / "logs"},
+                location_sources={"evidence": "user-settings"},
             )
+            capability = Capability(
+                "process-studio.process-effects", ("process", "effects", "compare"),
+                "workbench_registration_process_studio:process_effects", "compare",
+            )
+            installed = InstalledModule(
+                "process-studio", "workbench-process-studio", "0.1.0", "available",
+                module=Module("process-studio", "0.1.0", (capability,)),
+            )
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                status = dispatch([
+                    "process", "effects", "compare",
+                    "--baseline", "baseline.json", "--candidate", "candidate.json",
+                    "--fixture-adapters", "--output", "comparison.json", "--json",
+                ], context, (installed,))
+            self.assertEqual(status, 0)
+            row = ResourceCatalog(config).inventory(workspace=root)["resources"][0]
+            self.assertEqual(row["status"], "committed")
+            self.assertEqual(row["policy_id"], "dispatch-selection")
+            self.assertEqual(json.loads(Path(row["path"]).read_text()), json.loads(stdout.getvalue()))
+            self.assertIn(row["resource_id"], stderr.getvalue())
 
 
 if __name__ == "__main__":

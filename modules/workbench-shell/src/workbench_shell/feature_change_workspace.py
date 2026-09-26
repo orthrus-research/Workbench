@@ -12,7 +12,7 @@ from urllib.request import url2pathname
 
 from workbench_crucible.runtime_pair import FeatureRuntimePairPorts, PAIR_REQUEST_FORMAT, PAIR_RESULT_FORMAT
 import base64
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -26,7 +26,15 @@ import stat
 from typing import Any, Iterator, Mapping, NoReturn
 from urllib.parse import urlparse
 
-from workbench_api.host_filesystem import file_lease, fsync_directory
+from workbench_api.host_filesystem import (
+    DurableRecordError,
+    fsync_directory,
+    private_record_lock,
+    publish_immutable_bytes,
+    read_bounded_bytes,
+    read_private_bytes,
+    replace_private_bytes,
+)
 
 from .developer_feature import (
     apply_material_fluid_recipe_plan,
@@ -40,6 +48,7 @@ from .developer_feature import (
     verify_material_fluid_recipe_plan,
 )
 from workbench_api.state_paths import default_product_spine_state_root
+from workbench_api.record_stores import open_record_store
 from .work_session import validate_work_session_record
 
 
@@ -177,29 +186,8 @@ def _ordinary_directory(path: Path, label: str) -> Path:
     return path
 
 
-def _ordinary_json(path: Path, label: str) -> dict[str, Any]:
-    try:
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
-    except OSError as exc:
-        raise FeatureChangeWorkspaceError(f"cannot read {label}: {exc}") from exc
-    try:
-        before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_RECORD_BYTES:
-            _fail(f"{label} is not a bounded ordinary file")
-        raw = b""
-        while chunk := os.read(descriptor, min(1024 * 1024, _MAX_RECORD_BYTES + 1 - len(raw))):
-            raw += chunk
-            if len(raw) > _MAX_RECORD_BYTES:
-                _fail(f"{label} exceeds its byte bound")
-        after = os.fstat(descriptor)
-    finally:
-        os.close(descriptor)
-    if (
-        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-        or len(raw) != before.st_size
-    ):
-        _fail(f"{label} changed while it was read")
+def _ordinary_json(path: Path, label: str, *, private: bool = False) -> dict[str, Any]:
+    raw = _ordinary_bytes(path, label, private=private)
     try:
         value = json.loads(raw.decode("utf-8"))
     except (UnicodeError, json.JSONDecodeError) as exc:
@@ -209,53 +197,21 @@ def _ordinary_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def _ordinary_bytes(path: Path, label: str) -> bytes:
-    """Read one bounded owner record without following or racing a link."""
-
+def _ordinary_bytes(path: Path, label: str, *, private: bool = False) -> bytes:
     try:
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
-    except OSError as exc:
+        operation = read_private_bytes if private else read_bounded_bytes
+        return operation(path, byte_limit=_MAX_RECORD_BYTES)
+    except DurableRecordError as exc:
         raise FeatureChangeWorkspaceError(f"cannot read {label}: {exc}") from exc
-    try:
-        before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_RECORD_BYTES:
-            _fail(f"{label} is not a bounded ordinary file")
-        chunks: list[bytes] = []
-        remaining = before.st_size
-        while remaining:
-            chunk = os.read(descriptor, min(1024 * 1024, remaining))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        after = os.fstat(descriptor)
-    finally:
-        os.close(descriptor)
-    raw = b"".join(chunks)
-    if (
-        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-        or len(raw) != before.st_size
-    ):
-        _fail(f"{label} changed while it was read")
-    return raw
 
 
 def _write_immutable(path: Path, value: Mapping[str, Any]) -> None:
     payload = json.dumps(
         value, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True
     ).encode("utf-8") + b"\n"
-    if len(payload) > _MAX_RECORD_BYTES:
-        _fail("feature change record exceeds its byte bound")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     try:
-        descriptor = os.open(path, flags, 0o600)
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        fsync_directory(path.parent)
-    except OSError as exc:
+        publish_immutable_bytes(path, payload, byte_limit=_MAX_RECORD_BYTES)
+    except DurableRecordError as exc:
         raise FeatureChangeWorkspaceError(
             f"cannot publish immutable feature change record: {exc}"
         ) from exc
@@ -497,6 +453,9 @@ def _sha256_file(path: Path, label: str) -> str:
 
 
 def _session_context_root(suite_root: Path | str) -> Path:
+    managed = open_record_store("feature-change-session-context-v1", Path(suite_root))
+    if managed is not None:
+        return managed.root
     root = (
         default_product_spine_state_root(suite_root)
         / "feature-change-session-context-v1"
@@ -558,56 +517,32 @@ def _timestamp(value: Any, label: str) -> str:
 
 
 @contextmanager
-def _exclusive_record_lock(path: Path, label: str) -> Iterator[int]:
-    """Hold a process-scoped advisory lock; a killed writer cannot strand it."""
+def _exclusive_record_lock(path: Path, label: str) -> Iterator[None]:
+    """Hold Core's private record lease across a domain transition."""
 
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
-        descriptor = os.open(
-            path,
-            os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
-            0o600,
-        )
-    except OSError as exc:
-        raise FeatureChangeWorkspaceError(f"cannot open {label}: {exc}") from exc
-    try:
-        metadata = os.fstat(descriptor)
-        if not stat.S_ISREG(metadata.st_mode):
-            _fail(f"{label} is not an ordinary file")
-        with ExitStack() as leases:
-            try:
-                leases.enter_context(file_lease(descriptor, exclusive=True))
-            except BlockingIOError as exc:
-                raise FeatureChangeWorkspaceError(
-                    f"{label} is held by another writer"
-                ) from exc
-            except OSError as exc:
-                raise FeatureChangeWorkspaceError(f"cannot lock {label}: {exc}") from exc
-            os.ftruncate(descriptor, 0)
-            os.write(descriptor, f"{os.getpid()}\n".encode("ascii"))
-            os.fsync(descriptor)
-            yield descriptor
-    finally:
-        os.close(descriptor)
+        with private_record_lock(path):
+            yield
+    except DurableRecordError as exc:
+        if exc.code == "busy":
+            raise FeatureChangeWorkspaceError(f"{label} is held by another writer") from exc
+        raise FeatureChangeWorkspaceError(f"cannot lock {label}: {exc}") from exc
 
 
-def _replace_json(path: Path, value: Mapping[str, Any]) -> None:
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+def _replace_json(
+    path: Path, value: Mapping[str, Any], *,
+    expected_sha256: str | None, require_absent: bool,
+) -> None:
     payload = json.dumps(
         value, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True
     ).encode("utf-8") + b"\n"
-    temporary = path.parent / f".{path.name}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     try:
-        descriptor = os.open(temporary, flags, 0o600)
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-        fsync_directory(path.parent)
-    except OSError as exc:
-        temporary.unlink(missing_ok=True)
+        replace_private_bytes(
+            path, payload, byte_limit=_MAX_RECORD_BYTES,
+            expected_sha256=expected_sha256, require_absent=require_absent,
+        )
+    except DurableRecordError as exc:
         raise FeatureChangeWorkspaceError(
             f"cannot publish selected feature change context: {exc}"
         ) from exc
@@ -696,11 +631,11 @@ def _ensure_selection_history(
 ) -> None:
     path = _selection_history_path(root, selection["selection_id"])
     if path.exists() or path.is_symlink():
-        if _ordinary_bytes(path, "retained feature change selection") != selected_raw:
+        if _ordinary_bytes(path, "retained feature change selection", private=True) != selected_raw:
             _fail("retained feature change selection bytes changed")
         return
     _write_immutable(path, selection)
-    if _ordinary_bytes(path, "retained feature change selection") != selected_raw:
+    if _ordinary_bytes(path, "retained feature change selection", private=True) != selected_raw:
         _fail("retained feature change selection serialization changed")
 
 
@@ -717,7 +652,7 @@ def _validate_selection_chain(root: Path, selected: Mapping[str, Any]) -> None:
         ):
             _fail("feature change selection predecessor digest is stale")
         previous = _validate_selection(
-            _ordinary_json(previous_path, "previous feature change selection")
+            _ordinary_json(previous_path, "previous feature change selection", private=True)
         )
         if (
             previous["selection_id"] != current["previous_selection_id"]
@@ -746,10 +681,10 @@ def _publish_selection(
         selected_path = root / "selected-context-v1.json"
         if selected_path.exists() or selected_path.is_symlink():
             selected_raw = _ordinary_bytes(
-                selected_path, "previous context selection"
+                selected_path, "previous context selection", private=True
             )
             previous_record = _validate_selection(
-                _ordinary_json(selected_path, "previous context selection")
+                _ordinary_json(selected_path, "previous context selection", private=True)
             )
             _validate_selection_chain(root, previous_record)
             _ensure_selection_history(root, previous_record, selected_raw)
@@ -788,7 +723,11 @@ def _publish_selection(
             sort_keys=True,
         ).encode("utf-8") + b"\n"
         _ensure_selection_history(root, selected, selected_raw)
-        _replace_json(selected_path, selected)
+        _replace_json(
+            selected_path, selected,
+            expected_sha256=previous_sha256,
+            require_absent=previous_sha256 is None,
+        )
         return selected
 
 
@@ -1088,7 +1027,7 @@ def read_feature_change_selected_context(
     root = _session_context_root(suite_root)
     selected_path = root / "selected-context-v1.json"
     selected_raw = _ordinary_bytes(
-        selected_path, "selected feature change context"
+        selected_path, "selected feature change context", private=True
     )
     try:
         decoded = json.loads(selected_raw.decode("utf-8"))
@@ -1100,7 +1039,7 @@ def read_feature_change_selected_context(
     current_history = _selection_history_path(root, selected["selection_id"])
     try:
         retained_raw = _ordinary_bytes(
-            current_history, "retained current feature change selection"
+            current_history, "retained current feature change selection", private=True
         )
     except FeatureChangeWorkspaceError as exc:
         raise FeatureChangeWorkspaceError(

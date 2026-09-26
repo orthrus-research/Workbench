@@ -10,6 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from workbench_api.modules import EnvironmentSelection
 from workbench_api.state_paths import default_runtime_state_root
 
 from .setup_cli import _state_root, _workspace, default_setup_record_path, load_setup_record
@@ -21,10 +22,13 @@ from .user_preferences import (
     load_settings,
     load_workspaces,
     resolve_expression,
+    resolve_java_path,
+    resolve_selection_path,
 )
 
 
 FORMAT = "workbench-environment-resolution-v1"
+FORMAT_V2 = "workbench-environment-resolution-v2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +43,25 @@ class ResolvedEnvironment:
         if role not in LOCATION_ROLES:
             raise ValueError(f"unsupported Workbench location role: {role}")
         return self.locations[role]
+
+    def operation_selection(self) -> EnvironmentSelection:
+        """Freeze Core's selected local candidates and their provenance."""
+
+        row = self.record
+        java_home = row["tool_candidates"]["java_home"]
+        profile = row["profile_configuration_reference"]
+        return EnvironmentSelection(
+            resolution_id=row["resolution_id"],
+            workspace_id=row["workspace_selection"]["workspace_id"],
+            workspace_name=row["workspace_selection"]["name"],
+            workspace_source=row["workspace"]["source"],
+            profile_configuration=Path(profile) if profile is not None else None,
+            profile_source=row["choice_sources"]["profile_config"],
+            java_home=Path(java_home) if java_home is not None else None,
+            java_source=row["choice_sources"]["java_home"],
+            git_executable=row["tool_candidates"]["git_executable"],
+            managed_java_feature=row["tool_candidates"].get("managed_java_feature"),
+        )
 
 
 def _entry(path: Path, source: str) -> dict[str, str]:
@@ -71,14 +94,15 @@ def resolve_environment(
     selected_workspace: Path | str | None = workspace
     if selected_workspace is not None:
         workspace_source = "argument"
+    elif values.get("WORKBENCH_WORKSPACE"):
+        selected_workspace = values["WORKBENCH_WORKSPACE"]
+        workspace_source = "environment"
     elif workspaces["default"] is not None:
         row = next(row for row in workspaces["entries"] if row["name"] == workspaces["default"])
         selected_workspace = resolve_expression(row["path"], environment=values, config_home=config_home)
         workspace_source = "user-workspaces"
     elif selection.get("workspace"):
         workspace_source = "setup-v1"
-    elif values.get("WORKBENCH_WORKSPACE"):
-        workspace_source = "environment"
     else:
         workspace_source = "current-directory"
     selected = _workspace(
@@ -88,17 +112,42 @@ def resolve_environment(
         or current_directory
         or Path.cwd()
     )
+    matching_entries = []
+    for row in workspaces["entries"]:
+        registered = resolve_expression(row["path"], environment=values, config_home=config_home)
+        if registered == selected or (
+            registered.exists() and selected.exists() and registered.samefile(selected)
+        ):
+            matching_entries.append(row)
+    if len(matching_entries) > 1:
+        raise ValueError("multiple named workspaces refer to the selected directory")
+    workspace_entry = matching_entries[0] if matching_entries else None
+    workspace_selection = workspace_entry if workspaces["schema_version"] >= 2 else None
+    setup_matches = setup is not None and _workspace(selection["workspace"]) == selected
+    if workspace_selection is not None:
+        profile_choice = workspace_selection["profile_config"]
+        java_choice = workspace_selection["java_home"]
+        java_feature = workspace_selection.get("managed_java_feature")
+        choice_source = f"user-workspaces-v{workspaces['schema_version']}"
+    elif setup_matches:
+        profile_choice = selection.get("profile_config")
+        java_choice = selection.get("java_home") or selection.get("managed_java_home")
+        java_feature = None
+        choice_source = "setup-v1"
+    else:
+        profile_choice = java_choice = None
+        java_feature = None
+        choice_source = "none"
     state_root = _state_root(
         values.get("WORKBENCH_STATE_ROOT")
         or selection.get("state_root")
         or default_runtime_state_root(suite_root, environment=values)
     )
-    profile_reference = selection.get("profile_config")
+    profile_reference = profile_choice
     if profile_reference is not None:
-        candidate = Path(profile_reference).expanduser()
-        if not candidate.is_absolute():
-            raise ValueError("saved profile configuration reference must be absolute")
-        profile_reference = candidate.resolve()
+        profile_reference = resolve_selection_path(
+            str(profile_reference), environment=values, config_home=config_home,
+        )
     if values.get("WORKBENCH_STATE_ROOT"):
         state_source = "environment"
     elif selection.get("state_root"):
@@ -140,9 +189,11 @@ def resolve_environment(
             source = "default"
         locations[role] = path
         location_records[role] = _entry(path, source)
+    version = 2 if workspace_selection is not None and workspaces["schema_version"] == 3 else 1
+    effective_java_feature = None if values.get("WORKBENCH_JAVA_HOME") else java_feature
     body: dict[str, Any] = {
-        "format": FORMAT,
-        "schema_version": 1,
+        "format": FORMAT_V2 if version == 2 else FORMAT,
+        "schema_version": version,
         "configuration_home": str(config_home),
         "settings": {
             "path": str(settings_path),
@@ -156,6 +207,15 @@ def resolve_environment(
         },
         "setup": {"path": str(setup_path), "record_id": setup["record_id"] if setup else None},
         "workspace": _entry(selected, workspace_source),
+        "workspace_selection": {
+            "workspace_id": workspace_selection["workspace_id"] if workspace_selection is not None else None,
+            "name": workspace_selection["name"] if workspace_selection is not None else None,
+            "source": choice_source,
+        },
+        "choice_sources": {
+            "profile_config": choice_source if profile_reference is not None else "none",
+            "java_home": "environment" if values.get("WORKBENCH_JAVA_HOME") else choice_source if java_choice is not None else "none",
+        },
         "state_root": _entry(state_root, state_source),
         "locations": location_records,
         "profile_configuration_reference": (
@@ -166,8 +226,7 @@ def resolve_environment(
         "tool_candidates": {
             "java_home": (
                 values.get("WORKBENCH_JAVA_HOME")
-                or selection.get("java_home")
-                or selection.get("managed_java_home")
+                or (str(resolve_java_path(str(java_choice), environment=values, config_home=config_home)) if java_choice is not None else None)
             ),
             "git_executable": (
                 values.get("WORKBENCH_GIT_EXECUTABLE")
@@ -175,6 +234,11 @@ def resolve_environment(
             ),
         },
     }
+    if version == 2:
+        body["tool_candidates"]["managed_java_feature"] = effective_java_feature
+        body["choice_sources"]["managed_java_feature"] = (
+            choice_source if effective_java_feature is not None else "none"
+        )
     identity = "workbench-environment-resolution:sha256:" + sha256(
         json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -187,4 +251,4 @@ def resolve_environment(
     )
 
 
-__all__ = ["FORMAT", "ResolvedEnvironment", "resolve_environment"]
+__all__ = ["FORMAT", "FORMAT_V2", "ResolvedEnvironment", "resolve_environment"]

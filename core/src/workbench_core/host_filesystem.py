@@ -348,6 +348,37 @@ def secure_private_path(path: Path, *, directory: bool) -> Path:
     return resolved_path(path, strict=True)
 
 
+def read_private_bytes(path: Path, *, byte_limit: int) -> bytes:
+    from .durable_records import read_private_bytes as read
+    return read(path, byte_limit=byte_limit)
+
+
+def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
+    from .durable_records import read_bounded_bytes as read
+    return read(path, byte_limit=byte_limit)
+
+
+def publish_immutable_bytes(
+    path: Path, data: bytes, *, byte_limit: int, idempotent: bool = False,
+) -> None:
+    from .durable_records import publish_immutable_bytes as publish
+    publish(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+
+def replace_private_bytes(
+    path: Path, data: bytes, *, byte_limit: int,
+    expected_sha256: str | None = None, require_absent: bool = False,
+) -> None:
+    from .durable_records import replace_private_bytes as replace
+    replace(path, data, byte_limit=byte_limit,
+            expected_sha256=expected_sha256, require_absent=require_absent)
+
+
+def private_record_lock(path: Path, *, wait: bool = False):
+    from .durable_records import private_record_lock as lock
+    return lock(path, wait=wait)
+
+
 def secure_private_endpoint(path: Path) -> None:
     """Protect one already-bound local endpoint without assuming file kind."""
 

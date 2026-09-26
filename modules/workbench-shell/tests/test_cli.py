@@ -350,7 +350,10 @@ class WorkbenchCliTest(unittest.TestCase):
                 launcher="multimc",
                 packwiz_executable=packwiz,
                 seed_roots=[seed],
+                state_root=None,
                 configuration=configuration,
+                managed_java_service=None,
+                managed_config_path=Path("workbench.toml"),
             )
 
     def test_runtime_materialize_human_output_surfaces_packwiz_defaults(self) -> None:
@@ -517,7 +520,10 @@ class WorkbenchCliTest(unittest.TestCase):
                 offline_name="Workbench",
                 compatibility_patches=[],
                 timeout_seconds=12.0,
+                state_root=None,
                 configuration=configuration,
+                managed_java_service=None,
+                managed_config_path=config,
             )
             self.assertIs(
                 launch.call_args.kwargs["configuration"],

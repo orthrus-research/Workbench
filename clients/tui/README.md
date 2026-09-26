@@ -83,6 +83,17 @@ invoking Core's import. A conflicting destination blocks the bulk import and
 is shown for manual review; the client never chooses which record to replace.
 Core retains the earlier files and checks the records again before copying.
 
+Home also offers **Choose workspace profile and Java** for registered named
+workspaces. Textual reads and saves these local choices through Core's
+`settings workspace` JSON interface with a revision check. Java choices are
+the profile default (Java 25 for Cleanroom), an explicit managed Java 8
+release, or a supplied local path. **Acquire saved Java** asks Core to fetch
+the selected managed release into the stable Workbench state root. **Find
+Java** is optional; entering a path requires no inventory or compatibility
+probe. Core saves each workspace's choice in the stable `workspaces.json`
+record. A supplied path remains unverified until a consuming operation uses
+it; selecting Java 8 does not establish Cleanroom compatibility.
+
 ## Prototype surfaces
 
 - **Home:** Core version, setup readiness, workspace, installed module/profile
@@ -93,6 +104,8 @@ Core retains the earlier files and checks the records again before copying.
   selection and effects before Core applies it. Core rechecks the plan ID.
   Java discovery is read-only. A blank repair field retains the saved value;
   the resulting selection is visible in the plan and confirmation dialog.
+- **Workspace choices:** Select a named workspace, save a profile and Java
+  choice in Core's versioned user registry, and acquire managed Java on demand.
 - **Modules:** Tabs, tables, and a detail panel compare installed module and
   profile records. Highlighting a row reveals its capabilities or resources;
   missing or unavailable components retain their reported reason.

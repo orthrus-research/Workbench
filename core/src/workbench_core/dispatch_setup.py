@@ -2,6 +2,7 @@
 from __future__ import annotations
 from contextlib import contextmanager
 import os
+from pathlib import Path
 import sys
 from threading import RLock
 from typing import Iterator
@@ -39,6 +40,7 @@ def _activate_user_setup(arguments: list[str]) -> bool:
     if (
         arguments[:1] in (["setup"], ["settings"], ["repair"], ["tooling"], ["version"], ["--version"])
         or arguments[:2] == ["environment", "resolve"]
+        or arguments[:2] == ["storage", "resources"]
         or "--help" in arguments
         or "-h" in arguments
     ):
@@ -51,6 +53,8 @@ def _activate_user_setup(arguments: list[str]) -> bool:
     )
     from .user_config_home import LegacyConfigMigrationRequired
 
+    caller_java = os.environ.get("WORKBENCH_JAVA_HOME")
+    caller_workspace = os.environ.get("WORKBENCH_WORKSPACE")
     try:
         record = load_setup_record(default_setup_record_path())
         if record is not None:
@@ -69,8 +73,24 @@ def _activate_user_setup(arguments: list[str]) -> bool:
     try:
         registry = load_workspaces()
         if registry["default"] is not None:
-            entry = next(row for row in registry["entries"] if row["name"] == registry["default"])
-            os.environ["WORKBENCH_WORKSPACE"] = str(resolve_expression(entry["path"]))
+            if caller_workspace is not None:
+                os.environ["WORKBENCH_WORKSPACE"] = caller_workspace
+            else:
+                entry = next(row for row in registry["entries"] if row["name"] == registry["default"])
+                os.environ["WORKBENCH_WORKSPACE"] = str(resolve_expression(entry["path"]))
+        if caller_java is None:
+            from .environment_resolution import resolve_environment
+            selection_environment = dict(os.environ)
+            selection_environment.pop("WORKBENCH_JAVA_HOME", None)
+            resolved = resolve_environment(
+                Path.cwd(), workspace=os.environ.get("WORKBENCH_WORKSPACE"),
+                environment=selection_environment,
+            )
+            selected_java = resolved.record["tool_candidates"]["java_home"]
+            if selected_java is None:
+                os.environ.pop("WORKBENCH_JAVA_HOME", None)
+            else:
+                os.environ["WORKBENCH_JAVA_HOME"] = selected_java
         return True
     except (OSError, ValueError) as exc:
         print(

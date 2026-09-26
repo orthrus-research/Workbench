@@ -22,6 +22,7 @@ _SETUP_PLAN_FORMATS = {
 _MIGRATION_FORMAT = "workbench-user-config-migration-v1"
 _MIGRATION_STATES = {"ready", "conflict", "nothing-to-import", "explicit-config-home", "imported"}
 _MIGRATION_FILE_STATES = {"copy", "already-present", "conflict", "copied"}
+_WORKSPACE_FORMATS = {"workbench-user-workspaces-v1", "workbench-user-workspaces-v2", "workbench-user-workspaces-v3"}
 
 
 class CoreClientError(RuntimeError):
@@ -182,6 +183,86 @@ class CoreClient:
             raise CoreClientError("Core version record is incomplete")
         return record
 
+    @staticmethod
+    def _workspace_record(record: Any) -> Mapping[str, Any]:
+        if (
+            not isinstance(record, dict)
+            or record.get("format") not in _WORKSPACE_FORMATS
+            or (record.get("format"), record.get("schema_version")) not in {
+                ("workbench-user-workspaces-v1", 1),
+                ("workbench-user-workspaces-v2", 2),
+                ("workbench-user-workspaces-v3", 3),
+            }
+            or not isinstance(record.get("record_id"), str)
+            or not isinstance(record.get("entries"), list)
+            or any(
+                not isinstance(row, dict)
+                or not isinstance(row.get("name"), str)
+                or not isinstance(row.get("path"), str)
+                or (record.get("schema_version") == 3 and (
+                    "managed_java_feature" not in row
+                    or type(row.get("managed_java_feature")) not in {int, type(None)}
+                    or row.get("managed_java_feature") not in {None, 8}
+                    or (row.get("managed_java_feature") is not None and row.get("java_home") is not None)
+                ))
+                for row in record["entries"]
+            )
+        ):
+            raise CoreClientError("unsupported Workbench workspace choices")
+        return record
+
+    async def workspace_choices(self) -> Mapping[str, Any]:
+        return self._workspace_record(await self.json_record(
+            "settings", "workspace", "list", "--json"
+        ))
+
+    async def save_workspace_choice(
+        self, name: str, *, profile_config: str | None,
+        java_home: str | None, expected_record_id: str,
+        managed_java_feature: int | None = None,
+    ) -> Mapping[str, Any]:
+        if not name or not expected_record_id:
+            raise CoreClientError("choose a registered workspace and current revision")
+        arguments = ["settings", "workspace", "select", name]
+        arguments.extend(("--clear-profile",) if profile_config is None else ("--profile-config", profile_config))
+        if java_home is not None and managed_java_feature is not None:
+            raise CoreClientError("choose a Java path or a managed Java feature")
+        if managed_java_feature is not None:
+            arguments.extend(("--java-feature", str(managed_java_feature)))
+        else:
+            arguments.extend(("--clear-java",) if java_home is None else ("--java-home", java_home))
+        arguments.extend(("--expected-record-id", expected_record_id, "--json"))
+        result = self._workspace_record(await self.json_record(*arguments))
+        if result["format"] not in {"workbench-user-workspaces-v2", "workbench-user-workspaces-v3"}:
+            raise CoreClientError("Core did not save versioned workspace choices")
+        selected = next((row for row in result["entries"] if row["name"] == name), None)
+        if selected is None or selected.get("profile_config") != profile_config or selected.get("java_home") != java_home or selected.get("managed_java_feature") != managed_java_feature:
+            raise CoreClientError("Core workspace choice result differs from the requested values")
+        return result
+
+    async def acquire_workspace_java(
+        self, name: str, *, expected_record_id: str,
+    ) -> Mapping[str, Any]:
+        if not name or not expected_record_id:
+            raise CoreClientError("choose a saved workspace and current revision")
+        result = await self.json_record(
+            "settings", "workspace", "acquire", name,
+            "--expected-record-id", expected_record_id, "--json", timeout=600,
+        )
+        if (
+            not isinstance(result, dict)
+            or result.get("format") != "workbench-java-runtime-result-v2"
+            or result.get("source") != "managed"
+            or result.get("outcome") not in {"provisioned", "reused"}
+            or not isinstance(result.get("receipt"), dict)
+            or not isinstance(result["receipt"].get("policy"), dict)
+            or type(result["receipt"]["policy"].get("feature_version")) is not int
+            or not isinstance(result["receipt"].get("target"), dict)
+            or not isinstance(result["receipt"]["target"].get("java_home_uri"), str)
+        ):
+            raise CoreClientError("Core did not return a managed Java receipt")
+        return result
+
     async def setup_check(self, options: Sequence[str] = ()) -> Mapping[str, Any]:
         record = await self.json_record(
             "setup", "--check", "--json", *options, allowed_exit=(0, 1)
@@ -197,7 +278,7 @@ class CoreClient:
         if workspace:
             arguments.append(workspace)
         record = await self.json_record(*arguments, "--json")
-        if not isinstance(record, dict) or record.get("format") != "workbench-environment-resolution-v1":
+        if not isinstance(record, dict) or record.get("format") not in {"workbench-environment-resolution-v1", "workbench-environment-resolution-v2"}:
             raise CoreClientError("unsupported Workbench environment resolution format")
         selected = record.get("workspace")
         if (

@@ -8,6 +8,7 @@ from importlib import import_module, metadata
 from typing import Iterable, Sequence
 
 from workbench_api import Capability, ExecutionContext, Module, ModuleError
+from workbench_api.record_stores import record_store_scope
 from .dependencies import dependency_errors
 
 RESERVED_COMMANDS = frozenset({"setup", "settings", "repair", "environment", "modules", "profiles", "version", "storage", "runtime", "world"})
@@ -109,13 +110,42 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
     else:
         recording = nullcontext(None)
     with recording as invocation:
-        operation_context = (
-            replace(context, output_resolver=invocation.output_path)
-            if invocation is not None else context
+        durable_resources = None
+        record_stores = nullcontext()
+        if context.configuration_home is not None:
+            from .storage.registered import CoreDurableResources
+            from .storage.record_stores import CoreRecordStores
+            durable_resources = CoreDurableResources(
+                workspace=context.workspace,
+                configuration_home=context.configuration_home,
+                locations=context.locations,
+                owner_id=owner.id,
+                policy_id=context.environment_resolution_id,
+                location_sources=context.location_sources,
+                check_cancelled=context.check_cancelled,
+            )
+            record_stores = record_store_scope(CoreRecordStores(
+                workspace=context.workspace,
+                configuration_home=context.configuration_home,
+                owner_id=owner.id,
+            ))
+        operation_context = replace(
+            context,
+            output_resolver=invocation.output_path if invocation is not None else None,
+            durable_resources=durable_resources,
         )
+        if context.selection is not None:
+            from .managed_java import CoreManagedJava
+            operation_context = replace(
+                operation_context,
+                managed_java=CoreManagedJava(
+                    state_root=context.state_root, selection=context.selection,
+                ),
+            )
         try:
-            handler = getattr(import_module(package), name)
-            result = handler(list(arguments[len(capability.command):]), context=operation_context)
+            with record_stores:
+                handler = getattr(import_module(package), name)
+                result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:
             if type(exc.code) is int and 0 <= exc.code <= 255:
                 result = exc.code

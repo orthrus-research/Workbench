@@ -17,7 +17,7 @@ import stat
 import subprocess
 import tempfile
 import tomllib
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 from zipfile import BadZipFile, ZipFile
@@ -47,6 +47,9 @@ from .runtime_bootstrap import (
 from workbench_core.runtime_java import JavaRuntimeError, ensure_java_runtime
 from .runtime_plan import RuntimePlanError, plan_project_runtime
 from workbench_api.state_paths import default_suite_state_root
+
+if TYPE_CHECKING:
+    from workbench_api.managed_java import ManagedJava
 
 
 RECEIPT_V2_PATH = Path("receipts/packwiz-materialization-v2.json")
@@ -1115,8 +1118,11 @@ def _validate_plan(
 def _tool_identity(
     path: Path | str,
     label: str,
+    *,
+    preserve_path: bool = False,
 ) -> tuple[Path, dict[str, Any]]:
-    resolved = Path(path).expanduser().resolve()
+    resolved = (Path(path).expanduser().absolute() if preserve_path
+                else Path(path).expanduser().resolve())
     if not resolved.is_file():
         raise PackwizMaterializationError(
             f"{label} is not a regular file: {resolved}"
@@ -1863,6 +1869,7 @@ def materialize_packwiz_workspace_v2(
     java_path, java_observed = _tool_identity(
         java_executable,
         "Java executable",
+        preserve_path=java_identity.get("source") == "user-path",
     )
     installer, installer_identity = _validate_installer(
         installer_path,
@@ -2182,9 +2189,15 @@ def _selected_java(
                 receipt.get("probe", {})
             ).get("vendor"),
         }
-    elif source == "external":
+    elif source in {"external", "user-path"}:
+        if source == "user-path" and (
+            result.get("format") != "workbench-java-runtime-result-v3"
+            or result.get("schema_version") != 3
+            or result.get("outcome") != "observed"
+        ):
+            raise PackwizMaterializationError("user Java path has not been observed for execution")
         runtime = result.get("runtime")
-        policy = result.get("policy")
+        policy = result.get("policy") if source == "external" else {"selection_kind": "user-path"}
         if not isinstance(runtime, dict) or not isinstance(policy, dict):
             raise PackwizMaterializationError(
                 "external Java result lacks runtime identity"
@@ -2199,8 +2212,11 @@ def _selected_java(
                 "external Java result lacks a probe"
             )
         identity = {
-            "source": "external",
-            "runtime_identity": policy.get("runtime_identity"),
+            "source": source,
+            "runtime_identity": (
+                policy.get("runtime_identity") if source == "external"
+                else "user-supplied:" + str(probe.get("runtime_version"))
+            ),
             "runtime_version": probe.get("runtime_version"),
             "vendor": probe.get("vendor"),
         }
@@ -2216,7 +2232,7 @@ def _selected_java(
         raise PackwizMaterializationError(
             "selected Java identity is incomplete"
         )
-    return path.resolve(), identity
+    return (path.absolute() if source == "user-path" else path.resolve()), identity
 
 
 def _resolve_packwiz(
@@ -2267,6 +2283,8 @@ def materialize_project_runtime(
     configuration: WorkbenchConfiguration | None = None,
     config_path: Path | str | None = None,
     resolved_bindings: ResolvedBindings | None = None,
+    managed_java_service: ManagedJava | None = None,
+    managed_config_path: Path | None = None,
 ) -> dict[str, Any]:
     """Provision inputs and install a local Packwiz client payload."""
 
@@ -2346,11 +2364,15 @@ def materialize_project_runtime(
             "workspace changed while bootstrapping the Cleanroom fixture"
         )
     try:
-        java_result = ensure_java_runtime(
-            suite,
-            state_root=state,
-            configuration=active_configuration,
-            resolved_bindings=operation_bindings,
+        java_result = (
+            managed_java_service.for_execution(
+                suite, config_path=(managed_config_path or CONFIGURATION_PATH),
+            ) if managed_java_service is not None else ensure_java_runtime(
+                suite,
+                state_root=state,
+                configuration=active_configuration,
+                resolved_bindings=operation_bindings,
+            )
         )
     except JavaRuntimeError as exc:
         raise PackwizMaterializationError(str(exc)) from exc

@@ -6,8 +6,10 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
+if TYPE_CHECKING:
+    from workbench_api.managed_java import ManagedJava
 from workbench_project_intelligence import ProjectInspectionError
 
 from .active_instance import ActiveInstanceError, initialize_active_instance
@@ -2105,6 +2107,12 @@ def _human_java_runtime(result: dict[str, Any]) -> str:
         f"Java runtime: {result['outcome'].upper()}",
         f"Source: {result['source']}",
     ]
+    if result.get("source") == "user-path":
+        lines.extend([
+            f"Java home: {result['runtime']['java_home_uri']}",
+            "User path accepted without Java inventory or compatibility checks.",
+        ])
+        return "\n".join(lines)
     receipt = result.get("receipt")
     if isinstance(receipt, dict):
         probe = receipt["probe"]
@@ -2704,6 +2712,8 @@ def main(
     *,
     feature_program: str | None = None,
     resolved_locations: Mapping[str, Path] | None = None,
+    runtime_java_service: ManagedJava | None = None,
+    runtime_state_root: Path | None = None,
 ) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     from workbench_core.host_services import install_local_host_services
@@ -2740,7 +2750,7 @@ def main(
             "runtime-observe",
             "runtime-diagnose",
             "runtime-worldgen-audit",
-        }:
+        } and not (args.command == "runtime-java" and runtime_java_service is not None):
             active_configuration = load_workbench_configuration(
                 suite_root,
                 args.config_path,
@@ -3197,7 +3207,10 @@ def main(
                 launcher=args.launcher,
                 packwiz_executable=args.packwiz,
                 seed_roots=args.seed,
+                state_root=runtime_state_root,
                 configuration=active_configuration,
+                managed_java_service=runtime_java_service,
+                managed_config_path=args.config_path,
             )
         elif args.command == "runtime-launch":
             assert active_configuration is not None
@@ -3221,7 +3234,10 @@ def main(
                 offline_name=args.offline_name,
                 compatibility_patches=args.compatibility_patch,
                 timeout_seconds=args.timeout,
+                state_root=runtime_state_root,
                 configuration=active_configuration,
+                managed_java_service=runtime_java_service,
+                managed_config_path=args.config_path,
             )
         elif args.command == "runtime-observe":
             assert active_configuration is not None
@@ -3337,13 +3353,16 @@ def main(
             )
         else:
             assert args.command == "runtime-java"
-            assert active_configuration is not None
-            assert resolved_bindings is not None
-            result = ensure_java_runtime(
-                suite_root,
-                configuration=active_configuration,
-                resolved_bindings=resolved_bindings,
-            )
+            if runtime_java_service is not None:
+                result = runtime_java_service.ensure(suite_root, config_path=args.config_path)
+            else:
+                assert active_configuration is not None
+                assert resolved_bindings is not None
+                result = ensure_java_runtime(
+                    suite_root,
+                    configuration=active_configuration,
+                    resolved_bindings=resolved_bindings,
+                )
     except (
         ActiveInstanceError,
         BlueprintStageError,

@@ -30,6 +30,7 @@ except ImportError:  # Native Windows has numeric file identity, not POSIX names
 from workbench_api.runtime import RuntimeProviderError, runtime_provider
 from ..host_filesystem import fsync_directory
 from .. import check_lifecycle
+from ..user_config_home import default_user_config_home
 
 
 def sha256_file(path: Path) -> str:
@@ -1287,6 +1288,48 @@ def _candidate_paths(storage: Path) -> list[Path]:
     return candidates
 
 
+def _protect_registered_resources(workspace: Path, items: list[dict[str, Any]]) -> str | None:
+    """Keep the existing cleanup planner from collecting a registered child.
+
+    The V1 inventory describes workspace storage only. The Core resource
+    catalog also covers external role roots; its own inventory lists those
+    exact objects. A missing or unreadable catalog must fail closed here.
+    """
+
+    from .registered import ResourceCatalog
+
+    catalog = ResourceCatalog(default_user_config_home())
+    if not catalog.root.exists() and not catalog.root.is_symlink():
+        return None
+    try:
+        registered = catalog.inventory(workspace=workspace)
+        records = registered["resources"]
+        record_stores = registered["record_stores"]
+    except Exception as exc:
+        records = None
+        record_stores = None
+        limitation = f"Core resource catalog is unavailable; workspace cleanup is protected: {type(exc).__name__}"
+    else:
+        limitation = None
+    for item in items:
+        item_path = Path(item["path"])
+        if records is None or any(
+            Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
+            for row in records
+        ) or any(
+            Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
+            for row in record_stores
+        ):
+            deletion = item["deletion"]
+            deletion["state"] = "protected"
+            deletion["recoverability"] = "none"
+            deletion["reason_codes"] = sorted(set([
+                *deletion["reason_codes"],
+                "registered-resource" if records is not None else "registered-catalog-unavailable",
+            ]))
+    return limitation
+
+
 def _allocated(metadata: os.stat_result) -> int:
     blocks = getattr(metadata, "st_blocks", None)
     return int(blocks * 512) if isinstance(blocks, int) else int(metadata.st_size)
@@ -2241,6 +2284,7 @@ def inventory_storage(root: Path, *, now: datetime | str | None = None) -> dict[
             metadata_values[item_id] = (metadata, metadata_path)
 
     items.sort(key=lambda item: item["relative_path"])
+    registered_limitation = _protect_registered_resources(workspace, items)
 
     def target_for(path: Path) -> dict[str, Any] | None:
         matches = [
@@ -2360,6 +2404,7 @@ def inventory_storage(root: Path, *, now: datetime | str | None = None) -> dict[
             "The inventory does not hash large payload contents.",
             "Unknown custody, active resources, evidence, unsafe entries, and legacy trash are protected.",
             "Last use is reported only when a receipt or manager ledger observes it.",
+            *([registered_limitation] if registered_limitation is not None else []),
         ],
     }
     report["inventory_id"] = _identity(INVENTORY_PREFIX, report)

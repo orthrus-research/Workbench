@@ -7,7 +7,8 @@
   "required": [
     "format", "schema_version", "resolution_id", "configuration_home",
     "settings", "workspaces", "setup", "workspace", "state_root",
-    "locations", "profile_configuration_reference", "tool_candidates"
+    "locations", "profile_configuration_reference", "tool_candidates",
+    "workspace_selection", "choice_sources"
   ],
   "properties": {
     "format": {"const": "workbench-environment-resolution-v1"},
@@ -25,6 +26,23 @@
       }
     },
     "workspace": {"$ref": "#/$defs/location"},
+    "workspace_selection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["workspace_id", "name", "source"],
+      "properties": {
+        "workspace_id": {"type": ["string", "null"]},
+        "name": {"type": ["string", "null"]},
+        "source": {"enum": ["user-workspaces-v2", "setup-v1", "none"]}
+      }
+    },
+    "choice_sources": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile_config", "java_home"],
+      "properties": {
+        "profile_config": {"enum": ["user-workspaces-v2", "setup-v1", "none"]},
+        "java_home": {"enum": ["environment", "user-workspaces-v2", "setup-v1", "none"]}
+      }
+    },
     "state_root": {"$ref": "#/$defs/location"},
     "locations": {
       "type": "object", "additionalProperties": false,

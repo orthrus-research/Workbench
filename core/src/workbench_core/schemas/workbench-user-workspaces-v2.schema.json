@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.invalid/schemas/workbench-user-workspaces-v2.schema.json",
+  "title": "Workbench User Workspaces V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "default", "entries", "record_id"],
+  "properties": {
+    "format": {"const": "workbench-user-workspaces-v2"},
+    "schema_version": {"const": 2},
+    "default": {"type": ["string", "null"]},
+    "entries": {
+      "type": "array", "maxItems": 256,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "path", "workspace_id", "profile_config", "java_home"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "path": {"type": "string", "minLength": 1},
+          "workspace_id": {"type": "string", "pattern": "^workbench-workspace-v1:[0-9a-f]{32}$"},
+          "profile_config": {"type": ["string", "null"]},
+          "java_home": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "record_id": {"type": "string", "pattern": "^workbench-user-workspaces:sha256:[0-9a-f]{64}$"}
+  }
+}

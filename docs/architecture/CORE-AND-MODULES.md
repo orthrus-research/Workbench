@@ -48,6 +48,87 @@ Generic acquisition belongs in Core. Cleanroom or pack-specific selection and
 materialization policy belongs in the selected profile adapter. Core must not
 silently choose Supersymmetry when no profile is selected.
 
+## First durable resource slice
+
+`ExecutionContext.publish_bytes` delegates immutable file publication to a
+Core-bound resource service. The host binds its workspace, resolved location
+roots and policy identity to the admitted module before the handler runs.
+Process Studio's optional comparison report uses this port; its input and
+comparison rules remain with Process Studio. Core creates the output without
+replacing an existing file, retains an intent before publication, commits a
+resource reference and verifies bytes when reopening it. Interrupted
+publication can be reconciled when the prepared and published file still
+share the recorded identity.
+
+Core keeps the custody catalog in the stable user configuration home.
+`workbench storage resources list`, `inspect` and `reconcile` expose registered
+files across current and prior selected roots. The existing workspace storage
+inventory keeps its V1 format; its cleanup plans protect any workspace item
+containing a registered resource. Registered resources default to protected
+until a later, reviewed retention policy supplies collection rules. This slice
+supports immutable file output in the `evidence` and `artifacts` roles. The
+publisher currently requires POSIX descriptor-relative file operations and
+refuses unsupported hosts. The older `output_path` allocator remains for
+owners awaiting migration.
+
+## Private records and workspace choices
+
+Core's filesystem host also exposes bounded reads, immutable publication,
+revisioned replacement and a private advisory lease through the Core API.
+Work Session V2 uses these operations for its header, event journal and
+rebuildable summary. Feature Change uses them for selected-context history and
+its current pointer. Their domain formats, event sequencing, recovery rules
+and historical paths remain with Shell. Core owns the file staging, privacy
+check, no-clobber publication, compare-and-swap and directory flush. Generic
+bounded reads remain available for user-supplied inputs that are not
+Core-owned private records.
+
+`workbench settings workspace list --json` reads the named workspace registry.
+`workbench settings workspace select NAME --profile-config PATH --java-home PATH`
+saves local profile and Java candidates for that workspace; `--clear-profile`
+and `--clear-java` clear each choice. The operation accepts
+`--expected-record-id` for a stale-writer check. Saving a choice upgrades the
+registry from V1 to V2, gives each entry a stable workspace ID, and preserves
+unselected entries. The Textual Workspace choices screen uses these Core
+operations and Core's Java inventory. These paths are local bindings, not a
+portable reconstruction manifest. Runtime owners must still check a candidate
+against the selected profile's Java policy before execution.
+
+Core resolves profile and Java candidates only from the selected named
+workspace or a matching Setup workspace. A different workspace does not
+inherit Setup's Java. Explicit process Java remains a candidate with its own
+provenance. Earlier V1 records still open without changing their IDs or bytes.
+
+On Linux, private record directories must enforce owner-only access. On WSL,
+the Linux filesystem meets that condition in the tested configuration. The
+tested Windows-mounted 9p location did not preserve Unix mode bits and is
+rejected for private record writes; WSL mounts configured with Unix metadata
+may differ. Native Windows behavior requires its own execution validation.
+During Core dispatch, Work Session and Feature Change selection stores ask the
+Core API for a mutable namespace before publication. Core chooses their
+historical physical layout and registers a stable store ID in the resource
+catalog. `workbench storage resources list` and `inspect` expose these stores;
+the workspace cleanup planner protects registered namespaces. Their retention
+stays protected until a reviewed policy exists. Direct historical adapters
+retain their original readers and paths for records created outside Core
+dispatch.
+
+`ExecutionContext.selection` carries the selected workspace ID, profile
+configuration, Java choice and source labels as an immutable operation
+snapshot. The `runtime-java` command passes that selection to Core's managed
+Java service. With no Java choice, Core uses the profile's pinned managed
+release; the provisional Cleanroom profile currently pins Java 25. A user may
+explicitly select Core's exact managed Java 8 release, then acquire it into the
+resolved operation state root through `settings workspace acquire NAME` or
+`runtime-java`. This is an acquisition choice, not a claim that a Cleanroom
+operation supports Java 8. A supplied Java home is returned as an unverified
+path without inventory, execution or profile compatibility checks. The
+runtime materialization and launch operations probe only that selected path
+when execution needs Java, then report failures there. Core dispatch passes
+the same Java choice and resolved state root into those Shell operations.
+Direct legacy Shell entry points retain their existing configuration and
+state defaults until their consumers migrate.
+
 ## Source layout
 
 Keep one monorepo for coordinated contract changes and conformance testing:

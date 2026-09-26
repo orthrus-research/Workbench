@@ -172,6 +172,194 @@ class ResultScreen(Screen[None]):
             self.app.pop_screen()
 
 
+class WorkspaceChoicesScreen(Screen[None]):
+    """Edit Core's local profile and Java candidates for one named workspace."""
+
+    def __init__(self, record: Mapping[str, Any]) -> None:
+        super().__init__()
+        self.record = record
+        self.entries = {row["name"]: row for row in record["entries"]}
+        self.selected_name = record.get("default") or next(iter(self.entries), "")
+        self.busy = False
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        options = [(f"{name} · {row['path']}", name) for name, row in self.entries.items()]
+        if not options:
+            options = [("No named workspace is registered", "")]
+        yield Header(icon="W")
+        with VerticalScroll():
+            yield Static("Workspace choices", classes="screen-heading")
+            yield Static(
+                "Core saves local choices for future operations. Managed Java uses the "
+                "profile default or an explicit Java 8 release. A supplied path is used as given.",
+                classes="screen-intro",
+            )
+            yield Static("Named workspace", classes="field-label")
+            yield Select(options, value=self.selected_name, allow_blank=False, id="choice-workspace")
+            yield Static("Workbench configuration · blank clears", classes="field-label")
+            yield Input(placeholder="/path/to/workbench.toml", id="choice-profile")
+            yield Static("Java selection", classes="field-label")
+            yield Select([
+                ("Profile default (Cleanroom Java 25)", "default"),
+                ("Acquire managed Java 8", "managed-8"),
+                ("Use a local Java path", "path"),
+            ], value="default", allow_blank=False, id="choice-java-mode")
+            yield Static("Local Java home · only for path selection", classes="field-label")
+            yield Input(placeholder="/path/to/jdk", id="choice-java")
+            yield Static("Detected Java", classes="field-label")
+            yield Select([("Enter a Java home above", "manual")], value="manual",
+                         allow_blank=False, id="choice-java-candidates")
+            with Horizontal(classes="button-row"):
+                yield Button("Find Java", id="choice-find-java")
+                yield Button("Save choices", id="choice-save", variant="primary",
+                             disabled=not bool(self.entries))
+                yield Button("Acquire saved Java", id="choice-acquire",
+                             disabled=not bool(self.entries))
+                yield Button("Back", id="choice-back")
+            yield Static("", id="choice-status")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self._show_selected()
+
+    def _show_selected(self) -> None:
+        row = self.entries.get(self.selected_name)
+        if row is None:
+            self.query_one("#choice-status", Static).update(
+                "Register a workspace with 'workbench settings workspace add NAME PATH'."
+            )
+            return
+        self.query_one("#choice-profile", Input).value = row.get("profile_config") or ""
+        self.query_one("#choice-java", Input).value = row.get("java_home") or ""
+        mode = "managed-8" if row.get("managed_java_feature") == 8 else "path" if row.get("java_home") else "default"
+        self.query_one("#choice-java-mode", Select).value = mode
+        self.query_one("#choice-java", Input).disabled = mode != "path"
+        self.query_one("#choice-acquire", Button).disabled = mode == "path"
+        self.query_one("#choice-status", Static).update(
+            f"{row['path']} · saved revision {self.record['record_id']}"
+        )
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "choice-workspace" and isinstance(event.value, str):
+            self.selected_name = event.value
+            self._show_selected()
+        elif event.select.id == "choice-java-mode" and isinstance(event.value, str):
+            self.query_one("#choice-java", Input).disabled = event.value != "path"
+            self.query_one("#choice-acquire", Button).disabled = event.value == "path"
+        elif event.select.id == "choice-java-candidates" and isinstance(event.value, str) and event.value != "manual":
+            self.query_one("#choice-java-mode", Select).value = "path"
+            self.query_one("#choice-java", Input).value = event.value
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "choice-back":
+            self.app.pop_screen()
+        elif event.button.id == "choice-find-java":
+            self.find_java()
+        elif event.button.id == "choice-save":
+            self.save_choices()
+        elif event.button.id == "choice-acquire":
+            self.acquire_java()
+
+    @work(exclusive=True, group="workspace-java")
+    async def find_java(self) -> None:
+        profile = self.query_one("#choice-profile", Input).value.strip()
+        self.query_one("#choice-status", Static).update("Asking Core to inspect local Java installations…")
+        try:
+            inventory = await self.core.java_inventory(profile)
+            options = [("Enter a Java home above", "manual")]
+            for row in inventory.get("candidates", []):
+                if (not isinstance(row, dict) or row.get("state") != "available"
+                        or not row.get("jdk")):
+                    continue
+                probe = row.get("probe") or {}
+                home = probe.get("java_home")
+                if not isinstance(home, str) or not home:
+                    continue
+                label = f"Java {row.get('feature_version', '?')} · {row.get('compatibility', '?')} · {home}"
+                options.append((label, home))
+            self.query_one("#choice-java-candidates", Select).set_options(options)
+            self.query_one("#choice-status", Static).update(
+                f"Core found {len(options) - 1} installed JDK choices. "
+                "Select one or enter a Java home."
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            self.query_one("#choice-status", Static).update(str(exc))
+
+    @work(exclusive=True, group="workspace-save")
+    async def save_choices(self) -> None:
+        if not self.selected_name or self.busy:
+            return
+        self.busy = True
+        self.query_one("#choice-save", Button).disabled = True
+        profile = self.query_one("#choice-profile", Input).value.strip() or None
+        mode = self.query_one("#choice-java-mode", Select).value
+        java = (self.query_one("#choice-java", Input).value.strip() or None) if mode == "path" else None
+        if mode == "path" and java is None:
+            self.query_one("#choice-status", Static).update("Enter an absolute Java home path.")
+            self.busy = False
+            self.query_one("#choice-save", Button).disabled = False
+            return
+        feature = 8 if mode == "managed-8" else None
+        name = self.selected_name
+        self.query_one("#choice-status", Static).update("Saving workspace choices through Core…")
+        try:
+            result = await self.core.save_workspace_choice(
+                name, profile_config=profile, java_home=java,
+                managed_java_feature=feature,
+                expected_record_id=self.record["record_id"],
+            )
+            self.record = result
+            self.entries = {row["name"]: row for row in result["entries"]}
+            self.query_one("#choice-status", Static).update(
+                f"Saved {name}. Managed Java is acquired on use; supplied paths remain unverified."
+            )
+            self.app.refresh_environment()  # type: ignore[attr-defined]
+        except (CoreClientError, TimeoutError) as exc:
+            self.query_one("#choice-status", Static).update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#choice-save", Button).disabled = False
+
+    @work(exclusive=True, group="workspace-acquire")
+    async def acquire_java(self) -> None:
+        if not self.selected_name or self.busy:
+            return
+        mode = self.query_one("#choice-java-mode", Select).value
+        row = self.entries.get(self.selected_name)
+        feature = 8 if mode == "managed-8" else None
+        profile = self.query_one("#choice-profile", Input).value.strip() or None
+        if (mode == "path" or row is None or row.get("java_home") is not None
+                or row.get("managed_java_feature") != feature
+                or row.get("profile_config") != profile):
+            self.query_one("#choice-status", Static).update(
+                "Save a managed Java choice before acquiring it."
+            )
+            return
+        self.busy = True
+        self.query_one("#choice-acquire", Button).disabled = True
+        self.query_one("#choice-status", Static).update("Core is acquiring the exact managed Java release…")
+        try:
+            result = await self.core.acquire_workspace_java(
+                self.selected_name, expected_record_id=self.record["record_id"],
+            )
+            receipt = result["receipt"]
+            self.query_one("#choice-status", Static).update(
+                f"Java {receipt['policy']['feature_version']} {result['outcome']}: "
+                f"{receipt['target']['java_home_uri']}"
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            self.query_one("#choice-status", Static).update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#choice-acquire", Button).disabled = (
+                self.query_one("#choice-java-mode", Select).value == "path"
+            )
+
+
 class ModulesScreen(Screen[None]):
     """Compare DataTable and tabs as module/profile presentation primitives."""
 
@@ -874,6 +1062,7 @@ class WorkbenchApp(App[None]):
                     yield Static("START HERE", classes="panel-title")
                     yield OptionList(
                         Option("Set up or repair environment", id="setup", disabled=True),
+                        Option("Choose workspace profile and Java", id="workspace-choices", disabled=True),
                         Option("Explore installed modules", id="modules", disabled=True),
                         Option("Browse and run workflows", id="workflows", disabled=True),
                         Option("Open Workspace Home", id="home", disabled=True),
@@ -950,6 +1139,7 @@ class WorkbenchApp(App[None]):
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
         yield SystemCommand("Set up Workbench", "Open the setup wizard", self.open_setup)
+        yield SystemCommand("Workspace choices", "Choose a saved workspace profile and Java", self.open_workspace_choices)
         yield SystemCommand("Explore modules", "Show installed modules and profiles", self.open_modules)
         yield SystemCommand("Browse workflows", "Search the installed action catalog", self.open_workflows)
         yield SystemCommand(
@@ -968,6 +1158,18 @@ class WorkbenchApp(App[None]):
         self.push_screen(
             SetupScreen(self.view, self.initial_workspace, self.initial_profile_config)
         )
+
+    @work(exclusive=True, group="workspace-choices")
+    async def open_workspace_choices(self) -> None:
+        if self.view.version is None:
+            self.notify("Waiting for Workbench Core", severity="warning")
+            return
+        try:
+            choices = await self.core.workspace_choices()
+        except (CoreClientError, TimeoutError) as exc:
+            self.push_screen(ResultScreen("Workspace choices unavailable", str(exc)))
+            return
+        self.push_screen(WorkspaceChoicesScreen(choices))
 
     def open_modules(self) -> None:
         if not (self.view.modules_loaded and self.view.profiles_loaded):
@@ -1087,6 +1289,7 @@ class WorkbenchApp(App[None]):
         actions = home.query_one("#home-actions", OptionList)
         for option_id, ready in (
             ("setup", view.setup is not None),
+            ("workspace-choices", view.version is not None),
             ("modules", view.modules_loaded and view.profiles_loaded),
             ("workflows", view.catalog is not None),
             ("home", view.home is not None),
@@ -1173,6 +1376,8 @@ class WorkbenchApp(App[None]):
         action = event.option_id
         if action == "setup":
             self.open_setup()
+        elif action == "workspace-choices":
+            self.open_workspace_choices()
         elif action == "modules":
             self.open_modules()
         elif action == "workflows":

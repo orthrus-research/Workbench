@@ -40,6 +40,24 @@ distribution is rejected as incompatible. A selected external runtime returns
 `workbench-java-runtime-result-v1`, schema version `1`; that result identifies
 external discovery and is not a managed-runtime receipt version.
 
+Core's named-workspace selection adds two explicit branches. Managed Java 8
+selects exact Temurin `jdk8u504-b01` while the Cleanroom profile default
+remains Java 25. Its receipt records the explicit choice and the profile's
+original runtime identity. This choice does not certify Cleanroom runtime
+compatibility. A user-supplied Java home bypasses inventory, probing and
+profile admission at selection time. Core returns
+`workbench-java-runtime-result-v3` with `source: user-path` and
+`runtime.state: unverified`; no managed receipt is produced. A consuming
+operation is responsible for its own execution requirements and failure
+reporting. `settings workspace acquire NAME` acquires only saved managed
+choices and checks the reviewed workspace record revision when provided.
+Core-dispatched `runtime-materialize` and local `runtime-launch` use this same
+selection. They observe only a supplied path at execution time and retain its
+observed properties and executable hash in their own receipts. A WSL process
+is a Linux host for managed acquisition. A Windows launcher reached from WSL
+is a distinct execution host; its Java path or managed runtime is selected
+through the launcher's explicit cross-host arguments.
+
 ## Managed provisioning
 
 If no exact external candidate exists, Workbench:

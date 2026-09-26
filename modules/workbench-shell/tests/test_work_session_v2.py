@@ -38,6 +38,13 @@ from workbench_shell.work_session import (
     work_session_recovery_action,
 )
 from workbench_api.host_filesystem import HostFilesystemError
+from workbench_api.record_stores import record_store_scope
+from workbench_core import durable_records
+from workbench_core.host_services import install_local_host_services
+from workbench_core.storage.record_stores import CoreRecordStores
+from workbench_core.storage.registered import ResourceCatalog
+
+install_local_host_services()
 
 
 FRONTEND = {
@@ -170,6 +177,27 @@ def _frontend_crash_with_owned_child(
 
 
 class WorkSessionV2Tests(unittest.TestCase):
+    def test_core_registers_session_namespace_before_publication_and_legacy_reader_reopens(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            config = root / "config"
+            provider = CoreRecordStores(
+                workspace=workspace, configuration_home=config,
+                owner_id="workbench-shell",
+            )
+            with record_store_scope(provider):
+                store = WorkSessionStore(root)
+                rows = ResourceCatalog(config).inventory(workspace=workspace)["record_stores"]
+                self.assertEqual(1, len(rows))
+                self.assertEqual(store.base, Path(rows[0]["path"]))
+                self.assertEqual("available", rows[0]["status"])
+                _, created = self._create(root, store=store)
+            reopened = WorkSessionStore(root).open(created["session_id"])
+            self.assertEqual(created["session_record_id"], reopened["session"]["session_record_id"])
+            self.assertEqual("verified", reopened["integrity"]["journal_state"])
+
     def _create(
         self,
         root: Path,
@@ -1338,10 +1366,10 @@ class WorkSessionV2Tests(unittest.TestCase):
             workspace.mkdir()
             store = WorkSessionStore(root)
             operations: list[tuple[str, str]] = []
-            actual_secure = work_session.secure_private_path
-            actual_private = work_session.private_path
-            actual_link = work_session.os.link
-            actual_replace = work_session.os.replace
+            actual_secure = durable_records.secure_private_path
+            actual_private = durable_records.private_path
+            actual_link = durable_records.os.link
+            actual_replace = durable_records.os.replace
 
             def observed_secure(path: Path, *, directory: bool) -> Path:
                 if not directory:
@@ -1363,18 +1391,18 @@ class WorkSessionV2Tests(unittest.TestCase):
 
             with (
                 patch.object(
-                    work_session,
+                    durable_records,
                     "secure_private_path",
                     side_effect=observed_secure,
                 ),
                 patch.object(
-                    work_session,
+                    durable_records,
                     "private_path",
                     side_effect=observed_private,
                 ),
-                patch.object(work_session.os, "link", side_effect=observed_link),
+                patch.object(durable_records.os, "link", side_effect=observed_link),
                 patch.object(
-                    work_session.os,
+                    durable_records.os,
                     "replace",
                     side_effect=observed_replace,
                 ),
@@ -1448,16 +1476,17 @@ class WorkSessionV2Tests(unittest.TestCase):
                 workspace = root / "workspace"
                 workspace.mkdir()
                 store = WorkSessionStore(root)
-                actual_secure = work_session.secure_private_path
+                actual_secure = durable_records.secure_private_path
 
                 def fail_selected(path: Path, *, directory: bool) -> Path:
-                    if not directory and path.name.startswith(f".{failed_name}."):
+                    if (not directory and path.name.startswith(f".{failed_name}.")
+                            and not path.name.endswith(".lock")):
                         raise HostFilesystemError("cannot apply private ACL")
                     return actual_secure(path, directory=directory)
 
                 with (
                     patch.object(
-                        work_session,
+                        durable_records,
                         "secure_private_path",
                         side_effect=fail_selected,
                     ),
@@ -1504,7 +1533,8 @@ class WorkSessionV2Tests(unittest.TestCase):
                 }
                 self.assertFalse(targets[failed_name].exists())
                 self.assertEqual(
-                    list(directory.rglob(f".{failed_name}.*")),
+                    [path for path in directory.rglob(f".{failed_name}.*")
+                     if not path.name.endswith(".lock")],
                     [],
                 )
 
@@ -1512,8 +1542,8 @@ class WorkSessionV2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             store, created = self._create(Path(temporary))
             operations: list[str] = []
-            actual_secure = work_session.secure_private_path
-            actual_private = work_session.private_path
+            actual_secure = durable_records.secure_private_path
+            actual_private = durable_records.private_path
 
             def observed_secure(path: Path, *, directory: bool) -> Path:
                 if path.parent == store.locks:
@@ -1527,12 +1557,12 @@ class WorkSessionV2Tests(unittest.TestCase):
 
             with (
                 patch.object(
-                    work_session,
+                    durable_records,
                     "secure_private_path",
                     side_effect=observed_secure,
                 ),
                 patch.object(
-                    work_session,
+                    durable_records,
                     "private_path",
                     side_effect=observed_private,
                 ),
@@ -1546,7 +1576,7 @@ class WorkSessionV2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             store, created = self._create(Path(temporary))
             with patch.object(
-                work_session,
+                durable_records,
                 "secure_private_path",
                 side_effect=HostFilesystemError("cannot apply private ACL"),
             ):
@@ -1560,7 +1590,7 @@ class WorkSessionV2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             store, created = self._create(Path(temporary))
             store.status(created["session_id"])
-            actual_private = work_session.private_path
+            actual_private = durable_records.private_path
 
             def reject_lock(path: Path, *, directory: bool) -> bool:
                 if path.parent == store.locks:
@@ -1568,9 +1598,9 @@ class WorkSessionV2Tests(unittest.TestCase):
                 return actual_private(path, directory=directory)
 
             with (
-                patch.object(work_session, "secure_private_path") as secure,
+                patch.object(durable_records, "secure_private_path") as secure,
                 patch.object(
-                    work_session,
+                    durable_records,
                     "private_path",
                     side_effect=reject_lock,
                 ),

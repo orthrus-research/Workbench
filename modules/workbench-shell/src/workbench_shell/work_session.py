@@ -20,23 +20,23 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from workbench_api.record_stores import open_record_store
 import re
 import secrets
-import stat
-import tempfile
 import threading
 from typing import Any, NoReturn
 
-from workbench_api.service import ServicePhysicalLeasePorts, ServiceV3Error
 from workbench_api.host_filesystem import (
+    DurableRecordError,
     HostFilesystemError,
     fsync_directory,
     private_path,
+    private_record_lock,
+    publish_immutable_bytes,
+    read_private_bytes,
+    replace_private_bytes,
     secure_private_path,
 )
-
-from workbench_core.service.host import local_service_physical_lease_ports
-
 
 SESSION_FORMAT = "workbench-work-session-v2"
 EVENT_FORMAT = "workbench-work-session-event-v1"
@@ -1121,6 +1121,9 @@ def validate_work_session_summary(value: Any) -> dict[str, Any]:
 def _safe_storage_root(root: Path, *, create: bool) -> Path:
     if not isinstance(root, Path):
         _fail("work-session.invalid-root", "storage root must be a Path")
+    managed = open_record_store("work-session-v2", root) if create else None
+    if managed is not None:
+        return managed.root
     supplied = root.expanduser()
     lexical = Path(os.path.abspath(supplied))
     for component in [*reversed(lexical.parents), lexical]:
@@ -1151,41 +1154,19 @@ def _safe_storage_root(root: Path, *, create: bool) -> Path:
 
 
 def _read_private_json(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
-    if path.is_symlink():
-        _fail("work-session.unsafe-path", f"{label} is a symbolic link")
-    if path.exists() and not private_path(path, directory=False):
-        _fail("work-session.unsafe-path", f"{label} is not owner-private")
-    flags = os.O_RDONLY | (os.O_NOFOLLOW if hasattr(os, "O_NOFOLLOW") else 0)
     try:
-        descriptor = os.open(path, flags | getattr(os, "O_BINARY", 0))
-        try:
-            metadata = os.fstat(descriptor)
-            if (
-                not stat.S_ISREG(metadata.st_mode)
-                or metadata.st_size > MAX_RECORD_BYTES
-                or (
-                    os.name != "nt"
-                    and (
-                        metadata.st_mode & 0o077
-                        or (hasattr(os, "geteuid") and metadata.st_uid != os.geteuid())
-                    )
-                )
-            ):
-                _fail("work-session.invalid-record", f"{label} is not a bounded regular file")
-            raw = b""
-            while len(raw) <= MAX_RECORD_BYTES:
-                chunk = os.read(descriptor, min(65536, MAX_RECORD_BYTES + 1 - len(raw)))
-                if not chunk:
-                    break
-                raw += chunk
-        finally:
-            os.close(descriptor)
-    except OSError as exc:
+        raw = read_private_bytes(path, byte_limit=MAX_RECORD_BYTES)
+    except DurableRecordError as exc:
+        code = (
+            "work-session.unsafe-path" if exc.code == "unsafe"
+            else "work-session.invalid-record" if exc.code == "bounds"
+            else "work-session.unreadable-record"
+        )
+        raise WorkSessionError(code, f"cannot read {label}: {exc}") from exc
+    except HostFilesystemError as exc:
         raise WorkSessionError(
             "work-session.unreadable-record", f"cannot read {label}: {exc}"
         ) from exc
-    if len(raw) > MAX_RECORD_BYTES:
-        _fail("work-session.invalid-record", f"{label} exceeds its byte budget")
     try:
         value = json.loads(raw.decode("utf-8", errors="strict"))
     except (UnicodeError, json.JSONDecodeError) as exc:
@@ -1197,189 +1178,27 @@ def _read_private_json(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
     return value, raw
 
 
-_RECORD_CUSTODY_FIELDS = ("st_dev", "st_ino", "st_size", "st_mtime_ns")
-
-
-def _same_record_custody(
-    left: os.stat_result,
-    right: os.stat_result,
-    *,
-    expected_size: int,
-) -> bool:
-    """Compare one record across descriptor/path views without NTFS ctime.
-
-    Applying a private Windows DACL can change or expose a different ctime view
-    even though the file identity and content-bearing metadata are unchanged.
-    The stable fields below retain the actual custody boundary while allowing
-    that documented host difference.
-    """
-
-    return (
-        stat.S_ISREG(left.st_mode)
-        and stat.S_ISREG(right.st_mode)
-        and left.st_size == expected_size
-        and right.st_size == expected_size
-        and all(
-            getattr(left, field) == getattr(right, field)
-            for field in _RECORD_CUSTODY_FIELDS
-        )
-    )
-
-
-def _secure_new_private_record(
-    path: Path,
-    created: os.stat_result,
-    *,
-    expected_size: int,
-    label: str,
-) -> os.stat_result:
-    """Secure and re-identify one uncommitted record before publication."""
-
-    try:
-        secure_private_path(path, directory=False)
-    except OSError as exc:
-        raise WorkSessionError(
-            "work-session.unsafe-path",
-            f"cannot secure {label} before publication: {exc}",
-        ) from exc
-    if not private_path(path, directory=False):
-        _fail(
-            "work-session.unsafe-path",
-            f"{label} is not owner-private before publication",
-        )
-    try:
-        secured = path.lstat()
-    except OSError as exc:
-        raise WorkSessionError(
-            "work-session.unsafe-path",
-            f"cannot re-identify {label} before publication: {exc}",
-        ) from exc
-    if not _same_record_custody(created, secured, expected_size=expected_size):
-        _fail(
-            "work-session.unsafe-path",
-            f"{label} custody changed while it was secured",
-        )
-    return secured
-
-
-def _verify_published_private_record(
-    path: Path,
-    secured: os.stat_result,
-    *,
-    expected_size: int,
-    label: str,
-) -> None:
-    """Verify an atomic publication still names the secured source file."""
-
-    if path.is_symlink() or not private_path(path, directory=False):
-        _fail(
-            "work-session.unsafe-path",
-            f"published {label} is not owner-private",
-        )
-    try:
-        published = path.lstat()
-    except OSError as exc:
-        raise WorkSessionError(
-            "work-session.unsafe-path",
-            f"cannot re-identify published {label}: {exc}",
-        ) from exc
-    if not _same_record_custody(secured, published, expected_size=expected_size):
-        _fail(
-            "work-session.unsafe-path",
-            f"published {label} does not retain secured file custody",
-        )
-
-
-@contextmanager
-def _private_record_temporary(path: Path, raw: bytes, *, label: str):
-    """Create, flush, secure, and verify one unpublished record file."""
-
-    descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    temporary = Path(name)
-    descriptor_open = True
-    try:
-        os.chmod(temporary, 0o600)
-        output = os.fdopen(descriptor, "wb")
-        descriptor_open = False
-        with output:
-            output.write(raw)
-            output.flush()
-            os.fsync(output.fileno())
-            created = os.fstat(output.fileno())
-        secured = _secure_new_private_record(
-            temporary,
-            created,
-            expected_size=len(raw),
-            label=label,
-        )
-        yield temporary, secured
-    finally:
-        if descriptor_open:
-            os.close(descriptor)
-        temporary.unlink(missing_ok=True)
-
-
 def _write_immutable(path: Path, value: Mapping[str, Any]) -> None:
     raw = _canonical_bytes(value) + b"\n"
-    if path.is_symlink():
-        _fail("work-session.unsafe-path", f"immutable target is a symlink: {path}")
-    if path.exists():
-        _, observed = _read_private_json(path, "immutable record")
-        if observed != raw:
-            _fail("work-session.immutable-collision", f"immutable record differs: {path}")
-        return
-    with _private_record_temporary(path, raw, label="immutable record") as (
-        temporary,
-        secured,
-    ):
-        published = False
-        try:
-            os.link(temporary, path)
-        except FileExistsError:
-            _, observed = _read_private_json(path, "immutable record")
-            if observed != raw:
-                _fail("work-session.immutable-collision", f"immutable record raced: {path}")
-        else:
-            published = True
-        if published:
-            _verify_published_private_record(
-                path,
-                secured,
-                expected_size=len(raw),
-                label="immutable record",
-            )
-            _, observed = _read_private_json(path, "immutable record")
-            if observed != raw:
-                _fail(
-                    "work-session.immutable-collision",
-                    f"published immutable record differs: {path}",
-                )
-        # Preserve the original durability boundary for a same-content link
-        # race as well as for the link published by this writer.
-        fsync_directory(path.parent)
+    try:
+        publish_immutable_bytes(path, raw, byte_limit=MAX_RECORD_BYTES, idempotent=True)
+    except DurableRecordError as exc:
+        code = (
+            "work-session.immutable-collision" if exc.code == "collision"
+            else "work-session.unsafe-path" if exc.code == "unsafe"
+            else "work-session.invalid-record" if exc.code == "bounds"
+            else "work-session.unreadable-record"
+        )
+        raise WorkSessionError(code, f"cannot publish immutable record: {exc}") from exc
 
 
 def _replace_summary(path: Path, value: Mapping[str, Any]) -> None:
-    if path.is_symlink():
-        _fail("work-session.unsafe-path", "summary cache is a symbolic link")
-    if path.exists() and not private_path(path, directory=False):
-        _fail("work-session.unsafe-path", "summary cache is not owner-private")
     raw = _canonical_bytes(value) + b"\n"
-    with _private_record_temporary(path, raw, label="summary cache") as (
-        temporary,
-        secured,
-    ):
-        os.replace(temporary, path)
-        _verify_published_private_record(
-            path,
-            secured,
-            expected_size=len(raw),
-            label="summary cache",
-        )
-        _, observed = _read_private_json(path, "summary cache")
-        if observed != raw:
-            _fail("work-session.stale-summary", "published summary bytes changed")
-        fsync_directory(path.parent)
+    try:
+        replace_private_bytes(path, raw, byte_limit=MAX_RECORD_BYTES)
+    except DurableRecordError as exc:
+        code = "work-session.unsafe-path" if exc.code == "unsafe" else "work-session.stale-summary"
+        raise WorkSessionError(code, f"cannot publish summary cache: {exc}") from exc
 
 
 def _make_session_id() -> str:
@@ -1514,7 +1333,6 @@ class WorkSessionStore:
         self,
         root: Path,
         *,
-        physical_leases: ServicePhysicalLeasePorts | None = None,
         clock: Callable[[], str] = utc_now,
         fault_injector: Callable[[str], None] | None = None,
     ) -> None:
@@ -1527,12 +1345,6 @@ class WorkSessionStore:
             raise WorkSessionError(
                 "work-session.unsafe-path", f"cannot secure session locks: {exc}"
             ) from exc
-        self._physical_leases = physical_leases or local_service_physical_lease_ports()
-        if type(self._physical_leases) is not ServicePhysicalLeasePorts:
-            _fail(
-                "work-session.invalid-lease-provider",
-                "an exact Host Adapter physical lease provider is required",
-            )
         if not callable(clock) or (fault_injector is not None and not callable(fault_injector)):
             _fail("work-session.invalid-port", "clock and fault injector must be callable")
         self._clock = clock
@@ -1545,99 +1357,19 @@ class WorkSessionStore:
 
     def _lock_path(self, session_id: str) -> Path:
         digest = hashlib.sha256(session_id.encode("ascii")).hexdigest()
-        path = self.locks / f"{digest}.lock"
-        if path.is_symlink():
-            _fail("work-session.unsafe-path", "session lock is a symbolic link")
-        flags = os.O_RDWR | (os.O_NOFOLLOW if hasattr(os, "O_NOFOLLOW") else 0)
-        descriptor = -1
-        created = False
-        try:
-            try:
-                descriptor = os.open(path, flags | os.O_CREAT | os.O_EXCL, 0o600)
-            except FileExistsError:
-                if path.is_symlink():
-                    _fail("work-session.unsafe-path", "session lock is a symbolic link")
-                descriptor = os.open(path, flags)
-            else:
-                created = True
-
-            opened = os.fstat(descriptor)
-            current = path.lstat()
-            if (
-                not stat.S_ISREG(opened.st_mode)
-                or not stat.S_ISREG(current.st_mode)
-                or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
-            ):
-                _fail(
-                    "work-session.unsafe-path",
-                    "session lock custody changed while it was opened",
-                )
-            if created:
-                try:
-                    secure_private_path(path, directory=False)
-                except HostFilesystemError as exc:
-                    raise WorkSessionError(
-                        "work-session.unsafe-path", f"cannot secure session lock: {exc}"
-                    ) from exc
-            if not private_path(path, directory=False):
-                _fail("work-session.unsafe-path", "session lock is not owner-private")
-            verified = path.lstat()
-            if (
-                not stat.S_ISREG(verified.st_mode)
-                or (opened.st_dev, opened.st_ino)
-                != (verified.st_dev, verified.st_ino)
-            ):
-                _fail(
-                    "work-session.unsafe-path",
-                    "session lock custody changed while it was secured",
-                )
-            if created:
-                os.fsync(descriptor)
-        except WorkSessionError:
-            raise
-        except OSError as exc:
-            raise WorkSessionError(
-                "work-session.lock-failed", f"cannot open session lock: {exc}"
-            ) from exc
-        finally:
-            if descriptor >= 0:
-                os.close(descriptor)
-        if created:
-            try:
-                fsync_directory(path.parent)
-            except OSError as exc:
-                raise WorkSessionError(
-                    "work-session.lock-failed",
-                    f"cannot publish session lock: {exc}",
-                ) from exc
-        return path
+        return self.locks / f"{digest}.lock"
 
     @contextmanager
     def _exclusive(self, session_id: str):
         path = self._lock_path(session_id)
         with self._thread_lock:
             try:
-                lease = self._physical_leases.exclusive(path)
-                lease.__enter__()
-            except ServiceV3Error as exc:
-                raise WorkSessionError(
-                    "work-session.lock-failed", str(exc), retryable=exc.retryable
-                ) from exc
-            except Exception as exc:
-                raise WorkSessionError(
-                    "work-session.lock-failed",
-                    "Host Adapter record lease failed closed",
-                ) from exc
-            try:
-                yield
-            finally:
-                try:
-                    lease.__exit__(None, None, None)
-                except Exception as exc:
-                    raise WorkSessionError(
-                        "work-session.lock-failed",
-                        "Host Adapter record lease release failed closed",
-                    ) from exc
+                with private_record_lock(path, wait=True):
+                    yield
+            except DurableRecordError as exc:
+                code = "work-session.unsafe-path" if exc.code == "unsafe" else "work-session.lock-failed"
+                raise WorkSessionError(code, f"cannot lock Work Session: {exc}",
+                                       retryable=exc.code == "busy") from exc
 
     def _directory(self, session_id: str, *, must_exist: bool = True) -> Path:
         if type(session_id) is not str or _SESSION_ID.fullmatch(session_id) is None:

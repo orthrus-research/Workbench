@@ -17,7 +17,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Any, Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 
@@ -45,6 +45,9 @@ from .runtime_compatibility import (
     apply_compatibility_patches,
 )
 from workbench_api.state_paths import default_suite_state_root
+
+if TYPE_CHECKING:
+    from workbench_api.managed_java import ManagedJava
 
 
 MAX_CAPTURE_BYTES = 64 * 1024 * 1024
@@ -468,8 +471,16 @@ def _selected_java(
             "probe": dict(receipt["probe"]),
             "java_uri": executable.as_uri(),
         }
-    elif result.get("source") == "external":
+    elif result.get("source") in {"external", "user-path"}:
+        if result.get("source") == "user-path" and (
+            result.get("format") != "workbench-java-runtime-result-v3"
+            or result.get("schema_version") != 3
+            or result.get("outcome") != "observed"
+        ):
+            raise RuntimeLaunchError("user Java path has not been observed for execution")
         runtime = result.get("runtime")
+        if result.get("source") == "user-path" and result.get("host") != dict(host):
+            raise RuntimeLaunchError("user Java path was observed for a different host")
         if (
             not isinstance(runtime, dict)
             or not isinstance(runtime.get("probe"), dict)
@@ -482,16 +493,16 @@ def _selected_java(
             "external launcher Java",
         ).expanduser().absolute()
         identity = {
-            "source": "external",
+            "source": result["source"],
             "runtime_id": "sha256:" + sha256(
                 _canonical_bytes({
                     "host": dict(host),
                     "java_uri": executable.as_uri(),
                     "probe": runtime["probe"],
-                    "policy": result.get("policy"),
+                    "policy": result.get("policy") if result["source"] == "external" else {"selection_kind": "user-path"},
                 })
             ).hexdigest(),
-            "policy": dict(result.get("policy", {})),
+            "policy": dict(result.get("policy", {})) if result["source"] == "external" else {"selection_kind": "user-path"},
             "host": dict(host),
             "probe": dict(runtime["probe"]),
             "java_uri": executable.as_uri(),
@@ -1480,6 +1491,8 @@ def launch_project_runtime(
     timeout_seconds: float = 600.0,
     configuration: WorkbenchConfiguration | None = None,
     config_path: Path | str | None = None,
+    managed_java_service: ManagedJava | None = None,
+    managed_config_path: Path | None = None,
 ) -> dict[str, Any]:
     """Materialize, project, and launch one Cleanroom client."""
 
@@ -1520,6 +1533,8 @@ def launch_project_runtime(
             seed_roots=seed_roots,
             configuration=active_configuration,
             resolved_bindings=resolved_bindings,
+            managed_java_service=managed_java_service,
+            managed_config_path=managed_config_path,
         )
     except PackwizMaterializationError as exc:
         raise RuntimeLaunchError(str(exc)) from exc
@@ -1546,13 +1561,19 @@ def launch_project_runtime(
         else [("launcher-java", Path(launcher_java))]
     )
     try:
-        java_result = ensure_java_runtime(
-            suite,
-            host=selected_host,
-            state_root=java_state,
-            candidates=candidates if cross_host or launcher_java else None,
-            configuration=active_configuration,
-            resolved_bindings=resolved_bindings,
+        java_result = (
+            managed_java_service.for_execution(
+                suite, config_path=(managed_config_path or CONFIGURATION_PATH),
+            ) if managed_java_service is not None and not cross_host
+            and launcher_java is None and explicit_java_state is None
+            else ensure_java_runtime(
+                suite,
+                host=selected_host,
+                state_root=java_state,
+                candidates=candidates if cross_host or launcher_java else None,
+                configuration=active_configuration,
+                resolved_bindings=resolved_bindings,
+            )
         )
     except JavaRuntimeError as exc:
         raise RuntimeLaunchError(str(exc)) from exc

@@ -57,6 +57,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="emit the complete inventory as JSON"
     )
 
+    resources = storage_commands.add_parser(
+        "resources", help="inspect Core-registered resources in current and prior stores"
+    )
+    resource_commands = resources.add_subparsers(dest="resource_action", required=True)
+    resource_list = resource_commands.add_parser("list", help="list retained resource custody")
+    resource_list.add_argument("--json", action="store_true")
+    resource_inspect = resource_commands.add_parser("inspect", help="inspect one resource or record store by exact ID")
+    resource_inspect.add_argument("resource_id")
+    resource_inspect.add_argument("--json", action="store_true")
+    resource_reconcile = resource_commands.add_parser("reconcile", help="finish an interrupted publication after exact verification")
+    resource_reconcile.add_argument("resource_id")
+    resource_reconcile.add_argument("--json", action="store_true")
+
     storage_inspect = storage_commands.add_parser(
         "inspect", help="inspect one inventory resource by exact ID"
     )
@@ -245,6 +258,37 @@ def run(
     )
 
     if args.command == 'storage':
+        if args.storage_action == 'resources':
+            from dataclasses import asdict
+            from ..user_config_home import default_user_config_home
+            from .registered import ResourceCatalog
+
+            catalog = ResourceCatalog(default_user_config_home())
+            if args.resource_action == 'reconcile':
+                result = asdict(catalog.reconcile(args.resource_id))
+                result['path'] = str(result['path'])
+            else:
+                inventory = catalog.inventory()
+                if args.resource_action == 'inspect':
+                    matches = [
+                        *[row for row in inventory['resources'] if row['resource_id'] == args.resource_id],
+                        *[row for row in inventory['record_stores'] if row['store_id'] == args.resource_id],
+                    ]
+                    if len(matches) != 1:
+                        raise manager.RuntimeManagerError('registered resource is unavailable or ambiguous')
+                    result = matches[0]
+                else:
+                    result = inventory
+            if args.json:
+                print(json.dumps(result, indent=2, sort_keys=True))
+            elif args.resource_action == 'list':
+                for row in result['resources']:
+                    print(f"{row['status']}  {row['resource_id']}  {row['path']}")
+                for row in result['record_stores']:
+                    print(f"{row['status']}  {row['store_id']}  {row['path']}")
+            else:
+                print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
         from .. import check_lifecycle as checks
         if args.checks and args.checks_root:
             parser.error('select default check storage or one explicit historical store')

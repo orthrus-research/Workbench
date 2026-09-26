@@ -33,6 +33,12 @@ from workbench_shell.feature_change_workspace import (
     validate_feature_change_session_context,
 )
 from workbench_shell.work_session import SESSION_RECORD_NAME, WorkSessionStore
+from workbench_core.host_services import install_local_host_services
+from workbench_api.record_stores import record_store_scope
+from workbench_core.storage.record_stores import CoreRecordStores
+from workbench_core.storage.registered import ResourceCatalog
+
+install_local_host_services()
 
 
 SCHEMA_ROOT = ROOT / "modules/workbench-shell/schemas"
@@ -45,6 +51,21 @@ def _validator(name: str) -> Draft202012Validator:
 
 
 class FeatureChangeSessionContextTests(unittest.TestCase):
+    def test_core_registers_selection_namespace_at_historical_location(self) -> None:
+        provider = CoreRecordStores(
+            workspace=self.root, configuration_home=self.root / "config",
+            owner_id="workbench-shell",
+        )
+        with record_store_scope(provider):
+            selected = feature_change_workspace._session_context_root(ROOT)
+        self.assertEqual(
+            self.machine_state / "product-spine/feature-change-session-context-v1",
+            selected,
+        )
+        rows = ResourceCatalog(self.root / "config").inventory(workspace=self.root)["record_stores"]
+        self.assertEqual([str(selected)], [row["path"] for row in rows])
+        self.assertEqual("available", rows[0]["status"])
+
     def setUp(self) -> None:
         parent = ROOT / ".workbench/test-tmp"
         parent.mkdir(parents=True, exist_ok=True)
@@ -336,11 +357,11 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         failure: list[BaseException] = []
         original_replace = feature_change_workspace._replace_json
 
-        def blocked_replace(path: Path, value: dict[str, object]) -> None:
+        def blocked_replace(path: Path, value: dict[str, object], **conditions: object) -> None:
             entered.set()
             if not release.wait(10):
                 raise AssertionError("selection contention gate timed out")
-            original_replace(path, value)
+            original_replace(path, value, **conditions)
 
         def first_writer() -> None:
             try:
