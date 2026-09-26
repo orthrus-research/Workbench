@@ -371,6 +371,16 @@ class TreeCatalog:
             raise ManagedTreeError("tree.changed", "managed tree commit changed")
         return value
 
+    def abort_record(self, tree_id: str) -> dict:
+        nonce = _nonce(tree_id)
+        value = self._read("aborts", nonce, ABORT_KIND)
+        if (set(value) != {"id", "format", "tree_id", "reason", "aborted_at"}
+                or value["format"] != ABORT_KIND or value["tree_id"] != tree_id
+                or not isinstance(value["reason"], str)
+                or not isinstance(value["aborted_at"], str)):
+            raise ManagedTreeError("tree.changed", "managed tree abort changed")
+        return value
+
     def abort(self, tree_id: str, reason: str) -> dict:
         nonce = _nonce(tree_id)
         from datetime import datetime, timezone
@@ -520,6 +530,7 @@ class TreeCatalog:
         if not self.root.exists() and not self.root.is_symlink():
             return []
         names = ("reservations", "intents", "commits", "aborts", "leases")
+        children: dict[str, list[Path]] = {}
         try:
             check_storage.ordinary(self.root, directory=True)
             if not private_path(self.root, directory=True):
@@ -531,8 +542,9 @@ class TreeCatalog:
                 check_storage.ordinary(directory, directory=True)
                 if not private_path(directory, directory=True):
                     raise ValueError("managed tree namespace lost private custody")
+                children[name] = sorted(directory.iterdir())
                 suffix = ".lock" if name == "leases" else ".json"
-                for path in directory.iterdir():
+                for path in children[name]:
                     info = path.lstat()
                     if (re.fullmatch(r"[0-9a-f]{32}" + re.escape(suffix), path.name) is None
                             or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
@@ -546,17 +558,26 @@ class TreeCatalog:
             # A lease may precede its reservation if staging was interrupted.
         except (OSError, ValueError) as exc:
             raise ManagedTreeError("tree.changed", "managed tree catalog inventory is unavailable or changed") from exc
+
+        # Validate retained child content globally. A selected-workspace query
+        # must not hide a changed intent, commit, or abort from another workspace.
+        intents = {
+            path.stem: self.intent(f"workbench-tree-v1:{path.stem}")
+            for path in children["intents"]
+        }
+        for path in children["commits"]:
+            intent = intents.get(path.stem)
+            if intent is None:
+                raise ManagedTreeError("tree.changed", "managed tree commit lost its intent")
+            self.commit(f"workbench-tree-v1:{path.stem}", intent)
+        for path in children["aborts"]:
+            self.abort_record(f"workbench-tree-v1:{path.stem}")
         result = []
-        for path in sorted(self._directory("reservations").glob("*.json")):
+        for path in children["reservations"]:
             tree_id = f"workbench-tree-v1:{path.stem}"
             reservation = self.reservation(tree_id)
             selected = workspace is None or reservation["workspace"] == str(workspace)
-            intent_path = self._path("intents", path.stem)
-            intent = (
-                self.intent(tree_id)
-                if intent_path.is_file() and (selected or validate_references is not None)
-                else None
-            )
+            intent = intents.get(path.stem)
             if intent is not None and validate_references is not None:
                 validate_references(tree_id, str(reservation["workspace"]), tuple(intent["references"]))
             if not selected:

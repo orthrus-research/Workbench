@@ -14,10 +14,13 @@ import workbench_core.managed_trees as tree_module
 from workbench_api import Capability, ExecutionContext, Module
 from workbench_api.durable_resources import DurableResourceError
 from workbench_api.managed_trees import ManagedTreeError, managed_trees
+from workbench_core import check_storage
 from workbench_core.managed_trees import CoreManagedTrees
 from workbench_core.modules import InstalledModule, dispatch
 from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
-from workbench_core.storage.tree_catalog import TreeCatalog, DERIVED_INTENT_KIND, INTENT_KIND
+from workbench_core.storage.tree_catalog import (
+    ABORT_KIND, COMMIT_KIND, DERIVED_INTENT_KIND, INTENT_KIND, TreeCatalog,
+)
 from workbench_core.storage import manager
 
 
@@ -202,6 +205,51 @@ class ManagedTreeTests(unittest.TestCase):
             self.assertEqual([reference.tree_id], [row["tree_id"] for row in rows])
         finally:
             orphan_lease.unlink()
+
+    def test_foreign_tree_child_content_is_checked_before_workspace_filter(self) -> None:
+        own = self._publish()
+        foreign_workspace = self.home / "foreign-workspace"
+        foreign_workspace.mkdir()
+        foreign_host = CoreManagedTrees(
+            workspace=foreign_workspace, configuration_home=self.config,
+            locations={"evidence": self.home / "foreign-evidence"}, owner_id="atlas",
+        )
+        with foreign_host.stage("evidence", "published") as stage:
+            stage.path.mkdir()
+            (stage.path / "payload.txt").write_bytes(b"foreign\n")
+            published = stage.publish(validate=lambda _: None)
+        with foreign_host.stage("evidence", "aborted") as stage:
+            aborted_id = stage.tree_id
+        catalog = ResourceCatalog(self.config)
+        self.assertEqual([own.tree_id], [row["tree_id"] for row in
+                         catalog.trees.inventory(workspace=self.workspace)])
+        self.assertEqual([own.tree_id], [row["tree_id"] for row in
+                         catalog.inventory(workspace=self.workspace)["trees"]])
+
+        published_nonce = published.tree_id.rsplit(":", 1)[1]
+        aborted_nonce = aborted_id.rsplit(":", 1)[1]
+        root = catalog.trees.root
+        cases = (
+            (root / "intents" / f"{published_nonce}.json", "reservation_id", "different", INTENT_KIND),
+            (root / "commits" / f"{published_nonce}.json", "intent_id", "different", COMMIT_KIND),
+            (root / "aborts" / f"{aborted_nonce}.json", "tree_id", own.tree_id, ABORT_KIND),
+        )
+        for path, field, value, kind in cases:
+            with self.subTest(path=path):
+                original = path.read_bytes()
+                forged = json.loads(original)
+                forged[field] = value
+                forged = check_storage.seal(kind, {key: item for key, item in forged.items() if key != "id"})
+                path.write_bytes(check_storage.canonical(forged) + b"\n")
+                try:
+                    with self.assertRaises(ManagedTreeError) as direct:
+                        catalog.trees.inventory(workspace=self.workspace)
+                    self.assertEqual("tree.changed", direct.exception.code)
+                    with self.assertRaises(ManagedTreeError) as integrated:
+                        catalog.inventory(workspace=self.workspace)
+                    self.assertEqual("tree.changed", integrated.exception.code)
+                finally:
+                    path.write_bytes(original)
 
     def test_exact_target_lookup_scopes_committed_and_allocated_trees(self) -> None:
         output = self.workspace / "graphs" / "selected"
