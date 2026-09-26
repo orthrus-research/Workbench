@@ -143,6 +143,27 @@ class EnvironmentProjectImportTests(unittest.TestCase):
         self.assertEqual("reused", reused["outcome"])
         self.assertEqual(checkout, Path(reused["managed_destination"]))
 
+    def test_v3_tool_locked_share_acquires_project_without_claiming_tool_bytes(self) -> None:
+        self.share = build_share(
+            self.source_suite, "pack", environment=self.source_environment,
+            bind_project_source_lock=True, bind_managed_tools=True,
+        )
+        plan = self._plan()
+        self.assertEqual(("ready", "workbench-environment-project-import-plan-v2"),
+                         (plan["state"], plan["format"]))
+        self.assertEqual(self.share["lock"]["managed_tool_lock"], plan["managed_tool_lock"])
+        result = self._apply(plan)
+        self.assertEqual("workbench-environment-project-import-result-v2", result["format"])
+        self.assertEqual(plan["managed_tool_lock"], result["managed_tool_lock"])
+        self.assertNotIn("workspace-project-bytes", result["unresolved_inputs"])
+        self.assertIn("profile-fixture-and-tool-bytes", result["unresolved_inputs"])
+        self.assertEqual(self.commit, self._git(
+            "-C", result["managed_destination"], "rev-parse", "HEAD",
+        ).strip())
+        repeat = self._plan()
+        self.assertEqual(("ready", "reuse"), (repeat["state"], repeat["action"]))
+        self.assertEqual("reused", self._apply(repeat)["outcome"])
+
     def test_moved_remote_ref_and_changed_checkout_do_not_pass_review(self) -> None:
         plan = self._plan()
         (self.work / "pack.marker").write_bytes(b"new channel bytes\n")

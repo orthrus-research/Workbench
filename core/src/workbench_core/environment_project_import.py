@@ -1,4 +1,4 @@
-"""Reviewed V1 project-byte import for a V2 portable environment source lock.
+"""Reviewed project-byte import for portable exact source locks.
 
 This binds one exact Git commit and tree to a Core-managed input. Earlier
 environment import receipts remain local bindings with unresolved project bytes.
@@ -17,7 +17,7 @@ from .configuration import CONFIGURATION_PATH
 from .durable_records import read_bounded_bytes, read_private_bytes
 from .environment_resolution import resolve_environment
 from .environment_reconstruction import (
-    ReconstructionError, SHARE_FORMAT_V2, _canonical, _host_variant,
+    ReconstructionError, SHARE_FORMAT_V2, SHARE_FORMAT_V3, _canonical, _host_variant,
     _resource_host, _seal, plan_import, validate_share,
 )
 from .host_filesystem import private_path, secure_private_path
@@ -27,7 +27,9 @@ from .source_checkouts import CoreSourceCheckouts
 
 
 PLAN_FORMAT = "workbench-environment-project-import-plan-v1"
+PLAN_FORMAT_V2 = "workbench-environment-project-import-plan-v2"
 RESULT_FORMAT = "workbench-environment-project-import-result-v1"
+RESULT_FORMAT_V2 = "workbench-environment-project-import-result-v2"
 ACQUISITION_FORMAT = "workbench-environment-project-acquisition-v1"
 _BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\Z")
 _MAX_GIT_BYTES = 64 * 1024 * 1024
@@ -179,8 +181,9 @@ def plan_project_import(
     """Review one exact project acquisition without writing or contacting a remote."""
 
     portable = validate_share(dict(share))
-    if portable["format"] != SHARE_FORMAT_V2:
-        raise ReconstructionError("project-byte import requires a V2 share with an exact source lock")
+    if portable["format"] not in {SHARE_FORMAT_V2, SHARE_FORMAT_V3}:
+        raise ReconstructionError("project-byte import requires a share with an exact source lock")
+    tool_bound = portable["format"] == SHARE_FORMAT_V3
     if (type(branch) is not str or _BRANCH.fullmatch(branch) is None
             or ".." in branch or branch.endswith("/")):
         raise ReconstructionError("project acquisition branch is invalid")
@@ -224,8 +227,9 @@ def plan_project_import(
             action = "reuse"
         except ReconstructionError as exc:
             blockers.append(str(exc))
-    return _seal({
-        "format": PLAN_FORMAT, "schema_version": 1,
+    body = {
+        "format": PLAN_FORMAT_V2 if tool_bound else PLAN_FORMAT,
+        "schema_version": 2 if tool_bound else 1,
         "share_id": portable["share_id"], "lock_id": portable["lock"]["lock_id"],
         "base_plan_id": base["plan_id"], "workspace": base["workspace"],
         "workspace_name": workspace_name, "environment_resolution_id": base["environment_resolution_id"],
@@ -237,7 +241,10 @@ def plan_project_import(
         "action": action, "blockers": blockers,
         "state": "blocked" if blockers else "ready",
         "unresolved_inputs": list(base["unresolved_inputs"]),
-    }, "workbench-environment-project-import-plan", "plan_id")
+    }
+    if tool_bound:
+        body["managed_tool_lock"] = portable["lock"]["managed_tool_lock"]
+    return _seal(body, "workbench-environment-project-import-plan", "plan_id")
 
 
 def apply_project_import(
@@ -270,11 +277,16 @@ def apply_project_import(
     if service.policy_id != plan["environment_resolution_id"]:
         raise ReconstructionError("project import resolution changed after review")
     prepared = {
-        "format": "workbench-environment-project-import-attempt-v1", "schema_version": 1,
+        "format": ("workbench-environment-project-import-attempt-v2"
+                   if portable["format"] == SHARE_FORMAT_V3
+                   else "workbench-environment-project-import-attempt-v1"),
+        "schema_version": 2 if portable["format"] == SHARE_FORMAT_V3 else 1,
         "state": "prepared", "plan_id": plan["plan_id"],
         "share_id": plan["share_id"], "project_source_lock": plan["project_source_lock"],
         "managed_destination": plan["managed_destination"],
     }
+    if portable["format"] == SHARE_FORMAT_V3:
+        prepared["managed_tool_lock"] = plan["managed_tool_lock"]
     prepared_ref = service.publish_bytes(
         "evidence", "environment-project-import-attempt.json",
         _canonical(prepared) + b"\n", domain_id=plan["share_id"],
@@ -344,7 +356,8 @@ def apply_project_import(
         environment=git_environment, required=plan["required_paths"],
     )
     result = {
-        "format": RESULT_FORMAT, "schema_version": 1,
+        "format": RESULT_FORMAT_V2 if portable["format"] == SHARE_FORMAT_V3 else RESULT_FORMAT,
+        "schema_version": 2 if portable["format"] == SHARE_FORMAT_V3 else 1,
         "outcome": "acquired" if plan["action"] == "acquire" else "reused",
         "plan_id": plan["plan_id"], "share_id": plan["share_id"],
         "attempt_resource_id": prepared_ref.resource_id,
@@ -359,6 +372,8 @@ def apply_project_import(
         ],
         "scope": "Exact managed pack project bytes only; packages, fixtures, tools and Java remain separate inputs.",
     }
+    if portable["format"] == SHARE_FORMAT_V3:
+        result["managed_tool_lock"] = plan["managed_tool_lock"]
     payload = _canonical(result) + b"\n"
     completed = _resource_host(Path(suite_root), Path(plan["workspace"]), values)
     reference = completed.publish_bytes(
