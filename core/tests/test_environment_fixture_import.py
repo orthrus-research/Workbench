@@ -19,8 +19,8 @@ from workbench_core.environment_reconstruction import ReconstructionError, _cano
 from workbench_core.output_routing import _private_directory
 from workbench_core.storage.registered import CoreDurableResources
 
-from . import test_environment_input_candidates as candidate_tests
-from .test_environment_reconstruction import _environment
+import test_environment_input_candidates as candidate_tests
+from test_environment_reconstruction import _environment
 
 
 class _ImportFixtureOwner:

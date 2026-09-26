@@ -17,7 +17,7 @@ from workbench_core.environment_reconstruction import (
 )
 from workbench_core.user_preferences import register_workspace, set_workspace_selection
 
-from .test_environment_reconstruction import SOURCE_SUITE, _environment, _suite
+from test_environment_reconstruction import SOURCE_SUITE, _environment, _suite
 
 
 class EnvironmentToolImportTests(unittest.TestCase):

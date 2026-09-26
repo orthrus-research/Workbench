@@ -23,7 +23,7 @@ from workbench_core.environment_reconstruction import (
 )
 from workbench_core.user_preferences import register_workspace
 
-from .test_environment_reconstruction import SOURCE_SUITE, _environment, _suite
+from test_environment_reconstruction import SOURCE_SUITE, _environment, _suite
 
 
 def _wheel(path: Path) -> Path:

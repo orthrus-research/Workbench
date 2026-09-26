@@ -19,7 +19,7 @@ from workbench_core.host_filesystem import HostFilesystemError
 from workbench_core.user_preferences import register_workspace, set_workspace_selection
 from workbench_core.source_checkouts import SourceCheckoutError
 
-from .test_environment_reconstruction import SOURCE_SUITE, _environment, _suite
+from test_environment_reconstruction import SOURCE_SUITE, _environment, _suite
 
 
 class EnvironmentProjectImportTests(unittest.TestCase):

@@ -14,7 +14,7 @@ from workbench_core.environment_reconstruction import (
 from workbench_core import tooling_provision
 from workbench_core.user_preferences import set_workspace_selection
 
-from . import test_environment_project_import as project_fixture
+import test_environment_project_import as project_fixture
 
 
 class EnvironmentCompositionTests(unittest.TestCase):

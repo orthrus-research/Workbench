@@ -23,8 +23,8 @@ from workbench_core.storage.registered import CoreDurableResources
 from workbench_core.user_preferences import register_workspace
 from workbench_core.output_routing import _private_directory
 
-from .test_environment_input_candidates import _wheel
-from .test_environment_reconstruction import SOURCE_SUITE, _environment, _suite
+from test_environment_input_candidates import _wheel
+from test_environment_reconstruction import SOURCE_SUITE, _environment, _suite
 
 
 @skipIf(not sys.platform.startswith("linux"), "wheel import is a Linux/WSL slice")
