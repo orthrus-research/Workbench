@@ -46,6 +46,9 @@ class CoreRecordStores:
             # Release, history and session callers select distinct historical
             # CAS roots. Keep their V1 object keys and locators unchanged.
             root = selected
+        elif self.owner_id == "blueprints" and family == "blueprints-session-pointer-v1":
+            # The session's current.json stays beside its historical CAS root.
+            root = selected
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

@@ -162,6 +162,19 @@ class DurableResourceTests(unittest.TestCase):
             CoreRecordStores(workspace=self.workspace, configuration_home=self.config,
                              owner_id="workbench-shell").open("blueprints-artifact-v1", roots[0])
 
+    def test_blueprints_session_pointer_registers_its_v1_directory(self) -> None:
+        root = self.workspace / ".workbench/blueprints/session-one"
+        provider = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="blueprints",
+        )
+        opened = provider.open("blueprints-session-pointer-v1", root)
+        self.assertEqual(root, opened.root)
+        self.assertEqual(opened, provider.open("blueprints-session-pointer-v1", root))
+        with self.assertRaises(DurableResourceError):
+            CoreRecordStores(workspace=self.workspace, configuration_home=self.config,
+                             owner_id="workbench-shell").open("blueprints-session-pointer-v1", root)
+
     def test_dispatch_binds_core_and_inventory_sees_external_root(self) -> None:
         captured = []
 

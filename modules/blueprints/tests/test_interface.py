@@ -11,6 +11,7 @@ from pathlib import Path
 import sys
 from typing import Any
 import unittest
+from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 
@@ -516,6 +517,24 @@ class InterfaceTest(unittest.TestCase):
         self.assertEqual(
             result["diagnostics"][0]["code"], "BPA111_ARTIFACT_MISSING"
         )
+
+    def test_session_pointer_uses_core_custody_and_historical_read(self) -> None:
+        self._core("instructions")
+        pointer_path = self.workspace / "current.json"
+        before = pointer_path.read_bytes()
+        self.assertEqual(standards.canonical_json(json.loads(before)).encode("utf-8"), before)
+        catalog_root = self.fixture.configuration_home / "resources-v1/stores"
+        stores = [json.loads(path.read_text(encoding="utf-8")) for path in catalog_root.glob("*.json")]
+        self.assertIn(
+            ("blueprints-session-pointer-v1", str(self.workspace)),
+            {(row["family"], row["root"]) for row in stores},
+        )
+        with (
+            patch("workbench_blueprints.interface.open_record_store", return_value=None),
+            patch("workbench_blueprints.lifecycle.open_record_store", return_value=None),
+        ):
+            self.assertEqual("initialized", interface.SessionStore(self.workspace).load()["run"]["state"])
+        self.assertEqual(before, pointer_path.read_bytes())
 
     def test_workspace_traversal_is_rejected_before_creation(self) -> None:
         escaped = (

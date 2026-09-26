@@ -13,11 +13,16 @@ import os
 from pathlib import Path
 import re
 import stat
-import tempfile
 from typing import Any, Iterator, NoReturn
 
 from jsonschema import Draft202012Validator
 
+from workbench_api.durable_resources import DurableResourceError
+from workbench_api.host_filesystem import (
+    DurableRecordError, HostFilesystemError, read_private_bytes,
+    replace_private_bytes,
+)
+from workbench_api.record_stores import open_record_store
 from workbench_blueprints import lifecycle, planner, simulation, standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
 
@@ -331,29 +336,6 @@ def _admit(run: dict[str, Any], command: str, states: set[str]) -> None:
         )
 
 
-def _atomic_json(path: Path, value: dict[str, Any]) -> None:
-    content = standards.canonical_json(value).encode("utf-8")
-    temporary: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            dir=path.parent,
-            prefix=".interface.",
-            delete=False,
-        ) as handle:
-            temporary = handle.name
-            os.fchmod(handle.fileno(), 0o600)
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-        lifecycle._fsync_directory(path.parent, "BPA109_STORE_COLLISION")
-        temporary = None
-    finally:
-        if temporary is not None:
-            Path(temporary).unlink(missing_ok=True)
-
-
 class SessionStore:
     """Atomic current pointer over canonical content-addressed session states."""
 
@@ -429,7 +411,20 @@ class SessionStore:
             "format": "susy-blueprints-session-pointer-v1",
             "session_sha256": locator.rsplit(":", 1)[1],
         }
-        _atomic_json(self.pointer_path, pointer)
+        try:
+            managed = open_record_store("blueprints-session-pointer-v1", self.workspace)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPI106_WORKSPACE", str(self.workspace), str(exc))
+        if managed is None or managed.root != self.workspace:
+            _fail("BPI106_WORKSPACE", str(self.workspace), "session publication requires its Core store")
+        content = standards.canonical_json(pointer).encode("utf-8")
+        try:
+            replace_private_bytes(self.pointer_path, content, byte_limit=256)
+            observed = read_private_bytes(self.pointer_path, byte_limit=256)
+        except (DurableRecordError, HostFilesystemError, OSError) as exc:
+            _fail("BPI109_SESSION_POINTER", str(self.pointer_path), str(exc))
+        if observed != content:
+            _fail("BPI109_SESSION_POINTER", str(self.pointer_path), "session pointer changed after publication")
         return locator
 
     def load(self) -> dict[str, Any]:
@@ -440,7 +435,19 @@ class SessionStore:
                 "session has not been initialized",
                 exit_code=3,
             )
-        content = _read_regular(self.pointer_path, "BPI109_SESSION_POINTER")
+        try:
+            managed = open_record_store("blueprints-session-pointer-v1", self.workspace)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPI106_WORKSPACE", str(self.workspace), str(exc))
+        if managed is None:
+            content = _read_regular(self.pointer_path, "BPI109_SESSION_POINTER")
+        else:
+            if managed.root != self.workspace:
+                _fail("BPI106_WORKSPACE", str(self.workspace), "Core selected a different session root")
+            try:
+                content = read_private_bytes(self.pointer_path, byte_limit=256)
+            except (DurableRecordError, HostFilesystemError, OSError) as exc:
+                _fail("BPI109_SESSION_POINTER", str(self.pointer_path), str(exc))
         try:
             pointer = json.loads(content, object_pairs_hook=_strict_object)
         except (UnicodeError, json.JSONDecodeError) as exc:
