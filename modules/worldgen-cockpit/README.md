@@ -62,6 +62,10 @@ The direct aliases are `workbench cockpit ...` and
 `workbench worldgen compare ...`. The high-signal console exposes the same
 arguments through `world-studio.cockpit-run`, `-compare`, `-show`, and `-open`
 wizards.
+Execute `run` through Workbench Core so it can reserve and retain the mutable
+experiment and child iteration roots. A module-direct `run` without a bound
+Core host refuses before creating output; read-only preview and report commands
+remain available.
 
 See the [architecture](../../docs/architecture/WORLDGEN-COCKPIT.md), the
 [V1 contract](contracts/worldgen-cockpit-v1.md), and the

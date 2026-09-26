@@ -128,7 +128,7 @@ def doctor(argv, *, context):
 def run(argv, *, context):
     from .run_commands import _managed_run_main
     context.check_cancelled()
-    return _managed_run_main(list(argv))
+    return _managed_run_main(list(argv), workspace=context.workspace)
 
 
 def feature(argv, *, context):

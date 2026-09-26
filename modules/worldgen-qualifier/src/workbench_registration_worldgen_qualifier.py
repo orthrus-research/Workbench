@@ -18,4 +18,4 @@ def qualify(argv, *, context):
     context.check_cancelled()
     from workbench_worldgen_qualifier.cli import main
     from workbench_api.resources import repository_root
-    return main(argv, root=repository_root(__file__))
+    return main(argv, root=repository_root(__file__), workspace=context.workspace)

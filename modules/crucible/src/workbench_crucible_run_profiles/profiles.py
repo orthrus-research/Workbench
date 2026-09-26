@@ -528,6 +528,7 @@ def _without_value_option(arguments: Sequence[str], option: str) -> list[str]:
 def resolve_managed_run_plan(
     root: Path,
     *,
+    workspace: Path | None = None,
     profile_name: str,
     recipe_name: str,
     doctor_report: Mapping[str, Any],
@@ -543,6 +544,7 @@ def resolve_managed_run_plan(
         root = root.expanduser().resolve(strict=True)
     except OSError as exc:
         raise ManagedRunProfileError(f"Workbench root is unavailable: {root}") from exc
+    selected_workspace = root if workspace is None else workspace.expanduser().resolve(strict=True)
     if side != "dedicated-server":
         raise ManagedRunProfileError(
             f"managed run plan V1 supports only dedicated-server, not {side!r}"
@@ -729,7 +731,7 @@ def resolve_managed_run_plan(
         ]
         if recipe["record_jfr"]:
             recording = (
-                root
+                selected_workspace
                 / ".workbench/iterations/worldgen"
                 / effective_label
                 / "runtime/worldgen-iteration.jfr"
@@ -1382,13 +1384,30 @@ def execute_managed_run_plan(
     plan: Mapping[str, Any],
     *,
     root: Path,
+    workspace: Path | None = None,
     runner: Callable[..., int],
 ) -> int:
     validate_managed_run_freshness(plan, root=root)
     if plan.get("status") == "blocked" or plan["availability"]["state"] != "available":
         raise ManagedRunProfileError("blocked or unavailable managed run plan cannot be executed")
     arguments = list(plan["runner"]["arguments"])
-    return runner(arguments, root=root.expanduser().resolve())
+    resolved_root = root.expanduser().resolve(strict=True)
+    if workspace is None:
+        return runner(arguments, root=resolved_root)
+    selected_workspace = workspace.expanduser().resolve(strict=True)
+    if plan["effective"]["record_jfr"]:
+        label = _runner_options(arguments)[0]["--label"]
+        expected = (
+            selected_workspace / ".workbench/iterations/worldgen" / label
+            / "runtime/worldgen-iteration.jfr"
+        )
+        if not any(
+            argument.startswith("-XX:StartFlightRecording=")
+            and f"filename={expected}," in argument
+            for argument in plan["effective"]["jvm_arguments"]
+        ):
+            raise ManagedRunProfileError("managed run JFR path differs from selected workspace")
+    return runner(arguments, root=resolved_root, workspace=selected_workspace)
 
 
 __all__ = [

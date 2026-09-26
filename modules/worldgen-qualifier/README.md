@@ -38,6 +38,10 @@ python3 tools/workbench.py worldgen qualify run \
 
 Execute it by omitting `--show`. A rejected or inconclusive qualification
 returns exit 1; an operational or malformed-input failure returns exit 2.
+Execute `run` through Workbench Core so it can reserve and retain the mutable
+qualification, Cockpit, and iteration roots. A module-direct `run` without a
+bound Core host refuses before creating output; preview and report commands
+remain available.
 If required coverage is already known to be unavailable, preview is marked
 `ATTENTION` and execution refuses before launching Minecraft. The explicit
 `--allow-inconclusive` override exists only when retaining partial evidence is

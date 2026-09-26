@@ -385,7 +385,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _run_in_allocation(
-    argv: Sequence[str], *, root: Path, iteration_root: Path,
+    argv: Sequence[str], *, root: Path, workspace: Path, iteration_root: Path,
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(list(argv))
@@ -842,6 +842,8 @@ def _run_in_allocation(
     capture_command = [
         sys.executable,
         str(root / "modules/crucible/tools/run_strata_observation.py"),
+        "--workspace",
+        str(workspace),
         "--strata-root",
         str(strata_root),
         "--runtime",
@@ -1148,6 +1150,8 @@ def _run_in_allocation(
             sys.executable,
             str(root / "modules/crucible/tools/serve_strata_observation.py"),
             str(handoff),
+            "--workspace",
+            str(workspace),
             "--check",
         ]
         _run_streaming(
@@ -1173,6 +1177,8 @@ def _run_in_allocation(
                 sys.executable,
                 str(root / "modules/crucible/tools/serve_strata_observation.py"),
                 str(handoff),
+                "--workspace",
+                str(workspace),
             ]
             process = subprocess.Popen(
                 viewer_command,
@@ -1252,7 +1258,10 @@ def run(argv: Sequence[str], *, root: Path, workspace: Path | None = None) -> in
     allocation = custody.allocate("worldgen-iteration", args.label, requested_path=requested)
     with custody.execution(allocation):
         try:
-            result = _run_in_allocation(argv, root=root, iteration_root=allocation.path)
+            result = _run_in_allocation(
+                argv, root=root, workspace=selected_workspace,
+                iteration_root=allocation.path,
+            )
             evidence, references = _iteration_evidence(allocation.path)
             custody.finish(
                 allocation, outcome="complete", evidence=evidence,

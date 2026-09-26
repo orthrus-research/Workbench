@@ -72,6 +72,20 @@ class StrataObservationReceiptTests(unittest.TestCase):
         )
         self.write_json(self.report, self.report_value())
 
+    def test_capture_tool_accepts_explicit_workspace_without_changing_source_root(self) -> None:
+        tool = load_observation_tool()
+        args = tool.parse_args([
+            "--workspace", str(self.workbench),
+            "--runtime", str(self.runtime),
+            "--output-root", str(self.output / "new-observation"),
+        ])
+        self.assertEqual(self.workbench, args.workspace)
+        self.assertEqual(self.runtime, tool.require_under(
+            args.runtime, args.workspace / ".workbench", "runtime",
+        ))
+        with self.assertRaisesRegex(StrataObservationValidationError, "must be inside"):
+            tool.require_under(args.runtime, ROOT / ".workbench", "runtime")
+
     @staticmethod
     def write(path: Path, value: str | bytes) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)

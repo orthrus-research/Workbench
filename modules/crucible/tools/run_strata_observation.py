@@ -199,6 +199,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=Path(os.environ.get("WORKBENCH_STRATA_ROOT", ROOT.parent / "strata")),
     )
+    parser.add_argument(
+        "--workspace", type=Path, default=ROOT,
+        help="selected Workbench workspace holding runtime and retained capture",
+    )
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--server-jar", type=Path)
     parser.add_argument(
@@ -250,9 +254,10 @@ def main(argv: list[str] | None = None) -> int:
             "--label must match [A-Za-z0-9][A-Za-z0-9_.-]{0,95}"
         )
     strata_root = args.strata_root.expanduser().resolve(strict=True)
+    workspace = args.workspace.expanduser().resolve(strict=True)
     runtime = require_under(
         args.runtime,
-        ROOT / ".workbench",
+        workspace / ".workbench",
         "runtime",
     )
     server_jar = discover_server_jar(runtime, args.server_jar)
@@ -268,8 +273,8 @@ def main(argv: list[str] | None = None) -> int:
         or build_java_home
     ).expanduser().resolve(strict=True)
     output_root = require_under(
-        args.output_root or ROOT / ".workbench/evidence/strata" / args.label,
-        ROOT / ".workbench",
+        args.output_root or workspace / ".workbench/evidence/strata" / args.label,
+        workspace / ".workbench",
         "output root",
     )
     if output_root.exists():
@@ -335,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     ]
     reused_scan: Path | None = None
     if args.scan:
-        reused_scan = require_under(args.scan, ROOT / ".workbench", "scan")
+        reused_scan = require_under(args.scan, workspace / ".workbench", "scan")
         command.extend(["--scan", str(reused_scan)])
     command.extend(["--observer-java-home", str(build_java_home)])
     command.extend(
@@ -378,7 +383,7 @@ def main(argv: list[str] | None = None) -> int:
                 "V2 micro-region receipts require an absolute --java-cmd under a JDK bin directory"
             )
         receipt = build_strata_micro_region_receipt(
-            workbench_root=ROOT,
+            workbench_root=workspace,
             strata_root=strata_root,
             runtime_root=runtime,
             server_jar=server_jar,
@@ -399,7 +404,7 @@ def main(argv: list[str] | None = None) -> int:
         write_strata_micro_region_receipt(receipt_path, receipt)
     else:
         receipt = build_strata_observation_receipt(
-            workbench_root=ROOT,
+            workbench_root=workspace,
             strata_root=strata_root,
             runtime_root=runtime,
             server_jar=server_jar,

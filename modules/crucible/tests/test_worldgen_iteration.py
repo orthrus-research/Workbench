@@ -89,8 +89,9 @@ class WorldgenIterationTests(unittest.TestCase):
             locations={"evidence": self.root / "evidence"}, owner_id="crucible",
         )
 
-        def complete(_argv, *, root: Path, iteration_root: Path) -> int:
+        def complete(_argv, *, root: Path, workspace: Path, iteration_root: Path) -> int:
             self.assertEqual(self.root, root)
+            self.assertEqual(selected_workspace, workspace)
             self.assertEqual(selected_workspace / ".workbench/iterations/worldgen/trial", iteration_root)
             (iteration_root / "runtime").mkdir()
             report = {"format": FORMAT, "status": "complete", "label": "trial"}
@@ -116,7 +117,8 @@ class WorldgenIterationTests(unittest.TestCase):
             locations={"evidence": self.root / "evidence"}, owner_id="crucible",
         )
 
-        def fail(_argv, *, root: Path, iteration_root: Path) -> int:
+        def fail(_argv, *, root: Path, workspace: Path, iteration_root: Path) -> int:
+            self.assertEqual(self.root, workspace)
             (iteration_root / "iteration-report-v1.json").write_text(
                 json.dumps({"format": FORMAT, "status": "failed", "label": "trial"}),
             )

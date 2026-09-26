@@ -9,11 +9,14 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[3]
 for source in (
+    ROOT / "api/src",
+    ROOT / "core/src",
     ROOT / "modules/worldgen-qualifier/src",
     ROOT / "modules/worldgen-cockpit/src",
     ROOT / "modules/subsurface-studio/src",
@@ -26,12 +29,20 @@ for source in (
 
 from workbench_worldgen_qualifier.assessment import assess_matrix  # noqa: E402
 from workbench_worldgen_qualifier.cli import run as cli_run  # noqa: E402
+from workbench_worldgen_qualifier.cli import build_parser, _run_plan_args  # noqa: E402
+from workbench_worldgen_cockpit.model import load_profile as load_cockpit_profile  # noqa: E402
 from workbench_worldgen_qualifier.model import (  # noqa: E402
     QualifierError,
     load_profile,
     validate_qualification,
 )
 from workbench_worldgen_qualifier.risk import scan_jars  # noqa: E402
+from workbench_worldgen_qualifier.orchestrator import (  # noqa: E402
+    build_qualification_plan, execute_qualification_plan,
+)
+from workbench_worldgen_qualifier import orchestrator as qualifier_orchestrator  # noqa: E402
+from workbench_api.working_allocations import working_allocations_scope  # noqa: E402
+from workbench_core.working_allocations import CoreWorkingAllocations  # noqa: E402
 
 
 def _class_bytes(*constants: str) -> bytes:
@@ -147,6 +158,87 @@ class WorldgenQualifierTests(unittest.TestCase):
         self.assertIn("ATTENTION", release.getvalue())
         self.assertIn("capability.traversal-order", release.getvalue())
         self.assertIn("--allow-inconclusive", release.getvalue())
+
+    def test_core_custody_passes_workspace_to_nested_cockpit_cells(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            workspace = base / "workspace"
+            workspace.mkdir()
+            artifact = base / "worldgen.jar"
+            artifact.write_bytes(b"exact fixture artifact")
+            cockpit, cockpit_binding = load_cockpit_profile(self.profile["_cockpit_profile"], root=ROOT)
+            args = build_parser().parse_args([
+                "run", "--profile", "supersymmetry", "--label", "workspace-matrix",
+                "--artifact", str(artifact),
+            ])
+            plan = build_qualification_plan(
+                root=ROOT, workspace=workspace, profile=self.profile,
+                profile_binding=self.profile_binding,
+                cockpit_profile=cockpit, cockpit_profile_binding=cockpit_binding,
+                **_run_plan_args(args),
+            )
+            custody = CoreWorkingAllocations(
+                workspace=workspace, configuration_home=base / "config",
+                locations={"evidence": base / "evidence"}, owner_id="worldgen-qualifier",
+            )
+            seen: list[Path] = []
+
+            def cockpit_cell(*, root, workspace, plan, **_kwargs):
+                self.assertEqual(ROOT, root)
+                self.assertEqual(custody.workspace, workspace)
+                path = Path(plan["experiment"]["output_root"]) / "worldgen-cockpit-report-v1.json"
+                self.assertTrue(path.is_relative_to(workspace / ".workbench/experiments/worldgen"))
+                path.parent.mkdir(parents=True)
+                path.write_text("{}\n")
+                seen.append(path)
+                report = {
+                    "report_id": "fixture", "status": "equivalent",
+                    "sides": {
+                        side: {
+                            "iteration_report": {"path": str(path.parent / side / "iteration-report-v1.json")},
+                        } for side in ("baseline", "candidate")
+                    },
+                }
+                return report, path, path.with_suffix(".html"), path.parent / "cockpit-session-v1.json"
+
+            def html(path, _report):
+                path.write_text("<html>fixture</html>")
+
+            with working_allocations_scope(custody), \
+                    patch.object(qualifier_orchestrator, "execute_run_plan", side_effect=cockpit_cell), \
+                    patch.object(qualifier_orchestrator, "_cross_reports", return_value=[]), \
+                    patch.object(qualifier_orchestrator, "_runtime_jars", return_value=[]), \
+                    patch.object(qualifier_orchestrator, "assess_matrix", return_value={"report_id": "fixture", "status": "inconclusive"}), \
+                    patch.object(qualifier_orchestrator, "write_html", side_effect=html), \
+                    patch.object(qualifier_orchestrator, "_validate_completed_qualification"):
+                _, report_path, _, _ = execute_qualification_plan(
+                    root=ROOT, workspace=workspace, profile=self.profile,
+                    profile_binding=self.profile_binding,
+                    cockpit_profile=cockpit, cockpit_profile_binding=cockpit_binding,
+                    plan=plan, reproduction_command="fixture",
+                )
+            self.assertEqual(len(plan["matrix"]), len(seen))
+            self.assertTrue(report_path.is_relative_to(workspace / ".workbench/qualifications/worldgen"))
+            allocation = custody.inventory()[0]
+            self.assertEqual("complete", allocation.status)
+            self.assertEqual("worldgen-qualification", allocation.reference.family)
+            custody.verify(allocation.reference.allocation_id)
+
+    def test_direct_run_refuses_without_a_core_working_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            workspace = base / "workspace"
+            workspace.mkdir()
+            artifact = base / "worldgen.jar"
+            artifact.write_bytes(b"fixture")
+            errors = io.StringIO()
+            code = cli_run([
+                "run", "--profile", "supersymmetry", "--label", "direct-no-host",
+                "--artifact", str(artifact), "--allow-inconclusive",
+            ], root=ROOT, workspace=workspace, output=io.StringIO(), error=errors)
+            self.assertEqual(2, code)
+            self.assertIn("no managed working-allocation host", errors.getvalue())
+            self.assertFalse((workspace / ".workbench").exists())
 
     def test_generic_unordered_rng_rule_finds_weighted_selector_shape(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

@@ -110,15 +110,19 @@ never a generic default inside the module.
 
 ## Custody and mutation
 
-`run --show` and `run --json` are inert. Execution creates a fresh ignored
-experiment root, freezes both plans, profiles, supplied artifacts and optional
-evidence, then delegates each world to the existing Crucible iteration runner.
+`run --show` and `run --json` are inert. Execution asks Core to reserve a fresh
+working allocation in the selected workspace before freezing both plans,
+profiles, supplied artifacts and optional evidence. It then delegates each
+world to the existing Crucible iteration runner. Cockpit resolves each child
+iteration report through Core's allocation reference.
 It never reuses a world. A newly built first-side artifact is copied once and
 that exact copy is supplied to the second side.
 
 The incremental session remains `incomplete` until both iterations, comparison,
 report write, and review write finish. A failed stage remains failed with its
 error and retained paths. An existing experiment label is never overwritten.
+Core retains the entire working tree and seals the session, report, and review
+as exact terminal evidence. Existing path-bound reports remain readable.
 
 ## Authority and non-claims
 

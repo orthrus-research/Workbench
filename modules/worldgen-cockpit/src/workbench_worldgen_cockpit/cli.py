@@ -205,6 +205,7 @@ def run(
     argv: Sequence[str] | None = None,
     *,
     root: Path,
+    workspace: Path | None = None,
     output: TextIO = sys.stdout,
     error: TextIO = sys.stderr,
 ) -> int:
@@ -231,6 +232,7 @@ def run(
         if args.command == "run":
             plan = build_run_plan(
                 root=resolved_root,
+                workspace=workspace,
                 cockpit_profile=profile,
                 cockpit_profile_binding=profile_binding,
                 **_plan_arguments(args),
@@ -244,6 +246,7 @@ def run(
             reproduction = reproduction_command(arguments)
             report, report_path, review_path, session_path = execute_run_plan(
                 root=resolved_root,
+                workspace=workspace,
                 cockpit_profile=profile,
                 cockpit_profile_binding=profile_binding,
                 plan=plan,
@@ -289,9 +292,12 @@ def run(
         return 2
 
 
-def main(argv: Sequence[str] | None = None, *, root: Path | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None, *, root: Path | None = None,
+    workspace: Path | None = None,
+) -> int:
     selected_root = root or _repository_resource_root(__file__)
-    return run(argv, root=selected_root)
+    return run(argv, root=selected_root, workspace=workspace)
 
 
 __all__ = ["build_parser", "main", "run"]

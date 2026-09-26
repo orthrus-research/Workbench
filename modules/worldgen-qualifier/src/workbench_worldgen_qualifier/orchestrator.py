@@ -10,6 +10,7 @@ import shlex
 import shutil
 from typing import Any, Mapping, Sequence
 
+from workbench_api.working_allocations import working_allocations
 from workbench_worldgen_cockpit.analysis import analyze_pair
 from workbench_worldgen_cockpit.model import (
     FileBinding,
@@ -25,6 +26,7 @@ from .model import (
     LABEL_RE,
     PLAN_FORMAT,
     SESSION_FORMAT,
+    load_qualification,
     require,
     sha256_json,
     utc_now,
@@ -68,6 +70,7 @@ def _values(override: Sequence[Any] | None, default: Sequence[Any]) -> list[Any]
 def build_qualification_plan(
     *,
     root: Path,
+    workspace: Path | None = None,
     profile: Mapping[str, Any],
     profile_binding: FileBinding,
     cockpit_profile: Mapping[str, Any],
@@ -201,7 +204,7 @@ def build_qualification_plan(
             "suite": suite_id,
             "intent": intent_id,
             "mode": suite["mode"],
-            "output_root": str(root / ".workbench/qualifications/worldgen" / label),
+            "output_root": str((root if workspace is None else workspace) / ".workbench/qualifications/worldgen" / label),
             "estimated_jvm_launches": len(cells) * 2,
             "allow_known_inconclusive": allow_inconclusive,
             "acceptance_reachable_from_planned_acquisition": not known_gaps,
@@ -353,9 +356,11 @@ def _cross_reports(
     return produced
 
 
-def execute_qualification_plan(
+def _execute_in_allocation(
     *,
     root: Path,
+    workspace: Path,
+    output_root: Path,
     profile: Mapping[str, Any],
     profile_binding: FileBinding,
     cockpit_profile: Mapping[str, Any],
@@ -363,9 +368,6 @@ def execute_qualification_plan(
     plan: Mapping[str, Any],
     reproduction_command: str,
 ) -> tuple[dict[str, Any], Path, Path, Path]:
-    output_root = Path(plan["qualification"]["output_root"])
-    require(not output_root.exists() and not output_root.is_symlink(), f"qualification label already exists: {output_root}")
-    output_root.mkdir(parents=True)
     session_path = output_root / "qualification-session-v1.json"
     session: dict[str, Any] = {
         "format": SESSION_FORMAT,
@@ -428,6 +430,7 @@ def execute_qualification_plan(
             cockpit_label = f"{plan['qualification']['label']}-{cell['cell_id']}"
             cockpit_plan = build_run_plan(
                 root=root,
+                workspace=workspace,
                 cockpit_profile=frozen_cockpit_value,
                 cockpit_profile_binding=frozen_cockpit_binding,
                 profile_name=profile["pack_profile"],
@@ -464,6 +467,7 @@ def execute_qualification_plan(
             )
             cockpit_report, cockpit_path, _, _ = execute_run_plan(
                 root=root,
+                workspace=workspace,
                 cockpit_profile=frozen_cockpit_value,
                 cockpit_profile_binding=frozen_cockpit_binding,
                 plan=cockpit_plan,
@@ -540,7 +544,7 @@ def execute_qualification_plan(
         session["report"] = str(report_path)
         _write_session(session_path, session)
         return report, report_path, review_path, session_path
-    except Exception as exc:
+    except BaseException as exc:
         if current is not None and current.get("status") == "running":
             current["status"] = "failed"
             current["completed_at"] = utc_now()
@@ -548,6 +552,82 @@ def execute_qualification_plan(
         session["failure"] = {"stage": None if current is None else current.get("id"), "error": f"{type(exc).__name__}: {exc}"}
         _write_session(session_path, session)
         raise
+
+
+def _qualification_terminal_paths(output_root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    evidence = tuple(
+        path for path in (
+            output_root / "qualification-session-v1.json",
+            output_root / "worldgen-qualification-report-v1.json",
+            output_root / "worldgen-qualification-review.html",
+            output_root / "worldgen-static-risk-report-v1.json",
+        ) if path.is_file() and not path.is_symlink()
+    )
+    references = tuple(
+        path for path in (output_root / "inputs", output_root / "cross-comparisons")
+        if path.is_dir() and not path.is_symlink()
+    )
+    return evidence, references
+
+
+def _validate_completed_qualification(output_root: Path) -> None:
+    session, _ = load_json_file(
+        output_root / "qualification-session-v1.json", context="completed qualification session",
+    )
+    require(session.get("status") == "complete", "qualification session is not complete")
+    report, _ = load_qualification(output_root / "worldgen-qualification-report-v1.json")
+    require(report["report_id"] == session.get("stages", [{}])[-1].get("details", {}).get("report_id"),
+            "qualification report differs from its session")
+    require((output_root / "worldgen-qualification-review.html").is_file(),
+            "qualification review is missing")
+
+
+def execute_qualification_plan(
+    *,
+    root: Path,
+    profile: Mapping[str, Any],
+    profile_binding: FileBinding,
+    cockpit_profile: Mapping[str, Any],
+    cockpit_profile_binding: FileBinding,
+    plan: Mapping[str, Any],
+    reproduction_command: str,
+    workspace: Path | None = None,
+) -> tuple[dict[str, Any], Path, Path, Path]:
+    selected_workspace = root if workspace is None else workspace
+    requested = Path(plan["qualification"]["output_root"])
+    custody = working_allocations()
+    allocation = custody.allocate(
+        "worldgen-qualification", plan["qualification"]["label"],
+        requested_path=requested,
+    )
+    require(allocation.path == requested, "Core selected a different qualification root")
+    with custody.execution(allocation):
+        try:
+            result = _execute_in_allocation(
+                root=root, workspace=selected_workspace, output_root=allocation.path,
+                profile=profile, profile_binding=profile_binding,
+                cockpit_profile=cockpit_profile,
+                cockpit_profile_binding=cockpit_profile_binding,
+                plan=plan, reproduction_command=reproduction_command,
+            )
+            evidence, references = _qualification_terminal_paths(allocation.path)
+            custody.finish(
+                allocation, outcome="complete", evidence=evidence,
+                absolute_references=references,
+                validate=_validate_completed_qualification,
+            )
+            return result
+        except BaseException as exc:
+            evidence, references = _qualification_terminal_paths(allocation.path)
+            try:
+                custody.finish(
+                    allocation, outcome="failed", evidence=evidence,
+                    absolute_references=references,
+                    failure=f"{type(exc).__name__}: {exc}"[:4096],
+                )
+            except Exception:
+                pass
+            raise
 
 
 def reproduction_command(argv: Sequence[str]) -> str:

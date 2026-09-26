@@ -56,7 +56,7 @@ def _managed_run_parser() -> argparse.ArgumentParser:
     )
     return parser
 
-def _managed_run_main(argv: list[str]) -> int:
+def _managed_run_main(argv: list[str], *, workspace: Path | None = None) -> int:
     from workbench_crucible_run_profiles import (
         ManagedRunProfileError,
         execute_managed_run_plan,
@@ -78,6 +78,7 @@ def _managed_run_main(argv: list[str]) -> int:
         )
         plan = resolve_managed_run_plan(
             ROOT,
+            workspace=workspace,
             profile_name=args.profile,
             recipe_name=args.recipe,
             doctor_report=doctor_report,
@@ -108,6 +109,7 @@ def _managed_run_main(argv: list[str]) -> int:
         )
         fresh_plan = resolve_managed_run_plan(
             ROOT,
+            workspace=workspace,
             profile_name=args.profile,
             recipe_name=args.recipe,
             doctor_report=fresh_doctor_report,
@@ -127,7 +129,9 @@ def _managed_run_main(argv: list[str]) -> int:
         print("Executing the resolved plan with the existing disposable worldgen runner.")
         from workbench_crucible_worldgen_iteration.cli import main as iteration_main
 
-        return execute_managed_run_plan(plan, root=ROOT, runner=iteration_main)
+        return execute_managed_run_plan(
+            plan, root=ROOT, workspace=workspace, runner=iteration_main,
+        )
     except (OSError, ValueError, ManagedRunProfileError, WorkspaceDoctorError) as exc:
         print(f"Managed run failed: {exc}", file=sys.stderr)
         return 2

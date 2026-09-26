@@ -31,6 +31,10 @@ session remains `incomplete` until acquisition, cross-comparison, risk scan,
 gate evaluation, JSON retention, and HTML retention complete. Existing labels
 are never replaced.
 
+Core reserves the mutable qualification root in the selected workspace before
+the first write and retains its entire tree. Its terminal record seals the
+session, report, review, and available risk report. Each nested Cockpit cell
+uses the same selected workspace. Existing path-bound reports remain readable.
 All generated evidence stays under ignored `.workbench` storage.
 
 Before execution, the plan checks its selected axes, automatic evidence

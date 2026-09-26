@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 
 from workbench_crucible_worldgen_iteration.cli import main as run_iteration
 from workbench_crucible_worldgen_iteration.iteration import parse_region
+from workbench_api.working_allocations import working_allocations
 
 from .analysis import analyze_pair
 from .model import (
@@ -21,6 +22,7 @@ from .model import (
     SESSION_FORMAT,
     canonical_json_bytes,
     load_json_file,
+    load_report,
     require,
     sha256_file,
     sha256_json,
@@ -70,6 +72,7 @@ def _optional_pair(left: Path | None, right: Path | None, context: str) -> None:
 def build_run_plan(
     *,
     root: Path,
+    workspace: Path | None = None,
     cockpit_profile: Mapping[str, Any],
     cockpit_profile_binding: FileBinding,
     profile_name: str | None,
@@ -189,7 +192,7 @@ def build_run_plan(
             "region": list(parsed_region),
             "fresh_worlds": True,
             "comparison_intent": comparison_intent,
-            "output_root": str(root / ".workbench/experiments/worldgen" / label),
+            "output_root": str((root if workspace is None else workspace) / ".workbench/experiments/worldgen" / label),
         },
         "sides": {
             "baseline": {
@@ -305,7 +308,7 @@ def _stage_complete(session: dict[str, Any], path: Path, stage: dict[str, Any]) 
     _session_write(path, session)
 
 
-def _stage_fail(session: dict[str, Any], path: Path, stage: dict[str, Any], exc: Exception) -> None:
+def _stage_fail(session: dict[str, Any], path: Path, stage: dict[str, Any], exc: BaseException) -> None:
     message = f"{type(exc).__name__}: {exc}"
     stage["status"] = "failed"
     stage["completed_at"] = _utc_now()
@@ -373,18 +376,16 @@ def _freeze_optional_inputs(
     return result
 
 
-def execute_run_plan(
+def _execute_in_allocation(
     *,
     root: Path,
+    workspace: Path,
+    experiment_root: Path,
     cockpit_profile: Mapping[str, Any],
     cockpit_profile_binding: FileBinding,
     plan: Mapping[str, Any],
     reproduction_command: str,
 ) -> tuple[dict[str, Any], Path, Path, Path]:
-    experiment_root = Path(plan["experiment"]["output_root"])
-    if experiment_root.exists() or experiment_root.is_symlink():
-        raise CockpitError(f"cockpit experiment label already exists: {experiment_root}")
-    experiment_root.mkdir(parents=True)
     session_path = experiment_root / "cockpit-session-v1.json"
     session = _session_start(session_path, plan, reproduction_command)
     current_stage: dict[str, Any] | None = None
@@ -445,10 +446,24 @@ def execute_run_plan(
             )
             current_stage["details"]["arguments"] = arguments
             _session_write(session_path, session)
-            code = run_iteration(arguments, root=root)
-            report_path = root / ".workbench/iterations/worldgen" / plan["sides"][side]["label"] / "iteration-report-v1.json"
+            custody = working_allocations()
+            prior_ids = {
+                row.reference.allocation_id for row in custody.inventory()
+                if row.reference.family == "worldgen-iteration"
+            }
+            code = run_iteration(arguments, root=root, workspace=workspace)
+            side_label = plan["sides"][side]["label"]
+            allocations = [
+                row for row in custody.inventory()
+                if row.reference.family == "worldgen-iteration"
+                and row.reference.label == side_label
+                and row.reference.allocation_id not in prior_ids
+            ]
+            require(len(allocations) == 1, f"{side} iteration has no unique Core allocation")
+            report_path = allocations[0].reference.path / "iteration-report-v1.json"
             if code != 0:
                 raise CockpitError(f"{side} iteration failed; retained report: {report_path}")
+            require(allocations[0].status == "complete", f"{side} iteration has no complete Core allocation")
             report, _ = load_json_file(report_path, context=f"{side} completed iteration report")
             require(report.get("status") == "complete", f"{side} iteration returned success without a complete report")
             side_reports[side] = report_path.resolve(strict=True)
@@ -498,10 +513,79 @@ def execute_run_plan(
         session["review"] = str(review_path)
         _session_write(session_path, session)
         return report, report_path, review_path, session_path
-    except Exception as exc:
+    except BaseException as exc:
         if current_stage is not None and current_stage.get("status") == "running":
             _stage_fail(session, session_path, current_stage, exc)
         raise
+
+
+def _cockpit_terminal_paths(experiment_root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    evidence = tuple(
+        path for path in (
+            experiment_root / "cockpit-session-v1.json",
+            experiment_root / "worldgen-cockpit-report-v1.json",
+            experiment_root / "worldgen-cockpit-review.html",
+        ) if path.is_file() and not path.is_symlink()
+    )
+    inputs = experiment_root / "inputs"
+    references = (inputs,) if inputs.is_dir() and not inputs.is_symlink() else ()
+    return evidence, references
+
+
+def _validate_completed_cockpit(experiment_root: Path) -> None:
+    session, _ = load_json_file(
+        experiment_root / "cockpit-session-v1.json", context="completed Cockpit session",
+    )
+    require(session.get("status") == "complete" and session.get("label") == experiment_root.name,
+            "completed Cockpit session does not describe its allocation")
+    report, _ = load_report(experiment_root / "worldgen-cockpit-report-v1.json")
+    require(report["report_id"] == session.get("stages", [{}])[-1].get("details", {}).get("report_id"),
+            "completed Cockpit report differs from its session")
+    require((experiment_root / "worldgen-cockpit-review.html").is_file(),
+            "completed Cockpit review is missing")
+
+
+def execute_run_plan(
+    *,
+    root: Path,
+    cockpit_profile: Mapping[str, Any],
+    cockpit_profile_binding: FileBinding,
+    plan: Mapping[str, Any],
+    reproduction_command: str,
+    workspace: Path | None = None,
+) -> tuple[dict[str, Any], Path, Path, Path]:
+    selected_workspace = root if workspace is None else workspace
+    requested = Path(plan["experiment"]["output_root"])
+    custody = working_allocations()
+    allocation = custody.allocate(
+        "worldgen-cockpit", plan["experiment"]["label"], requested_path=requested,
+    )
+    require(allocation.path == requested, "Core selected a different Cockpit experiment root")
+    with custody.execution(allocation):
+        try:
+            result = _execute_in_allocation(
+                root=root, workspace=selected_workspace, experiment_root=allocation.path,
+                cockpit_profile=cockpit_profile,
+                cockpit_profile_binding=cockpit_profile_binding,
+                plan=plan, reproduction_command=reproduction_command,
+            )
+            evidence, references = _cockpit_terminal_paths(allocation.path)
+            custody.finish(
+                allocation, outcome="complete", evidence=evidence,
+                absolute_references=references, validate=_validate_completed_cockpit,
+            )
+            return result
+        except BaseException as exc:
+            evidence, references = _cockpit_terminal_paths(allocation.path)
+            try:
+                custody.finish(
+                    allocation, outcome="failed", evidence=evidence,
+                    absolute_references=references,
+                    failure=f"{type(exc).__name__}: {exc}"[:4096],
+                )
+            except Exception:
+                pass
+            raise
 
 
 def reproduction_command(argv: Sequence[str]) -> str:

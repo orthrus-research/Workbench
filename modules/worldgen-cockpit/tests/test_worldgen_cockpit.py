@@ -9,10 +9,13 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
 for source in (
+    ROOT / "api/src",
+    ROOT / "core/src",
     ROOT / "modules/worldgen-cockpit/src",
     ROOT / "modules/subsurface-studio/src",
     ROOT / "modules/crucible/src",
@@ -33,9 +36,13 @@ from workbench_worldgen_cockpit.model import (  # noqa: E402
 )
 from workbench_worldgen_cockpit.orchestrator import (  # noqa: E402
     build_run_plan,
+    execute_run_plan,
     render_run_plan,
 )
 from workbench_worldgen_cockpit.render import render_html, render_report  # noqa: E402
+from workbench_api.working_allocations import working_allocations_scope  # noqa: E402
+from workbench_core.working_allocations import CoreWorkingAllocations  # noqa: E402
+from workbench_worldgen_cockpit import orchestrator as cockpit_orchestrator  # noqa: E402
 
 
 SUBSURFACE_TEST = ROOT / "modules/subsurface-studio/tests/test_subsurface_studio.py"
@@ -337,6 +344,92 @@ class WorldgenCockpitTests(unittest.TestCase):
         self.assertEqual(plan["artifact_policy"], "build-first-side-once-and-freeze-for-second")
         self.assertEqual(plan["experiment"]["comparison_intent"], "identical-input-control")
         self.assertIn("two fresh disposable worlds", render_run_plan(plan))
+
+    def test_core_custody_and_nested_iteration_reports_use_selected_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            workspace = base / "workspace"
+            workspace.mkdir()
+            artifact = base / "worldgen.jar"
+            artifact.write_bytes(b"exact fixture artifact")
+            custody = CoreWorkingAllocations(
+                workspace=workspace, configuration_home=base / "config",
+                locations={"evidence": base / "evidence"}, owner_id="worldgen-cockpit",
+            )
+            plan = build_run_plan(
+                root=ROOT, workspace=workspace,
+                cockpit_profile=self.profile, cockpit_profile_binding=self.profile_binding,
+                profile_name="supersymmetry", mode="fast", label="workspace-pair",
+                seed=42, region="0,0,1,1", order="baseline-first",
+                baseline_plan=None, candidate_plan=None, artifact=artifact,
+                baseline_artifact=None, candidate_artifact=None,
+                runtime_template=None, strata_root=None, java_cmd=None,
+                gradle_cmd=None, heap=None, diagnostic_sample_modulo=None,
+                startup_timeout=30, scan_timeout=60, stop_timeout=10,
+                baseline_observatory_bundle=None, candidate_observatory_bundle=None,
+                comparison_scope_sha256=None, baseline_inventory=None,
+                candidate_inventory=None, baseline_impact=None, candidate_impact=None,
+                baseline_trace=None, candidate_trace=None,
+                baseline_observer_off_jfr=None, candidate_observer_off_jfr=None,
+            )
+            seen: list[tuple[Path, Path]] = []
+
+            def iteration(arguments, *, root, workspace):
+                self.assertEqual(ROOT, root)
+                self.assertEqual(custody.workspace, workspace)
+                label = arguments[arguments.index("--label") + 1]
+                child = custody.allocate(
+                    "worldgen-iteration", label,
+                    requested_path=workspace / ".workbench/iterations/worldgen" / label,
+                )
+                with custody.execution(child):
+                    path = child.path / "iteration-report-v1.json"
+                    path.write_text(json.dumps({"status": "complete"}))
+                    custody.finish(child, outcome="complete", evidence=(path,), validate=lambda _: None)
+                return 0
+
+            def analyze(**kwargs):
+                seen.append((kwargs["baseline_report"], kwargs["candidate_report"]))
+                return {"report_id": "fixture", "status": "equivalent", "coverage": "complete-for-mode"}
+
+            def html(path, _report):
+                path.write_text("<html>fixture</html>")
+
+            with working_allocations_scope(custody), \
+                    patch.object(cockpit_orchestrator, "run_iteration", side_effect=iteration), \
+                    patch.object(cockpit_orchestrator, "analyze_pair", side_effect=analyze), \
+                    patch.object(cockpit_orchestrator, "write_html", side_effect=html), \
+                    patch.object(cockpit_orchestrator, "_validate_completed_cockpit"):
+                _, report_path, _, _ = execute_run_plan(
+                    root=ROOT, workspace=workspace,
+                    cockpit_profile=self.profile, cockpit_profile_binding=self.profile_binding,
+                    plan=plan, reproduction_command="fixture",
+                )
+            self.assertEqual(1, len(seen))
+            for path in seen[0]:
+                self.assertTrue(path.is_relative_to(workspace / ".workbench/iterations/worldgen"))
+            self.assertTrue(report_path.is_relative_to(workspace / ".workbench/experiments/worldgen"))
+            parent = next(row for row in custody.inventory() if row.reference.family == "worldgen-cockpit")
+            self.assertEqual("complete", parent.status)
+            self.assertEqual({"cockpit-session-v1.json", "worldgen-cockpit-report-v1.json", "worldgen-cockpit-review.html"},
+                             {row["relative_path"] for row in parent.evidence})
+            custody.verify(parent.reference.allocation_id)
+
+    def test_direct_run_refuses_without_a_core_working_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            workspace = base / "workspace"
+            workspace.mkdir()
+            artifact = base / "worldgen.jar"
+            artifact.write_bytes(b"fixture")
+            errors = io.StringIO()
+            code = cli_run([
+                "run", "--profile", "supersymmetry", "--label", "direct-no-host",
+                "--artifact", str(artifact),
+            ], root=ROOT, workspace=workspace, output=io.StringIO(), error=errors)
+            self.assertEqual(2, code)
+            self.assertIn("no managed working-allocation host", errors.getvalue())
+            self.assertFalse((workspace / ".workbench").exists())
 
     def test_exact_changed_pair_is_content_addressed_and_visual(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

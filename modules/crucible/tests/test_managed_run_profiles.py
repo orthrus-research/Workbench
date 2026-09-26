@@ -393,7 +393,6 @@ class ManagedRunProfileTests(unittest.TestCase):
         self.assertNotIn("open_viewer", stages["debug"])
         self.assertIn("open_viewer", stages["worldgen"])
         self.assertIn("performance", stages["performance"])
-
         for name, expected_mode in {
             "fast": "fast",
             "debug": "debug",
@@ -405,6 +404,37 @@ class ManagedRunProfileTests(unittest.TestCase):
         self.assertIn("--no-open", plans["fast"]["runner"]["arguments"])
         self.assertIn("--no-open", plans["debug"]["runner"]["arguments"])
         self.assertNotIn("--no-open", plans["worldgen"]["runner"]["arguments"])
+
+    def test_performance_preview_and_runner_use_selected_workspace(self) -> None:
+        workspace = Path(self.temporary.name) / "selected-workspace"
+        workspace.mkdir()
+        plan = self._resolve("performance", workspace=workspace, label="selected-workspace-jfr")
+        expected = (
+            workspace / ".workbench/iterations/worldgen/selected-workspace-jfr"
+            / "runtime/worldgen-iteration.jfr"
+        )
+        self.assert_plan_valid(plan)
+        self.assertTrue(any(
+            f"filename={expected}," in argument
+            for argument in plan["effective"]["jvm_arguments"]
+        ))
+        seen = []
+
+        def runner(arguments, *, root, workspace):
+            seen.append((arguments, root, workspace))
+            return 0
+
+        self.assertEqual(0, execute_managed_run_plan(
+            plan, root=ROOT, workspace=workspace, runner=runner,
+        ))
+        self.assertEqual([(plan["runner"]["arguments"], ROOT, workspace)], seen)
+
+        with self.assertRaisesRegex(ManagedRunProfileError, "JFR path differs"):
+            execute_managed_run_plan(
+                self._resolve("performance", label="selected-workspace-jfr"),
+                root=ROOT, workspace=workspace, runner=runner,
+            )
+        self.assertEqual(1, len(seen))
 
     def test_proof_is_explicitly_unavailable_and_cannot_execute(self) -> None:
         plan = self._resolve("proof", label="managed-proof-test")

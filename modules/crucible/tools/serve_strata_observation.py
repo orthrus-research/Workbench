@@ -30,6 +30,10 @@ def parse_args() -> argparse.Namespace:
         help="viewer-handoff.json emitted by run_strata_observation.py",
     )
     parser.add_argument(
+        "--workspace", type=Path, default=ROOT,
+        help="selected Workbench workspace holding the viewer handoff",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="validate and print the launch details without starting the server",
@@ -39,7 +43,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    handoff = parse_strata_viewer_handoff(args.handoff, workbench_root=ROOT)
+    handoff = parse_strata_viewer_handoff(args.handoff, workbench_root=args.workspace)
     npm = shutil.which("npm")
     if not npm:
         raise StrataViewerHandoffValidationError("npm is not available on PATH")

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import importlib.util
+import io
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -77,6 +81,39 @@ class StrataViewerHandoffTests(unittest.TestCase):
         self.write_handoff(manifest=str(self.root / "missing.json"))
         with self.assertRaises(FileNotFoundError):
             parse_strata_viewer_handoff(self.handoff, workbench_root=self.root)
+
+    def test_selected_workspace_controls_handoff_custody(self) -> None:
+        workspace = self.root / "selected-workspace"
+        artifacts = workspace / ".workbench/evidence/sample.strataview.d"
+        artifacts.mkdir(parents=True)
+        manifest = artifacts / "manifest.json"
+        manifest.write_text("{}\n", encoding="utf-8")
+        handoff = workspace / ".workbench/evidence/viewer-handoff.json"
+        handoff.write_text(json.dumps({
+            "cwd": str(self.viewer),
+            "externalArtifactRoot": str(artifacts),
+            "manifest": str(manifest),
+            "port": 5173,
+            "url": "http://127.0.0.1:5173/?view=region&manifest=%2Fmanifest.json",
+        }) + "\n", encoding="utf-8")
+        self.assertEqual(str(handoff), parse_strata_viewer_handoff(
+            handoff, workbench_root=workspace,
+        )["handoff"])
+        with self.assertRaisesRegex(StrataViewerHandoffValidationError, "must be under"):
+            parse_strata_viewer_handoff(handoff, workbench_root=self.root)
+
+        tool_path = ROOT / "modules/crucible/tools/serve_strata_observation.py"
+        spec = importlib.util.spec_from_file_location("serve_strata_observation_test", tool_path)
+        assert spec and spec.loader
+        tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tool)
+        output = io.StringIO()
+        with patch.object(sys, "argv", ["serve_strata_observation.py", str(handoff),
+                                        "--workspace", str(workspace), "--check"]), \
+                patch.object(tool.shutil, "which", return_value="/usr/bin/npm"), \
+                redirect_stdout(output):
+            self.assertEqual(0, tool.main())
+        self.assertIn("handoff check passed", output.getvalue())
 
 
 if __name__ == "__main__":
