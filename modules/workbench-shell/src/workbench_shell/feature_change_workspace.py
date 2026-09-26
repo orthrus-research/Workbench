@@ -48,7 +48,10 @@ from .developer_feature import (
     verify_material_fluid_recipe_plan,
 )
 from workbench_api.state_paths import default_product_spine_state_root
-from workbench_api.record_stores import open_record_store
+from workbench_api.record_stores import (
+    SessionOwnerAllocationError, open_record_store, session_owner_scope,
+)
+from workbench_api.durable_resources import DurableResourceError
 from workbench_api.managed_trees import (
     ManagedTreeError, ManagedTreeReference, ManagedTrees, managed_trees,
 )
@@ -164,7 +167,7 @@ def _safe_state_root(value: Path | str, *, create: bool) -> Path:
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
     try:
         metadata = root.lstat()
-    except OSError as exc:
+    except (DurableResourceError, OSError) as exc:
         raise FeatureChangeWorkspaceError(
             "feature change state root is unavailable"
         ) from exc
@@ -549,10 +552,67 @@ def _contexts_root(suite_root: Path | str) -> Path:
 def _session_owner_directory(suite_root: Path | str, session_id: str) -> Path:
     if _SESSION_ID.fullmatch(session_id) is None:
         _fail("feature change Work Session selector is invalid")
-    owners = _session_context_root(suite_root) / "session-owners"
-    owners.mkdir(mode=0o700, exist_ok=True)
-    _ordinary_directory(owners, "feature change Work Session owner collection")
-    return owners / session_id
+    return _session_context_root(suite_root) / "session-owners" / session_id
+
+
+def _verify_session_owner(suite_root: Path | str, context: Mapping[str, Any]) -> None:
+    """Reopen new Core owner custody; allow only fully validated V1 history."""
+
+    session_id = str(context["session_id"])
+    suite = Path(suite_root).resolve(strict=True)
+    expected = _session_owner_directory(suite, session_id)
+    if (
+        _local_uri(context["state_root_uri"], "feature change state root")
+        != expected / "owner-state"
+        or _local_uri(context["start_result_uri"], "feature change start result")
+        != expected / "start-result-v1.json"
+    ):
+        _fail("feature change context points outside its immutable session storage")
+    _ordinary_directory(expected, "feature change Work Session owner directory")
+    try:
+        with session_owner_scope(
+            "feature-change-session-context-v1", suite, session_id,
+            create=False,
+        ) as held:
+            reference = held.verify_started()
+            if reference.path != expected or reference.state_root != expected / "owner-state":
+                _fail("feature change Core session owner differs from the V1 context")
+    except SessionOwnerAllocationError as exc:
+        if exc.code == "owner.unregistered":
+            # This path is called only after the complete historical V1
+            # context and its start result have been validated. A Core
+            # cataloged context requires its paired owner allocation.
+            marker = expected / "core-owner-allocation-v1.json"
+            started = _session_context_root(suite) / "owner-allocations" / f"{session_id}.started.json"
+            if (
+                not (marker.exists() or marker.is_symlink())
+                and not (started.exists() or started.is_symlink())
+                and _context_tree_reference(
+                    _session_context_directory(suite, session_id), session_id,
+                ) is None
+            ):
+                return
+        raise FeatureChangeWorkspaceError(
+            f"feature change session owner requires Core review: {exc}"
+        ) from exc
+    except (DurableResourceError, OSError) as exc:
+        raise FeatureChangeWorkspaceError(
+            f"feature change session owner requires Core review: {exc}"
+        ) from exc
+
+
+@contextmanager
+def _new_session_owner_scope(suite: Path, session_id: str):
+    try:
+        with session_owner_scope(
+            "feature-change-session-context-v1", suite, session_id,
+            create=True,
+        ) as held:
+            yield held
+    except (SessionOwnerAllocationError, DurableResourceError, OSError) as exc:
+        raise FeatureChangeWorkspaceError(
+            f"feature change session owner requires Core review: {exc}"
+        ) from exc
 
 
 def _context_for_session(suite_root: Path | str, session_id: str) -> Path:
@@ -981,19 +1041,17 @@ def bind_material_fluid_recipe_session_context(
                     "this Work Session already owns a different immutable "
                     "feature change context"
                 )
+            _verify_session_owner(suite, validated)
         else:
             for stale in contexts.glob(f".{session_id}.staging-*"):
                 _remove_incomplete_setup(
                     stale, "stale feature change Work Session staging directory"
                 )
-            _remove_incomplete_setup(
-                owner_directory,
-                "incomplete feature change Work Session owner directory",
-            )
-            tree_started = False
-            try:
-                owner_directory.mkdir(mode=0o700)
-                state_root = owner_directory / "owner-state"
+            with _new_session_owner_scope(suite, session_id) as held:
+                owner = held.reference
+                if owner.path != owner_directory or owner.workspace != suite:
+                    _fail("feature change Core session owner chose another target")
+                state_root = owner.state_root
                 start = start_material_fluid_recipe_change(
                     suite, workspace, state_root, **request
                 )
@@ -1005,7 +1063,9 @@ def bind_material_fluid_recipe_session_context(
                         "Work Session setup did not create one fresh planned change"
                     )
                 start_path = owner_directory / "start-result-v1.json"
-                _write_immutable(start_path, _validate_start_result(start))
+                validated_start = _validate_start_result(start)
+                _write_immutable(start_path, validated_start)
+                held.record_started(_pretty_record_bytes(validated_start))
                 body = {
                     "change_id": start["change_id"],
                     "claims": {
@@ -1043,7 +1103,7 @@ def bind_material_fluid_recipe_session_context(
                     + ".json"
                 )
                 validated = validate_feature_change_session_context(context)
-                tree_started = True
+                held.verify_started()
                 try:
                     with tree_host.stage(
                         "artifacts", context_directory.name,
@@ -1068,13 +1128,7 @@ def bind_material_fluid_recipe_session_context(
                 ):
                     _fail("feature change context Core publication changed its destination")
                 context_path = context_directory / context_name
-            except BaseException:
-                if not context_directory.exists() and not tree_started:
-                    _remove_incomplete_setup(
-                        owner_directory,
-                        "feature change Work Session owner directory",
-                    )
-                raise
+                held.verify_started()
         try:
             active, _state, _runtime = resolve_material_fluid_recipe_session_context(
                 suite
@@ -1100,6 +1154,7 @@ def select_material_fluid_recipe_session_context(
     )
     if context["session_id"] != session_id:
         _fail("feature change context directory and session identity differ")
+    _verify_session_owner(suite_root, context)
     return _publish_selection(suite_root, context=context, context_path=path)
 
 
@@ -1191,6 +1246,7 @@ def resolve_material_fluid_recipe_session_context(
         != expected_start_path
     ):
         _fail("feature change context points outside its immutable session storage")
+    _verify_session_owner(suite_root, context)
     return (
         context,
         expected_state_root,

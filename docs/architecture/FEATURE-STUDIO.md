@@ -87,6 +87,13 @@ requires the exact reviewed plan identity and fresh source revalidation.
 Rollback never overwrites later user edits, and recovery reports the current
 transaction boundary instead of guessing.
 
+Work Session based setup selects its existing session record and installed
+runtime configuration once. Core allocates and holds a suite-bound owner for
+its mutable change state and start result, then catalogs the immutable V1
+context. A completed context can be selected again by its session ID. If
+setup stops before context publication, its owner remains protected and retry
+requires review; Workbench does not discard unknown files to make room.
+
 ## Review and execution boundaries
 
 A read-only plan must show:

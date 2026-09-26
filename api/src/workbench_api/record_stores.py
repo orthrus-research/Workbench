@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Protocol
+from typing import ContextManager, Iterator, Protocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,12 +24,44 @@ class RecordStoreReference:
     retention: str
 
 
+class SessionOwnerAllocationError(ValueError):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+@dataclass(frozen=True, slots=True)
+class SessionOwnerReference:
+    allocation_id: str
+    store_id: str
+    workspace: Path
+    owner_id: str
+    session_id: str
+    path: Path
+    state_root: Path
+
+
+class SessionOwnerAllocation(Protocol):
+    @property
+    def reference(self) -> SessionOwnerReference: ...
+
+    def verify(self) -> SessionOwnerReference: ...
+
+    def record_started(self, expected_start_result: bytes) -> SessionOwnerReference: ...
+
+    def verify_started(self) -> SessionOwnerReference: ...
+
+
 class RecordStores(Protocol):
     def open(self, family: str, base: Path) -> RecordStoreReference: ...
 
     def open_target(
         self, family: str, state_root: Path, target_workspace: Path,
     ) -> RecordStoreReference: ...
+
+    def session_owner(
+        self, family: str, base: Path, session_id: str, *, create: bool,
+    ) -> ContextManager[SessionOwnerAllocation]: ...
 
 
 _bound: ContextVar[RecordStores | None] = ContextVar("workbench_record_stores", default=None)
@@ -72,7 +104,22 @@ def record_store_host_bound() -> bool:
     return _bound.get() is not None
 
 
+def session_owner_scope(
+    family: str, base: Path, session_id: str, *, create: bool,
+) -> ContextManager[SessionOwnerAllocation]:
+    """Hold Core's fixed session-owner child while the domain performs work."""
+
+    provider = _bound.get()
+    if provider is None:
+        raise SessionOwnerAllocationError(
+            "owner.host", "session owner allocation requires Workbench Core",
+        )
+    return provider.session_owner(family, base, session_id, create=create)
+
+
 __all__ = [
     "RecordStoreReference", "RecordStores", "record_store_scope",
     "open_record_store", "open_target_record_store", "record_store_host_bound",
+    "SessionOwnerAllocation", "SessionOwnerAllocationError", "SessionOwnerReference",
+    "session_owner_scope",
 ]

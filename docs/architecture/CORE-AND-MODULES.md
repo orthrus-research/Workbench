@@ -103,8 +103,9 @@ workspace, owner and role, returning the catalog tree ID and publication state.
 An optional domain identity must match a prepared intent. Missing, duplicate,
 foreign or changed records fail closed; the path is a lookup key, not authority
 to adopt an uncataloged tree. Recovery still uses Core's ID-based reconcile.
-Direct Shell entry binding and the Feature Change V1 context writer are not yet
-ported to this lookup.
+Feature Change V1 context publication uses this lookup during direct Shell and
+Core-dispatched Work Session actions. Other direct Shell tree writers remain
+separate migration candidates.
 
 ## Private records and workspace choices
 
@@ -201,6 +202,17 @@ the workspace cleanup planner protects registered namespaces. Their retention
 stays protected until a reviewed policy exists. Direct historical adapters
 retain their original readers and paths for records created outside Core
 dispatch.
+
+Feature Change Work Session setup also asks Core for a fixed session-owner
+child within the suite's registered context store. Core retains its allocation
+identity, an owner-local marker, a lease, and the exact identity of the mutable
+state root and immutable start result. A completed context keeps its V1 URIs
+and bytes. Unknown existing owner paths, changed files, and interrupted setup
+are retained for review; setup does not delete or adopt them on retry. V1
+contexts without Core owner or tree markers remain readable after full
+historical validation. If all independent Core witnesses are externally lost,
+the current catalog cannot prove whether such a context was historical, so
+automatic cleanup remains unavailable.
 
 `ExecutionContext.selection` carries the selected workspace ID, profile
 configuration, Java choice and source labels as an immutable operation

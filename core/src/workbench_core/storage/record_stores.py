@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import stat
+from contextlib import contextmanager
+from typing import Iterator
 
-from workbench_api.record_stores import RecordStoreReference
+from workbench_api.record_stores import RecordStoreReference, SessionOwnerAllocation
 from workbench_api.state_paths import default_product_spine_state_root
 from workbench_api.durable_resources import DurableResourceError
 
@@ -139,6 +141,25 @@ class CoreRecordStores:
             store_id=store_id, family=family, owner_id=self.owner_id,
             workspace=target, root=root, retention="protected-until-reviewed-policy",
         )
+
+    @contextmanager
+    def session_owner(
+        self, family: str, base: Path, session_id: str, *, create: bool,
+    ) -> Iterator[SessionOwnerAllocation]:
+        if (
+            self.owner_id != "workbench-shell"
+            or family != "feature-change-session-context-v1"
+            or not isinstance(base, Path)
+            or Path(os.path.abspath(base.expanduser())) != self.workspace
+        ):
+            raise DurableResourceError(
+                "resource.policy", "session owner requires the suite-bound Core record store",
+            )
+        from ..session_owner_allocations import CoreSessionOwnerAllocations
+
+        store = self.open(family, base)
+        with CoreSessionOwnerAllocations(store, session_id).open(create=create) as allocation:
+            yield allocation
 
 
 __all__ = ["CoreRecordStores"]

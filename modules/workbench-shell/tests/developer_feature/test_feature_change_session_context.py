@@ -9,6 +9,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import threading
@@ -45,6 +46,7 @@ from workbench_core.storage.registered import ResourceCatalog
 from workbench_api.managed_trees import managed_trees_scope
 from workbench_core.managed_trees import CoreManagedTrees
 import workbench_core.managed_trees as core_managed_trees
+import workbench_core.session_owner_allocations as core_session_owner_allocations
 
 install_local_host_services()
 
@@ -86,6 +88,12 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         )
         self.tree_scope = managed_trees_scope(self.tree_provider)
         self.tree_scope.__enter__()
+        self.record_provider = CoreRecordStores(
+            workspace=ROOT, configuration_home=self.root / "config",
+            owner_id="workbench-shell",
+        )
+        self.record_scope = record_store_scope(self.record_provider)
+        self.record_scope.__enter__()
         self.environment = patch.dict(
             os.environ,
             {"WORKBENCH_STATE_ROOT": str(self.machine_state)},
@@ -110,6 +118,7 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.environment.stop()
+        self.record_scope.__exit__(None, None, None)
         self.tree_scope.__exit__(None, None, None)
         self.temporary.cleanup()
 
@@ -167,6 +176,17 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
             **self._request(f"Thermal Solvent {label}"),
         )
         return context, created
+
+    def _cli_start(self, record: Path, label: str) -> list[str]:
+        request = self._request(label)
+        arguments = [
+            "material-fluid-recipe", "start",
+            "--session-record", str(record),
+            "--runtime-config", str(self.runtime_config),
+        ]
+        for key, value in request.items():
+            arguments.extend(("--" + key.replace("_", "-"), str(value)))
+        return [*arguments, "--json"]
 
     @property
     def _context_root(self) -> Path:
@@ -271,7 +291,7 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         ):
             resolve_material_fluid_recipe_session_context(ROOT)
 
-    def test_failed_setup_cleans_partial_state_and_stale_crash_state_is_retryable(self) -> None:
+    def test_failed_setup_retains_owner_and_refuses_unproven_retry(self) -> None:
         record, created = self._session("retry")
         session_id = str(created["session_id"])
         with patch.object(
@@ -291,27 +311,201 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         self.assertFalse(
             (self._context_root / "contexts" / session_id).exists()
         )
-        self.assertFalse(
-            (self._context_root / "session-owners" / session_id).exists()
-        )
+        owner = self._context_root / "session-owners" / session_id
+        self.assertTrue(owner.is_dir())
+        allocation = self._context_root / "owner-allocations" / f"{session_id}.json"
+        self.assertTrue(allocation.is_file())
         self.assertFalse(
             (self._context_root / "selected-context-v1.json").exists()
         )
+        before = allocation.read_bytes()
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "already exists"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config,
+                **self._request("Thermal Solvent Retry"),
+            )
+        self.assertEqual(before, allocation.read_bytes())
+        self.assertTrue(owner.is_dir())
 
-        stale = self._context_root / "contexts" / f".{session_id}.staging-dead"
-        stale.mkdir(parents=True)
-        (stale / "partial.json").write_text("{}\n", encoding="utf-8")
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
+    def test_exit_after_owner_mkdir_retains_unclaimed_path_and_refuses_retry(self) -> None:
+        record, created = self._session("owner-mkdir-crash")
+        original_sync = core_session_owner_allocations.fsync_directory
+
+        def exit_after_owner_mkdir(path: Path) -> None:
+            if path.name == "session-owners":
+                os._exit(71)
+            original_sync(path)
+
+        child = os.fork()
+        if child == 0:
+            with patch.object(core_session_owner_allocations, "fsync_directory", side_effect=exit_after_owner_mkdir):
+                bind_material_fluid_recipe_session_context(
+                    ROOT, record, self.runtime_config,
+                    **self._request("Thermal Solvent Owner Crash"),
+                )
+            os._exit(72)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(71, os.waitstatus_to_exitcode(status))
+        session_id = str(created["session_id"])
         owner = self._context_root / "session-owners" / session_id
-        owner.mkdir(parents=True)
-        (owner / "partial").write_text("dead\n", encoding="utf-8")
-        context = bind_material_fluid_recipe_session_context(
-            ROOT,
-            record,
-            self.runtime_config,
-            **self._request("Thermal Solvent Retry"),
+        self.assertTrue(owner.is_dir())
+        self.assertFalse((owner / "core-owner-allocation-v1.json").exists())
+        self.assertFalse((self._context_root / "owner-allocations" / f"{session_id}.json").exists())
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "already exists"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config,
+                **self._request("Thermal Solvent Owner Crash"),
+            )
+        self.assertTrue(owner.is_dir())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
+    def test_exit_after_owner_marker_retains_core_witness_without_record(self) -> None:
+        record, created = self._session("owner-marker-crash")
+        original_publish = core_session_owner_allocations.publish_immutable_bytes
+
+        def exit_after_marker(path: Path, data: bytes, *, byte_limit: int) -> None:
+            original_publish(path, data, byte_limit=byte_limit)
+            if path.name == "core-owner-allocation-v1.json":
+                os._exit(71)
+
+        child = os.fork()
+        if child == 0:
+            with patch.object(core_session_owner_allocations, "publish_immutable_bytes", side_effect=exit_after_marker):
+                bind_material_fluid_recipe_session_context(
+                    ROOT, record, self.runtime_config,
+                    **self._request("Thermal Solvent Marker Crash"),
+                )
+            os._exit(72)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(71, os.waitstatus_to_exitcode(status))
+        session_id = str(created["session_id"])
+        owner = self._context_root / "session-owners" / session_id
+        marker = owner / "core-owner-allocation-v1.json"
+        self.assertTrue(marker.is_file())
+        before = marker.read_bytes()
+        self.assertFalse((self._context_root / "owner-allocations" / f"{session_id}.json").exists())
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "already exists"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config,
+                **self._request("Thermal Solvent Marker Crash"),
+            )
+        self.assertEqual(before, marker.read_bytes())
+
+    def test_cataloged_context_refuses_lost_owner_allocation(self) -> None:
+        context, created = self._bind("lostallocation")
+        session_id = str(created["session_id"])
+        owner = self._context_root / "session-owners" / session_id
+        allocation = self._context_root / "owner-allocations" / f"{session_id}.json"
+        allocation.unlink()
+        self.assertTrue((owner / "core-owner-allocation-v1.json").is_file())
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "Core review"):
+            resolve_material_fluid_recipe_session_context(ROOT)
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "Core review"):
+            select_material_fluid_recipe_session_context(ROOT, session_id)
+        # Loss of the tree catalog row as well cannot make a marked owner legacy.
+        legacy = CoreManagedTrees(
+            workspace=ROOT, configuration_home=self.root / "lost-tree-config",
+            locations={"artifacts": ROOT}, owner_id="workbench-shell",
         )
-        self.assertEqual(session_id, context["session_id"])
-        self.assertFalse(stale.exists())
+        with managed_trees_scope(legacy):
+            with self.assertRaisesRegex(FeatureChangeWorkspaceError, "Core review"):
+                resolve_material_fluid_recipe_session_context(ROOT)
+        self.assertEqual(context["session_id"], session_id)
+        self.assertTrue(allocation.parent.is_dir())
+
+    def test_historical_v1_readback_without_any_core_witness(self) -> None:
+        context, created = self._bind("legacyv1")
+        session_id = str(created["session_id"])
+        owner = self._context_root / "session-owners" / session_id
+        # Model a fully validated pre-Core V1 context in this disposable
+        # fixture. Total external witness loss is indistinguishable here and
+        # remains a retention/cleanup gate rather than adoption authority.
+        (owner / "core-owner-allocation-v1.json").unlink()
+        (self._context_root / "owner-allocations" / f"{session_id}.json").unlink()
+        (self._context_root / "owner-allocations" / f"{session_id}.started.json").unlink()
+        legacy = CoreManagedTrees(
+            workspace=ROOT, configuration_home=self.root / "legacy-v1-config",
+            locations={"artifacts": ROOT}, owner_id="workbench-shell",
+        )
+        with managed_trees_scope(legacy):
+            reopened = resolve_material_fluid_recipe_session_context(ROOT)[0]
+        self.assertEqual(context["context_id"], reopened["context_id"])
+
+    def test_core_owner_rejects_same_byte_state_and_start_replacements(self) -> None:
+        for label, target_name in (("statereplaced", "owner-state"), ("startreplaced", "start-result-v1.json")):
+            with self.subTest(target_name=target_name):
+                _, created = self._bind(label)
+                owner = self._context_root / "session-owners" / str(created["session_id"])
+                target = owner / target_name
+                displaced = owner / (target_name + "-old")
+                target.rename(displaced)
+                if target.is_dir() or displaced.is_dir():
+                    shutil.copytree(displaced, target)
+                else:
+                    target.write_bytes(displaced.read_bytes())
+                    target.chmod(0o600)
+                with self.assertRaisesRegex(FeatureChangeWorkspaceError, "Core review"):
+                    resolve_material_fluid_recipe_session_context(ROOT)
+                self.assertTrue(displaced.exists())
+
+    def test_direct_cli_start_binds_session_owner_through_core(self) -> None:
+        record, created = self._session("direct-cli")
+        output, error = StringIO(), StringIO()
+        code = change_main(
+            self._cli_start(record, "Thermal Solvent Direct CLI"),
+            root=ROOT, output=output, error=error,
+            configuration_home=self.root / "config",
+        )
+        self.assertEqual(0, code, error.getvalue())
+        context = json.loads(output.getvalue())
+        self.assertEqual(created["session_id"], context["session_id"])
+        owner = self._context_root / "session-owners" / str(created["session_id"])
+        self.assertEqual((owner / "owner-state").as_uri(), context["state_root_uri"])
+        self.assertEqual((owner / "start-result-v1.json").as_uri(), context["start_result_uri"])
+        self.assertTrue((owner / "core-owner-allocation-v1.json").is_file())
+        self.assertEqual(
+            context["context_id"],
+            resolve_material_fluid_recipe_session_context(ROOT)[0]["context_id"],
+        )
+
+    def test_external_dispatch_start_binds_suite_owner(self) -> None:
+        record, created = self._session("external-start")
+        external_workspace = self.root / "selected-project-start"
+        external_workspace.mkdir()
+        foreign = CoreManagedTrees(
+            workspace=external_workspace,
+            configuration_home=self.root / "config",
+            locations={"artifacts": external_workspace},
+            owner_id="workbench-shell",
+        )
+        output, error = StringIO(), StringIO()
+        original_change_main = change_main
+
+        def routed_change_main(*args: object, **kwargs: object) -> int:
+            return original_change_main(*args, **kwargs, output=output, error=error)
+
+        with managed_trees_scope(foreign):
+            with patch.object(commands, "ROOT", ROOT), patch(
+                "workbench_shell.golden_journey_cli.change_main", side_effect=routed_change_main,
+            ):
+                code = commands.change(
+                    self._cli_start(record, "Thermal Solvent External Start"),
+                    context=ExecutionContext(
+                        external_workspace, self.root / "external-state",
+                        configuration_home=self.root / "config",
+                    ),
+                )
+        self.assertEqual(0, code, error.getvalue())
+        context = json.loads(output.getvalue())
+        self.assertEqual(created["session_id"], context["session_id"])
+        owner = self._context_root / "session-owners" / str(created["session_id"])
+        self.assertTrue((owner / "core-owner-allocation-v1.json").is_file())
+        catalog = ResourceCatalog(self.root / "config")
+        self.assertFalse(any(
+            row["family"] == "feature-change-session-context-v1"
+            for row in catalog.inventory(workspace=external_workspace)["record_stores"]
+        ))
 
     def test_retry_after_committed_context_before_selection_reuses_exact_owner(self) -> None:
         record, created = self._session("post-commit-retry")
