@@ -12,6 +12,7 @@ from unittest.mock import patch
 import workbench_core.managed_trees as tree_module
 
 from workbench_api import Capability, ExecutionContext, Module
+from workbench_api.durable_resources import DurableResourceError
 from workbench_api.managed_trees import ManagedTreeError, managed_trees
 from workbench_core.managed_trees import CoreManagedTrees
 from workbench_core.modules import InstalledModule, dispatch
@@ -421,6 +422,41 @@ with host.stage("evidence", "recovered", requested_path=Path(os.environ["W3_OUTP
         (reference.path / "source.jsonl").write_bytes(b"changed\n")
         with self.assertRaisesRegex(ManagedTreeError, "authoritative members changed"):
             self.host.describe(reference.tree_id)
+
+    def test_inventory_requires_committed_tree_resource_reference(self) -> None:
+        input_resource = CoreDurableResources(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="atlas",
+        ).publish_bytes("evidence", "source.json", b"source\n")
+        tree = self._publish(references=(input_resource.resource_id,))
+        catalog = ResourceCatalog(self.config)
+        inventory = catalog.inventory(workspace=self.workspace)
+        self.assertEqual("ready-unproven", inventory["root_state"])
+        self.assertEqual([tree.tree_id], [row["tree_id"] for row in inventory["trees"]])
+
+        nonce = input_resource.resource_id.rsplit(":", 1)[1]
+        commit = self.config / "resources-v1" / "commits" / f"{nonce}.json"
+        held = self.home / "held-resource-commit.json"
+        commit.rename(held)
+        try:
+            with self.assertRaises(DurableResourceError) as failure:
+                catalog.inventory(workspace=self.workspace)
+            self.assertEqual("resource.changed", failure.exception.code)
+            self.assertFalse(commit.exists())
+        finally:
+            held.rename(commit)
+        self.assertEqual("committed", catalog.inventory(workspace=self.workspace)["trees"][0]["status"])
+
+    def test_inventory_rejects_changed_tree_resource_payload(self) -> None:
+        input_resource = CoreDurableResources(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="atlas",
+        ).publish_bytes("evidence", "source.json", b"source\n")
+        self._publish(references=(input_resource.resource_id,))
+        input_resource.path.write_bytes(b"broken\n")
+        with self.assertRaises(DurableResourceError) as failure:
+            ResourceCatalog(self.config).inventory(workspace=self.workspace)
+        self.assertEqual("resource.changed", failure.exception.code)
 
     def test_tree_dependency_is_recorded_and_cross_workspace_reference_is_refused(self) -> None:
         source = self._publish()

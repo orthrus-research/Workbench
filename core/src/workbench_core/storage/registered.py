@@ -642,6 +642,7 @@ class ResourceCatalog:
 
         root_state = self.verify_root()
         rows = []
+        resource_states: dict[str, tuple[str, str]] = {}
         if self.root.exists() or self.root.is_symlink():
             check_storage.ordinary(self.root, directory=True)
             if any(
@@ -729,6 +730,7 @@ class ResourceCatalog:
                     "retention": "protected-until-reviewed-policy",
                 }
                 rows.append(row)
+                resource_states[resource_id] = (str(record["workspace"]), status)
         record_stores = self._registered_record_stores(workspace)
         overlay_envelopes: list[dict[str, object]] = []
         for store in record_stores:
@@ -761,12 +763,22 @@ class ResourceCatalog:
                 if not private_path(path, directory=True):
                     raise DurableResourceError("resource.changed", "unregistered overlay attempt root is unsafe")
                 overlay_envelopes.append({"path": str(path), "status": "unregistered-store"})
+        trees = self.trees.inventory(workspace=workspace)
+        for tree in trees:
+            for reference in tree["references"]:
+                if not reference.startswith("workbench-resource-v1:"):
+                    continue
+                state = resource_states.get(reference)
+                if state is None or state[0] != tree["workspace"] or state[1] != "committed":
+                    raise DurableResourceError(
+                        "resource.changed", "managed tree resource reference is unavailable or changed",
+                    )
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,
             "workspace": str(workspace) if workspace is not None else None,
             "resources": rows, "record_stores": record_stores,
-            "trees": self.trees.inventory(workspace=workspace),
+            "trees": trees,
             "working_allocations": WorkingAllocationCatalog(self.root.parent).inventory_rows(
                 workspace=workspace,
             ),
