@@ -155,6 +155,15 @@ cannot produce a successful aggregate. Diagnostic artifacts are uploaded even
 after failures. These job definitions provide CI coverage only when dispatched;
 a local source run does not establish that the remote platform matrix passed.
 
+The `validate` workflow's stage-selection plan is retained at its historical
+`.workbench/validation/ci/plan.json` path in a Core-registered validation
+record namespace. Core publishes the exact JSON before the workflow exposes
+the GitHub output used by downstream jobs. A repeat with the same bytes can
+reopen that plan; a different prior plan, redirected or linked file, or an
+interrupted plan stage requires review in that checkout. CI uses a fresh
+checkout for each invocation. This source custody does not establish that a
+remote workflow ran or passed.
+
 If a required check cannot run, report it explicitly and keep the resulting
 claim narrow. A crash, timeout, corrupt output, missing report, or failed
 required check is a failure.

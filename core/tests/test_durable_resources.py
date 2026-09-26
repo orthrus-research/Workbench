@@ -139,6 +139,17 @@ class DurableResourceTests(unittest.TestCase):
         with self.assertRaises(DurableResourceError):
             provider.open("validation-timings-v1", self.home)
 
+    def test_validation_ci_plan_store_uses_historical_workspace_root(self) -> None:
+        provider = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="validation",
+        )
+        selected = provider.open("validation-ci-plan-v1", self.workspace)
+        self.assertEqual(self.workspace / ".workbench/validation/ci", selected.root)
+        self.assertEqual(selected, provider.open("validation-ci-plan-v1", self.workspace))
+        with self.assertRaises(DurableResourceError):
+            provider.open("validation-ci-plan-v1", self.home)
+
     def test_blueprints_sealed_store_uses_its_existing_namespace_and_owner(self) -> None:
         provider = CoreRecordStores(
             workspace=self.workspace, configuration_home=self.config,

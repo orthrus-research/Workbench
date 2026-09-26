@@ -68,6 +68,9 @@ class CoreRecordStores:
             # Keep the scheduler's historical latest-report lookup while
             # registering its mutable diagnostic namespace with Core.
             root = selected / ".workbench/validation/test-timings"
+        elif self.owner_id == "validation" and family == "validation-ci-plan-v1" and selected == self.workspace:
+            # The workflow uploads this exact historical plan directory.
+            root = selected / ".workbench/validation/ci"
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

@@ -8,12 +8,14 @@ here; the validation scheduler still owns suite admission and result meaning.
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import re
 import stat
 import sys
 
 
 _SUITE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_MAX_CI_PLAN = 4 * 1024 * 1024
 
 
 def _source_core() -> None:
@@ -118,4 +120,62 @@ def publish_validation_timing(root: Path, suite_name: str, payload: bytes) -> Pa
     return target
 
 
-__all__ = ["allocate_validation_run", "allocate_validation_scratch", "publish_validation_timing"]
+def publish_ci_plan(
+    root: Path, output: Path, payload: bytes, *,
+    configuration_home: Path | None = None,
+) -> Path:
+    """Publish one exact CI selection in Core's historical plan namespace.
+
+    A second identical call can reopen the plan. A different prior plan or an
+    interrupted unclaimed stage stays in place for review; CI starts from a
+    fresh checkout and never needs to erase earlier selection evidence.
+    """
+
+    _source_core()
+    from workbench_core.host_filesystem import (
+        read_bounded_bytes, read_private_single_link_bytes,
+        publish_immutable_bytes, secure_private_path,
+    )
+    from workbench_core.storage.record_stores import CoreRecordStores
+    from workbench_core.user_config_home import default_user_config_home
+
+    selected_root = Path(root).resolve(strict=True)
+    target = selected_root / ".workbench/validation/ci/plan.json"
+    selected_output = Path(os.path.abspath(Path(output).expanduser()))
+    if selected_output != target:
+        raise ValueError("CI plan output must use Core's selected historical path")
+    if type(payload) is not bytes or len(payload) > _MAX_CI_PLAN:
+        raise ValueError("CI plan exceeds its exact byte bound")
+    if target.exists() or target.is_symlink():
+        info = target.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError("prior CI plan is not an independent regular file")
+        if read_bounded_bytes(target, byte_limit=_MAX_CI_PLAN) != payload:
+            raise ValueError("a different CI plan is already retained at this path")
+    plan_parent = target.parent
+    if plan_parent.exists() or plan_parent.is_symlink():
+        if plan_parent.is_symlink() or not plan_parent.is_dir():
+            raise ValueError("CI plan parent is redirected or unavailable")
+        for member in plan_parent.iterdir():
+            if member.name.startswith(".plan.json."):
+                raise ValueError("interrupted CI plan stage requires review")
+    store = CoreRecordStores(
+        workspace=selected_root,
+        configuration_home=Path(configuration_home or default_user_config_home()).absolute(),
+        owner_id="validation",
+    ).open("validation-ci-plan-v1", selected_root)
+    target = store.root / "plan.json"
+    if target.exists() or target.is_symlink():
+        # The historical direct writer used the host's umask. Adopt only the
+        # exact same ordinary bytes before asking Core for idempotent custody.
+        secure_private_path(target, directory=False)
+    publish_immutable_bytes(target, payload, byte_limit=_MAX_CI_PLAN, idempotent=True)
+    if read_private_single_link_bytes(target, byte_limit=_MAX_CI_PLAN) != payload:
+        raise ValueError("Core CI plan changed after publication")
+    return target
+
+
+__all__ = [
+    "allocate_validation_run", "allocate_validation_scratch", "publish_ci_plan",
+    "publish_validation_timing",
+]

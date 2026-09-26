@@ -1,6 +1,9 @@
 """CI selection must never turn missing required coverage into a green gate."""
+from contextlib import redirect_stdout
 import copy
+import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -12,6 +15,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "validation"))
 from ci_validation import REQUIRED_TESTS, STAGES, gate, plan, required_test_failures
+from ci_validation import main as ci_main
+from core_run_custody import publish_ci_plan
 from suite_measurement import inventory_digest
 
 
@@ -23,6 +28,91 @@ class CiValidationTests(unittest.TestCase):
         return {"plan": {"result": "success"}, **{
             row["name"]: {"result": "success" if row["required"] else "skipped"}
             for row in document["stages"]}}
+
+    def test_ci_plan_uses_core_namespace_and_preserves_exact_legacy_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            target = root / ".workbench/validation/ci/plan.json"
+            payload = (json.dumps(self.selected("workflow_dispatch", []), indent=2) + "\n").encode()
+            with self.assertRaisesRegex(ValueError, "historical path"):
+                publish_ci_plan(root, root / "elsewhere.json", payload, configuration_home=home)
+            self.assertFalse((root / ".workbench").exists())
+            target.parent.mkdir(parents=True)
+            target.write_bytes(payload)
+            os.chmod(target, 0o644)
+            self.assertEqual(target, publish_ci_plan(
+                root, target, payload, configuration_home=home,
+            ))
+            self.assertEqual(payload, target.read_bytes())
+            self.assertEqual(target, publish_ci_plan(
+                root, target, payload, configuration_home=home,
+            ))
+            self.assertEqual(0, target.stat().st_mode & 0o077)
+            from workbench_core.storage.registered import ResourceCatalog
+            rows = ResourceCatalog(home).inventory(workspace=root)["record_stores"]
+            self.assertEqual(["validation-ci-plan-v1"], [row["family"] for row in rows])
+            with self.assertRaisesRegex(ValueError, "different CI plan"):
+                publish_ci_plan(root, target, b"different\n", configuration_home=home)
+            self.assertEqual(payload, target.read_bytes())
+            os.link(target, root / "linked-plan.json")
+            with self.assertRaisesRegex(ValueError, "independent regular file"):
+                publish_ci_plan(root, target, payload, configuration_home=home)
+            self.assertEqual(payload, target.read_bytes())
+
+    def test_ci_plan_refuses_redirected_target_and_interrupted_stage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            target = root / ".workbench/validation/ci/plan.json"
+            target.parent.mkdir(parents=True)
+            outside = Path(temporary) / "outside.json"
+            outside.write_bytes(b"unrelated\n")
+            target.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "independent regular file"):
+                publish_ci_plan(root, target, b"planned\n", configuration_home=home)
+            self.assertEqual(b"unrelated\n", outside.read_bytes())
+            target.unlink()
+            orphan = target.parent / ".plan.json.unknown"
+            orphan.write_bytes(b"unknown\n")
+            with self.assertRaisesRegex(ValueError, "interrupted CI plan stage"):
+                publish_ci_plan(root, target, b"planned\n", configuration_home=home)
+            self.assertEqual(b"unknown\n", orphan.read_bytes())
+            self.assertFalse(target.exists())
+
+    def test_ci_plan_command_publishes_before_github_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            event = root / "event.json"
+            event.write_text("{}", encoding="utf-8")
+            target = root / ".workbench/validation/ci/plan.json"
+            github_output = root / "github-output"
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(home)}), \
+                    patch("ci_validation.ROOT", root), \
+                    patch("ci_validation.subprocess.check_output", return_value="a" * 40 + "\n"):
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(0, ci_main([
+                        "plan", "--event-name", "workflow_dispatch",
+                        "--event-file", str(event), "--output", str(target),
+                        "--github-output", str(github_output),
+                    ]))
+            expected = plan("workflow_dispatch", [], revision="a" * 40)
+            self.assertEqual(expected, json.loads(target.read_bytes()))
+            self.assertEqual(
+                (json.dumps(expected, indent=2) + "\n").encode(), target.read_bytes(),
+            )
+            self.assertIn("plan=", github_output.read_text(encoding="utf-8"))
+            from workbench_core.storage.registered import ResourceCatalog
+            self.assertEqual(
+                ["validation-ci-plan-v1"],
+                [row["family"] for row in ResourceCatalog(home).inventory(
+                    workspace=root,
+                )["record_stores"]],
+            )
 
     def test_every_source_or_unknown_change_requires_complete_stages(self):
         for path in ("api/src/workbench_api/canonical.py", "modules/workbench-shell/src/main.py",

@@ -9,11 +9,13 @@ import re
 import subprocess
 
 from orchestration import OrchestrationFailure, fingerprint_paths, load_suite_report
+from core_run_custody import publish_ci_plan
 from suite_measurement import inventory_digest
 
 STAGES = ("workbench", "source-ci", "native-packages", "axiom", "ide", "physical-cleanroom")
 EVENTS = {"pull_request", "push", "schedule", "workflow_dispatch"}
 FORMAT = "workbench-ci-validation-plan-v1"
+ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_TESTS = {
     "pip": (("core", "test_package_lifecycle.InstallerConfinementTests.test_real_pip_ignores_injected_module_and_all_configuration"),),
     "windows-paths": (
@@ -175,8 +177,10 @@ def main(argv=None) -> int:
         return int(bool(failures))
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     document = plan(args.event_name, changed_paths(args.event_name, json.loads(args.event_file.read_text())), revision=revision)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    publish_ci_plan(
+        ROOT, args.output,
+        (json.dumps(document, indent=2) + "\n").encode("utf-8"),
+    )
     if args.github_output:
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write("plan=" + json.dumps(document, separators=(",", ":")) + "\n")
