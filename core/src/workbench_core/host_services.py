@@ -19,6 +19,7 @@ from workbench_api.derived_indexes import (
     derived_indexes_scope_active,
 )
 from workbench_api.record_stores import record_store_scope
+from workbench_api.managed_trees import managed_trees_scope
 from workbench_api.source_transactions import source_transactions_scope
 from . import axiom_sandbox, host_filesystem, live_console_reader, tool_process, verified_artifact_host
 from .source_transactions import CoreSourceTransactions
@@ -52,15 +53,23 @@ def direct_module_custody_scope(
     if not isinstance(workspace, Path) or not workspace.is_absolute():
         raise ValueError("direct module workspace must be absolute")
     from .storage.record_stores import CoreRecordStores
+    from .managed_trees import CoreManagedTrees
     from .user_config_home import default_user_config_home
 
     install_local_host_services()
+    configuration_home = default_user_config_home(environment=environment)
     with record_store_scope(CoreRecordStores(
         workspace=workspace,
-        configuration_home=default_user_config_home(environment=environment),
+        configuration_home=configuration_home,
         owner_id=owner_id,
+    )), managed_trees_scope(CoreManagedTrees(
+        workspace=workspace,
+        configuration_home=configuration_home,
+        locations={"artifacts": workspace},
+        owner_id=owner_id,
+        location_sources={"artifacts": "direct-workspace"},
     )), source_transactions_scope(CoreSourceTransactions(owner_id=owner_id)), registration_attempts_scope(CoreRegistrationAttempts(
-        configuration_home=default_user_config_home(environment=environment), owner_id=owner_id,
+        configuration_home=configuration_home, owner_id=owner_id,
     ) if owner_id == "workbench-shell" else None):
         yield
 
