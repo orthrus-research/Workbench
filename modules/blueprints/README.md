@@ -4,6 +4,9 @@ Blueprints turns an explicit developer request into a reviewable source
 change. It selects a registered standard or a clearly labeled experimental
 pattern, plans deterministic edits, validates the candidate, and applies the
 result through a recoverable transaction.
+Core performs the physical source staging, replacement, deletion, and guarded
+rollback for a consented direct application. Blueprints retains plan admission,
+source semantics, and its V1 history records.
 
 For native package development, install `api/` and `modules/blueprints/` in a
 dedicated virtual environment. Dependency declarations in `pyproject.toml`

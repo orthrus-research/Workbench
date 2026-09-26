@@ -134,6 +134,17 @@ the same Java choice and resolved state root into those Shell operations.
 Direct legacy Shell entry points retain their existing configuration and
 state defaults until their consumers migrate.
 
+## Protected source changes
+
+Blueprints admits a consented direct-apply plan and validates its source and
+resulting manifest. During Core dispatch, its physical source transaction uses
+the Core API to stage exact file or symlink bytes, recheck each baseline before
+replacement or deletion, and flush the changed directory. On failure, Core
+restores only paths whose applied bytes still match; a later edit is preserved
+for review. Core removes only its own staged files and empty directories it
+created. Blueprints keeps its V1 history markers and domain receipts. The
+external source tree remains outside Core's retained-resource cleanup scope.
+
 ## Source layout
 
 Keep one monorepo for coordinated contract changes and conformance testing:

@@ -739,6 +739,24 @@ class LifecycleTest(unittest.TestCase):
             (self.history_store.root / "active-transaction.lock").read_bytes(),
         )
 
+    def test_later_edit_of_applied_source_is_preserved_for_review(self) -> None:
+        _engine, released = self._release("direct-apply")
+        changed: list[Path] = []
+
+        def edit_after_commit(ordinal: int, relative: str) -> None:
+            if ordinal == 0:
+                target = self.fixture.repository / relative
+                target.write_bytes(b"external later edit\n")
+                changed.append(target)
+                raise RuntimeError("synthetic interruption")
+
+        rejected = self._engine(mutation_hook=edit_after_commit).apply(released)
+        self.assertEqual("failed", rejected["application"]["rollback"])
+        self.assertEqual(["BPA143_ROLLBACK_FAILED"], rejected["diagnostics"])
+        self.assertEqual(b"external later edit\n", changed[0].read_bytes())
+        self.assertTrue((self.history_store.root / "active-transaction.json").exists())
+        self.assertTrue((self.history_store.root / "active-transaction.lock").exists())
+
     def test_verification_drift_and_side_effects_fail_closed(self) -> None:
         engine, released = self._release("direct-apply")
         applied = engine.apply(released)

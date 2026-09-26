@@ -23,6 +23,9 @@ from workbench_api.host_filesystem import (
     secure_private_path,
 )
 from workbench_api.record_stores import open_record_store
+from workbench_api.source_transactions import (
+    SourceImage, SourceStage, SourceTransactionError, open_source_transaction,
+)
 from workbench_blueprints import planner, simulation, standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
 
@@ -1446,41 +1449,13 @@ class LifecycleEngine:
         return context
 
     @staticmethod
-    def _restore_path(path: Path, content: dict[str, Any] | None) -> None:
-        if path.exists() or path.is_symlink():
-            if path.is_dir() and not path.is_symlink():
-                _fail("BPA103_PATH_KIND", str(path), "target path is a directory")
-            path.unlink()
+    def _source_image(content: dict[str, Any] | None) -> SourceImage | None:
         if content is None:
-            return
-        decoded = _decode_content(content)
-        if content["kind"] == "symlink":
-            os.symlink(os.fsdecode(decoded), path)
-            return
-        descriptor = os.open(
-            path,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL
-            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
-            0o600,
+            return None
+        return SourceImage(
+            kind=content["kind"], data=_decode_content(content),
+            executable=content["mode"] == "100755",
         )
-        try:
-            remaining = memoryview(decoded)
-            while remaining:
-                written = os.write(descriptor, remaining)
-                if written <= 0:
-                    _fail(
-                        "BPA141_TRANSACTION_TEMP",
-                        str(path),
-                        "short write while staging released content",
-                    )
-                remaining = remaining[written:]
-            os.fchmod(
-                descriptor,
-                0o755 if content["mode"] == "100755" else 0o644,
-            )
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
 
     def _application_record(
         self,
@@ -1638,11 +1613,15 @@ class LifecycleEngine:
             "bundle_sha256": result["bundle_locator"].rsplit(":", 1)[1],
             "operations_sha256": bundle["operations_sha256"],
         }
+        try:
+            source_transaction = open_source_transaction(
+                self.target_repository, binding=run["release"]["release_id"],
+            )
+        except SourceTransactionError as exc:
+            _fail("BPA141_TRANSACTION_TEMP", str(self.target_repository), str(exc))
         lock_path = self.history_store.acquire_transaction(journal)
         journal_path: Path | None = None
-        created_dirs: list[Path] = []
-        staged: dict[int, Path] = {}
-        touched: list[dict[str, Any]] = []
+        staged: list[tuple[dict[str, Any], SourceStage]] = []
         mutation_error: Exception | None = None
         rollback = "not-needed"
         atomic = True
@@ -1650,100 +1629,28 @@ class LifecycleEngine:
         try:
             journal_path = self.history_store.write_journal(journal)
             for row in bundle["operations"]:
-                path, made = _safe_target(
-                    self.target_repository,
+                stage = source_transaction.prepare(
                     row["path"],
+                    before=self._source_image(row["before"]),
+                    after=self._source_image(row["after"]),
                     create_parents=row["operation"] == "create",
                 )
-                created_dirs.extend(made)
-                exists = path.exists() or path.is_symlink()
-                if (row["operation"] == "create") == exists:
-                    _fail(
-                        "BPA140_APPLICATION_COLLISION",
-                        row["path"],
-                        "released operation baseline no longer matches",
-                    )
-                if row["before"] is not None:
-                    kind = "symlink" if path.is_symlink() else "file"
-                    status = path.lstat()
-                    mode = (
-                        "120000"
-                        if kind == "symlink"
-                        else (
-                            "100755"
-                            if status.st_mode & stat.S_IXUSR
-                            else "100644"
-                        )
-                    )
-                    current = (
-                        os.readlink(os.fsencode(path))
-                        if kind == "symlink"
-                        else _read_regular(path, "BPA105_TARGET_RACE")
-                    )
-                    if (
-                        kind != row["before"]["kind"]
-                        or mode != row["before"]["mode"]
-                        or _digest_bytes(current) != row["before"]["sha256"]
-                    ):
-                        _fail(
-                            "BPA140_APPLICATION_COLLISION",
-                            row["path"],
-                            "released baseline bytes no longer match",
-                        )
-                if row["after"] is not None:
-                    temporary = path.parent / (
-                        f".blueprints-{run['release']['release_id'][-12:]}-"
-                        f"{row['ordinal']}"
-                    )
-                    if temporary.exists() or temporary.is_symlink():
-                        _fail(
-                            "BPA141_TRANSACTION_TEMP",
-                            str(temporary),
-                            "transaction temporary path already exists",
-                        )
-                    self._restore_path(temporary, row["after"])
-                    staged[row["ordinal"]] = temporary
-            for row in bundle["operations"]:
-                path, _ = _safe_target(
-                    self.target_repository,
-                    row["path"],
-                    create_parents=False,
-                )
-                if row["after"] is None:
-                    path.unlink()
-                else:
-                    os.replace(staged[row["ordinal"]], path)
-                touched.append(row)
-                _fsync_directory(path.parent, "BPA141_TRANSACTION_TEMP")
+                staged.append((row, stage))
+            for row, stage in staged:
+                source_transaction.commit(stage)
                 if self.mutation_hook is not None:
                     self.mutation_hook(row["ordinal"], row["path"])
             post = planner.capture_target_state(
                 self.target_repository, result["request"]["target"]["repository_id"]
             )
             self._validate_applied_manifest(observed, post, bundle)
+            source_transaction.cleanup()
         except Exception as exc:
             mutation_error = exc
             rollback = "succeeded"
             try:
-                for row in reversed(touched):
-                    path, _ = _safe_target(
-                        self.target_repository,
-                        row["path"],
-                        create_parents=True,
-                    )
-                    self._restore_path(path, row["before"])
-                    _fsync_directory(path.parent, "BPA142_ROLLBACK_MISMATCH")
-                for temporary in staged.values():
-                    if temporary.exists() or temporary.is_symlink():
-                        temporary.unlink()
-                for directory in reversed(created_dirs):
-                    try:
-                        directory.rmdir()
-                        _fsync_directory(
-                            directory.parent, "BPA142_ROLLBACK_MISMATCH"
-                        )
-                    except OSError:
-                        pass
+                source_transaction.rollback_all()
+                source_transaction.cleanup(remove_created_directories=True)
                 restored = planner.capture_target_state(
                     self.target_repository,
                     result["request"]["target"]["repository_id"],
