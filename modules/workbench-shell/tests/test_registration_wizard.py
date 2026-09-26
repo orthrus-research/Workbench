@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.parse import unquote, urlparse
 
 
@@ -35,6 +36,7 @@ from workbench_core.configuration import load_workbench_configuration  # noqa: E
 from workbench_core.host_services import install_local_host_services  # noqa: E402
 from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
 from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
+from workbench_core.source_transactions import _SourceTransaction  # noqa: E402
 from workbench_api.record_stores import record_store_scope  # noqa: E402
 from workbench_shell.registration_wizard import (  # noqa: E402
     RegistrationWizardError,
@@ -193,6 +195,85 @@ def _uri_path(value: str) -> Path:
 class RegistrationWizardTest(unittest.TestCase):
     def setUp(self) -> None:
         install_local_host_services()
+
+    def test_later_commit_failure_restores_only_unchanged_wizard_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            originals = {
+                row["path"]: (payload / row["path"]).read_bytes()
+                for row in plan["operations"]
+            }
+            original_commit = _SourceTransaction.commit
+            calls = 0
+
+            def fail_second(transaction, stage):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("injected second commit failure")
+                original_commit(transaction, stage)
+
+            with patch.object(_SourceTransaction, "commit", fail_second):
+                with self.assertRaisesRegex(
+                    RegistrationWizardError, "failed and was rolled back",
+                ):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+            self.assertEqual(calls, 2)
+            for relative, before in originals.items():
+                self.assertEqual((payload / relative).read_bytes(), before)
+            self.assertEqual([], list((state / "registrations").iterdir()))
+
+    def test_changed_output_blocks_rollback_and_keeps_original_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            first = plan["operations"][0]["path"]
+            target = payload / first
+            before = target.read_bytes()
+            original_commit = _SourceTransaction.commit
+            calls = 0
+
+            def change_after_first(transaction, stage):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("injected second commit failure")
+                original_commit(transaction, stage)
+                target.write_bytes(b"later user edit\n")
+
+            with patch.object(_SourceTransaction, "commit", change_after_first):
+                with self.assertRaisesRegex(
+                    RegistrationWizardError, "rollback also failed",
+                ):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+            self.assertEqual(target.read_bytes(), b"later user edit\n")
+            transaction = state / "registrations" / plan["plan_id"].removeprefix("sha256:")
+            self.assertTrue(transaction.is_dir())
+            self.assertEqual((transaction / "backups" / first).read_bytes(), before)
+            self.assertEqual(json.loads((transaction / "receipt.json").read_bytes())["state"], "prepared")
 
     def test_active_instance_core_store_keeps_historical_locator(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

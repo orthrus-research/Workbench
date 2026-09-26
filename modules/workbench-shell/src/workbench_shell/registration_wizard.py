@@ -9,11 +9,17 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import stat
 import sys
 import tempfile
 from typing import Any, NoReturn
 
 from .active_instance import load_active_instance
+from workbench_api.source_transactions import (
+    SourceImage,
+    SourceTransactionError,
+    open_source_transaction,
+)
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
     WorkbenchConfiguration,
@@ -374,27 +380,6 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
         _fail(f"cannot retain registration receipt: {exc}")
 
 
-def _atomic_replace(path: Path, content: bytes, mode: int) -> None:
-    temporary_name: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            delete=False,
-        ) as output:
-            temporary_name = output.name
-            os.fchmod(output.fileno(), mode)
-            output.write(content)
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary_name, path)
-        temporary_name = None
-    finally:
-        if temporary_name is not None:
-            Path(temporary_name).unlink(missing_ok=True)
-
-
 def apply_active_registration(
     suite_root: Path | str,
     workspace_root: Path | str,
@@ -440,9 +425,11 @@ def apply_active_registration(
     temporary = Path(tempfile.mkdtemp(prefix=".apply-", dir=transactions))
     backups = temporary / "backups"
     backups.mkdir()
-    applied: list[tuple[Path, Path, int]] = []
+    source_transaction = None
+    retain_incomplete = False
     try:
         receipt_outputs: list[dict[str, Any]] = []
+        images: list[tuple[str, SourceImage, SourceImage]] = []
         for operation in operations:
             relative = _safe_relative(operation["path"], "registration operation path")
             target = payload.joinpath(*relative.parts)
@@ -454,6 +441,12 @@ def apply_active_registration(
             backup = backups.joinpath(*relative.parts)
             backup.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(target, backup)
+            mode = stat.S_IMODE(target.stat().st_mode)
+            images.append((
+                relative.as_posix(),
+                SourceImage("file", before, mode=mode),
+                SourceImage("file", operation["content"], mode=mode),
+            ))
             receipt_outputs.append({
                 "operation": "update",
                 "path": relative.as_posix(),
@@ -476,17 +469,17 @@ def apply_active_registration(
                 "receipt_uri": (transaction / "receipt.json").as_uri(),
             },
         }
+        source_transaction = open_source_transaction(
+            payload, binding=f"registration:{plan['plan_id']}",
+        )
+        stages = [
+            source_transaction.prepare(relative, before=before, after=after)
+            for relative, before, after in images
+        ]
         _write_json(temporary / "receipt.json", receipt)
 
-        for operation in operations:
-            relative = _safe_relative(operation["path"], "registration operation path")
-            target = payload.joinpath(*relative.parts)
-            backup = backups.joinpath(*relative.parts)
-            mode = target.stat().st_mode & 0o777
-            _atomic_replace(target, operation["content"], mode)
-            applied.append((target, backup, mode))
-            if sha256(target.read_bytes()).hexdigest() != operation["content_sha256"]:
-                _fail(f"registration output verification failed: {relative}")
+        for stage in stages:
+            source_transaction.commit(stage)
 
         receipt["state"] = "applied"
         _write_json(temporary / "receipt.json", receipt)
@@ -500,12 +493,20 @@ def apply_active_registration(
         }
     except Exception as exc:
         rollback_error: Exception | None = None
-        for target, backup, mode in reversed(applied):
+        if source_transaction is not None:
             try:
-                _atomic_replace(target, backup.read_bytes(), mode)
-            except Exception as rollback_exc:  # pragma: no cover - catastrophic filesystem failure
+                source_transaction.rollback_all()
+            except Exception as rollback_exc:
                 rollback_error = rollback_exc
         if rollback_error is not None:
+            # Preserve the original images for an explicit recovery decision.
+            # Core refused to overwrite a source changed after our commit.
+            retain_incomplete = True
+            if not transaction.exists() and not transaction.is_symlink():
+                try:
+                    os.replace(temporary, transaction)
+                except OSError:
+                    pass
             raise RegistrationWizardError(
                 f"registration failed and rollback also failed: {rollback_error}"
             ) from exc
@@ -513,7 +514,13 @@ def apply_active_registration(
             raise
         _fail(f"registration transaction failed and was rolled back: {exc}")
     finally:
-        if temporary.exists():
+        if source_transaction is not None:
+            try:
+                source_transaction.cleanup()
+            except SourceTransactionError:
+                retain_incomplete = True
+                raise
+        if temporary.exists() and not retain_incomplete:
             shutil.rmtree(temporary)
 
 
