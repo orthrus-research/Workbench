@@ -159,3 +159,25 @@ class NativeReuseTests(unittest.TestCase):
                 [b"unqualified bytes"],
                 [path.read_bytes() for path in base.glob(".workbench-tree-*.pending/payload/partial.txt")],
             )
+
+    def test_core_selects_new_default_output_each_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            source = base / "source"
+            self.assembly(source)
+            outputs = []
+            for _ in range(2):
+                result, reference = publish_build_tree(
+                    None,
+                    lambda staged: self.derive(source, staged),
+                    lambda path, expected: self.assertEqual(expected, distribution.verify(path)),
+                    lambda path, _result: "workbench-native-wheelhouse-v1:sha256:"
+                    + distribution._digest(path / "wheelhouse.json"),
+                    owner_id="native-build",
+                    configuration_home=base / "core-home",
+                    default_output_root=base / "fresh",
+                )
+                self.assertEqual(result, distribution.verify(reference.path))
+                outputs.append(reference.path)
+            self.assertEqual(2, len(set(outputs)))
+            self.assertTrue(all(path.is_relative_to(base / "fresh") for path in outputs))

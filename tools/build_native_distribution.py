@@ -28,7 +28,7 @@ def main(argv=None):
     choice = parser.add_mutually_exclusive_group()
     choice.add_argument("--component", action="append", dest="components")
     choice.add_argument("--suite", action="store_true", help="assemble all native modules and profiles")
-    parser.add_argument("--output", type=Path, default=Path(".workbench/build/native-wheelhouse"))
+    parser.add_argument("--output", type=Path, help="new output directory; Core chooses one when omitted")
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--from-wheelhouse", type=Path, help="derive a verified offline closure without rebuilding wheels")
     parser.add_argument("--diagnostics", type=Path, help="new directory for bounded phase logs")

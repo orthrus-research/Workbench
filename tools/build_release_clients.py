@@ -1206,13 +1206,14 @@ def build(
 
 
 def build_managed(
-    output_dir: Path,
+    output_dir: Path | None,
     *,
     component: str | None = None,
     lane: str = PUBLIC_LANE,
     skip_build: bool = False,
     skip_vscode_extension_host: bool = False,
     configuration_home: Path | None = None,
+    default_output_root: Path | None = None,
 ):
     """Publish a fresh verified client bundle through source-checkout Core."""
 
@@ -1233,6 +1234,7 @@ def build_managed(
         lambda _path, result: str(result["client_artifact_manifest_id"]),
         owner_id="developer-client-build",
         configuration_home=configuration_home,
+        default_output_root=default_output_root,
     )
 
 
@@ -1241,7 +1243,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=ROOT / ".workbench/distribution/developer-clients",
+        help="new output directory; Core chooses one when omitted",
     )
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--skip-vscode-extension-host", action="store_true")
@@ -1259,7 +1261,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         result, custody = build_managed(
-            args.output_dir.resolve(),
+            None if args.output_dir is None else args.output_dir.resolve(),
             component=args.component,
             lane=args.lane,
             skip_build=args.skip_build,

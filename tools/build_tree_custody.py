@@ -16,7 +16,7 @@ Result = TypeVar("Result")
 
 
 def publish_build_tree(
-    output: Path,
+    output: Path | None,
     produce: Callable[[Path], Result],
     validate: Callable[[Path, Result], None],
     domain_id: Callable[[Path, Result], str],
@@ -24,6 +24,7 @@ def publish_build_tree(
     owner_id: str,
     workspace: Path = ROOT,
     configuration_home: Path | None = None,
+    default_output_root: Path | None = None,
 ):
     """Build into Core staging and return the result and cataloged tree.
 
@@ -31,10 +32,16 @@ def publish_build_tree(
     retains staged bytes for inspection without presenting a complete output.
     """
 
-    output = Path(output).absolute()
-    if output.exists() or output.is_symlink():
-        raise ValueError("build output must be a new directory")
     workspace = Path(workspace).resolve(strict=True)
+    selected_output = None if output is None else Path(output).absolute()
+    if selected_output is not None and (selected_output.exists() or selected_output.is_symlink()):
+        raise ValueError("build output must be a new directory")
+    if selected_output is not None:
+        selected_root = selected_output.parent
+    elif default_output_root is not None:
+        selected_root = Path(default_output_root).absolute()
+    else:
+        selected_root = workspace / ".workbench/build"
     source_root = Path(__file__).resolve().parents[1]
     for source in (source_root / "api/src", source_root / "core/src"):
         if str(source) not in sys.path:
@@ -47,19 +54,22 @@ def publish_build_tree(
     host = CoreManagedTrees(
         workspace=workspace,
         configuration_home=home,
-        locations={"artifacts": output.parent},
+        locations={"artifacts": selected_root},
         location_sources={"artifacts": "contributor-build-output"},
         owner_id=owner_id,
     )
 
-    with host.stage("artifacts", output.name, requested_path=output) as stage:
+    with host.stage(
+        "artifacts", "bundle" if selected_output is None else selected_output.name,
+        requested_path=selected_output,
+    ) as stage:
         result = produce(stage.path)
         validate(stage.path, result)
         reference = stage.publish(
             validate=lambda path: validate(path, result),
             domain_id=domain_id(stage.path, result),
         )
-    validate(output, result)
+    validate(reference.path, result)
     if host.describe(reference.tree_id) != reference:
         raise ValueError("build output Core record changed after publication")
     return result, reference

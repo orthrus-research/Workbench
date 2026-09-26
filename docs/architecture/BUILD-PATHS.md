@@ -33,6 +33,9 @@ The client builder also requires a fresh output directory. Source-checkout Core
 publishes its verified ZIPs and exact client manifest as one cataloged tree;
 the CLI returns that tree ID and path. Existing client bundles remain readable
 at their original paths.
+If a native or client build omits its output argument, Core chooses a new
+directory under the checkout's ignored build area. An explicit destination
+must be new and is never overwritten.
 
 The component candidate workflow accepts an annotated namespaced tag such as
 `workbench-atlas/v0.1.0-rc.1`. It builds the selected package and its dependency
