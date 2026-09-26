@@ -185,6 +185,22 @@ still need their own owner locks and reviewed acquisition before a complete
 rebuild can be claimed. Linux exact-tree support is required; WSL storage on
 Windows mounts still needs native qualification.
 
+`plan_environment_input_composition` is a V2 linked review of five separately
+completed Core results: workspace selection, exact project checkout, managed
+tools, retained optional wheel bytes and retained profile fixture sources. It
+binds their resource IDs and current readbacks to the same V3 share, input
+candidate and workspace. `apply_environment_input_composition` publishes a
+linked evidence result; `reopen_environment_input_composition` repeats the live
+checks without requiring the original wheel or fixture source paths. When the
+selection acquired managed Java, Core also reopens and probes that runtime
+against its policy and receipt. A user-supplied Java path remains an unchecked
+local binding. The linked result inherits the project-byte closure and any
+managed-Java closure from their original receipts. Optional package
+installation, dependency closure and fixture toolchain/runtime execution remain
+unresolved. It does not orchestrate
+acquisition of all five inputs after one approval; that needs a separate step
+journal and recovery contract.
+
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
 names the exact import plan, local blockers and missing acquisition inputs. The

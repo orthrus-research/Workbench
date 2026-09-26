@@ -1,8 +1,8 @@
 """Review and retain the already acquired parts of a V3 environment share.
 
-This operation does not acquire bytes. It reopens three Core results, checks
-their current local bindings, and links them in one durable result. Package and
-profile fixture inputs remain unresolved until they have their own locks.
+This operation does not acquire bytes. V1 reopens selection, project, and tool
+results. V2 additionally reopens reviewed wheel and fixture source snapshots.
+Neither version installs optional packages or executes the profile fixture.
 """
 
 from __future__ import annotations
@@ -15,6 +15,8 @@ from typing import Any, Mapping
 
 from . import tooling_provision
 from .durable_records import read_private_bytes
+from .environment_fixture_import import reopen_fixture_import
+from .environment_input_candidates import validate_input_candidate
 from .environment_project_import import (
     ACQUISITION_FORMAT,
     RESULT_FORMAT_V2 as PROJECT_RESULT_FORMAT,
@@ -27,13 +29,21 @@ from .environment_reconstruction import (
 )
 from .environment_resolution import resolve_environment
 from .environment_tool_import import RESULT_FORMAT as TOOL_RESULT_FORMAT
+from .environment_wheel_import import reopen_wheel_import
 from .portable_managed_tools import inspect_locked_managed_tools
+from .runtime_java import (
+    JavaRuntimeError, host_platform, inspect_managed_java_runtime,
+    load_java_runtime_policy, select_managed_java_policy,
+)
+from .configuration import WorkbenchConfigurationError, load_workbench_configuration
 from .storage.registered import DurableResourceError
 from .user_preferences import load_workspaces, resolve_expression
 
 
 PLAN_FORMAT = "workbench-environment-composition-plan-v1"
 RESULT_FORMAT = "workbench-environment-composition-result-v1"
+PLAN_FORMAT_V2 = "workbench-environment-composition-plan-v2"
+RESULT_FORMAT_V2 = "workbench-environment-composition-result-v2"
 
 
 def _reopen(
@@ -247,4 +257,202 @@ def apply_environment_composition(
     }}
 
 
-__all__ = ["plan_environment_composition", "apply_environment_composition"]
+def _java_evidence(
+    suite_root: Path, portable: dict[str, Any], selection: dict[str, Any],
+    *, state_root: Path,
+) -> dict[str, Any]:
+    """Reopen managed Java only when the selection imported a managed runtime."""
+
+    mode = portable["intent"]["java"]["mode"]
+    acquired = selection.get("managed_java")
+    if acquired is None:
+        return ({"state": "user-local-binding-unchecked", "marker": "local-java-home"}
+                if mode == "local-binding-required" else
+                {"state": "unresolved", "marker": "managed-java-archive"})
+    if mode == "local-binding-required" or type(acquired) is not dict:
+        raise ReconstructionError("selection result has inconsistent managed Java evidence")
+    try:
+        configuration = load_workbench_configuration(
+            suite_root, Path(selection["configuration_manifest"]["path"]),
+        )
+        policy = select_managed_java_policy(
+            load_java_runtime_policy(suite_root, configuration=configuration),
+            portable["intent"]["java"]["feature_version"],
+        )
+        if policy["policy_sha256"] != portable["lock"]["java_policy"]["selected_policy_sha256"]:
+            raise ReconstructionError("selected managed Java policy differs from the V3 share")
+        current = inspect_managed_java_runtime(policy, host_platform(), state_root=state_root)
+    except (JavaRuntimeError, WorkbenchConfigurationError, OSError, KeyError, TypeError) as exc:
+        raise ReconstructionError(f"managed Java cannot be reopened: {exc}") from exc
+    receipt = current.get("receipt") if type(current) is dict else None
+    if (type(receipt) is not dict or current.get("source") != "managed"
+            or receipt.get("runtime_id") != acquired.get("runtime_id")
+            or receipt.get("target", {}).get("receipt_uri") != acquired.get("receipt_uri")
+            or receipt.get("policy", {}).get("policy_sha256") != acquired.get("policy_sha256")):
+        raise ReconstructionError("managed Java differs from the imported selection receipt")
+    return {
+        "state": "current-managed-runtime", "runtime_id": receipt["runtime_id"],
+        "policy_sha256": policy["policy_sha256"],
+    }
+
+
+def plan_environment_input_composition(
+    suite_root: Path, share: Mapping[str, Any], candidate: Mapping[str, Any], *,
+    workspace_name: str, workspace: Path | str, selection_resource_id: str,
+    project_resource_id: str, tool_resource_id: str, wheel_resource_id: str,
+    fixture_resource_id: str, environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Review five already retained inputs without installing or executing them."""
+
+    portable = validate_share(dict(share))
+    reviewed = validate_input_candidate(portable, dict(candidate))
+    identifiers = (
+        selection_resource_id, project_resource_id, tool_resource_id,
+        wheel_resource_id, fixture_resource_id,
+    )
+    if any(type(value) is not str for value in identifiers) or len(set(identifiers)) != 5:
+        raise ReconstructionError("input composition needs five distinct Core result resources")
+    values = dict(os.environ if environment is None else environment)
+    base = plan_environment_composition(
+        suite_root, portable, workspace_name=workspace_name, workspace=workspace,
+        selection_resource_id=selection_resource_id,
+        project_resource_id=project_resource_id, tool_resource_id=tool_resource_id,
+        environment=values,
+    )
+    local = resolve_environment(suite_root, workspace=workspace, environment=values)
+    service = _resource_host(Path(suite_root), local.workspace, values)
+    selection, _ = _reopen(service, selection_resource_id, "selection", portable["share_id"])
+    wheel = reopen_wheel_import(
+        suite_root, portable, reviewed, workspace=local.workspace,
+        result_resource_id=wheel_resource_id, environment=values,
+    )
+    fixture = reopen_fixture_import(
+        suite_root, portable, reviewed, workspace=local.workspace,
+        result_resource_id=fixture_resource_id, environment=values,
+    )
+    java = _java_evidence(Path(suite_root), portable, selection, state_root=local.state_root)
+    if java["state"] == "current-managed-runtime" and "managed-java-archive" in base["unresolved_inputs"]:
+        raise ReconstructionError("managed Java evidence conflicts with the selection unresolved list")
+    if java["state"] != "current-managed-runtime" and (
+        java["marker"] not in base["unresolved_inputs"]
+    ):
+        raise ReconstructionError("selection omitted an unresolved Java input")
+    resources = {
+        **base["resources"],
+        "optional_wheels": {
+            "resource_id": wheel_resource_id,
+            "sha256": "sha256:" + sha256(_canonical(wheel) + b"\n").hexdigest(),
+        },
+        "profile_fixture": {
+            "resource_id": fixture_resource_id,
+            "sha256": "sha256:" + sha256(_canonical(fixture) + b"\n").hexdigest(),
+        },
+    }
+    return _seal({
+        "format": PLAN_FORMAT_V2, "schema_version": 2,
+        "share_id": portable["share_id"], "lock_id": portable["lock"]["lock_id"],
+        "candidate_id": reviewed["candidate_id"],
+        "workspace_name": workspace_name, "workspace": str(local.workspace),
+        "workspace_id": base["workspace_id"],
+        "environment_resolution_id": local.record["resolution_id"],
+        "base_plan_id": base["plan_id"], "java": java,
+        "resources": resources,
+        "unresolved_inputs": base["unresolved_inputs"], "state": "ready",
+    }, "workbench-environment-composition-plan", "plan_id")
+
+
+def _input_result(plan: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "format": RESULT_FORMAT_V2, "schema_version": 2,
+        "plan_id": plan["plan_id"], "share_id": plan["share_id"],
+        "lock_id": plan["lock_id"], "candidate_id": plan["candidate_id"],
+        "workspace_name": plan["workspace_name"], "workspace": plan["workspace"],
+        "workspace_id": plan["workspace_id"],
+        "environment_resolution_id": plan["environment_resolution_id"],
+        "java": plan["java"], "resources": plan["resources"],
+        "unresolved_inputs": plan["unresolved_inputs"],
+        "scope": "Linked exact selection, project, managed tools, optional wheel bytes and profile fixture sources; package installation, fixture execution and dependency closure remain unresolved.",
+    }
+
+
+def apply_environment_input_composition(
+    suite_root: Path, share: Mapping[str, Any], candidate: Mapping[str, Any], *,
+    expected_plan_id: str, workspace_name: str, workspace: Path | str,
+    selection_resource_id: str, project_resource_id: str, tool_resource_id: str,
+    wheel_resource_id: str, fixture_resource_id: str,
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Link five exact Core results after repeating their live review."""
+
+    values = dict(os.environ if environment is None else environment)
+    plan = plan_environment_input_composition(
+        suite_root, share, candidate, workspace_name=workspace_name, workspace=workspace,
+        selection_resource_id=selection_resource_id, project_resource_id=project_resource_id,
+        tool_resource_id=tool_resource_id, wheel_resource_id=wheel_resource_id,
+        fixture_resource_id=fixture_resource_id, environment=values,
+    )
+    if type(expected_plan_id) is not str or expected_plan_id != plan["plan_id"]:
+        raise ReconstructionError("environment input composition changed after review")
+    service = _resource_host(Path(suite_root), Path(plan["workspace"]), values)
+    if service.policy_id != plan["environment_resolution_id"]:
+        raise ReconstructionError("environment input composition resolution changed after review")
+    result = _input_result(plan)
+    payload = _canonical(result) + b"\n"
+    reference = service.publish_bytes(
+        "evidence", "environment-input-composition.json", payload,
+        domain_id=plan["share_id"],
+        references=tuple(item["resource_id"] for item in plan["resources"].values()),
+    )
+    if service.read_bytes(reference.resource_id) != payload:
+        raise ReconstructionError("environment input composition result did not reopen exactly")
+    return {**result, "resource": {
+        "resource_id": reference.resource_id, "store_id": reference.store_id,
+        "path": str(reference.path), "sha256": reference.sha256,
+    }}
+
+
+def reopen_environment_input_composition(
+    suite_root: Path, share: Mapping[str, Any], candidate: Mapping[str, Any], *,
+    workspace_name: str, workspace: Path | str, result_resource_id: str,
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Recheck a V2 linked result and all five surviving inputs."""
+
+    portable = validate_share(dict(share))
+    reviewed = validate_input_candidate(portable, dict(candidate))
+    values = dict(os.environ if environment is None else environment)
+    local = resolve_environment(suite_root, workspace=workspace, environment=values)
+    service = _resource_host(Path(suite_root), local.workspace, values)
+    receipt, _ = _reopen(service, result_resource_id, "input composition", portable["share_id"])
+    if (receipt.get("format") != RESULT_FORMAT_V2 or receipt.get("schema_version") != 2
+            or receipt.get("share_id") != portable["share_id"]
+            or receipt.get("candidate_id") != reviewed["candidate_id"]
+            or receipt.get("workspace_name") != workspace_name
+            or receipt.get("workspace") != str(local.workspace)
+            or type(receipt.get("resources")) is not dict
+            or set(receipt["resources"]) != {
+                "selection", "project", "managed_tools", "optional_wheels", "profile_fixture",
+            }
+            or any(type(row) is not dict or type(row.get("resource_id")) is not str
+                   for row in receipt["resources"].values())):
+        raise ReconstructionError("environment input composition result has another identity")
+    resources = receipt["resources"]
+    plan = plan_environment_input_composition(
+        suite_root, portable, reviewed, workspace_name=workspace_name, workspace=local.workspace,
+        selection_resource_id=resources["selection"]["resource_id"],
+        project_resource_id=resources["project"]["resource_id"],
+        tool_resource_id=resources["managed_tools"]["resource_id"],
+        wheel_resource_id=resources["optional_wheels"]["resource_id"],
+        fixture_resource_id=resources["profile_fixture"]["resource_id"],
+        environment=values,
+    )
+    if receipt != _input_result(plan):
+        raise ReconstructionError("environment input composition result differs from live inputs")
+    return receipt
+
+
+__all__ = [
+    "plan_environment_composition", "apply_environment_composition",
+    "plan_environment_input_composition", "apply_environment_input_composition",
+    "reopen_environment_input_composition",
+]

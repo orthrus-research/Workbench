@@ -1305,6 +1305,27 @@ def apply_environment_composition(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def plan_environment_input_composition(*args, **kwargs) -> dict[str, Any]:
+    """Review five separately retained V3 environment inputs."""
+
+    from .environment_composition import plan_environment_input_composition as operation
+    return operation(*args, **kwargs)
+
+
+def apply_environment_input_composition(*args, **kwargs) -> dict[str, Any]:
+    """Retain a linked result for five reviewed environment inputs."""
+
+    from .environment_composition import apply_environment_input_composition as operation
+    return operation(*args, **kwargs)
+
+
+def reopen_environment_input_composition(*args, **kwargs) -> dict[str, Any]:
+    """Reopen a linked V2 result and its five surviving inputs."""
+
+    from .environment_composition import reopen_environment_input_composition as operation
+    return operation(*args, **kwargs)
+
+
 def plan_wheel_import(*args, **kwargs) -> dict[str, Any]:
     """Review exact optional wheel bytes for separate Core custody."""
 
@@ -1352,6 +1373,8 @@ __all__ = [
     "build_share", "export_share", "load_share", "plan_import", "validate_share",
     "plan_project_import", "apply_project_import", "plan_tool_import", "apply_tool_import",
     "plan_environment_composition", "apply_environment_composition",
+    "plan_environment_input_composition", "apply_environment_input_composition",
+    "reopen_environment_input_composition",
     "plan_wheel_import", "apply_wheel_import", "reopen_wheel_import",
     "plan_fixture_import", "apply_fixture_import", "reopen_fixture_import",
 ]
