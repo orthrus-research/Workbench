@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, Mock, patch
 from urllib.parse import unquote, urlparse
 
 
@@ -27,11 +27,35 @@ from supersymmetry_project_fixture import (  # noqa: E402
     create_supersymmetry_project,
 )
 from workbench_shell.cli import main as cli_main  # noqa: E402
+from workbench_api.feature_exports import feature_export_scope, feature_exports  # noqa: E402
+from workbench_core.feature_exports import CoreFeatureExports  # noqa: E402
 from workbench_core.configuration import (  # noqa: E402
     load_workbench_configuration,
 )
 
 class WorkbenchCliTest(unittest.TestCase):
+    def test_installed_studio_uses_dispatch_configuration_home(self) -> None:
+        from workbench_shell.commands import studio
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            selected = CoreFeatureExports(configuration_home=root / "selected")
+            foreign = CoreFeatureExports(configuration_home=root / "foreign")
+            context = Mock(configuration_home=selected.configuration_home)
+            seen = []
+
+            def run(_arguments, **_kwargs):
+                seen.append(feature_exports().configuration_home)
+                return 0
+
+            with feature_export_scope(foreign), patch(
+                "workbench_shell.cli.main", side_effect=run,
+            ):
+                self.assertEqual(0, studio(["plan"], context=context))
+                self.assertIs(feature_exports(), foreign)
+            context.check_cancelled.assert_called_once_with()
+            self.assertEqual([selected.configuration_home], seen)
+
     def _environment(self) -> dict[str, str]:
         environment = os.environ.copy()
         source_roots = [

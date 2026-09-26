@@ -21,6 +21,8 @@ from workbench_core.service.runtime import LocalServiceAuthenticator, ServiceRun
 from workbench_core.service.record_backend import CoreServiceRecordBackend
 from workbench_api.service import ServiceCancelled, ServiceExecutionContext, ServiceHandlerRegistration
 from workbench_api.canonical import canonical_json_bytes, content_id, parse_canonical_json
+from workbench_api.feature_exports import feature_export_scope
+from workbench_core.feature_exports import CoreFeatureExports
 
 from .feature_studio import (
     execute_feature_request,
@@ -1035,7 +1037,10 @@ def compose_feature_studio_service_v3(
         repository_root.is_absolute()
         and repository_root.is_dir()
         and service_root.is_absolute()
-        and not service_root.is_symlink(),
+        and not service_root.is_symlink()
+        and (configuration_home is None or (
+            isinstance(configuration_home, Path) and configuration_home.is_absolute()
+        )),
         "feature-studio.service-root",
         "Feature Studio service roots are invalid",
     )
@@ -1069,6 +1074,10 @@ def compose_feature_studio_service_v3(
         "Feature Studio live binding projection is invalid",
     )
 
+    # Runtime handlers and result validators may run on different workers.
+    # Each callback must reopen exports against the same selected Core catalog.
+    export_host = CoreFeatureExports(configuration_home=configuration_home)
+
     registrations: list[ServiceHandlerRegistration] = []
     binding_specs: list[
         tuple[ServiceHandlerRegistration, str, Callable[[Mapping[str, Any]], OwnerBindingProjection]]
@@ -1099,6 +1108,17 @@ def compose_feature_studio_service_v3(
         result_schema_port = _schema_validator(
             resources, method_binding["result_schema_id"]
         )
+
+        def hosted_handler(
+            context: ServiceExecutionContext, value: Mapping[str, Any],
+        ) -> Any:
+            with feature_export_scope(export_host):
+                return handler(context, value)
+
+        def hosted_result_validator(value: Any) -> bool:
+            with feature_export_scope(export_host):
+                return result_validator(value) and result_schema_port(value)
+
         registration = ServiceHandlerRegistration(
             method=method_name,
             capability_id=descriptor["capability_id"],
@@ -1108,15 +1128,12 @@ def compose_feature_studio_service_v3(
             mutation_boundary=mutation_boundary,
             asynchronous=asynchronous,
             maximum_concurrency=maximum_concurrency,
-            handler=handler,
+            handler=hosted_handler,
             request_validator=lambda value: (
                 request_validator(value)
                 and request_schema_port(value)
             ),
-            result_validator=lambda value: (
-                result_validator(value)
-                and result_schema_port(value)
-            ),
+            result_validator=hosted_result_validator,
             context_binding=(
                 descriptor["context_applicability"]["context_binding"]
                 if context_binding is None

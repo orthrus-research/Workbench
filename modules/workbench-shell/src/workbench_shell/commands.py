@@ -178,8 +178,12 @@ def process_recipes(argv, *, context):
 
 def studio(argv, *, context):
     context.check_cancelled()
+    from workbench_api.feature_exports import feature_export_scope
     from workbench_shell.cli import main as shell_main
-    return shell_main(['feature', *list(argv), '--suite-root', str(ROOT)], feature_program='workbench studio')
+    from workbench_core.feature_exports import CoreFeatureExports
+
+    with feature_export_scope(CoreFeatureExports(configuration_home=context.configuration_home)):
+        return shell_main(['feature', *list(argv), '--suite-root', str(ROOT)], feature_program='workbench studio')
 
 
 def host_status(argv, *, context):

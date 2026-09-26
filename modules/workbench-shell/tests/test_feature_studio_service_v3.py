@@ -34,6 +34,7 @@ from workbench_crucible_jobs.synthetic import (  # noqa: E402
     build_synthetic_job_publication,
 )
 from workbench_api.canonical import canonical_json_bytes
+from workbench_api.feature_exports import feature_export_scope
 from workbench_api.profiles import profile_scope, profiles
 from workbench_shell.material_fluid_flow import (
     MaterialFluidFlowError,
@@ -65,6 +66,7 @@ from workbench_core.service.host import (  # noqa: E402
     LocalServiceEndpointV3,
 )
 from workbench_core.storage.registered import ResourceCatalog
+from workbench_core.feature_exports import CoreFeatureExports
 from workbench_core.host_services import install_local_host_services
 
 
@@ -203,6 +205,113 @@ class FeatureStudioServiceV3Tests(unittest.TestCase):
             self.assertEqual(1, len(stores))
             self.assertEqual((stores[0]["family"], stores[0]["path"], stores[0]["status"]),
                              ("service-jobs", str(service / "store"), "available"))
+
+    def test_export_uses_selected_core_home_through_job_result_and_restart(self) -> None:
+        install_local_host_services()
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary).resolve()
+            workspace = root / "source"
+            workspace.mkdir()
+            owner_plan = _owner_plan(workspace)
+            output = root / "exports" / "pilot"
+            output.parent.mkdir()
+            request = _request(
+                workspace, "export", reviewed_plan_id=owner_plan["plan_id"],
+            )
+            request["export_uri"] = output.as_uri()
+            selected_home = root / "selected-configuration"
+            foreign_home = root / "foreign-configuration"
+            service_root = root / "service"
+            account_home = root / "account"
+            account_home.mkdir(mode=0o700)
+            profile_projection = {
+                "format": "workbench-supersymmetry-material-fluid-feature-projection-v1",
+                "schema_version": 1,
+                "profile_family_id": "workbench-pack:supersymmetry",
+                "feature_kind": "material-backed-fluid",
+                "registry_namespace": "susy",
+                "physical_side": "client",
+                "source_owners": [
+                    {"relative_path": path, "role": role}
+                    for path, role in zip(PATHS, (
+                        "material-registration", "material-declaration", "client-localization",
+                    ))
+                ],
+            }
+
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(foreign_home)}), patch(
+                "workbench_shell.feature_studio.plan_material_fluid_trial",
+                return_value=owner_plan,
+            ), patch(
+                "workbench_core.package_guard.account_home",
+                return_value=account_home,
+            ), patch(
+                "workbench_shell.feature_studio_service.require_material_fluid_profile",
+            ), patch(
+                "workbench_shell.feature_studio.require_material_fluid_profile",
+            ), patch(
+                "workbench_shell.feature_studio.material_fluid_feature_profile",
+                return_value=profile_projection,
+            ):
+                composition = compose_feature_studio_service_v3(
+                    SUITE_ROOT, service_root,
+                    configuration_home=selected_home, workspace=workspace,
+                )
+                try:
+                    client = FeatureStudioServiceClientV3.embedded(composition)
+                    client.initialize()
+                    self._register(client)
+                    job = client.submit(
+                        request,
+                        context_ref_id=self.publication.context_ref.id,
+                        input_binding_id=self.publication.input_binding.id,
+                    )["outcome"]["job"]
+                    deadline = time.monotonic() + 10
+                    handle = composition.runtime.store.handle(job["job_id"])
+                    while handle.terminal_outcome is None and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                        handle = composition.runtime.store.handle(job["job_id"])
+                    self.assertEqual("succeeded", handle.terminal_outcome)
+                    wrapper = client.result(
+                        job["job_id"],
+                        context_ref_id=self.publication.context_ref.id,
+                        input_binding_id=self.publication.input_binding.id,
+                    )["outcome"]["value"]
+                    with feature_export_scope(CoreFeatureExports(configuration_home=selected_home)):
+                        owner_result = owner_result_from_feature_service_result_v1(
+                            wrapper, suite_root=SUITE_ROOT,
+                        )
+                    with feature_export_scope(CoreFeatureExports(configuration_home=foreign_home)):
+                        with self.assertRaises(FeatureStudioServiceV3Error):
+                            owner_result_from_feature_service_result_v1(
+                                wrapper, suite_root=SUITE_ROOT,
+                            )
+                    self.assertEqual(output.as_uri(), owner_result["export"]["directory_uri"])
+                    self.assertEqual(
+                        [str(output)],
+                        [row["path"] for row in ResourceCatalog(selected_home).inventory(
+                            workspace=workspace,
+                        )["transport_trees"]],
+                    )
+                    self.assertFalse((foreign_home / "resources-v1/transport-trees").exists())
+                finally:
+                    composition.close()
+
+                reopened = compose_feature_studio_service_v3(
+                    SUITE_ROOT, service_root,
+                    configuration_home=selected_home, workspace=workspace,
+                )
+                try:
+                    restarted = FeatureStudioServiceClientV3.embedded(reopened)
+                    restarted.initialize()
+                    retained = restarted.result(
+                        job["job_id"],
+                        context_ref_id=self.publication.context_ref.id,
+                        input_binding_id=self.publication.input_binding.id,
+                    )["outcome"]["value"]
+                    self.assertEqual(wrapper, retained)
+                finally:
+                    reopened.close()
 
     def test_installed_service_command_passes_core_catalog_binding(self) -> None:
         from workbench_shell.commands import service_host_v3
