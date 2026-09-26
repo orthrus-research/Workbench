@@ -718,6 +718,7 @@ class ResourceCatalog:
         return "committed"
 
     def inventory(self, *, workspace: Path | None = None) -> dict:
+        from ..reusable_projections import CoreReusableProjections, ReusableProjectionError
         from ..temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
         from ..transport_trees import CoreTransportTrees, TransportTreeError
         from ..working_allocations import WorkingAllocationCatalog
@@ -943,6 +944,14 @@ class ResourceCatalog:
             raise DurableResourceError(
                 "resource.changed", "transport tree catalog is unavailable or changed",
             ) from exc
+        try:
+            reusable_projections = CoreReusableProjections.inventory_catalog(
+                self.configuration_home, workspace=workspace,
+            )
+        except ReusableProjectionError as exc:
+            raise DurableResourceError(
+                "resource.changed", "reusable projection catalog is unavailable or changed",
+            ) from exc
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,
@@ -954,6 +963,7 @@ class ResourceCatalog:
             ),
             "temporary_leases": temporary_leases,
             "transport_trees": transport_trees,
+            "reusable_projections": reusable_projections,
             "overlay_envelopes": overlay_envelopes,
         }
 

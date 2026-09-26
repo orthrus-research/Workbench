@@ -20,7 +20,10 @@ from typing import Callable, Iterator
 from workbench_api.reusable_projections import ReusableProjectionError, ReusableProjectionReference
 
 from . import check_storage
-from .durable_records import private_record_lock, publish_immutable_bytes, read_bounded_bytes
+from .durable_records import (
+    private_record_lock, publish_immutable_bytes, read_bounded_bytes, read_private_bytes,
+    read_private_single_link_bytes,
+)
 from .host_filesystem import fsync_directory, private_path, secure_private_path
 from .output_routing import _private_directory
 from .source_checkouts import _rename_noreplace
@@ -35,6 +38,10 @@ _MAX_SOURCE_FILES = 2048
 _MAX_SOURCE_BYTES = 16 * 1024 * 1024
 _MAX_MEMBERS = 100_000
 _RECORD_LIMIT = 4 * 1024 * 1024
+_CATALOG_CHILDREN = frozenset({"records", "leases", "publication-leases"})
+_RECORD_NAME = re.compile(r"([0-9a-f]{64})\.json\Z")
+_RECORD_STAGE_NAME = re.compile(r"\.([0-9a-f]{64})\.json\.[a-z0-9_]{8}\Z")
+_LEASE_NAME = re.compile(r"[0-9a-f]{64}\.lock\Z")
 
 
 def _fail(code: str, message: str) -> None:
@@ -241,9 +248,45 @@ class CoreReusableProjections:
             _fail("id", "projection ID is invalid")
         return self.root / "records" / f"{match.group(1)}.json"
 
+    @staticmethod
+    def _record_bytes(path: Path) -> bytes:
+        """Accept only the publisher's exact hard-exit second link."""
+
+        visible = path.lstat()
+        if visible.st_nlink == 1:
+            return read_private_single_link_bytes(path, byte_limit=_RECORD_LIMIT)
+        if visible.st_nlink != 2:
+            raise ValueError("projection record has an unknown hard link")
+        nonce = path.stem
+        stages = [
+            stage for stage in path.parent.iterdir()
+            if (match := _RECORD_STAGE_NAME.fullmatch(stage.name)) is not None
+            and match.group(1) == nonce
+        ]
+        if len(stages) != 1:
+            raise ValueError("projection record has an unknown hard link")
+        stage = stages[0]
+        staged = stage.lstat()
+        if (not stat.S_ISREG(visible.st_mode) or not stat.S_ISREG(staged.st_mode)
+                or not private_path(stage, directory=False)
+                or (visible.st_dev, visible.st_ino, visible.st_size, visible.st_nlink)
+                != (staged.st_dev, staged.st_ino, staged.st_size, staged.st_nlink)):
+            raise ValueError("projection record stage changed")
+        raw = read_private_bytes(path, byte_limit=_RECORD_LIMIT)
+        after = path.lstat()
+        staged_after = stage.lstat()
+        def identity(info: os.stat_result) -> tuple[int, int, int, int, int, int, int]:
+            return (
+                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                info.st_ctime_ns, info.st_mode, info.st_nlink,
+            )
+        if identity(visible) != identity(after) or identity(staged) != identity(staged_after):
+            raise ValueError("projection record stage changed while reading")
+        return raw
+
     def _record(self, projection_id: str) -> dict[str, object]:
         try:
-            row = check_storage.read_json(self._record_path(projection_id), byte_limit=_RECORD_LIMIT)
+            row = json.loads(self._record_bytes(self._record_path(projection_id)))
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise ReusableProjectionError("projection.unavailable", "projection record is unavailable") from exc
         old_fields = {
@@ -271,6 +314,123 @@ class CoreReusableProjections:
         if projection_id != "workbench-reusable-projection-v1:" + sha256(check_storage.canonical(binding)).hexdigest():
             _fail("changed", "projection record identity changed")
         return row
+
+    @staticmethod
+    def _inventory_directory(path: Path) -> Path:
+        try:
+            directory = check_storage.ordinary(path, directory=True)
+        except (OSError, ValueError) as exc:
+            raise ReusableProjectionError("projection.changed", "projection catalog directory changed") from exc
+        if not private_path(directory, directory=True):
+            _fail("changed", "projection catalog directory lost private custody")
+        return directory
+
+    @classmethod
+    def inventory_catalog(cls, configuration_home: Path, *, workspace: Path | None = None) -> list[dict[str, object]]:
+        """Close current record bindings without owner validation or adoption."""
+
+        root = ResourceCatalog(configuration_home).root / "reusable-projections"
+        if not root.exists() and not root.is_symlink():
+            return []
+        try:
+            if {entry.name for entry in cls._inventory_directory(root).iterdir()} != _CATALOG_CHILDREN:
+                _fail("changed", "projection catalog has an unknown or missing child")
+            children = {
+                name: sorted(cls._inventory_directory(root / name).iterdir())
+                for name in sorted(_CATALOG_CHILDREN)
+            }
+            for name in ("leases", "publication-leases"):
+                for path in children[name]:
+                    if _LEASE_NAME.fullmatch(path.name) is None:
+                        _fail("changed", "projection catalog has an invalid lease")
+                    # Both locks can precede a record during publication.
+                    read_private_single_link_bytes(path, byte_limit=0)
+            records: list[tuple[str, Path]] = []
+            for path in children["records"]:
+                match = _RECORD_NAME.fullmatch(path.name)
+                if match is None:
+                    stage_match = _RECORD_STAGE_NAME.fullmatch(path.name)
+                    if stage_match is None:
+                        _fail("changed", "projection catalog has an invalid record name")
+                    info = path.lstat()
+                    if (not stat.S_ISREG(info.st_mode) or info.st_size > _RECORD_LIMIT
+                            or info.st_nlink not in (1, 2)
+                            or not private_path(path, directory=False)):
+                        _fail("changed", "projection catalog has an unsafe record stage")
+                    if info.st_nlink == 2:
+                        final = path.parent / f"{stage_match.group(1)}.json"
+                        published = final.lstat()
+                        if (not stat.S_ISREG(published.st_mode)
+                                or (info.st_dev, info.st_ino, info.st_nlink)
+                                != (published.st_dev, published.st_ino, published.st_nlink)):
+                            _fail("changed", "projection record stage lost its published link")
+                    continue
+                records.append((match.group(1), path))
+            rows = []
+            for nonce, path in records:
+                raw = json.loads(cls._record_bytes(path))
+                if (not isinstance(raw, dict) or not isinstance(raw.get("workspace"), str)
+                        or not isinstance(raw.get("owner_id"), str)):
+                    _fail("changed", "projection catalog record changed")
+                host = cls(
+                    workspace=Path(raw["workspace"]), configuration_home=configuration_home,
+                    owner_id=raw["owner_id"],
+                )
+                projection_id = f"workbench-reusable-projection-v1:{nonce}"
+                row = host._record(projection_id)
+                if raw != row:
+                    _fail("changed", "projection record changed during inventory")
+                if (not isinstance(row["family"], str) or _NAME.fullmatch(row["family"]) is None
+                        or not isinstance(row["source_digest"], str)
+                        or _SHA.fullmatch(row["source_digest"]) is None
+                        or not isinstance(row["path"], str)
+                        or not isinstance(row["project_relative"], str)
+                        or not isinstance(row["source_files"], list)
+                        or not isinstance(row["generated_parts"], list)
+                        or not isinstance(row["generated_suffixes"], list)
+                        or ("generated_roots" in row and not isinstance(row["generated_roots"], list))):
+                    _fail("changed", "projection catalog binding changed")
+                projection = Path(row["path"])
+                if (not projection.is_absolute() or ".." in projection.parts
+                        or str(projection) != row["path"]
+                        or projection.name != row["source_digest"].removeprefix("sha256:")
+                        or projection.parent.name != row["family"]
+                        or projection.parent.parent.name != "source-projections"
+                        or _relative(Path(row["project_relative"])) != row["project_relative"]
+                        or _source_rows(tuple(row["source_files"])) != row["source_files"]
+                        or _generated(tuple(row["generated_parts"])) != row["generated_parts"]
+                        or _suffixes(tuple(row["generated_suffixes"])) != row["generated_suffixes"]):
+                    _fail("changed", "projection catalog binding changed")
+                generated = set(row["generated_parts"])
+                suffixes = set(row["generated_suffixes"])
+                if any(
+                    generated.intersection(Path(source["path"]).parts)
+                    or Path(source["path"]).suffix in suffixes
+                    for source in row["source_files"]
+                ):
+                    _fail("changed", "projection source overlaps generated state")
+                if "generated_roots" in row:
+                    roots = tuple(Path(value) for value in row["generated_roots"])
+                    if _generated_roots(roots) != row["generated_roots"]:
+                        _fail("changed", "projection generated roots changed")
+                    project = projection / row["project_relative"]
+                    if any(
+                        (projection / root).is_relative_to(project)
+                        or project.is_relative_to(projection / root)
+                        for root in roots
+                    ):
+                        _fail("changed", "projection generated root overlaps project")
+                if workspace is None or row["workspace"] == str(workspace):
+                    rows.append({
+                        "projection_id": projection_id, "workspace": row["workspace"],
+                        "owner_id": row["owner_id"], "family": row["family"],
+                        "path": row["path"], "status": "catalog-only",
+                    })
+            return rows
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            if isinstance(exc, ReusableProjectionError):
+                raise
+            raise ReusableProjectionError("projection.changed", "projection catalog changed") from exc
 
     def ensure(
         self, family: str, path: Path, *, source_root: Path,
