@@ -153,9 +153,13 @@ unsaved documents. Mutation and recovery decisions remain in Core.
 
 Workbench runs locally. The plugin does not upload project files, read launcher
 account data, embed pack policy, or create a second approval path. Machine-local
-settings select launcher inputs and optional external state roots. When Core
-runs in WSL, explicit Windows paths must be absolute UNC paths for the same
-configured distribution.
+settings select launcher inputs. The Retained Records panel reads Core's
+workspace-bound Feature state-root choice and its **Save in Core** control
+reviews and saves a new choice there. An older IntelliJ project setting is a
+migration hint; it does not select the active root. The reviewed recipe run
+also reads Core's choice and passes its policy ID to the owner before that
+owner allocates a runtime attempt. When Core runs in WSL, explicit Windows
+paths must be absolute UNC paths for the same configured distribution.
 
 ## Development and packaging
 

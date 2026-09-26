@@ -59,15 +59,27 @@ public final class RunMaterialFluidRecipeAction extends AnAction {
         }
         dialog.retain(configuration);
         String executable = CoreLocation.discover(project);
+        String earlierStateRoot = PropertiesComponent.getInstance(project)
+                .getValue(PREFIX + "stateRoot", "");
         new Task.Backgroundable(project, "Running reviewed Workbench feature in Cleanroom", false) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
+                    FeatureStateRootPolicy.Choice choice = FeatureStateRootPolicy.resolve(
+                            CoreLaunch.resolve(executable), project.getBasePath(), null
+                    );
+                    if (!earlierStateRoot.isBlank()
+                            && choice.source().equals("platform-default")) {
+                        throw new IllegalArgumentException(
+                                "Review the earlier Feature state root in Retained Records and save it in Core before running"
+                        );
+                    }
                     DeveloperFeatureClient.Result result = DeveloperFeatureClient.run(
                             executable,
                             configuration.planId(),
-                            configuration.options(),
-                            project.getBasePath()
+                            configuration.options().withStateRoot(choice.stateRoot()),
+                            project.getBasePath(),
+                            choice.policyId()
                     );
                     ApplicationManager.getApplication().invokeLater(
                             () -> WorkbenchNotifications.developerFeatureFinished(project, result)
@@ -108,7 +120,6 @@ public final class RunMaterialFluidRecipeAction extends AnAction {
         private final JTextField launcherJavaState = new JTextField(72);
         private final JTextField packwizExecutable = new JTextField(72);
         private final JTextArea seedRoots = new JTextArea(3, 72);
-        private final JTextField stateRoot = new JTextField(72);
         private final JTextField timeout = new JTextField(8);
         private final JTextField attachTimeout = new JTextField(8);
         private final JTextField sessionTimeout = new JTextField(8);
@@ -125,7 +136,6 @@ public final class RunMaterialFluidRecipeAction extends AnAction {
             launcherJavaState.setText(value("launcherJavaState", ""));
             packwizExecutable.setText(value("packwizExecutable", ""));
             seedRoots.setText(value("seedRoots", ""));
-            stateRoot.setText(value("stateRoot", ""));
             timeout.setText(value("timeoutSeconds", "600"));
             attachTimeout.setText(value("attachTimeoutSeconds", "120"));
             sessionTimeout.setText(value("sessionTimeoutSeconds", "21600"));
@@ -153,7 +163,6 @@ public final class RunMaterialFluidRecipeAction extends AnAction {
             row = add(panel, row, "Java state root (optional)", launcherJavaState);
             row = add(panel, row, "Packwiz executable (optional)", packwizExecutable);
             row = add(panel, row, "Seed roots (one per line)", new JScrollPane(seedRoots));
-            row = add(panel, row, "Feature state root (optional)", stateRoot);
             row = add(panel, row, "FML timeout seconds", timeout);
             row = add(panel, row, "Attach timeout seconds", attachTimeout);
             add(panel, row, "Session timeout seconds", sessionTimeout);
@@ -192,7 +201,7 @@ public final class RunMaterialFluidRecipeAction extends AnAction {
                     optional(launcherJavaState.getText()),
                     optional(packwizExecutable.getText()),
                     selectedSeeds,
-                    optional(stateRoot.getText()),
+                    null,
                     positive(timeout.getText(), "FML timeout"),
                     positive(attachTimeout.getText(), "attach timeout"),
                     positive(sessionTimeout.getText(), "session timeout")
@@ -210,7 +219,6 @@ public final class RunMaterialFluidRecipeAction extends AnAction {
             set("launcherJavaState", options.launcherJavaState());
             set("packwizExecutable", options.packwizExecutable());
             set("seedRoots", configuration.seedText());
-            set("stateRoot", options.stateRoot());
             set("timeoutSeconds", Double.toString(options.timeoutSeconds()));
             set("attachTimeoutSeconds", Double.toString(options.attachTimeoutSeconds()));
             set("sessionTimeoutSeconds", Double.toString(options.sessionTimeoutSeconds()));

@@ -162,6 +162,13 @@ applies to future attempts. An invocation without a policy ID keeps the direct
 and run receipts do not yet retain the Core policy ID. Catalog, presentation
 and transaction inspection use the selected Feature path.
 
+IntelliJ Community reads the same Core `feature` choice for Retained Records
+and the reviewed material/fluid recipe run. The Records panel saves a reviewed
+change through Core; earlier project properties remain migration hints. The
+run submits the policy ID to the owner at attempt allocation. This client
+path has source and focused Java test coverage; native IDE execution remains
+a separate qualification step.
+
 On Linux, private record directories must enforce owner-only access. On WSL,
 the Linux filesystem meets that condition in the tested configuration. The
 tested Windows-mounted 9p location did not preserve Unix mode bits and is

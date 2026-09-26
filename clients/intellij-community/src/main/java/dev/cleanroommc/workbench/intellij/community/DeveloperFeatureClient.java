@@ -77,6 +77,15 @@ public final class DeveloperFeatureClient {
             @NotNull String planId,
             @NotNull Options options
     ) {
+        return runCommand(launch, planId, options, null);
+    }
+
+    static @NotNull List<String> runCommand(
+            @NotNull CoreLaunch launch,
+            @NotNull String planId,
+            @NotNull Options options,
+            @Nullable String expectedStateRootPolicyId
+    ) {
         String plan = planId(planId);
         if (!options.launcher().equals("prism") && !options.launcher().equals("multimc")) {
             throw new IllegalArgumentException("launcher must be prism or multimc");
@@ -102,6 +111,13 @@ public final class DeveloperFeatureClient {
             arguments.add(path(launch, seed, "seed root"));
         }
         optionalPath(arguments, launch, "--state-root", options.stateRoot(), "feature state root");
+        if (expectedStateRootPolicyId != null) {
+            if (!expectedStateRootPolicyId.matches(
+                    "workbench-state-root-policy:sha256:[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("Feature state-root policy ID is invalid");
+            }
+            arguments.addAll(List.of("--expected-state-root-policy-id", expectedStateRootPolicyId));
+        }
         arguments.addAll(List.of(
                 "--timeout", positive(options.timeoutSeconds(), "launch timeout"),
                 "--attach-timeout", positive(options.attachTimeoutSeconds(), "attach timeout"),
@@ -117,8 +133,19 @@ public final class DeveloperFeatureClient {
             @NotNull Options options,
             @Nullable String workingDirectory
     ) throws IOException {
+        return run(executable, planId, options, workingDirectory, null);
+    }
+
+    public static @NotNull Result run(
+            @NotNull String executable,
+            @NotNull String planId,
+            @NotNull Options options,
+            @Nullable String workingDirectory,
+            @Nullable String expectedStateRootPolicyId
+    ) throws IOException {
         CoreLaunch launch = CoreLaunch.resolve(executable);
-        ProcessBuilder builder = new ProcessBuilder(runCommand(launch, planId, options));
+        ProcessBuilder builder = new ProcessBuilder(runCommand(
+                launch, planId, options, expectedStateRootPolicyId));
         if (launch.host().equals("native") && workingDirectory != null && !workingDirectory.isBlank()) {
             builder.directory(new File(workingDirectory));
         }
@@ -416,6 +443,14 @@ public final class DeveloperFeatureClient {
     ) {
         public Options {
             seedRoots = List.copyOf(seedRoots);
+        }
+
+        public @NotNull Options withStateRoot(@NotNull String selected) {
+            return new Options(
+                    launcher, launcherExecutable, launcherRoot, launcherJava,
+                    launcherJavaState, packwizExecutable, seedRoots, selected,
+                    timeoutSeconds, attachTimeoutSeconds, sessionTimeoutSeconds
+            );
         }
     }
 

@@ -15,6 +15,8 @@ public final class DeveloperFeatureClientTest {
             "workbench-developer-material-fluid-recipe-plan:sha256:" + "1".repeat(64);
     private static final String RUN =
             "workbench-developer-material-fluid-recipe-run:sha256:" + "2".repeat(64);
+    private static final String POLICY =
+            "workbench-state-root-policy:sha256:" + "3".repeat(64);
     private static final List<String> ASSERTIONS = List.of(
             "fluid_registration", "fml_client_load", "groovy_compilation",
             "localization", "material_registration", "recipe_registration"
@@ -64,6 +66,13 @@ public final class DeveloperFeatureClientTest {
         assertTrue(command.contains("/mnt/c/Prism"));
         assertTrue(command.contains("/home/dev/packwiz"));
         assertTrue(command.contains("/home/dev/state"));
+        List<String> guarded = DeveloperFeatureClient.runCommand(
+                launch, PLAN, options, POLICY
+        );
+        assertEquals(POLICY, guarded.get(guarded.indexOf("--expected-state-root-policy-id") + 1));
+        assertThrows(IllegalArgumentException.class, () -> DeveloperFeatureClient.runCommand(
+                launch, PLAN, options, "bad-policy"
+        ));
     }
 
     @Test

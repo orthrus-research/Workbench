@@ -61,6 +61,7 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
     private final JComboBox<String> family = new JComboBox<>(FAMILIES);
     private final JComboBox<String> collection = new JComboBox<>(COLLECTIONS);
     private final JButton refresh = new JButton("Refresh");
+    private final JButton saveStateRoot = new JButton("Save in Core");
     private final DefaultListModel<FeatureRecordCatalog.Record> recordModel =
             new DefaultListModel<>();
     private final JBList<FeatureRecordCatalog.Record> recordList = new JBList<>(recordModel);
@@ -86,7 +87,7 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
         String configuredState = PropertiesComponent.getInstance(project)
                 .getValue(STATE_ROOT_PROPERTY);
         stateRoot.setText(configuredState == null ? "" : configuredState);
-        stateRoot.getEmptyText().setText("Core default retained state");
+        stateRoot.getEmptyText().setText("Core selected retained state");
         add(filters(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);
         add(statusArea(), BorderLayout.SOUTH);
@@ -97,13 +98,6 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
     void refreshRecords() {
         if (disposed || project.isDisposed()) {
             return;
-        }
-        String selectedStateRoot = stateRoot.getText().trim();
-        PropertiesComponent properties = PropertiesComponent.getInstance(project);
-        if (selectedStateRoot.isEmpty()) {
-            properties.unsetValue(STATE_ROOT_PROPERTY);
-        } else {
-            properties.setValue(STATE_ROOT_PROPERTY, selectedStateRoot);
         }
         long request = generation.incrementAndGet();
         setBusy(true, "Discovering retained owner records…");
@@ -117,16 +111,27 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
                     CoreLaunch launch = CoreLaunch.resolve(executable);
+                    FeatureStateRootPolicy.Choice choice = FeatureStateRootPolicy.resolve(
+                            launch, workingDirectory, null
+                    );
+                    String legacy = PropertiesComponent.getInstance(project)
+                            .getValue(STATE_ROOT_PROPERTY);
+                    if (legacy != null && !legacy.isBlank()
+                            && choice.source().equals("platform-default")) {
+                        throw new IllegalArgumentException(
+                                "Review the earlier IntelliJ state root and select Save in Core before opening records"
+                        );
+                    }
                     String output = CommandProcess.capture(
                             launch,
-                            RetainedFeatureClient.recordsArguments(launch, selectedStateRoot),
+                            RetainedFeatureClient.recordsArguments(launch, choice.stateRoot()),
                             FeatureRecordCatalog.MAX_BYTES,
                             900,
                             workingDirectory
                     );
                     FeatureRecordCatalog catalog = FeatureRecordCatalog.parse(output);
                     ApplicationManager.getApplication().invokeLater(
-                            () -> acceptCatalog(request, catalog)
+                            () -> acceptCatalog(request, catalog, choice)
                     );
                 } catch (Exception error) {
                     failLater(request, "Retained record discovery failed", error);
@@ -172,6 +177,12 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
         constraints.weightx = 1;
         constraints.insets = new Insets(0, 0, 0, 0);
         panel.add(stateRoot, constraints);
+        constraints.gridx = 5;
+        constraints.gridwidth = 1;
+        constraints.fill = GridBagConstraints.NONE;
+        constraints.weightx = 0;
+        constraints.insets = new Insets(0, JBUI.scale(6), 0, 0);
+        panel.add(saveStateRoot, constraints);
         return panel;
     }
 
@@ -210,7 +221,8 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
 
     private void configureInteractions() {
         refresh.addActionListener(event -> refreshRecords());
-        stateRoot.addActionListener(event -> refreshRecords());
+        saveStateRoot.addActionListener(event -> saveStateRoot());
+        stateRoot.addActionListener(event -> saveStateRoot());
         family.addActionListener(event -> applyFilters());
         collection.addActionListener(event -> applyFilters());
         recordList.addListSelectionListener(event -> {
@@ -259,10 +271,12 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
         rawJson.setEnabled(false);
     }
 
-    private void acceptCatalog(long request, @NotNull FeatureRecordCatalog catalog) {
+    private void acceptCatalog(long request, @NotNull FeatureRecordCatalog catalog,
+                               @NotNull FeatureStateRootPolicy.Choice choice) {
         if (!current(request)) {
             return;
         }
+        stateRoot.setText(choice.stateRoot());
         allRecords = catalog.records();
         limitations.setText(
                 catalog.limitations().isEmpty()
@@ -320,7 +334,6 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
     }
 
     private void loadPresentation(@NotNull FeatureRecordCatalog.Record record) {
-        String selectedStateRoot = stateRoot.getText().trim();
         long request = generation.incrementAndGet();
         presentation = null;
         transaction = null;
@@ -338,10 +351,13 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
                     CoreLaunch launch = CoreLaunch.resolve(executable);
+                    FeatureStateRootPolicy.Choice choice = FeatureStateRootPolicy.resolve(
+                            launch, workingDirectory, null
+                    );
                     String transactionOutput = CommandProcess.capture(
                             launch,
                             RetainedFeatureClient.transactionArguments(
-                                    launch, record, selectedStateRoot
+                                    launch, record, choice.stateRoot()
                             ),
                             RetainedFeatureClient.TransactionView.MAX_BYTES,
                             900,
@@ -352,7 +368,7 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
                     String output = CommandProcess.capture(
                             launch,
                             RetainedFeatureClient.presentationArguments(
-                                    launch, record, selectedStateRoot
+                                    launch, record, choice.stateRoot()
                             ),
                             FeaturePresentation.MAX_BYTES,
                             900,
@@ -435,10 +451,47 @@ final class RetainedRecordsPanel extends JPanel implements Disposable {
     private void setBusy(boolean busy, @NotNull String message) {
         refresh.setEnabled(!busy);
         stateRoot.setEnabled(!busy);
+        saveStateRoot.setEnabled(!busy);
         family.setEnabled(!busy);
         collection.setEnabled(!busy);
         recordList.setEnabled(!busy);
         status.setText(message);
+    }
+
+    private void saveStateRoot() {
+        if (disposed || project.isDisposed()) {
+            return;
+        }
+        String requested = stateRoot.getText().trim();
+        long request = generation.incrementAndGet();
+        setBusy(true, "Saving Feature state root through Core…");
+        String executable = CoreLocation.discover(project);
+        String workspace = project.getBasePath();
+        new Task.Backgroundable(project, "Saving Workbench Feature state root", false) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                try {
+                    CoreLaunch launch = CoreLaunch.resolve(executable);
+                    FeatureStateRootPolicy.Choice before = FeatureStateRootPolicy.resolve(
+                            launch, workspace, null
+                    );
+                    FeatureStateRootPolicy.Choice selected = FeatureStateRootPolicy.save(
+                            launch, workspace, requested.isEmpty() ? null : requested,
+                            before.policyId()
+                    );
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (!current(request)) {
+                            return;
+                        }
+                        PropertiesComponent.getInstance(project).unsetValue(STATE_ROOT_PROPERTY);
+                        stateRoot.setText(selected.stateRoot());
+                        refreshRecords();
+                    });
+                } catch (Exception error) {
+                    failLater(request, "Feature state root was not saved", error);
+                }
+            }
+        }.queue();
     }
 
     private void failLater(long request, @NotNull String title, @NotNull Throwable error) {
