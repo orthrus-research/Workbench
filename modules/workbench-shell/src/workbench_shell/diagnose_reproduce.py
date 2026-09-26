@@ -11,8 +11,8 @@ from __future__ import annotations
 from workbench_api.resources import module_root as _module_resource_root, repository_root as _repository_resource_root
 
 import hashlib
+from io import BytesIO
 import json
-import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
@@ -20,6 +20,16 @@ from typing import Any, Callable, Iterable, Mapping
 from zipfile import BadZipFile, ZIP_STORED, ZipFile, ZipInfo
 
 from jsonschema import Draft202012Validator, FormatChecker
+
+from workbench_api.capsule_exports import (
+    CapsuleExportError,
+    capsule_exports,
+    capsule_exports_bound,
+)
+from workbench_api.host_filesystem import (
+    HostFilesystemError,
+    read_bounded_single_link_bytes,
+)
 
 from workbench_core.sessions import (
     SessionError,
@@ -625,43 +635,26 @@ def create_reproduction_capsule(
     )
     manifest_raw = _canonical_bytes(manifest)
     destination = output.absolute()
-    if destination.exists() or destination.is_symlink():
-        raise DiagnoseReproduceV2Error("capsule output already exists")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(f".{destination.name}.tmp")
-    if temporary.exists() or temporary.is_symlink():
-        raise DiagnoseReproduceV2Error("capsule temporary output already exists")
     try:
-        with ZipFile(temporary, "x", compression=ZIP_STORED, allowZip64=False) as archive:
+        stream = BytesIO()
+        with ZipFile(stream, "x", compression=ZIP_STORED, allowZip64=False) as archive:
             archive.writestr(_zip_info("diagnosis.json"), diagnosis_raw)
             archive.writestr(_zip_info("manifest.json"), manifest_raw)
-        descriptor = os.open(
-            temporary,
-            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+        raw = stream.getvalue()
+        if not 1 <= len(raw) <= MAX_CAPSULE_BYTES:
+            raise DiagnoseReproduceV2Error("capsule exceeds its supported byte bound")
+        capsule_exports().publish(
+            target=destination, data=raw, capsule_id=manifest["capsule_id"],
         )
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-        os.replace(temporary, destination)
-        directory_descriptor = os.open(
-            destination.parent,
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
-        )
-        try:
-            os.fsync(directory_descriptor)
-        finally:
-            os.close(directory_descriptor)
-    except (OSError, BadZipFile) as exc:
-        temporary.unlink(missing_ok=True)
-        raise DiagnoseReproduceV2Error("capsule could not be published atomically") from exc
+    except (OSError, BadZipFile, CapsuleExportError) as exc:
+        raise DiagnoseReproduceV2Error(f"capsule could not be published: {exc}") from exc
     return {
         "format": "workbench-reproduction-capsule-result-v1",
         "capsule_id": manifest["capsule_id"],
         "diagnosis_id": manifest["diagnosis_id"],
         "path": str(destination),
-        "size": destination.stat().st_size,
-        "sha256": "sha256:" + hashlib.sha256(destination.read_bytes()).hexdigest(),
+        "size": len(raw),
+        "sha256": "sha256:" + hashlib.sha256(raw).hexdigest(),
     }
 
 
@@ -700,19 +693,14 @@ def _safe_member_name(value: str) -> str:
 def inspect_reproduction_capsule(path: Path) -> dict[str, Any]:
     """Verify a capsule without hydration, execution, or extraction."""
 
+    destination = path.absolute()
     try:
-        metadata = path.lstat()
-    except OSError as exc:
-        raise DiagnoseReproduceV2Error("capsule does not exist") from exc
-    if (
-        not stat.S_ISREG(metadata.st_mode)
-        or stat.S_ISLNK(metadata.st_mode)
-        or metadata.st_nlink != 1
-        or not 1 <= metadata.st_size <= MAX_CAPSULE_BYTES
-    ):
-        raise DiagnoseReproduceV2Error("capsule file identity is unsafe")
-    try:
-        with ZipFile(path, "r", allowZip64=False) as archive:
+        raw = read_bounded_single_link_bytes(
+            destination, byte_limit=MAX_CAPSULE_BYTES,
+        )
+        if not raw:
+            raise DiagnoseReproduceV2Error("capsule file identity is unsafe")
+        with ZipFile(BytesIO(raw), "r", allowZip64=False) as archive:
             infos = archive.infolist()
             if not 1 <= len(infos) <= MAX_MEMBERS:
                 raise DiagnoseReproduceV2Error("capsule member count is invalid")
@@ -733,7 +721,7 @@ def inspect_reproduction_capsule(path: Path) -> dict[str, Any]:
                 ):
                     raise DiagnoseReproduceV2Error("capsule member identity is unsafe")
                 raw_members[info.filename] = archive.read(info)
-    except (OSError, BadZipFile, RuntimeError) as exc:
+    except (HostFilesystemError, OSError, BadZipFile, RuntimeError) as exc:
         if isinstance(exc, DiagnoseReproduceV2Error):
             raise
         raise DiagnoseReproduceV2Error("capsule archive is invalid") from exc
@@ -756,6 +744,19 @@ def inspect_reproduction_capsule(path: Path) -> dict[str, Any]:
     _validate_privacy_review(manifest.get("privacy_review"))
     if manifest.get("expected_fingerprint") != diagnosis["fingerprint"]:
         raise DiagnoseReproduceV2Error("capsule expected fingerprint differs")
+    if capsule_exports_bound():
+        try:
+            host = capsule_exports()
+            if host.cataloged(target=destination):
+                host.verify(
+                    target=destination,
+                    capsule_id=manifest["capsule_id"],
+                    size=len(raw), sha256=hashlib.sha256(raw).hexdigest(),
+                )
+        except CapsuleExportError as exc:
+            raise DiagnoseReproduceV2Error(
+                f"capsule Core custody verification failed: {exc}"
+            ) from exc
     return {
         "format": "workbench-reproduction-capsule-inspection-v1",
         "capsule_id": manifest["capsule_id"],

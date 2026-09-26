@@ -27,6 +27,9 @@ from .diagnose_reproduce import (
     replay_reproduction_capsule,
 )
 from workbench_api.state_paths import default_product_spine_state_root
+from workbench_api.capsule_exports import CapsuleExportError, capsule_export_scope
+from workbench_core.capsule_exports import CoreCapsuleExports
+from workbench_core.host_services import install_local_host_services
 from workbench_core.sessions import (
     SessionError,
     list_sessions,
@@ -417,8 +420,35 @@ def diagnose_main(
     replay_executors: Mapping[
         str, Callable[[dict[str, Any]], Mapping[str, Any]]
     ] | None = None,
+    configuration_home: Path | None = None,
+    workspace: Path | None = None,
 ) -> int:
     """Serve diagnosis/capsule routes through closed owner ports."""
+
+    try:
+        install_local_host_services()
+        with capsule_export_scope(CoreCapsuleExports(
+            workspace=workspace or root, configuration_home=configuration_home,
+        )):
+            return _diagnose_main(
+                argv, root=root, output=output, error=error,
+                replay_executors=replay_executors,
+            )
+    except (CapsuleExportError, OSError, ValueError) as exc:
+        error.write(f"Workbench diagnose failed: {exc}\n")
+        return 2
+
+
+def _diagnose_main(
+    argv: Sequence[str],
+    *,
+    root: Path,
+    output: TextIO,
+    error: TextIO,
+    replay_executors: Mapping[
+        str, Callable[[dict[str, Any]], Mapping[str, Any]]
+    ] | None,
+) -> int:
 
     arguments = list(argv)
     try:

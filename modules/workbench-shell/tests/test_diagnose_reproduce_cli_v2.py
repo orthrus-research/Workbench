@@ -12,7 +12,9 @@ from unittest.mock import patch
 from workbench_shell.catalog import build_catalog, redact_argv
 from workbench_shell.diagnose_reproduce_cli import diagnose_main
 from workbench_shell.diagnose_reproduce import create_reproduction_capsule
+from workbench_api.capsule_exports import capsule_export_scope
 from workbench_api.events import EventNormalizer, RawLocator
+from workbench_core.capsule_exports import CoreCapsuleExports
 from workbench_core.sessions import (
     RetainedSession,
     live_console_execution_reference,
@@ -189,6 +191,7 @@ class DiagnoseReproduceCliV2Tests(unittest.TestCase):
                     root=ROOT,
                     output=output,
                     error=error,
+                    configuration_home=state / "config",
                 ),
                 0,
                 error.getvalue(),
@@ -243,6 +246,7 @@ class DiagnoseReproduceCliV2Tests(unittest.TestCase):
                     root=ROOT,
                     output=output,
                     error=error,
+                    configuration_home=state / "config",
                 ),
                 0,
                 error.getvalue(),
@@ -260,6 +264,7 @@ class DiagnoseReproduceCliV2Tests(unittest.TestCase):
                     root=ROOT,
                     output=output,
                     error=error,
+                    configuration_home=state / "config",
                 ),
                 0,
                 error.getvalue(),
@@ -427,29 +432,32 @@ class DiagnoseReproduceCliV2Tests(unittest.TestCase):
             )
             diagnosis = json.loads(output.getvalue())
             capsule = state / "dev-fixture.wb-repro"
-            create_reproduction_capsule(
-                diagnosis,
-                capsule,
-                replay_action={
-                    "action_id": "dev.fixture-run",
-                    "arguments": {
-                        "source_plan_id": (
-                            "workbench-cleanroom-dev-loop-plan:sha256:" + "a" * 64
-                        ),
-                        "sides": ["server"],
-                        "debug": False,
+            with capsule_export_scope(CoreCapsuleExports(
+                workspace=ROOT, configuration_home=state / "config",
+            )):
+                create_reproduction_capsule(
+                    diagnosis,
+                    capsule,
+                    replay_action={
+                        "action_id": "dev.fixture-run",
+                        "arguments": {
+                            "source_plan_id": (
+                                "workbench-cleanroom-dev-loop-plan:sha256:" + "a" * 64
+                            ),
+                            "sides": ["server"],
+                            "debug": False,
+                        },
+                        "mutation": "isolated-target-only",
                     },
-                    "mutation": "isolated-target-only",
-                },
-                privacy_review={
-                    "approved": True,
-                    "excluded": [
-                        "credentials",
-                        "personal-worlds",
-                        "protected-binaries",
-                    ],
-                },
-            )
+                    privacy_review={
+                        "approved": True,
+                        "excluded": [
+                            "credentials",
+                            "personal-worlds",
+                            "protected-binaries",
+                        ],
+                    },
+                )
             plan = {"plan_id": "fresh-plan"}
             result = {
                 "outcome": "failed",
@@ -494,6 +502,7 @@ class DiagnoseReproduceCliV2Tests(unittest.TestCase):
                         root=ROOT,
                         output=output,
                         error=error,
+                        configuration_home=state / "config",
                     ),
                     0,
                     error.getvalue(),

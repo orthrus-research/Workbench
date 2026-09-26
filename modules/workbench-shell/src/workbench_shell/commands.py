@@ -65,7 +65,11 @@ def project_qualify(argv, *, context):
 def diagnose(argv, *, context):
     context.check_cancelled()
     from workbench_shell.diagnose_reproduce_cli import diagnose_main
-    return diagnose_main(list(argv), root=ROOT)
+    return diagnose_main(
+        list(argv), root=ROOT,
+        configuration_home=context.configuration_home,
+        workspace=context.workspace,
+    )
 
 
 def dev_fixture(argv, *, context):

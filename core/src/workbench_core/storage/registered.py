@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import stat
 from typing import Iterator, Mapping
+import unicodedata
 from uuid import uuid4
 
 from workbench_api.durable_resources import DurableResourceError, ResourceReference
@@ -56,6 +57,26 @@ _CATALOG_LEASE = re.compile(r"(?:[0-9a-f]{32}\.lock|[0-9a-f]{64}\.record-store\.
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _OWNER = re.compile(r"[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*\Z")
 _MAX_BYTES = 32 * 1024 * 1024
+
+
+def _explicit_output_filename(name: str) -> bool:
+    """Admit a bounded user-selected basename without changing default names."""
+
+    if type(name) is not str or name in {"", ".", ".."} or name.endswith((" ", ".")):
+        return False
+    try:
+        encoded = name.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return (
+        1 <= len(encoded) <= 255
+        and name.split(".", 1)[0].rstrip(" .").upper() not in _WINDOWS_RESERVED
+        and all(
+            char not in '/\\<>:"|?*'
+            and unicodedata.category(char) not in {"Cc", "Cf"}
+            for char in name
+        )
+    )
 
 
 def _now() -> str:
@@ -1048,6 +1069,7 @@ class CoreDurableResources:
         policy_id: str | None = None, location_sources: Mapping[str, str] | None = None,
         check_cancelled=lambda: None,
         post_birth_issuance: bool = False,
+        allow_explicit_filename: bool = False,
     ):
         if _OWNER.fullmatch(owner_id) is None:
             raise DurableResourceError("resource.policy", "invalid owner identity")
@@ -1062,12 +1084,29 @@ class CoreDurableResources:
         if type(post_birth_issuance) is not bool:
             raise DurableResourceError("resource.policy", "post-birth issuance selection must be explicit")
         self.post_birth_issuance = post_birth_issuance
+        if type(allow_explicit_filename) is not bool:
+            raise DurableResourceError("resource.policy", "explicit filename selection must be a boolean")
+        self.allow_explicit_filename = allow_explicit_filename
         self.catalog = ResourceCatalog(configuration_home)
 
     def _destination(self, role: str, name: str, requested_path: Path | None, nonce: str) -> tuple[Path, Path]:
         if role not in {"evidence", "artifacts"} or role not in self.locations:
             raise DurableResourceError("output.role", "unsupported durable output role")
-        if type(name) is not str or _NAME.fullmatch(name) is None or name.split(".", 1)[0].upper() in _WINDOWS_RESERVED:
+        explicitly_named = (
+            self.allow_explicit_filename
+            and isinstance(requested_path, Path)
+            and requested_path.is_absolute()
+        )
+        valid_name = (
+            _explicit_output_filename(name)
+            if explicitly_named
+            else (
+                type(name) is str
+                and _NAME.fullmatch(name) is not None
+                and name.split(".", 1)[0].upper() not in _WINDOWS_RESERVED
+            )
+        )
+        if not valid_name:
             raise DurableResourceError("output.write", "output name must be one portable filename")
         if requested_path is not None and not isinstance(requested_path, Path):
             raise DurableResourceError("output.path", "requested output path must be a path")

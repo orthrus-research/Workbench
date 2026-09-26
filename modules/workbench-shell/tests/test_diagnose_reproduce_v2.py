@@ -1,26 +1,44 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import tempfile
 import unittest
-from zipfile import ZipFile
+from zipfile import ZIP_STORED, ZipFile
 
 from jsonschema import Draft202012Validator
 
 from workbench_shell.diagnose_reproduce import (
     DiagnoseReproduceV2Error,
+    _zip_info,
     create_reproduction_capsule,
     diagnose_live_console,
     inspect_reproduction_capsule,
     replay_reproduction_capsule,
 )
+from workbench_api.capsule_exports import capsule_export_scope
 from workbench_api.events import EventNormalizer, RawLocator as EventRawLocator
+from workbench_core.capsule_exports import CoreCapsuleExports
+from workbench_core.host_services import install_local_host_services
 from workbench_core.sessions import RetainedSession, live_console_owner_reference
 
 
 class DiagnoseReproduceV2Tests(unittest.TestCase):
     SCHEMAS = Path(__file__).resolve().parents[1] / "schemas"
+
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory(dir="/tmp")
+        self.addCleanup(temporary.cleanup)
+        host_root = Path(temporary.name)
+        workspace = host_root / "workspace"
+        workspace.mkdir()
+        install_local_host_services()
+        scope = capsule_export_scope(CoreCapsuleExports(
+            workspace=workspace, configuration_home=host_root / "config",
+        ))
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
 
     def _assert_schema(self, name: str, value: object) -> None:
         schema = json.loads((self.SCHEMAS / name).read_text(encoding="utf-8"))
@@ -210,6 +228,22 @@ class DiagnoseReproduceV2Tests(unittest.TestCase):
                 },
             )
             self.assertEqual(first.read_bytes(), second.read_bytes())
+            legacy = root / "legacy-zip-shape.wb-repro"
+            with ZipFile(first) as archive:
+                members = {
+                    name: archive.read(name)
+                    for name in ("diagnosis.json", "manifest.json")
+                }
+            with ZipFile(legacy, "x", compression=ZIP_STORED, allowZip64=False) as archive:
+                for name in ("diagnosis.json", "manifest.json"):
+                    archive.writestr(_zip_info(name), members[name])
+            self.assertEqual(first.read_bytes(), legacy.read_bytes())
+            self.assertEqual(first_result["path"], str(first))
+            self.assertEqual(first_result["size"], len(first.read_bytes()))
+            self.assertEqual(
+                first_result["sha256"],
+                "sha256:" + hashlib.sha256(first.read_bytes()).hexdigest(),
+            )
             self.assertEqual(first_result["capsule_id"], second_result["capsule_id"])
             self._assert_schema(
                 "workbench-reproduction-capsule-result-v1.schema.json",
@@ -231,6 +265,18 @@ class DiagnoseReproduceV2Tests(unittest.TestCase):
                 "workbench-reproduction-capsule-inspection-v1.schema.json",
                 inspected,
             )
+            received = root / "received.wb-repro"
+            received.write_bytes(first.read_bytes())
+            recipient_workspace = root / "recipient-workspace"
+            recipient_workspace.mkdir()
+            with capsule_export_scope(CoreCapsuleExports(
+                workspace=recipient_workspace,
+                configuration_home=root / "recipient-config",
+            )):
+                self.assertEqual(
+                    inspect_reproduction_capsule(received)["capsule_id"],
+                    first_result["capsule_id"],
+                )
 
             calls: list[dict[str, object]] = []
 
@@ -306,6 +352,79 @@ class DiagnoseReproduceV2Tests(unittest.TestCase):
                 if path.is_file()
             }
             self.assertEqual(before, after)
+
+    def test_capsule_publication_preserves_source_and_target_parent_identity(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            target_parent = root / "shared capsules"
+            target_parent.mkdir()
+            diagnosis = diagnose_live_console(source, self._failed_owner(source))
+            source_before = source.stat()
+            target_before = target_parent.stat()
+            source_bytes = {
+                path.relative_to(source): path.read_bytes()
+                for path in source.rglob("*") if path.is_file()
+            }
+            target = target_parent / "failed server.wb-repro"
+            created = create_reproduction_capsule(
+                diagnosis, target,
+                replay_action={
+                    "action_id": "cleanroom.fixture-run", "arguments": {},
+                    "mutation": "isolated-target-only",
+                },
+                privacy_review={
+                    "approved": True,
+                    "excluded": ["credentials", "protected-binaries", "personal-worlds"],
+                },
+            )
+            self.assertEqual(created["path"], str(target))
+            self.assertEqual(
+                (source_before.st_dev, source_before.st_ino),
+                (source.stat().st_dev, source.stat().st_ino),
+            )
+            self.assertEqual(
+                (target_before.st_dev, target_before.st_ino),
+                (target_parent.stat().st_dev, target_parent.stat().st_ino),
+            )
+            self.assertEqual(source_bytes, {
+                path.relative_to(source): path.read_bytes()
+                for path in source.rglob("*") if path.is_file()
+            })
+            self.assertEqual(
+                inspect_reproduction_capsule(target)["capsule_id"], created["capsule_id"],
+            )
+
+    def test_recipient_rejects_valid_zip_when_core_binding_bytes_change(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            diagnosis = diagnose_live_console(root, self._failed_owner(root))
+            review = {
+                "approved": True,
+                "excluded": ["credentials", "protected-binaries", "personal-worlds"],
+            }
+            first = root / "first.wb-repro"
+            second = root / "second.wb-repro"
+            create_reproduction_capsule(
+                diagnosis, first,
+                replay_action={
+                    "action_id": "cleanroom.fixture-run", "arguments": {"side": "server"},
+                    "mutation": "isolated-target-only",
+                },
+                privacy_review=review,
+            )
+            create_reproduction_capsule(
+                diagnosis, second,
+                replay_action={
+                    "action_id": "cleanroom.fixture-run", "arguments": {"side": "client"},
+                    "mutation": "isolated-target-only",
+                },
+                privacy_review=review,
+            )
+            first.write_bytes(second.read_bytes())
+            with self.assertRaisesRegex(DiagnoseReproduceV2Error, "Core custody"):
+                inspect_reproduction_capsule(first)
 
 
 if __name__ == "__main__":
