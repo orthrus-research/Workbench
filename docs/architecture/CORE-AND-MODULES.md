@@ -95,6 +95,12 @@ retains the existing per-workspace selection URI. A prior ordinary-mode
 selection is upgraded to owner-private custody on its next successful update;
 hardlinked legacy files are refused.
 
+Project qualification retains its reviewed plan and external binding path.
+Its private binding reader and revisioned replacement use the Core filesystem
+port while Shell keeps the profile and workspace validation. The explicit
+qualification target can differ from Core's selected workspace, so this
+family awaits a target-aware Core namespace registration contract.
+
 `workbench settings workspace list --json` reads the named workspace registry.
 `workbench settings workspace select NAME --profile-config PATH --java-home PATH`
 saves local profile and Java candidates for that workspace; `--clear-profile`

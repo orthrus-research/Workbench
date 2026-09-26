@@ -23,9 +23,11 @@ from typing import Any, TextIO
 import unicodedata
 
 from workbench_api.host_filesystem import (
+    DurableRecordError,
     HostFilesystemError,
-    fsync_directory,
     private_path,
+    read_private_bytes,
+    replace_private_bytes,
     secure_private_path,
 )
 from workbench_project_intelligence import ProjectInspectionError
@@ -941,64 +943,12 @@ def _load_binding(path: Path) -> dict[str, Any] | None:
         )
     if not 1 <= metadata.st_size <= MAX_BINDING_BYTES:
         raise ProjectQualificationError("qualification binding is outside its byte limit")
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
     try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
-        raise ProjectQualificationError(
-            f"cannot open qualification binding safely: {exc}"
-        ) from exc
-    try:
-        opened = os.fstat(descriptor)
-        if (
-            not stat.S_ISREG(opened.st_mode)
-            or not 1 <= opened.st_size <= MAX_BINDING_BYTES
-            or (os.name != "nt" and opened.st_mode & 0o077)
-            or (
-                os.name != "nt"
-                and hasattr(os, "geteuid")
-                and opened.st_uid != os.geteuid()
-            )
-        ):
-            raise ProjectQualificationError(
-                "qualification binding is not an owner-private regular file"
-            )
-        if os.name == "nt" and not private_path(path, directory=False):
-            raise ProjectQualificationError(
-                "qualification binding is not owner-private"
-            )
-        chunks: list[bytes] = []
-        consumed = 0
-        while consumed <= MAX_BINDING_BYTES:
-            chunk = os.read(
-                descriptor,
-                min(65536, MAX_BINDING_BYTES + 1 - consumed),
-            )
-            if not chunk:
-                break
-            chunks.append(chunk)
-            consumed += len(chunk)
-        after = os.fstat(descriptor)
-        if (
-            consumed > MAX_BINDING_BYTES
-            or opened.st_dev != after.st_dev
-            or opened.st_ino != after.st_ino
-            or opened.st_size != after.st_size
-            or opened.st_mtime_ns != after.st_mtime_ns
-            or consumed != after.st_size
-        ):
-            raise ProjectQualificationError(
-                "qualification binding changed while it was read"
-            )
-        raw = b"".join(chunks)
-    except OSError as exc:
+        raw = read_private_bytes(path, byte_limit=MAX_BINDING_BYTES)
+    except (DurableRecordError, HostFilesystemError) as exc:
         raise ProjectQualificationError(
             f"cannot read qualification binding safely: {exc}"
         ) from exc
-    finally:
-        os.close(descriptor)
     try:
         value = json.loads(raw.decode("utf-8", "strict"))
     except (UnicodeError, json.JSONDecodeError) as exc:
@@ -1186,29 +1136,34 @@ def _write_binding(
     *,
     workspace: Path,
     state_root: Path,
+    expected_state_revision: str | None,
 ) -> None:
     _ensure_private_state(path, workspace=workspace, state_root=state_root)
+    # Preserve V1's refusal to overwrite a stage left by the historical writer.
     temporary = path.parent / f".{path.name}.{os.getpid()}.tmp"
     if temporary.exists() or temporary.is_symlink():
         raise ProjectQualificationError("qualification staging path already exists")
-    descriptor: int | None = None
+    raw = (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    if not 1 <= len(raw) <= MAX_BINDING_BYTES:
+        raise ProjectQualificationError("qualification binding is outside its byte limit")
     try:
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        descriptor = os.open(temporary, flags, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-            descriptor = None
-            json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        secure_private_path(temporary, directory=False)
-        os.replace(temporary, path)
-        fsync_directory(path.parent)
-        if not private_path(path, directory=False):
+        retained = _load_binding(path)
+        if (None if retained is None else retained["state_revision"]) != expected_state_revision:
+            raise ProjectQualificationError("qualification binding changed while applying")
+        previous = (
+            None if retained is None
+            else read_private_bytes(path, byte_limit=MAX_BINDING_BYTES)
+        )
+        replace_private_bytes(
+            path, raw, byte_limit=MAX_BINDING_BYTES,
+            require_absent=previous is None,
+            expected_sha256=(
+                None if previous is None else "sha256:" + sha256(previous).hexdigest()
+            ),
+        )
+        if _load_binding(path) != dict(value):
             raise ProjectQualificationError(
-                "published qualification binding is not owner-private"
+                "published qualification binding changed during verification"
             )
     except KeyboardInterrupt as exc:
         # Atomic replace is the commit point. A signal immediately after it
@@ -1231,13 +1186,6 @@ def _write_binding(
         raise ProjectQualificationError(
             f"cannot publish qualification binding: {exc}"
         ) from exc
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
-        try:
-            temporary.unlink(missing_ok=True)
-        except OSError:
-            pass
 
 
 @contextmanager
@@ -1316,6 +1264,7 @@ def apply_qualification_plan(
                     retained,
                     workspace=target,
                     state_root=effective_state_root,
+                    expected_state_revision=locked_plan["binding"]["state_revision"],
                 )
                 outcome = (
                     "qualified" if operation.endswith("create") else "requalified"

@@ -38,6 +38,7 @@ from workbench_shell.project_qualification import (  # noqa: E402
     main,
     qualification_status,
 )
+from workbench_core.host_services import install_local_host_services  # noqa: E402
 import workbench_shell.project_qualification as qualification_module  # noqa: E402
 
 
@@ -86,6 +87,35 @@ def _git_status(project: Path) -> str:
 
 class ProjectQualificationTests(unittest.TestCase):
     maxDiff = None
+
+    def setUp(self) -> None:
+        install_local_host_services()
+
+    def test_core_publication_refuses_raced_absent_binding(self) -> None:
+        with _temporary_directory() as temporary:
+            root = Path(temporary)
+            project = create_supersymmetry_project(root)
+            state_root = root / "external-state"
+            plan = build_qualification_plan(_status(project, state_root))
+            target = Path(plan["binding"]["path"])
+            original = qualification_module.replace_private_bytes
+
+            def raced(path: Path, data: bytes, **options: object) -> None:
+                path.write_bytes(b"competing binding\n")
+                if os.name == "posix":
+                    path.chmod(0o600)
+                original(path, data, **options)
+
+            with patch.object(
+                qualification_module, "replace_private_bytes", side_effect=raced,
+            ):
+                with self.assertRaisesRegex(ProjectQualificationError, "cannot publish"):
+                    apply_qualification_plan(
+                        REPOSITORY_ROOT, project,
+                        profile_selector="supersymmetry",
+                        state_root=state_root, expected_plan_id=plan["plan_id"],
+                    )
+            self.assertEqual(b"competing binding\n", target.read_bytes())
 
     def test_status_is_read_only_and_reports_an_absent_ready_binding(self) -> None:
         with _temporary_directory() as temporary:
