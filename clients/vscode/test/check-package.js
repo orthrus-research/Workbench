@@ -107,6 +107,7 @@ assert.match(developerFeatureSource, /execFile\(/);
 assert.match(developerFeatureSource, /shell: false/);
 assert.match(developerFeatureSource, /"feature", "run", "material-fluid-recipe"/);
 assert.match(developerFeatureSource, /"--packwiz-executable"/);
+assert.match(developerFeatureSource, /"--expected-state-root-policy-id"/);
 assert.doesNotMatch(developerFeatureSource, /execSync|spawnSync|shell: true/);
 const commandSource = fs.readFileSync(path.join(root, "coreCommandClient.js"), "utf8");
 assert.match(commandSource, /execFile\(/);
@@ -282,6 +283,7 @@ assert.match(extensionSource, /registerCommand\("workbench\.feature\.records\.op
 assert.match(extensionSource, /registerCommand\(\s*"workbench\.core\.configureFeatureStateRoot"/);
 assert.match(extensionSource, /invokeStateRootPolicy\(\s*selectedCore\(\), workspacePath \|\| localWorkspace\(\)\.uri\.fsPath, "feature"/);
 assert.match(extensionSource, /stateRoot: currentPolicy\.stateRoot/);
+assert.match(extensionSource, /expectedStateRootPolicyId: currentPolicy\.policyId/);
 assert.doesNotMatch(extensionSource, /stateRoot: configuration\.get\("feature\.stateRoot"/);
 assert.equal((extensionSource.match(/get\("feature\.stateRoot", ""\)/g) || []).length, 1);
 assert.match(extensionSource, /workbench\.feature\.currentContextAction/);

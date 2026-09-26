@@ -170,10 +170,12 @@ so the extension can find Core before reading its policy. **Configure Feature
 State Root** saves the separate `feature` role through Core for retained Feature
 records and runs. The earlier `workbench.feature.stateRoot` setting remains a
 migration suggestion and no longer selects the active directory. A Feature run
-rechecks the selected policy after consent, but its owner command currently
-accepts only a state-root path; a policy change after that check can still
-reach the owner until it accepts the policy ID. When Core runs in WSL, explicit
-Windows paths must be UNC paths for the same configured distribution.
+passes the reviewed policy ID to Core after consent. Core checks the selected
+directory while the owner retains the plan and creates the runtime attempt.
+The running attempt then keeps that directory if the user selects another one.
+Other Feature mutation commands do not yet have this policy-ID guard. When Core
+runs in WSL, explicit Windows paths must be UNC paths for the same configured
+distribution.
 
 ## Development and packaging
 

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from workbench_api.resources import module_root as _module_resource_root, repository_root as _repository_resource_root
+from workbench_api.state_root_policies import state_root_policies
 
 import argparse
+from contextlib import nullcontext
 import json
 from pathlib import Path
 import sys
@@ -16,12 +18,14 @@ from .developer_feature import (
     apply_material_fluid_recipe_plan,
     build_material_fluid_recipe_plan,
     default_feature_state_root,
+    material_fluid_recipe_workspace,
     material_fluid_recipe_options,
     recover_material_fluid_recipe,
     resolve_feature_record,
     retain_feature_record,
     rollback_material_fluid_recipe,
     transaction_state_root,
+    validate_material_fluid_recipe_plan,
     verify_material_fluid_recipe_plan,
     workspace_transaction_lock_path,
     workspace_transaction_lock_path_for_uri,
@@ -381,6 +385,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--attach-timeout", type=float, default=120.0)
     run.add_argument("--session-timeout", type=float, default=21_600.0)
     _add_state_root(run)
+    run.add_argument(
+        "--expected-state-root-policy-id",
+        help="Core feature state-root policy ID reviewed by the caller",
+    )
     _add_json(run)
 
     compare_runtime = actions.add_parser(
@@ -1164,7 +1172,18 @@ def main(
         elif args.action == "run":
             state_root = _state_root(args, suite)
             plan = resolve_feature_record(state_root, "plans", args.plan)
-            retain_feature_record(state_root, "plans", plan)
+            allocation_scope = nullcontext()
+            if args.expected_state_root_policy_id is not None:
+                reviewed = validate_material_fluid_recipe_plan(plan)
+                workspace = material_fluid_recipe_workspace(reviewed)
+                allocation_scope = state_root_policies().hold(
+                    workspace, "feature", state_root,
+                    args.expected_state_root_policy_id,
+                )
+
+            def retain_run_plan() -> None:
+                retain_feature_record(state_root, "plans", plan)
+
             result = run_material_fluid_recipe(
                 suite,
                 plan,
@@ -1183,6 +1202,8 @@ def main(
                 timeout_seconds=args.timeout,
                 attach_timeout=args.attach_timeout,
                 session_timeout=args.session_timeout,
+                allocation_scope=allocation_scope,
+                before_allocation=retain_run_plan,
             )
             retained = retain_feature_record(state_root, "runs", result)
         elif args.action == "compare-runtime":

@@ -146,17 +146,21 @@ selection before invoking them. Project qualification can apply with
 `--expected-state-root-policy-id ID`; Core rechecks that ID and the destination
 under its selection lock through the owner write. An explicit `--state-root`
 without a policy ID retains the existing one-command override behavior. If a
-workspace is replaced and its saved root
-is bound to the old identity, `settings show --json` exposes the selections
+workspace is replaced and its saved root is bound to the old identity,
+`settings show --json` exposes the selections
 record ID; `state-root clear-stale WORKSPACE ROLE --expected-record-id ID`
 removes only that stale role after review.
 
 VS Code reads the `feature` policy for retained Feature records and runs. Its
 earlier editor setting is a migration hint. A Feature run rechecks the policy
-after user consent, then passes Core's selected path to the owner. The Feature
-owner command has no policy-ID guard yet, so a later policy change can race
-with that mutation. Catalog, presentation and transaction inspection use the
-selected Feature path.
+after user consent, then passes Core's selected path and policy ID to the owner.
+For `feature run material-fluid-recipe`, Core holds the selection lock through
+plan retention and runtime-attempt allocation. The attempt then keeps its
+selected path while the long-running observation proceeds; a later selection
+applies to future attempts. An invocation without a policy ID keeps the direct
+`--state-root` override. Other Feature mutations still lack this owner guard,
+and run receipts do not yet retain the Core policy ID. Catalog, presentation
+and transaction inspection use the selected Feature path.
 
 On Linux, private record directories must enforce owner-only access. On WSL,
 the Linux filesystem meets that condition in the tested configuration. The

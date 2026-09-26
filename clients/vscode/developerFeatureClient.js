@@ -10,6 +10,7 @@ const { scrubbedEnvironment } = require("./coreClient");
 
 const MAX_OUTPUT = 48 * 1024 * 1024;
 const PLAN_ID = /^workbench-developer-material-fluid-recipe-plan:sha256:[0-9a-f]{64}$/;
+const STATE_ROOT_POLICY_ID = /^workbench-state-root-policy:sha256:[0-9a-f]{64}$/;
 const RUN_ID = /^workbench-developer-material-fluid-recipe-run:sha256:[0-9a-f]{64}$/;
 const ATTEMPT_ID = /^uuid:[0-9a-f]{32}$/;
 const ASSERTIONS = Object.freeze([
@@ -107,6 +108,13 @@ function argumentsForRun(launch, options) {
   ]) {
     const selected = corePath(value, launch, label, true);
     if (selected) arguments_.push(flag, selected);
+  }
+  if (options.expectedStateRootPolicyId !== undefined) {
+    if (typeof options.expectedStateRootPolicyId !== "string"
+        || !STATE_ROOT_POLICY_ID.test(options.expectedStateRootPolicyId)) {
+      throw new Error("Feature state-root policy ID is invalid");
+    }
+    arguments_.push("--expected-state-root-policy-id", options.expectedStateRootPolicyId);
   }
   if (options.seedRoots !== undefined && !Array.isArray(options.seedRoots)) {
     throw new Error("seed roots must be an array");

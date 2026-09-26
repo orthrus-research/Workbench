@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import subprocess
@@ -75,6 +76,45 @@ class DeveloperFeatureRuntimeTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_policy_allocation_scope_ends_before_the_runtime_observation(self) -> None:
+        events = []
+        active = False
+
+        @contextmanager
+        def allocation_scope():
+            nonlocal active
+            active = True
+            events.append("entered")
+            try:
+                yield
+            finally:
+                parent = self.state / "runtime/material-fluid-recipe/attempts"
+                self.assertEqual(1, len(list(parent.iterdir())))
+                active = False
+                events.append("released")
+
+        def retain_plan() -> None:
+            self.assertTrue(active)
+            events.append("retained")
+
+        def verify(*_arguments):
+            self.assertFalse(active)
+            events.append("verified")
+            return {"state": "stale", "reason": "test stopped before native launch"}
+
+        with patch.object(runtime, "verify_material_fluid_recipe_plan", side_effect=verify):
+            receipt = run_material_fluid_recipe(
+                ROOT, self.plan, self.state,
+                consent_plan_id=self.plan["id"],
+                launcher_executable=self.root / "launcher.exe",
+                launcher_root=self.root / "launcher",
+                allocation_scope=allocation_scope(),
+                before_allocation=retain_plan,
+            )
+        self.assertEqual(["entered", "retained", "released", "verified", "verified"], events)
+        self.assertEqual("incomplete", receipt["state"])
+        self.assertEqual("failed", receipt["outcome"])
 
     def test_stage_applies_only_to_a_tracked_disposable_copy(self) -> None:
         source_before = _bytes(self.checkout)

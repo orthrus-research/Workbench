@@ -11,6 +11,7 @@ const {
 } = require("../developerFeatureClient");
 
 const PLAN = `workbench-developer-material-fluid-recipe-plan:sha256:${"1".repeat(64)}`;
+const POLICY = `workbench-state-root-policy:sha256:${"4".repeat(64)}`;
 const RUN = `workbench-developer-material-fluid-recipe-run:sha256:${"2".repeat(64)}`;
 const MEANINGS = Object.freeze({
   fluid_registration: "the material-backed Forge fluid identity is registered",
@@ -79,6 +80,7 @@ test("builds the complete exact-consent disposable run command", () => {
     packwizExecutable: "/opt/packwiz",
     seedRoots: ["/tmp/seed"],
     stateRoot: "/tmp/workbench-state",
+    expectedStateRootPolicyId: POLICY,
     memoryMiB: 6144,
     offlineName: "WBFeature",
   }));
@@ -95,6 +97,7 @@ test("builds the complete exact-consent disposable run command", () => {
     ["--packwiz-executable", "/opt/packwiz"],
     ["--seed", "/tmp/seed"],
     ["--state-root", "/tmp/workbench-state"],
+    ["--expected-state-root-policy-id", POLICY],
     ["--memory-mib", "6144"],
     ["--offline-name", "WBFeature"],
   ]) {
@@ -111,11 +114,15 @@ test("maps every core-side path through the configured WSL distribution", () => 
     launcherRoot: "\\\\wsl.localhost\\Ubuntu\\mnt\\c\\PrismData",
     packwizExecutable: "\\\\wsl.localhost\\Ubuntu\\opt\\packwiz",
     seedRoots: ["\\\\wsl.localhost\\Ubuntu\\tmp\\seed"],
+    stateRoot: "\\\\wsl.localhost\\Ubuntu\\home\\dev\\feature-state",
+    expectedStateRootPolicyId: POLICY,
   }));
   assert.equal(args[args.indexOf("--launcher-executable") + 1], "/mnt/c/Prism/prismlauncher.exe");
   assert.equal(args[args.indexOf("--launcher-root") + 1], "/mnt/c/PrismData");
   assert.equal(args[args.indexOf("--packwiz-executable") + 1], "/opt/packwiz");
   assert.equal(args[args.indexOf("--seed") + 1], "/tmp/seed");
+  assert.equal(args[args.indexOf("--state-root") + 1], "/home/dev/feature-state");
+  assert.equal(args[args.indexOf("--expected-state-root-policy-id") + 1], POLICY);
 });
 
 test("rejects launcher values outside the runtime's actual bounds", () => {
@@ -134,6 +141,14 @@ test("rejects launcher values outside the runtime's actual bounds", () => {
   assert.throws(
     () => argumentsForRun(launch, runOptions({ launcherProfile: "bad\nprofile" })),
     /launcher profile must be printable/,
+  );
+  assert.throws(
+    () => argumentsForRun(launch, runOptions({ expectedStateRootPolicyId: "stale" })),
+    /Feature state-root policy ID is invalid/,
+  );
+  assert.equal(
+    argumentsForRun(launch, runOptions()).includes("--expected-state-root-policy-id"),
+    false,
   );
 });
 

@@ -1646,6 +1646,7 @@ async function runMaterialFluidRecipe(context) {
         packwizExecutable: configuration.get("feature.packwizExecutable", ""),
         seedRoots: configuration.get("feature.seedRoots", []),
         stateRoot: currentPolicy.stateRoot,
+        expectedStateRootPolicyId: currentPolicy.policyId,
         memoryMiB: configuration.get("feature.memoryMiB", 8192),
         offlineName: configuration.get("feature.offlineName", "Workbench"),
         timeoutSeconds: configuration.get("feature.timeoutSeconds", 600),

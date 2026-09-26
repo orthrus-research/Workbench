@@ -11,12 +11,13 @@ from __future__ import annotations
 from workbench_blueprints.reviewed_stage import (_paths_overlap, stage_reviewed_feature_plan)
 
 
+from contextlib import nullcontext
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import re
-from typing import Any, Mapping, NoReturn, Sequence, cast
+from typing import Any, Callable, ContextManager, Mapping, NoReturn, Sequence, cast
 from uuid import uuid4
 
 
@@ -331,6 +332,8 @@ def run_material_fluid_recipe(
     timeout_seconds: float = 600.0,
     attach_timeout: float = 120.0,
     session_timeout: float = 21_600.0,
+    allocation_scope: ContextManager[None] | None = None,
+    before_allocation: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     """Stage, launch, observe, and retain one exact reviewed recipe plan."""
 
@@ -345,17 +348,20 @@ def run_material_fluid_recipe(
     state = Path(state_root).expanduser().resolve(strict=False)
     if _paths_overlap(launcher_path, workspace) or _paths_overlap(state, workspace):
         _fail("feature runtime outputs cannot overlap the developer checkout")
-    parent = _prepare_attempt_parent(state, workspace)
-    token = uuid4().hex
-    destination = parent / token
-    if destination.exists() or destination.is_symlink():
-        _fail("feature runtime attempt identity unexpectedly exists")
-    try:
-        destination.mkdir(mode=0o700)
-    except OSError as exc:
-        raise DeveloperFeatureRuntimeError(
-            f"cannot create feature runtime attempt: {exc}"
-        ) from exc
+    with nullcontext() if allocation_scope is None else allocation_scope:
+        if before_allocation is not None:
+            before_allocation()
+        parent = _prepare_attempt_parent(state, workspace)
+        token = uuid4().hex
+        destination = parent / token
+        if destination.exists() or destination.is_symlink():
+            _fail("feature runtime attempt identity unexpectedly exists")
+        try:
+            destination.mkdir(mode=0o700)
+        except OSError as exc:
+            raise DeveloperFeatureRuntimeError(
+                f"cannot create feature runtime attempt: {exc}"
+            ) from exc
     runtime_state = state / "cleanroom-runtime"
     assertions = _pending_assertions()
     stage: dict[str, Any] | None = None
