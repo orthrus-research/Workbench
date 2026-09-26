@@ -684,7 +684,7 @@ class ManagedLanguageSessionTests(unittest.TestCase):
             "workbench_core.host_services.install_local_host_services",
             wraps=install_local_host_services,
         ) as install, patch(
-            "workbench_core.working_allocations.resolve_direct_working_allocations",
+            "workbench_core.host_services.resolve_local_working_allocations",
             return_value=sentinel,
         ) as resolve, patch(
             "workbench_pack_program_studio.cli.run", return_value=0,

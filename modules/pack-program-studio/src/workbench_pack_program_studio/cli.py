@@ -552,9 +552,9 @@ def main(
     )
     if (arguments[:1] == ["session"] and session_custody is None
             and not any(item in {"-h", "--help"} for item in arguments)):
-        from workbench_core.working_allocations import resolve_direct_working_allocations
+        from workbench_core.host_services import resolve_local_working_allocations
         try:
-            session_custody = resolve_direct_working_allocations(
+            session_custody = resolve_local_working_allocations(
                 repository, owner_id="pack-program-studio",
             )
         except (OSError, ValueError) as exc:
