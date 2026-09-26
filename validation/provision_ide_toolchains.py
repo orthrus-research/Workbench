@@ -12,13 +12,11 @@ import platform
 import re
 import stat
 import sys
-import tarfile
 from typing import Any
-import zipfile
 
 from core_run_custody import (
     admit_ide_toolchain_directory, allocate_ide_toolchain_stage,
-    promote_ide_toolchain_directory,
+    extract_ide_toolchain_archive, promote_ide_toolchain_directory,
     reject_existing_ide_toolchain_stage, review_ide_toolchain_stages_on_reuse,
 )
 
@@ -83,42 +81,10 @@ def download(entry: dict[str, Any], suffix: str) -> Path:
     return archive
 
 
-def validate_member_name(name: str) -> None:
-    path = Path(name)
-    if path.is_absolute() or ".." in path.parts:
-        raise ProvisionFailure(f"unsafe archive member: {name}")
-
-
-def extract_tar(archive: Path, destination: Path) -> None:
-    with tarfile.open(archive, "r:gz") as bundle:
-        for member in bundle.getmembers():
-            validate_member_name(member.name)
-        bundle.extractall(destination, filter="data")
-
-
-def extract_tar_xz(archive: Path, destination: Path) -> None:
-    with tarfile.open(archive, "r:xz") as bundle:
-        for member in bundle.getmembers():
-            validate_member_name(member.name)
-        bundle.extractall(destination, filter="data")
-
-
-def extract_zip(archive: Path, destination: Path) -> None:
-    with zipfile.ZipFile(archive) as bundle:
-        for member in bundle.infolist():
-            validate_member_name(member.filename)
-        bundle.extractall(destination)
-        for member in bundle.infolist():
-            mode = (member.external_attr >> 16) & 0o777
-            if mode:
-                (destination / member.filename).chmod(mode)
-
-
 def provision_entry(
     entry: dict[str, str],
     *,
     suffix: str,
-    extractor: Any,
     extracted_root: str | None = None,
 ) -> Path:
     archive_root = entry["archive_root"]
@@ -189,7 +155,13 @@ def provision_entry(
         with stage_host.execution(stage):
             try:
                 try:
-                    extractor(archive, stage.path)
+                    extract_ide_toolchain_archive(
+                        stage_host, stage, archive.absolute(),
+                        archive_sha256=entry["archive_sha256"],
+                        archive_size=entry["archive_size"],
+                        extracted_root=expected_root,
+                        archive_format=archive_format,
+                    )
                 except Exception as exc:
                     raise ProvisionFailure(
                         f"IDE extraction failed; retain stage for review: {stage.path}: {exc}"
@@ -235,15 +207,9 @@ def provision() -> tuple[Path, Path, Path]:
             "the current IDE toolchain lock supports Linux x86_64 only"
         )
     lock = load_lock()
-    java_home = provision_entry(
-        lock["java"], suffix=".tar.gz", extractor=extract_tar
-    )
-    java_platform_home = provision_entry(
-        lock["java_platform"], suffix=".tar.gz", extractor=extract_tar
-    )
-    gradle_home = provision_entry(
-        lock["gradle"], suffix="-bin.zip", extractor=extract_zip
-    )
+    java_home = provision_entry(lock["java"], suffix=".tar.gz")
+    java_platform_home = provision_entry(lock["java_platform"], suffix=".tar.gz")
+    gradle_home = provision_entry(lock["gradle"], suffix="-bin.zip")
     return java_home, java_platform_home, gradle_home
 
 
@@ -255,9 +221,7 @@ def provision_node() -> Path:
         raise ProvisionFailure(
             "the current Node toolchain lock supports Linux x86_64 only"
         )
-    return provision_entry(
-        load_lock()["node"], suffix=".tar.xz", extractor=extract_tar_xz
-    )
+    return provision_entry(load_lock()["node"], suffix=".tar.xz")
 
 
 def provision_npm() -> Path:
@@ -271,7 +235,6 @@ def provision_npm() -> Path:
     return provision_entry(
         load_lock()["npm"],
         suffix=".tgz",
-        extractor=extract_tar,
         extracted_root="package",
     )
 

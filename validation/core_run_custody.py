@@ -267,6 +267,27 @@ def promote_ide_toolchain_directory(
         raise OSError(f"Core IDE toolchain promotion needs review: {exc}") from exc
 
 
+def extract_ide_toolchain_archive(
+    stage_host, stage_reference, archive: Path, *, archive_sha256: str,
+    archive_size: int, extracted_root: str, archive_format: str,
+) -> Path:
+    """Ask Core to validate and extract a locked archive in its active lease."""
+
+    _source_core()
+    from workbench_core.ide_toolchain_extract import (
+        IdeToolchainExtractionError, extract_locked_ide_archive,
+    )
+
+    try:
+        return extract_locked_ide_archive(
+            stage_host, stage_reference, archive,
+            archive_sha256=archive_sha256, archive_size=archive_size,
+            expected_root=extracted_root, archive_format=archive_format,
+        )
+    except IdeToolchainExtractionError as exc:
+        raise OSError(f"Core IDE toolchain extraction needs review: {exc}") from exc
+
+
 def verify_ide_toolchain_directory(
     archive: Path, target: Path, *, archive_sha256: str,
     archive_size: int, extracted_root: str, archive_format: str,
@@ -370,6 +391,6 @@ __all__ = [
     "publish_validation_timing", "open_validation_invocation", "allocate_ide_toolchain_stage",
     "reject_existing_ide_toolchain_stage",
     "review_ide_toolchain_stages_on_reuse",
-    "promote_ide_toolchain_directory",
+    "promote_ide_toolchain_directory", "extract_ide_toolchain_archive",
     "verify_ide_toolchain_directory", "admit_ide_toolchain_directory",
 ]

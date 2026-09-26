@@ -1,10 +1,12 @@
 """IDE archive acquisition uses Core without erasing historical inputs."""
 
 from hashlib import sha256
+from io import BytesIO
 import os
 from pathlib import Path
 import stat
 import sys
+import tarfile
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -108,7 +110,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
     def test_fresh_target_publishes_then_matching_marker_reuses_same_path(self) -> None:
         with patch.object(provision, "download", return_value=self.archive) as download:
             published = provision.provision_entry(
-                self.entry, suffix=".zip", extractor=self._extract,
+                self.entry, suffix=".zip",
             )
             self.assertEqual(self.toolchains / "locked-tool", published)
             self.assertEqual(b"exact installed bytes", (published / "bin").read_bytes())
@@ -116,12 +118,12 @@ class IdeExtractionPreservationTests(unittest.TestCase):
                 published / ".workbench-provisioned-sha256"
             ).read_text(encoding="ascii"))
             again = provision.provision_entry(
-                self.entry, suffix=".zip", extractor=self._extract,
+                self.entry, suffix=".zip",
             )
             interrupted_tail = self.toolchains / "locked-tool.postmove"
             interrupted_tail.mkdir()
             after_interruption = provision.provision_entry(
-                self.entry, suffix=".zip", extractor=self._extract,
+                self.entry, suffix=".zip",
             )
         self.assertEqual(published, again)
         self.assertEqual(published, after_interruption)
@@ -135,6 +137,36 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         self.assertEqual("ide-toolchain", rows[0]["role"])
         self.assertTrue((Path(rows[0]["path"]) / ".workbench-temporary-retained.json").is_file())
 
+    def test_plus_named_tar_with_relative_link_uses_core_extract_and_admission(self) -> None:
+        archive = self.root / "plus.tar.gz"
+        name = "jdk-25.0.4+7"
+        with tarfile.open(archive, "w:gz") as bundle:
+            for directory in (name, f"{name}/bin"):
+                member = tarfile.TarInfo(directory)
+                member.type = tarfile.DIRTYPE
+                member.mode = 0o755
+                bundle.addfile(member)
+            member = tarfile.TarInfo(f"{name}/bin/java")
+            member.mode = 0o555
+            member.size = len(b"exact java")
+            bundle.addfile(member, BytesIO(b"exact java"))
+            member = tarfile.TarInfo(f"{name}/bin/current")
+            member.type = tarfile.SYMTYPE
+            member.linkname = "java"
+            bundle.addfile(member)
+        entry = {
+            "archive_root": name,
+            "archive_sha256": sha256(archive.read_bytes()).hexdigest(),
+            "archive_size": archive.stat().st_size,
+        }
+        with patch.object(provision, "download", return_value=archive):
+            target = provision.provision_entry(entry, suffix=".tar.gz")
+            self.assertEqual(target, provision.provision_entry(entry, suffix=".tar.gz"))
+        self.assertEqual("java", (target / "bin/current").readlink().as_posix())
+        self.assertEqual(b"exact java", (target / "bin/java").read_bytes())
+        rows = list((self.root / ".ide-toolchain-core/admissions-v1").glob("*.json"))
+        self.assertEqual(1, len(rows))
+
     def test_invalid_lock_root_refuses_before_download_or_stage(self) -> None:
         for archive_root, extracted_root in (
             ("../escape", None), ("locked-tool", "../escape"),
@@ -145,7 +177,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
                 with patch.object(provision, "download") as download:
                     with self.assertRaisesRegex(provision.ProvisionFailure, "invalid extraction root"):
                         provision.provision_entry(
-                            entry, suffix=".zip", extractor=self._extract,
+                            entry, suffix=".zip",
                             extracted_root=extracted_root,
                         )
                     download.assert_not_called()
@@ -167,7 +199,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
                     for _ in range(2):
                         with self.assertRaisesRegex(provision.ProvisionFailure, "retain for review"):
                             provision.provision_entry(
-                                self.entry, suffix=".zip", extractor=self._extract,
+                                self.entry, suffix=".zip",
                             )
                     download.assert_not_called()
                 self.assertEqual(b"historical installation", sentinel.read_bytes())
@@ -180,7 +212,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         marker.write_text(self.entry["archive_sha256"] + "\n", encoding="ascii")
         with patch.object(provision, "download", return_value=self.archive) as download:
             with self.assertRaisesRegex(provision.ProvisionFailure, "exact readback"):
-                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+                provision.provision_entry(self.entry, suffix=".zip")
             download.assert_called_once()
         self.assertEqual(self.entry["archive_sha256"] + "\n", marker.read_text(encoding="ascii"))
         self.assertEqual([marker], list(destination.iterdir()))
@@ -196,7 +228,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         )
         with patch.object(provision, "download") as download:
             with self.assertRaisesRegex(provision.ProvisionFailure, "incomplete Core IDE extraction stage"):
-                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+                provision.provision_entry(self.entry, suffix=".zip")
             download.assert_not_called()
         self.assertTrue(stage.path.is_dir())
         self.assertEqual(b"exact installed bytes", (destination / "bin").read_bytes())
@@ -213,7 +245,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         if child == 0:
             with patch.object(provision, "download", return_value=self.archive):
                 with patch.object(prepared, "_rename_no_replace", side_effect=exit_after_move):
-                    provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+                    provision.provision_entry(self.entry, suffix=".zip")
             os._exit(74)
         _, status = os.waitpid(child, 0)
         self.assertEqual(73, os.waitstatus_to_exitcode(status))
@@ -225,7 +257,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         self.assertEqual("active-or-abandoned", rows[0]["status"])
         with patch.object(provision, "download") as download:
             with self.assertRaisesRegex(provision.ProvisionFailure, "incomplete Core IDE extraction stage"):
-                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+                provision.provision_entry(self.entry, suffix=".zip")
             download.assert_not_called()
 
     def test_redirected_destination_or_marker_refuses_without_replacing_tree(self) -> None:
@@ -239,7 +271,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         destination.symlink_to(real, target_is_directory=True)
         with patch.object(provision, "download") as download:
             with self.assertRaisesRegex(provision.ProvisionFailure, "redirected"):
-                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+                provision.provision_entry(self.entry, suffix=".zip")
             download.assert_not_called()
         destination.unlink()
         destination.mkdir()
@@ -247,7 +279,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         marker.symlink_to(real / ".workbench-provisioned-sha256")
         with patch.object(provision, "download") as download:
             with self.assertRaisesRegex(provision.ProvisionFailure, "retain for review"):
-                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+                provision.provision_entry(self.entry, suffix=".zip")
             download.assert_not_called()
         self.assertTrue(marker.is_symlink())
 
@@ -259,24 +291,25 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         with patch.object(provision, "download", return_value=self.archive) as download:
             self.assertEqual(
                 destination,
-                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract),
+                provision.provision_entry(self.entry, suffix=".zip"),
             )
             download.assert_called_once()
         self.assertEqual(2, marker.stat().st_nlink)
 
     def test_destination_created_during_extraction_is_retained(self) -> None:
         destination = self.toolchains / self.entry["archive_root"]
+        core_extract = provision.extract_ide_toolchain_archive
 
-        def competing_extraction(archive: Path, temporary: Path) -> None:
-            self._extract(archive, temporary)
+        def competing_extraction(*args, **kwargs) -> Path:
+            extracted = core_extract(*args, **kwargs)
             destination.mkdir()
             (destination / "keep.bin").write_bytes(b"other publisher")
+            return extracted
 
         with patch.object(provision, "download", return_value=self.archive):
-            with self.assertRaisesRegex(provision.ProvisionFailure, "already exists"):
-                provision.provision_entry(
-                    self.entry, suffix=".zip", extractor=competing_extraction,
-                )
+            with patch.object(provision, "extract_ide_toolchain_archive", side_effect=competing_extraction):
+                with self.assertRaisesRegex(provision.ProvisionFailure, "already exists"):
+                    provision.provision_entry(self.entry, suffix=".zip")
         self.assertEqual(b"other publisher", (destination / "keep.bin").read_bytes())
         stages = list(self.toolchains.glob(f"ide-{self.entry['archive_sha256']}-*"))
         self.assertEqual(1, len(stages))
@@ -293,7 +326,7 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         with patch.object(provision, "download") as download:
             with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted Core IDE extraction stage"):
                 provision.provision_entry(
-                    self.entry, suffix=".zip", extractor=self._extract,
+                    self.entry, suffix=".zip",
                 )
             download.assert_not_called()
 
@@ -304,40 +337,41 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         with patch.object(provision, "download") as download:
             with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted IDE toolchain extraction"):
                 provision.provision_entry(
-                    self.entry, suffix=".zip", extractor=self._extract,
+                    self.entry, suffix=".zip",
                 )
             download.assert_not_called()
         self.assertEqual(b"historical residue", (stage / "partial.bin").read_bytes())
 
     def test_changed_core_stage_marker_blocks_promotion(self) -> None:
-        def changed_marker(archive: Path, temporary: Path) -> None:
-            self._extract(archive, temporary)
-            (temporary / ".workbench-temporary-lease.json").write_bytes(b"changed")
+        core_extract = provision.extract_ide_toolchain_archive
+
+        def changed_marker(*args, **kwargs) -> Path:
+            extracted = core_extract(*args, **kwargs)
+            (extracted.parent / ".workbench-temporary-lease.json").write_bytes(b"changed")
+            return extracted
 
         with patch.object(provision, "download", return_value=self.archive):
-            with self.assertRaisesRegex(provision.ProvisionFailure, "Core IDE toolchain stage or publication"):
-                provision.provision_entry(
-                    self.entry, suffix=".zip", extractor=changed_marker,
-                )
+            with patch.object(provision, "extract_ide_toolchain_archive", side_effect=changed_marker):
+                with self.assertRaisesRegex(provision.ProvisionFailure, "Core IDE toolchain stage or publication"):
+                    provision.provision_entry(self.entry, suffix=".zip")
         self.assertFalse((self.toolchains / self.entry["archive_root"]).exists())
         stage, = self.toolchains.glob(f"ide-{self.entry['archive_sha256']}-*")
         self.assertEqual(b"changed", (stage / ".workbench-temporary-lease.json").read_bytes())
 
     def test_failed_extraction_retains_partial_stage_and_refuses_retry(self) -> None:
-        def broken_extraction(_archive: Path, temporary: Path) -> None:
-            (temporary / "partial.bin").write_bytes(b"unfinished")
+        def broken_extraction(_host, stage, _archive: Path, **_kwargs) -> None:
+            (stage.path / "partial.bin").write_bytes(b"unfinished")
             raise OSError("archive ended early")
 
         with patch.object(provision, "download", return_value=self.archive) as download:
-            with self.assertRaisesRegex(provision.ProvisionFailure, "retain stage for review"):
-                provision.provision_entry(
-                    self.entry, suffix=".zip", extractor=broken_extraction,
-                )
+            with patch.object(provision, "extract_ide_toolchain_archive", side_effect=broken_extraction):
+                with self.assertRaisesRegex(provision.ProvisionFailure, "retain stage for review"):
+                    provision.provision_entry(self.entry, suffix=".zip")
             stage, = self.toolchains.glob(f"ide-{self.entry['archive_sha256']}-*")
             self.assertEqual(b"unfinished", (stage / "partial.bin").read_bytes())
             with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted Core IDE extraction stage"):
                 provision.provision_entry(
-                    self.entry, suffix=".zip", extractor=self._extract,
+                    self.entry, suffix=".zip",
                 )
             download.assert_called_once()
 
