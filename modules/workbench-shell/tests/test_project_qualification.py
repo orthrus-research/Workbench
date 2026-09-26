@@ -39,6 +39,9 @@ from workbench_shell.project_qualification import (  # noqa: E402
     qualification_status,
 )
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_api.record_stores import record_store_scope  # noqa: E402
+from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
+from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
 import workbench_shell.project_qualification as qualification_module  # noqa: E402
 
 
@@ -90,6 +93,32 @@ class ProjectQualificationTests(unittest.TestCase):
 
     def setUp(self) -> None:
         install_local_host_services()
+
+    def test_binding_catalogs_explicit_target_when_dispatch_selected_suite(self) -> None:
+        with _temporary_directory() as temporary:
+            root = Path(temporary)
+            project = create_supersymmetry_project(root)
+            state_root = root / "external-state"
+            config = root / "user-config"
+            plan = build_qualification_plan(_status(project, state_root))
+            host = CoreRecordStores(
+                workspace=REPOSITORY_ROOT, configuration_home=config,
+                owner_id="workbench-shell",
+            )
+            with record_store_scope(host):
+                result = apply_qualification_plan(
+                    REPOSITORY_ROOT, project, profile_selector="supersymmetry",
+                    state_root=state_root, expected_plan_id=plan["plan_id"],
+                )
+            self.assertTrue(result["qualification"]["qualified"])
+            self.assertEqual([], ResourceCatalog(config).inventory(
+                workspace=REPOSITORY_ROOT,
+            )["record_stores"])
+            rows = ResourceCatalog(config).inventory(workspace=project)["record_stores"]
+            self.assertEqual(1, len(rows))
+            self.assertEqual(
+                str(state_root / "project-qualification-v1/bindings"), rows[0]["path"],
+            )
 
     def test_core_publication_refuses_raced_absent_binding(self) -> None:
         with _temporary_directory() as temporary:

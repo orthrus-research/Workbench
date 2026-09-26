@@ -34,8 +34,11 @@ from workbench_api.state_paths import (  # noqa: E402
     default_product_spine_state_root,
 )
 from workbench_api.profiles import profile_scope  # noqa: E402
+from workbench_api.record_stores import record_store_scope  # noqa: E402
 from workbench_core.human_presentation import human_command  # noqa: E402
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
+from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
 from workbench_shell.work_session import WorkSessionStore  # noqa: E402
 from workbench_shell.workspace_dashboard import (  # noqa: E402
     OwnerRecordPort,
@@ -1060,6 +1063,30 @@ class WorkspaceHomeV2Tests(unittest.TestCase):
             )
             self.assertEqual(before, _tree_snapshot(workspace))
             self.assertFalse((workspace / ".workbench").exists())
+
+    def test_adoption_catalogs_explicit_target_when_dispatch_selected_suite(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            base = Path(temporary)
+            workspace = self._workspace(base)
+            state = base / "suite-state"
+            config = base / "user-config"
+            host = CoreRecordStores(
+                workspace=REPOSITORY_ROOT, configuration_home=config,
+                owner_id="workbench-shell",
+            )
+            with record_store_scope(host):
+                adopted = adopt_workspace_home_v2(
+                    REPOSITORY_ROOT, workspace, state_root=state,
+                )
+            self.assertEqual("adopted", adopted["adoption"]["state"])
+            self.assertEqual([], ResourceCatalog(config).inventory(
+                workspace=REPOSITORY_ROOT,
+            )["record_stores"])
+            rows = ResourceCatalog(config).inventory(workspace=workspace)["record_stores"]
+            self.assertEqual(1, len(rows))
+            self.assertEqual(
+                str(state / "workspace-home-v2/adoptions"), rows[0]["path"],
+            )
 
     def test_load_adoption_is_read_only_and_returns_a_defensive_copy(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:

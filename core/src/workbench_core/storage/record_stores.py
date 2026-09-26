@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import stat
 
 from workbench_api.record_stores import RecordStoreReference
 from workbench_api.state_paths import default_product_spine_state_root
@@ -81,6 +82,59 @@ class CoreRecordStores:
             store_id=store_id, family=family, owner_id=self.owner_id,
             workspace=self.workspace, root=root,
             retention="protected-until-reviewed-policy",
+        )
+
+    def open_target(
+        self, family: str, state_root: Path, target_workspace: Path,
+    ) -> RecordStoreReference:
+        """Bind a Shell-owned external binding to its explicit target workspace."""
+
+        if self.owner_id != "workbench-shell" or family not in {
+            "project-qualification-v1", "workspace-home-adoption-v2",
+        }:
+            raise DurableResourceError("resource.policy", "target record-store family is unsupported")
+        if any(
+            not isinstance(value, Path) or not value.is_absolute() or ".." in value.parts
+            for value in (state_root, target_workspace)
+        ):
+            raise DurableResourceError("resource.policy", "target record-store paths must be absolute")
+        state = Path(os.path.abspath(state_root))
+        target = Path(os.path.abspath(target_workspace))
+        identities: dict[Path, tuple[int, int]] = {}
+        try:
+            for value in (state, target):
+                for component in (value, *value.parents):
+                    info = component.lstat()
+                    if not stat.S_ISDIR(info.st_mode) or getattr(component, "is_junction", lambda: False)():
+                        raise ValueError("record-store path traverses a redirect")
+                    identities[component] = (info.st_dev, info.st_ino)
+        except (OSError, ValueError) as exc:
+            raise DurableResourceError("resource.unsafe", "target or state root is unsafe") from exc
+        if family == "project-qualification-v1":
+            if state == target or state.is_relative_to(target):
+                raise DurableResourceError("resource.policy", "qualification state overlaps its target")
+            root = state / "project-qualification-v1/bindings"
+        else:
+            root = state / "workspace-home-v2/adoptions"
+        _private_directory(root)
+        secure_private_path(root, directory=True)
+        if not private_path(root, directory=True):
+            raise DurableResourceError("resource.unsafe", "target record store cannot enforce private custody")
+        store_id = self.catalog.register_record_store(
+            family=family, owner_id=self.owner_id, workspace=target, root=root,
+        )
+        try:
+            if any(
+                (info.st_dev, info.st_ino) != identities[component]
+                for component in identities
+                for info in (component.lstat(),)
+            ):
+                raise ValueError("target or state root changed")
+        except (OSError, ValueError) as exc:
+            raise DurableResourceError("resource.changed", "target or state root changed during registration") from exc
+        return RecordStoreReference(
+            store_id=store_id, family=family, owner_id=self.owner_id,
+            workspace=target, root=root, retention="protected-until-reviewed-policy",
         )
 
 

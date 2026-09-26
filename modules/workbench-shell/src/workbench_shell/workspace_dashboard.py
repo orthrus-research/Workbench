@@ -36,6 +36,7 @@ from workbench_api.host_filesystem import (
     read_private_single_link_bytes,
     secure_private_path,
 )
+from workbench_api.record_stores import open_target_record_store
 
 from workbench_project_intelligence.workspace_doctor import (
     new_report,
@@ -2592,7 +2593,7 @@ def adopt_workspace_home_v2(
         capability_catalog_record=capability_catalog_record,
         owner_records=owner_records,
     )
-    _, bindings, locks = _storage_paths(
+    selected_state, bindings, locks = _storage_paths(
         suite_root,
         state_root,
         create=True,
@@ -2601,6 +2602,12 @@ def adopt_workspace_home_v2(
     binding_path = bindings / _binding_filename(binding_id)
     lock_path = _lock_path(locks, binding_id)
     with _exclusive_state_lease(lock_path, create=True):
+        opened_store = open_target_record_store(
+            "workspace-home-adoption-v2", selected_state,
+            Path(home["workspace"]["root"]),
+        )
+        if opened_store is not None and opened_store.root != bindings:
+            raise WorkspaceHomeV2Error("Core adoption binding namespace changed")
         interrupted_write_count = _interrupted_adoption_count(binding_path)
         owner_revisions = _retained_owner_revisions(home["owner_records"])
         adoption_record: dict[str, Any] = {

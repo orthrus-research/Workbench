@@ -31,6 +31,7 @@ from workbench_api.host_filesystem import (
     replace_private_bytes,
     secure_private_path,
 )
+from workbench_api.record_stores import open_target_record_store
 from workbench_project_intelligence import ProjectInspectionError
 from workbench_project_intelligence.git_observation import (
     GitObservationError,
@@ -1249,6 +1250,11 @@ def apply_qualification_plan(
                 raise ProjectQualificationError(
                     "qualification evidence or retained state changed while applying"
                 )
+            opened_store = open_target_record_store(
+                "project-qualification-v1", effective_state_root, target,
+            )
+            if opened_store is not None and opened_store.root != binding_path.parent:
+                raise ProjectQualificationError("Core qualification binding namespace changed")
             operation = locked_plan["actions"][0]["operation"]
             if operation == "reuse-current-binding":
                 outcome = "reused"

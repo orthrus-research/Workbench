@@ -27,6 +27,10 @@ class RecordStoreReference:
 class RecordStores(Protocol):
     def open(self, family: str, base: Path) -> RecordStoreReference: ...
 
+    def open_target(
+        self, family: str, state_root: Path, target_workspace: Path,
+    ) -> RecordStoreReference: ...
+
 
 _bound: ContextVar[RecordStores | None] = ContextVar("workbench_record_stores", default=None)
 
@@ -47,6 +51,21 @@ def open_record_store(family: str, base: Path) -> RecordStoreReference | None:
     return None if provider is None else provider.open(family, base)
 
 
+def open_target_record_store(
+    family: str, state_root: Path, target_workspace: Path,
+) -> RecordStoreReference | None:
+    """Register an owner-admitted target even when dispatch selected another workspace.
+
+    The domain owner must validate the target and binding identity first. Core
+    validates the physical target/state relationship and owns the namespace.
+    """
+
+    provider = _bound.get()
+    return None if provider is None else provider.open_target(
+        family, state_root, target_workspace,
+    )
+
+
 def record_store_host_bound() -> bool:
     """Tell a direct entry point whether dispatch already selected custody."""
 
@@ -55,5 +74,5 @@ def record_store_host_bound() -> bool:
 
 __all__ = [
     "RecordStoreReference", "RecordStores", "record_store_scope",
-    "open_record_store", "record_store_host_bound",
+    "open_record_store", "open_target_record_store", "record_store_host_bound",
 ]

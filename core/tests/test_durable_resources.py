@@ -16,6 +16,7 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api import Capability, DurableResourceError, ExecutionContext, Module, ModuleError
+from workbench_api.record_stores import open_target_record_store, record_store_scope
 from workbench_core.durable_files import StagedFile
 from workbench_core.modules import InstalledModule, dispatch
 from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
@@ -83,6 +84,38 @@ class DurableResourceTests(unittest.TestCase):
         self.assertEqual(1, len(set(ids)))
         self.assertEqual(1, len(ResourceCatalog(self.config).inventory()["record_stores"]))
         self.assertEqual([], list((self.config / "resources-v1/stores").glob(".*.pending")))
+
+    def test_explicit_target_record_stores_bind_the_target_not_dispatch_workspace(self) -> None:
+        target = self.home / "qualified-target"
+        target.mkdir()
+        state = self.home / "shared-state"
+        state.mkdir(mode=0o700)
+        host = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="workbench-shell",
+        )
+        with record_store_scope(host):
+            qualification = open_target_record_store(
+                "project-qualification-v1", state, target,
+            )
+            adoption = open_target_record_store(
+                "workspace-home-adoption-v2", state, target,
+            )
+        self.assertEqual(target, qualification.workspace)
+        self.assertEqual(state / "project-qualification-v1/bindings", qualification.root)
+        self.assertEqual(state / "workspace-home-v2/adoptions", adoption.root)
+        self.assertEqual([], ResourceCatalog(self.config).inventory(
+            workspace=self.workspace,
+        )["record_stores"])
+        rows = ResourceCatalog(self.config).inventory(workspace=target)["record_stores"]
+        self.assertEqual({qualification.store_id, adoption.store_id}, {row["store_id"] for row in rows})
+        self.assertEqual(qualification, host.open_target("project-qualification-v1", state, target))
+        with self.assertRaises(DurableResourceError):
+            host.open_target("work-session-v2", state, target)
+        alias = self.home / "target-alias"
+        alias.symlink_to(target, target_is_directory=True)
+        with self.assertRaises(DurableResourceError):
+            host.open_target("project-qualification-v1", state, alias)
 
     def test_validation_timing_store_uses_historical_workspace_root(self) -> None:
         provider = CoreRecordStores(
