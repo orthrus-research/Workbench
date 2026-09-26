@@ -307,6 +307,26 @@ class CatalogRootTests(unittest.TestCase):
         self.assertEqual(ResourceCatalog(transport_home).verify_root(), "ready-unproven")
         self.assertTrue((transport_home / "resources-v1/transport-trees").is_dir())
 
+    def test_inventory_refuses_unknown_and_redirected_catalog_entries(self) -> None:
+        self.resources.publish_bytes("evidence", "retained.json", b"retained\n")
+        catalog = ResourceCatalog(self.config)
+        reservations = catalog.root / "reservations"
+        original = next(reservations.iterdir())
+        candidates = (
+            (reservations / "unrecognized.pending", lambda path: path.write_bytes(b"partial")),
+            (catalog.root / "intents" / "unrecognized.pending", lambda path: path.write_bytes(b"partial")),
+            (catalog.root / "commits" / ("a" * 32 + ".json"), lambda path: path.symlink_to(original)),
+            (catalog.root / "aborts" / ("b" * 32 + ".json"), lambda path: os.link(original, path)),
+        )
+        for path, create in candidates:
+            with self.subTest(path=path):
+                create(path)
+                with self.assertRaises(DurableResourceError) as changed:
+                    catalog.inventory(workspace=self.workspace)
+                self.assertEqual("resource.changed", changed.exception.code)
+                path.unlink()
+        self.assertEqual(1, len(catalog.inventory(workspace=self.workspace)["resources"]))
+
     def test_cleanup_blocks_unregistered_workspace_items_with_unproven_history(self) -> None:
         from workbench_core.storage.manager import inventory_storage
 

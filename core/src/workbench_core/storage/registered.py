@@ -563,20 +563,24 @@ class ResourceCatalog:
             check_storage.ordinary(self.root, directory=True)
             for name in ("reservations", "intents", "commits", "aborts", "leases"):
                 check_storage.ordinary(self._directory(name), directory=True)
-            for name in ("intents", "commits", "aborts"):
-                for path in self._directory(name).glob("*.json"):
+            for name in ("reservations", "intents", "commits", "aborts"):
+                for path in self._directory(name).iterdir():
+                    info = path.lstat()
                     if (
-                        re.fullmatch(r"[0-9a-f]{32}", path.stem) is None
-                        or not self._path("reservations", path.stem).is_file()
-                        or (name == "commits" and not self._path("intents", path.stem).is_file())
+                        re.fullmatch(r"[0-9a-f]{32}\.json", path.name) is None
+                        or not stat.S_ISREG(info.st_mode)
+                        or info.st_nlink != 1
+                        or not private_path(path, directory=False)
                     ):
+                        raise DurableResourceError("resource.changed", "resource catalog has an unknown or unsafe record")
+                    if name != "reservations" and not self._path("reservations", path.stem).is_file():
+                        raise DurableResourceError("resource.changed", "resource catalog has an orphan record")
+                    if name == "commits" and not self._path("intents", path.stem).is_file():
                         raise DurableResourceError("resource.changed", "resource catalog has an orphan record")
         directory = self._directory("reservations")
         if directory.exists():
             check_storage.ordinary(directory, directory=True)
-            for path in sorted(directory.glob("*.json")):
-                if _RESOURCE.fullmatch(f"workbench-resource-v1:{path.stem}") is None:
-                    raise DurableResourceError("resource.changed", "resource catalog has an invalid reservation name")
+            for path in sorted(directory.iterdir()):
                 resource_id = f"workbench-resource-v1:{path.stem}"
                 reservation = self._reservation(resource_id)
                 if workspace is not None and reservation["workspace"] != str(workspace):
