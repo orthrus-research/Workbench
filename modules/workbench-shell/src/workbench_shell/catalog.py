@@ -3902,6 +3902,12 @@ def _atlas_recipe_health_commands() -> list[CommandSpec]:
             (
                 path,
                 _f(
+                    "workspace",
+                    "Explicit Workbench workspace for direct index attempt custody.",
+                    flags=("--workspace",),
+                    kind="path",
+                ),
+                _f(
                     "max_source_bytes",
                     "Maximum authoritative JSONL bytes read during rebuild.",
                     flags=("--max-source-bytes",),
@@ -4189,7 +4195,8 @@ def _atlas_observation_commands() -> list[CommandSpec]:
           _f("snapshot", "Original retained source; requires pack-profile.", flags=("--snapshot",), kind="path"),
           _f("pack_profile", "Explicit evidence-reader profile; requires snapshot.", flags=("--pack-profile",)), json_output)),
         ("index", "Rebuild observation query index", "Validate authoritative streams and rebuild only disposable query storage.",
-         (path, _f("max_source_bytes", "Maximum authoritative input bytes.", flags=("--max-source-bytes",), kind="integer", default=8589934592),
+         (path, _f("workspace", "Explicit Workbench workspace for direct index attempt custody.", flags=("--workspace",), kind="path"),
+          _f("max_source_bytes", "Maximum authoritative input bytes.", flags=("--max-source-bytes",), kind="integer", default=8589934592),
           _f("max_index_bytes", "Maximum index bytes, with twice this free staging disk required.", flags=("--max-index-bytes",), kind="integer", default=4294967296), json_output)),
         ("import-snapshot", "Import retained observations", "Admit an original snapshot through an explicitly selected profile into a new graph.",
          (path, _f("pack_profile", "Explicit observation-graph profile adapter.", flags=("--pack-profile",), required=True),
