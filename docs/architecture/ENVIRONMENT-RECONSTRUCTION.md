@@ -142,6 +142,27 @@ results. It downloads nothing and does not claim a complete environment:
 optional module packages and profile fixtures remain unresolved, and Java
 acquisition still follows the selection import's separate reviewed choice.
 
+Core can also build a read-only `workbench-environment-input-candidate-v1` for
+an exact V3 share through `build_input_candidate(share, wheels=...,
+profile_owner_id=...)`. The caller selects one to 64 local optional package
+wheels, each within Core's 256 MiB wheel bound, and
+the admitted platform profile owner. Core snapshots each wheel under its
+existing package admission parser and records distribution, version, declared
+module/profile IDs, size and SHA-256. The selected platform document identity
+in the share differs from its installed owner ID; Core compares the admitted
+owner's platform document bytes to the share lock before asking that owner's
+fixture extension to validate its complete source tree. The candidate records
+the fixture tree digest, owner code identity, and hashes of its lock, schema
+and preflight tool. Local paths do not enter the candidate. `recheck_input_candidate`
+reopens those exact local inputs before a later operation may use them.
+
+This candidate is an identity prerequisite, not an acquisition result. It does
+not install wheels, copy fixture bytes, prove the optional package closure is
+complete, or change V1–V3 share and import receipts. A target without the
+admitted owner, exact wheel bytes or validated fixture tree cannot produce a
+matching candidate. Toolchain and runtime fixture bytes still need their own
+owner locks and reviewed acquisition before a complete rebuild can be claimed.
+
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
 names the exact import plan, local blockers and missing acquisition inputs. The
