@@ -7,13 +7,16 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 from typing import Any
 import unittest
+from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 import yaml
@@ -388,6 +391,42 @@ class SimulationTest(unittest.TestCase):
         ):
             cache.ensure(definition, lambda _row: b"wrong")
 
+    def test_dependency_cache_uses_core_custody_and_refuses_a_racing_collision(self) -> None:
+        cache = simulation.DependencyCache(self.cache_root)
+        definition = self.environment["dependencies"][0]
+        path = cache.ensure(definition, self._provider)
+        self.assertEqual(self.tools[definition["id"]], path.read_bytes())
+        if os.name != "nt":
+            self.assertEqual(0o500, stat.S_IMODE(path.stat().st_mode))
+        self.assertEqual(path, cache.ensure(definition))
+        registrations = [json.loads(path.read_text(encoding="utf-8")) for path in
+                         (self.configuration_home / "resources-v1/stores").glob("*.json")]
+        self.assertEqual([str(self.cache_root)], [row["root"] for row in registrations
+                          if row["family"] == "blueprints-dependency-cache-v1"])
+
+        content = b"another approved dependency"
+        new_definition = {"id": "second", "size": len(content), "sha256": hashlib.sha256(content).hexdigest(),
+                          "executable": True}
+        raced_path = cache._path(new_definition["sha256"])
+        def race(_definition):
+            raced_path.parent.mkdir(mode=0o700, parents=True)
+            raced_path.write_bytes(b"racing wrong bytes")
+            raced_path.chmod(0o500)
+            return content
+        with self.assertRaises(simulation.SimulationDiagnostic) as rejected:
+            cache.ensure(new_definition, race)
+        self.assertEqual("BPX110_DEPENDENCY_CACHE", rejected.exception.code)
+        self.assertEqual(b"racing wrong bytes", raced_path.read_bytes())
+
+    def test_new_dependency_refuses_unbound_core_store(self) -> None:
+        cache = simulation.DependencyCache(self.cache_root)
+        definition = self.environment["dependencies"][0]
+        with patch.object(simulation, "open_record_store", return_value=None):
+            with self.assertRaises(simulation.SimulationDiagnostic) as rejected:
+                cache.ensure(definition, self._provider)
+        self.assertEqual("BPX109_CACHE_ROOT", rejected.exception.code)
+        self.assertFalse(self.cache_root.exists())
+
     def test_missing_dependency_is_unavailable_and_closes_later_gates(self) -> None:
         unavailable = self._simulator(
             provider=lambda definition: (
@@ -510,6 +549,39 @@ class SimulationTest(unittest.TestCase):
                 planning_evidence=self.planning_evidence,
                 environment_lock=self.environment,
             )
+
+
+class HistoricalDependencyCacheTests(unittest.TestCase):
+    def test_historical_cache_reopens_without_core_but_cannot_acquire(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            script = """
+from hashlib import sha256
+from pathlib import Path
+from workbench_blueprints.simulation import DependencyCache, SimulationDiagnostic
+
+cache = DependencyCache(Path('dependencies'))
+old = b'historical executable'
+definition = {'id': 'old', 'sha256': sha256(old).hexdigest(), 'size': len(old), 'executable': True}
+path = cache._path(definition['sha256'])
+path.parent.mkdir(mode=0o700, parents=True)
+path.write_bytes(old)
+path.chmod(0o500)
+assert cache.ensure(definition) == path
+fresh = b'new dependency'
+new = {'id': 'new', 'sha256': sha256(fresh).hexdigest(), 'size': len(fresh), 'executable': True}
+try:
+    cache.ensure(new, lambda _: fresh)
+except SimulationDiagnostic as error:
+    assert error.code == 'BPX109_CACHE_ROOT', error
+else:
+    raise AssertionError('unbound cache acquired bytes')
+assert not cache._path(new['sha256']).exists()
+"""
+            environment = dict(os.environ, PYTHONPATH=os.pathsep.join(
+                (str(WORKBENCH_ROOT / "api/src"), str(WORKBENCH_ROOT / "modules/blueprints/src"))))
+            result = subprocess.run([sys.executable, "-c", script], cwd=temporary, env=environment,
+                                    text=True, capture_output=True)
+            self.assertEqual(0, result.returncode, result.stderr)
 
 
 if __name__ == "__main__":

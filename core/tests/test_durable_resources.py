@@ -103,6 +103,22 @@ class DurableResourceTests(unittest.TestCase):
         self.assertEqual(rows[0]["store_id"], opened.store_id)
         self.assertEqual(rows[0]["owner_id"], "blueprints")
 
+    def test_blueprints_dependency_cache_registers_selected_historical_root(self) -> None:
+        provider = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="blueprints",
+        )
+        root = self.home / "blueprints-session/dependencies"
+        opened = provider.open("blueprints-dependency-cache-v1", root)
+        self.assertEqual(root, opened.root)
+        self.assertEqual(opened, provider.open("blueprints-dependency-cache-v1", root))
+        rows = ResourceCatalog(self.config).inventory(workspace=self.workspace)["record_stores"]
+        self.assertEqual([(opened.store_id, str(root), "blueprints-dependency-cache-v1")],
+                         [(row["store_id"], row["path"], row["family"]) for row in rows])
+        with self.assertRaises(DurableResourceError):
+            CoreRecordStores(workspace=self.workspace, configuration_home=self.config,
+                             owner_id="workbench-shell").open("blueprints-dependency-cache-v1", root)
+
     def test_dispatch_binds_core_and_inventory_sees_external_root(self) -> None:
         captured = []
 

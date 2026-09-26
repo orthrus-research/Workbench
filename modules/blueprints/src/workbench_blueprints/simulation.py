@@ -20,6 +20,12 @@ from typing import Any, Callable, NoReturn
 
 from jsonschema import Draft202012Validator
 
+from workbench_api.durable_resources import DurableResourceError
+from workbench_api.host_filesystem import (
+    DurableRecordError, HostFilesystemError, publish_immutable_bytes,
+    read_private_bytes, secure_private_path,
+)
+from workbench_api.record_stores import open_record_store
 from workbench_blueprints import planner, standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
 
@@ -77,7 +83,9 @@ def _digest_json(value: Any) -> str:
     return _digest_bytes(standards.canonical_json(value).encode("utf-8"))
 
 
-def _read_regular(path: Path, code: str) -> bytes:
+def _read_regular(path: Path, code: str, *, byte_limit: int | None = None) -> bytes:
+    if byte_limit is not None and (type(byte_limit) is not int or byte_limit < 0):
+        _fail(code, str(path), "invalid approved byte size")
     try:
         descriptor = os.open(
             path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
@@ -89,11 +97,19 @@ def _read_regular(path: Path, code: str) -> bytes:
         if not stat.S_ISREG(status.st_mode):
             _fail(code, str(path), "path is not a regular file")
         chunks: list[bytes] = []
+        total = 0
         while True:
-            chunk = os.read(descriptor, 1024 * 1024)
+            amount = (
+                1024 * 1024 if byte_limit is None
+                else min(1024 * 1024, byte_limit - total + 1)
+            )
+            chunk = os.read(descriptor, amount)
             if not chunk:
                 break
             chunks.append(chunk)
+            total += len(chunk)
+            if byte_limit is not None and total > byte_limit:
+                _fail(code, str(path), "file exceeds its approved byte size")
         return b"".join(chunks)
     finally:
         os.close(descriptor)
@@ -250,14 +266,29 @@ class DependencyCache:
         provider: DependencyProvider | None = None,
     ) -> Path:
         path = self._path(definition["sha256"])
+        objects = self.root / "objects"
+        if any(row.is_symlink() for row in (self.root, objects, path.parent)):
+            _fail("BPX109_CACHE_ROOT", str(path.parent), "cache path contains a symlink")
+        if path.is_symlink():
+            _fail("BPX110_DEPENDENCY_CACHE", str(path), "cached dependency is a symlink")
         if path.exists():
-            if path.is_symlink():
-                _fail(
-                    "BPX110_DEPENDENCY_CACHE",
-                    str(path),
-                    "cached dependency is a symlink",
+            try:
+                managed = open_record_store("blueprints-dependency-cache-v1", self.root)
+            except (DurableResourceError, OSError, ValueError) as exc:
+                _fail("BPX109_CACHE_ROOT", str(self.root), str(exc))
+            if managed is None:
+                # A previously acquired cache remains useful to standalone
+                # readers. Only an admitted Core store may add new bytes.
+                content = _read_regular(
+                    path, "BPX110_DEPENDENCY_CACHE", byte_limit=definition["size"],
                 )
-            content = _read_regular(path, "BPX110_DEPENDENCY_CACHE")
+            else:
+                if managed.root != self.root:
+                    _fail("BPX109_CACHE_ROOT", str(self.root), "Core selected a different cache root")
+                try:
+                    content = read_private_bytes(path, byte_limit=definition["size"])
+                except (HostFilesystemError, OSError) as exc:
+                    _fail("BPX110_DEPENDENCY_CACHE", str(path), str(exc))
         else:
             if provider is None:
                 _fail(
@@ -290,34 +321,31 @@ class DependencyCache:
                     definition["id"],
                     "acquired bytes do not match the approved lock",
                 )
-            self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
-            objects = self.root / "objects"
-            objects.mkdir(mode=0o700, exist_ok=True)
-            path.parent.mkdir(mode=0o700, exist_ok=True)
-            if any(row.is_symlink() for row in (self.root, objects, path.parent)):
-                _fail(
-                    "BPX109_CACHE_ROOT",
-                    str(path.parent),
-                    "cache path contains a symlink",
-                )
-            temporary: str | None = None
             try:
-                with tempfile.NamedTemporaryFile(
-                    mode="wb",
-                    dir=path.parent,
-                    prefix=".dependency.",
-                    delete=False,
-                ) as handle:
-                    temporary = handle.name
-                    os.fchmod(handle.fileno(), 0o500)
-                    handle.write(content)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(temporary, path)
-                temporary = None
-            finally:
-                if temporary is not None:
-                    Path(temporary).unlink(missing_ok=True)
+                managed = open_record_store("blueprints-dependency-cache-v1", self.root)
+            except (DurableResourceError, OSError, ValueError) as exc:
+                _fail("BPX109_CACHE_ROOT", str(self.root), str(exc))
+            if managed is None or managed.root != self.root:
+                _fail("BPX109_CACHE_ROOT", str(self.root), "dependency acquisition requires its Core cache store")
+            try:
+                secure_private_path(objects, directory=True)
+                secure_private_path(path.parent, directory=True)
+            except (HostFilesystemError, OSError) as exc:
+                _fail("BPX109_CACHE_ROOT", str(path.parent), str(exc))
+            try:
+                publish_immutable_bytes(
+                    path, content, byte_limit=definition["size"], idempotent=True,
+                )
+                content = read_private_bytes(path, byte_limit=definition["size"])
+            except DurableRecordError as exc:
+                code = (
+                    "BPX110_DEPENDENCY_CACHE"
+                    if exc.code in {"collision", "changed", "unavailable", "unsafe"}
+                    else "BPX109_CACHE_ROOT"
+                )
+                _fail(code, str(path), str(exc))
+            except (HostFilesystemError, OSError) as exc:
+                _fail("BPX109_CACHE_ROOT", str(path), str(exc))
         if (
             len(content) != definition["size"]
             or _digest_bytes(content) != definition["sha256"]

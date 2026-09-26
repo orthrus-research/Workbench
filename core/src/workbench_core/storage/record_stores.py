@@ -34,6 +34,10 @@ class CoreRecordStores:
             # Blueprints admits the target and protected session before it
             # requests this historical CAS namespace. Keep its V1 locators.
             root = selected
+        elif self.owner_id == "blueprints" and family == "blueprints-dependency-cache-v1":
+            # The environment lock owns each digest key below the selected
+            # historical cache root; Core registers custody of that root.
+            root = selected
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)
