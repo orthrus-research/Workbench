@@ -416,6 +416,16 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
                 )
         self.assertEqual(0, code, error.getvalue())
         self.assertEqual(context["context_id"], json.loads(output.getvalue())["context_id"])
+        catalog = ResourceCatalog(self.root / "config")
+        suite_rows = catalog.inventory(workspace=ROOT)["record_stores"]
+        self.assertEqual(
+            [str(self._context_root)],
+            [row["path"] for row in suite_rows if row["family"] == "feature-change-session-context-v1"],
+        )
+        self.assertFalse(any(
+            row["family"] == "feature-change-session-context-v1"
+            for row in catalog.inventory(workspace=external_workspace)["record_stores"]
+        ))
 
     @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
     def test_exit_after_tree_intent_reconciles_before_context_reuse(self) -> None:

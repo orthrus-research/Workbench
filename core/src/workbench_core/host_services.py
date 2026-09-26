@@ -78,11 +78,13 @@ def direct_module_custody_scope(
 def suite_managed_tree_scope(
     *, workspace: Path, configuration_home: Path | None = None,
 ) -> Iterator[None]:
-    """Bind Shell's suite-owned trees without changing other dispatch ports.
+    """Bind Shell's suite-owned trees and records without changing other ports.
 
     Work Session contexts live under the Workbench suite root, which can differ
-    from dispatch's selected target workspace. The caller passes dispatch's
-    configuration home so both entry routes reopen the same Core catalog.
+    from dispatch's selected target workspace. Their tree and mutable record
+    namespace must have the same suite workspace identity in Core's catalog.
+    The caller passes dispatch's configuration home so both entry routes reopen
+    that catalog.
     """
 
     if not isinstance(workspace, Path) or not workspace.is_absolute():
@@ -93,7 +95,13 @@ def suite_managed_tree_scope(
     selected_home = configuration_home or default_user_config_home()
     if not isinstance(selected_home, Path) or not selected_home.is_absolute():
         raise ValueError("suite managed tree configuration home must be absolute")
-    with managed_trees_scope(CoreManagedTrees(
+    from .storage.record_stores import CoreRecordStores
+
+    with record_store_scope(CoreRecordStores(
+        workspace=workspace,
+        configuration_home=selected_home,
+        owner_id="workbench-shell",
+    )), managed_trees_scope(CoreManagedTrees(
         workspace=workspace,
         configuration_home=selected_home,
         locations={"artifacts": workspace},
