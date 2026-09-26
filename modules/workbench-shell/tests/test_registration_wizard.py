@@ -52,6 +52,7 @@ from workbench_shell.registration_wizard import (  # noqa: E402
     inspect_active_registration_attempt,
     plan_active_registration,
     registration_capabilities,
+    rollback_active_registration_attempt,
     resume_active_registration_attempt,
 )
 
@@ -347,6 +348,252 @@ class RegistrationWizardTest(unittest.TestCase):
             self.assertEqual("applied", json.loads(output.getvalue())["outcome"])
             self.assertTrue(all((payload / row["path"]).is_file()
                                 for row in plan["operations"]))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_partial_rollback_restores_sources_and_blocks_forward_replay(self) -> None:
+        for ordinal, after_replace in ((1, True), (2, False)):
+            with self.subTest(ordinal=ordinal, after_replace=after_replace):
+                with tempfile.TemporaryDirectory() as temporary:
+                    project, payload, state, plan, _answers = self._interrupted_material_apply(
+                        Path(temporary), ordinal=ordinal, after_replace=after_replace,
+                    )
+                    retained = state / "registrations" / (
+                        ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                    )
+                    result = rollback_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    )
+                    self.assertEqual("source-restored", result["outcome"])
+                    self.assertEqual(retained, _uri_path(result["attempt_uri"]))
+                    self.assertTrue((retained / "rollback.json").is_file())
+                    self.assertEqual("prepared", json.loads((retained / "receipt.json").read_bytes())["state"])
+                    for operation in plan["operations"]:
+                        relative = operation["path"]
+                        self.assertEqual(
+                            (retained / "backups" / relative).read_bytes(),
+                            (payload / relative).read_bytes(),
+                        )
+                    self.assertEqual(result, rollback_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    ))
+                    inspected = inspect_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    )
+                    self.assertTrue(inspected["rollback_requested"])
+                    self.assertEqual(["before"] * len(plan["operations"]), [
+                        row["source_state"] for row in inspected["operations"]
+                    ])
+                    with self.assertRaisesRegex(RegistrationWizardError, "rollback intent"):
+                        resume_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                    with self.assertRaisesRegex(RegistrationWizardError, "rollback intent"):
+                        finalize_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                    output = io.StringIO()
+                    with redirect_stdout(output):
+                        code = cli_main([
+                            "register", str(project), "--suite-root", str(SUITE_ROOT),
+                            "--state-root", str(state), "--rollback-attempt", plan["plan_id"],
+                            "--json",
+                        ])
+                    self.assertEqual(0, code)
+                    self.assertEqual("source-restored", json.loads(output.getvalue())["outcome"])
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_installed_dispatch_rolls_back_with_selected_configuration_home(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project, payload, state, plan, _answers = self._interrupted_material_apply(
+                root, ordinal=1, after_replace=True,
+            )
+            context = ExecutionContext(
+                project, state, configuration_home=self.configuration_home,
+            )
+            module = InstalledModule(
+                "workbench-shell", "workbench-shell", "0.1.0", "available",
+                module=Module("workbench-shell", "0.1.0", (
+                    Capability(
+                        "workbench-shell.register", ("register",),
+                        "workbench_shell.commands:register", "Run register",
+                    ),
+                )),
+            )
+            output = io.StringIO()
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(root / "other-config")}):
+                with redirect_stdout(output):
+                    code = dispatch([
+                        "register", str(project), "--suite-root", str(SUITE_ROOT),
+                        "--state-root", str(state), "--rollback-attempt", plan["plan_id"],
+                        "--json",
+                    ], context, (module,), suite_root=SUITE_ROOT)
+            self.assertEqual(0, code)
+            self.assertEqual("source-restored", json.loads(output.getvalue())["outcome"])
+            retained = state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            )
+            self.assertTrue((retained / "rollback.json").is_file())
+            self.assertTrue(all(
+                (payload / row["path"]).read_bytes() ==
+                (retained / "backups" / row["path"]).read_bytes()
+                for row in plan["operations"]
+            ))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_rollback_survives_exit_before_and_after_source_restore(self) -> None:
+        for after_restore in (False, True):
+            with self.subTest(after_restore=after_restore):
+                with tempfile.TemporaryDirectory() as temporary:
+                    project, payload, state, plan, _answers = self._interrupted_material_apply(
+                        Path(temporary), ordinal=1, after_replace=True,
+                    )
+                    pid = os.fork()
+                    if pid == 0:
+                        original_rollback = _SourceTransaction.rollback
+
+                        def exit_at_restore(transaction, reference):
+                            if not after_restore:
+                                os._exit(86)
+                            original_rollback(transaction, reference)
+                            os._exit(86)
+
+                        try:
+                            with patch.object(_SourceTransaction, "rollback", exit_at_restore):
+                                rollback_active_registration_attempt(
+                                    SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                                )
+                        except BaseException:
+                            os._exit(87)
+                        os._exit(88)
+                    _, status = os.waitpid(pid, 0)
+                    self.assertEqual(86, os.waitstatus_to_exitcode(status))
+                    inspected = inspect_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    )
+                    self.assertTrue(inspected["rollback_requested"])
+                    with self.assertRaisesRegex(RegistrationWizardError, "rollback intent"):
+                        resume_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                    recovered = rollback_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    )
+                    self.assertEqual("source-restored", recovered["outcome"])
+                    retained = _uri_path(recovered["attempt_uri"])
+                    self.assertTrue(all(
+                        (payload / row["path"]).read_bytes() ==
+                        (retained / "backups" / row["path"]).read_bytes()
+                        for row in plan["operations"]
+                    ))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_rollback_refuses_unknown_source_and_extra_stage(self) -> None:
+        for condition in ("unknown-source", "extra-stage"):
+            with self.subTest(condition=condition):
+                with tempfile.TemporaryDirectory() as temporary:
+                    project, payload, state, plan, _answers = self._interrupted_material_apply(
+                        Path(temporary), ordinal=1, after_replace=True,
+                    )
+                    retained = state / "registrations" / (
+                        ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                    )
+                    if condition == "unknown-source":
+                        (payload / plan["operations"][0]["path"]).write_bytes(b"later user edit\n")
+                    else:
+                        manifest = json.loads((retained / "attempt.json").read_bytes())
+                        source = payload / plan["operations"][0]["path"]
+                        (source.parent / (
+                            f".{source.name}.workbench-{manifest['staging_token']}-extra.tmp"
+                        )).write_bytes(b"unrecorded")
+                    sources = {row["path"]: (payload / row["path"]).read_bytes()
+                               for row in plan["operations"]}
+                    with self.assertRaisesRegex(RegistrationWizardError, "review"):
+                        rollback_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                    self.assertFalse((retained / "rollback.json").exists())
+                    self.assertEqual(sources, {
+                        path: (payload / path).read_bytes() for path in sources
+                    })
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_rollback_accepts_prior_interrupted_rollback_without_intent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project, payload, state, plan, _answers = self._interrupted_material_apply(
+                Path(temporary), ordinal=1, after_replace=True,
+            )
+            retained = state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            )
+            manifest = json.loads((retained / "attempt.json").read_bytes())
+            relative = plan["operations"][1]["path"]
+            stage = json.loads((retained / "stages/001.json").read_bytes())
+            transaction = _SourceTransaction(
+                payload, binding=f"registration:{plan['plan_id']}",
+                staging_token=manifest["staging_token"], check_cancelled=lambda: None,
+            )
+            reference = transaction.attach(
+                relative,
+                before=SourceImage("file", (retained / "backups" / relative).read_bytes(),
+                                   mode=stat.S_IMODE((payload / relative).stat().st_mode)),
+                after=SourceImage("file", (retained / "after" / relative).read_bytes(),
+                                  mode=stat.S_IMODE((payload / relative).stat().st_mode)),
+                staged_relative=stage["staged_relative"], attempted=True,
+            )
+            transaction.rollback(reference)
+            self.assertFalse((retained / "rollback.json").exists())
+            result = rollback_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            )
+            self.assertEqual("source-restored", result["outcome"])
+            self.assertTrue(all(
+                (payload / row["path"]).read_bytes() ==
+                (retained / "backups" / row["path"]).read_bytes()
+                for row in plan["operations"]
+            ))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_rollback_keeps_unjournaled_restore_stage_after_hard_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project, payload, state, plan, _answers = self._interrupted_material_apply(
+                Path(temporary), ordinal=1, after_replace=True,
+            )
+            retained = state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            )
+            before = {row["path"]: (payload / row["path"]).read_bytes()
+                      for row in plan["operations"]}
+            pid = os.fork()
+            if pid == 0:
+                original_stage = _SourceTransaction._stage
+
+                def exit_after_stage(transaction, target, image):
+                    original_stage(transaction, target, image)
+                    os._exit(86)
+
+                try:
+                    with patch.object(_SourceTransaction, "_stage", exit_after_stage):
+                        rollback_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                except BaseException:
+                    os._exit(87)
+                os._exit(88)
+            _, status = os.waitpid(pid, 0)
+            self.assertEqual(86, os.waitstatus_to_exitcode(status))
+            inspected = inspect_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            )
+            self.assertTrue(inspected["rollback_requested"])
+            self.assertEqual("review-required", inspected["journal_status"])
+            self.assertTrue(any(row["extra_stage_present"] for row in inspected["operations"]))
+            with self.assertRaisesRegex(RegistrationWizardError, "review"):
+                rollback_active_registration_attempt(
+                    SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                )
+            self.assertEqual(before, {path: (payload / path).read_bytes() for path in before})
+            self.assertTrue((retained / "rollback.json").is_file())
 
     @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
     def test_restart_resumption_survives_exit_around_replay(self) -> None:

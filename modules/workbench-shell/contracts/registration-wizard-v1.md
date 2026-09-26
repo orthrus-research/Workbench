@@ -101,7 +101,25 @@ rechecks the source bytes, and finishes through the same applied receipt and
 no-replace promotion as uninterrupted application.
 
 The action can be repeated after an exit around a marker, replacement, receipt
-or promotion. Missing stage markers, interrupted rollback, unknown source
-bytes or changed retained evidence remain protected for review. An applied V1
+or promotion. Forward resumption refuses missing stage markers, interrupted
+rollback, unknown source bytes or changed retained evidence. An applied V1
 receipt still means that every planned source edit was verified; it does not
 claim Groovy compilation or runtime registration.
+
+`workbench register WORKSPACE --rollback-attempt PLAN_ID` restores source from
+a staged, partial attempt when Core can prove the exact retained before and after
+images, selected instance, source parents, complete stage journal and ordered
+attempt prefix. It restores only files still at their recorded after image,
+working in reverse order. Files already at their recorded before image are
+left alone. Core records rollback intent before the first restoration; after
+that, `--resume-attempt` and `--finalize-attempt` refuse to move the same
+attempt forward. Repeating rollback after an exit is safe while the journal
+and source evidence remain intact.
+
+The rollback result reports `source-restored`. The prepared receipt, retained
+attempt, backups and incomplete stages remain in place for explicit review;
+this command does not remove them. Unknown or externally changed source bytes,
+missing stage marks, extra token-named stages and changed retained evidence
+stop rollback without overwriting those bytes. A hard exit during creation
+of a restoration stage can leave an extra stage and require manual review.
+Source restoration does not establish Groovy or runtime behavior.

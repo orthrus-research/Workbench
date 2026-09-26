@@ -579,7 +579,7 @@ def finalize_active_registration_attempt(
 
     return _recover_active_registration_attempt(
         suite_root, workspace_root, plan_id=plan_id, state_root=state_root,
-        configuration=configuration, config_path=config_path, resume=False,
+        configuration=configuration, config_path=config_path, action="finalize",
     )
 
 
@@ -596,7 +596,24 @@ def resume_active_registration_attempt(
 
     return _recover_active_registration_attempt(
         suite_root, workspace_root, plan_id=plan_id, state_root=state_root,
-        configuration=configuration, config_path=config_path, resume=True,
+        configuration=configuration, config_path=config_path, action="resume",
+    )
+
+
+def rollback_active_registration_attempt(
+    suite_root: Path | str,
+    workspace_root: Path | str,
+    *,
+    plan_id: str,
+    state_root: Path | str | None = None,
+    configuration: WorkbenchConfiguration | None = None,
+    config_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Restore proven source images after an interrupted partial attempt."""
+
+    return _recover_active_registration_attempt(
+        suite_root, workspace_root, plan_id=plan_id, state_root=state_root,
+        configuration=configuration, config_path=config_path, action="rollback",
     )
 
 
@@ -608,7 +625,7 @@ def _recover_active_registration_attempt(
     state_root: Path | str | None,
     configuration: WorkbenchConfiguration | None,
     config_path: Path | str | None,
-    resume: bool,
+    action: str,
 ) -> dict[str, Any]:
 
     suite = Path(suite_root).resolve()
@@ -624,19 +641,31 @@ def _recover_active_registration_attempt(
             payload=selection["payload_path"], plan_id=plan_id,
             selection_id=selection["selection_id"],
         ) as attempt:
-            inspected = attempt.resume_partial() if resume else attempt.finalize_committed()
+            inspected = (
+                attempt.resume_partial() if action == "resume" else
+                attempt.rollback_partial() if action == "rollback" else
+                attempt.finalize_committed()
+            )
     except (OSError, DurableResourceError, ModuleError) as exc:
         _fail(f"registration attempt requires review: {exc}")
-    return {
+    result = {
         "format": "workbench-registration-recovery-v1",
         "schema_version": 1,
-        "outcome": "applied",
+        "outcome": "source-restored" if action == "rollback" else "applied",
         "plan_id": plan_id,
-        "receipt_uri": inspected["receipt_uri"],
-        "outstanding_checks": [
-            "Relaunch the selected instance to check Groovy compilation and registration.",
-        ],
+        "receipt_uri": (
+            inspected["attempt_uri"] + "/receipt.json" if action == "rollback"
+            else inspected["receipt_uri"]
+        ),
+        "outstanding_checks": (
+            ["The retained attempt and incomplete stages require explicit review before cleanup."]
+            if action == "rollback" else
+            ["Relaunch the selected instance to check Groovy compilation and registration."]
+        ),
     }
+    if action == "rollback":
+        result["attempt_uri"] = inspected["attempt_uri"]
+    return result
 
 
 __all__ = [
@@ -644,6 +673,7 @@ __all__ = [
     "apply_active_registration",
     "finalize_active_registration_attempt",
     "resume_active_registration_attempt",
+    "rollback_active_registration_attempt",
     "inspect_active_registration_attempt",
     "plan_active_registration",
     "registration_capabilities",

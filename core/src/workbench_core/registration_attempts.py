@@ -263,6 +263,16 @@ class _Attempt:
         token = body.get("staging_token")
         if type(token) is not str or re.fullmatch(r"[0-9a-f]{32}", token) is None:
             _fail("record", "registration source staging token is invalid")
+        rollback_path = retained / "rollback.json"
+        rollback_requested = rollback_path.exists() or rollback_path.is_symlink()
+        if rollback_requested:
+            expected_rollback = _canonical({
+                "format": "workbench-registration-rollback-intent-v1",
+                "attempt_id": seal, "plan_id": self.plan_id,
+                "selection_id": self.selection_id, "staging_token": token,
+            })
+            if read_private_bytes(rollback_path, byte_limit=4096) != expected_rollback:
+                _fail("record", "registration rollback intent differs from the retained attempt")
         rows = body.get("operations")
         if not isinstance(rows, list) or not 1 <= len(rows) <= _MAX_OPERATIONS:
             _fail("record", "registration operation journal is invalid")
@@ -421,12 +431,16 @@ class _Attempt:
             "attempt_uri": retained.as_uri(),
             "receipt_uri": (self.transaction_path / "receipt.json").as_uri(),
             "receipt_state": receipt_state,
+            "rollback_requested": rollback_requested,
             "journal_status": "review-required" if review_required else "consistent",
             "operations": classified,
-            "outstanding_checks": [
-                "Recovery action is not automated by this inspection.",
-                "Relaunch the selected instance to check Groovy compilation and registration.",
-            ],
+            "outstanding_checks": (
+                ["Rollback intent blocks forward replay; review the retained attempt and stages."]
+                if rollback_requested else [
+                    "Recovery action is not automated by this inspection.",
+                    "Relaunch the selected instance to check Groovy compilation and registration.",
+                ]
+            ),
         }
 
     def finalize_committed(self) -> dict:
@@ -448,6 +462,8 @@ class _Attempt:
         retained = self.path if staged else self.transaction_path
         retained_identity = _identity(retained)
         inspected = self.inspect()
+        if inspected["rollback_requested"]:
+            _fail("review", "registration rollback intent blocks forward publication")
         if not complete(inspected):
             _fail("incomplete", "registration source edits are not all proven committed")
         if not staged:
@@ -514,7 +530,8 @@ class _Attempt:
 
         def recoverable(inspection: dict) -> None:
             operations = inspection["operations"]
-            if (inspection["receipt_state"] != "prepared"
+            if (inspection["rollback_requested"]
+                    or inspection["receipt_state"] != "prepared"
                     or inspection["journal_status"] != "consistent"
                     or not operations
                     or any(not row["stage_recorded"] or row["extra_stage_present"]
@@ -533,6 +550,8 @@ class _Attempt:
                     _fail("review", "registration source order cannot prove safe resumption")
 
         inspected = self.inspect()
+        if inspected["rollback_requested"]:
+            _fail("review", "registration rollback intent blocks forward resumption")
         if inspected["receipt_state"] == "applied":
             return self.finalize_committed()
         recoverable(inspected)
@@ -587,6 +606,92 @@ class _Attempt:
                     _fail("changed", "registration source attempt marker did not reopen")
             transaction.commit(reference)
         return self.finalize_committed()
+
+    def rollback_partial(self) -> dict:
+        """Restore only exact recorded after images; retain all attempt evidence.
+
+        A durable intent blocks forward replay after the first restoration.
+        Unknown source bytes, stage files, or journal order remain untouched for
+        review. The attempt and incomplete source stages are not deleted.
+        """
+
+        def recoverable(inspection: dict) -> None:
+            operations = inspection["operations"]
+            if (inspection["receipt_state"] != "prepared"
+                    or inspection["journal_status"] != "consistent"
+                    or not operations
+                    or any(not row["stage_recorded"] or row["extra_stage_present"]
+                           for row in operations)):
+                _fail("review", "registration partial attempt lacks a complete source proof")
+            attempted = sum(bool(row["attempted"]) for row in operations)
+            saw_before = False
+            for ordinal, row in enumerate(operations):
+                state, present = row["source_state"], row["stage_present"]
+                if ordinal < attempted:
+                    if state == "after" and not present and not saw_before:
+                        continue
+                    if state != "before" or (present and ordinal != attempted - 1):
+                        _fail("review", "registration source order cannot prove safe rollback")
+                    saw_before = True
+                elif state != "before" or not present:
+                    _fail("review", "registration unattempted source is not intact")
+
+        if self.transaction_path.exists() or self.transaction_path.is_symlink():
+            _fail("state", "completed registration is not a partial attempt")
+        inspected = self.inspect()
+        recoverable(inspected)
+        retained = self.path
+        manifest_raw = read_private_bytes(retained / "attempt.json", byte_limit=32 * 1024)
+        manifest = _read_json(manifest_raw, label="attempt manifest")
+        token = manifest["staging_token"]
+        if not inspected["rollback_requested"]:
+            _write_file(retained / "rollback.json", _canonical({
+                "format": "workbench-registration-rollback-intent-v1",
+                "attempt_id": manifest["id"], "plan_id": self.plan_id,
+                "selection_id": self.selection_id, "staging_token": token,
+            }), limit=4096)
+        inspected = self.inspect()
+        recoverable(inspected)
+        if not inspected["rollback_requested"]:
+            _fail("changed", "registration rollback intent did not reopen")
+        transaction = CoreSourceTransactions(owner_id="workbench-shell").open(
+            self.payload, binding=f"registration:{self.plan_id}", staging_token=token,
+        )
+        rows = manifest["operations"]
+        for ordinal in reversed(range(len(rows))):
+            inspected = self.inspect()
+            recoverable(inspected)
+            if (not inspected["rollback_requested"]
+                    or read_private_bytes(retained / "attempt.json", byte_limit=32 * 1024) != manifest_raw):
+                _fail("changed", "registration attempt changed during rollback")
+            operation = inspected["operations"][ordinal]
+            if operation["source_state"] == "before":
+                continue
+            row = rows[ordinal]
+            relative = row["path"]
+            before = read_private_bytes(retained / "backups" / relative, byte_limit=_MAX_FILE)
+            after = read_private_bytes(retained / "after" / relative, byte_limit=_MAX_FILE)
+            if (len(before) != row["before_size"] or sha256(before).hexdigest() != row["before_sha256"]
+                    or len(after) != row["after_size"] or sha256(after).hexdigest() != row["after_sha256"]):
+                _fail("changed", "registration retained source image changed during rollback")
+            stage = _read_json(
+                read_private_bytes(retained / "stages" / f"{ordinal:03d}.json", byte_limit=4096),
+                label="source stage",
+            )
+            reference = transaction.attach(
+                relative,
+                before=SourceImage("file", before, mode=row["mode"]),
+                after=SourceImage("file", after, mode=row["mode"]),
+                staged_relative=stage["staged_relative"], attempted=True,
+            )
+            transaction.rollback(reference)
+        final = self.inspect()
+        recoverable(final)
+        if not final["rollback_requested"] or any(
+            row["source_state"] != "before" for row in final["operations"]
+        ):
+            _fail("changed", "registration source restoration did not reopen exactly")
+        return final
 
     def record_stage(self, ordinal: int, staged_relative: str | None) -> None:
         self._check_roots()

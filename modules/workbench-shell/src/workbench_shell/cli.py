@@ -100,6 +100,7 @@ from .registration_wizard import (
     finalize_active_registration_attempt,
     plan_active_registration,
     registration_capabilities,
+    rollback_active_registration_attempt,
     resume_active_registration_attempt,
 )
 from .stdio_host import main as serve_stdio
@@ -664,6 +665,11 @@ def _parser(*, feature_program: str | None = None) -> argparse.ArgumentParser:
         "--resume-attempt",
         metavar="PLAN_ID",
         help="resume an interrupted partial attempt only if Core proves its source order",
+    )
+    register.add_argument(
+        "--rollback-attempt",
+        metavar="PLAN_ID",
+        help="restore exact source images from a proven partial attempt; retain evidence for review",
     )
     register.add_argument(
         "--yes",
@@ -1774,16 +1780,24 @@ def _run_registration(
     *,
     configuration: WorkbenchConfiguration,
 ) -> tuple[dict[str, Any], bool]:
-    if args.finalize_attempt is not None and args.resume_attempt is not None:
+    selected = [
+        action for action in (
+            args.finalize_attempt, args.resume_attempt, args.rollback_attempt,
+        ) if action is not None
+    ]
+    if len(selected) > 1:
         raise RegistrationWizardError("select one registration recovery action")
-    recovery_id = args.finalize_attempt if args.finalize_attempt is not None else args.resume_attempt
+    recovery_id = selected[0] if selected else None
     if recovery_id is not None:
         if args.list or args.pattern is not None or args.answers is not None or args.apply or args.yes:
             raise RegistrationWizardError(
                 "registration recovery cannot be combined with planning or application options"
             )
-        action = (finalize_active_registration_attempt if args.finalize_attempt is not None
-                  else resume_active_registration_attempt)
+        action = (
+            finalize_active_registration_attempt if args.finalize_attempt is not None else
+            resume_active_registration_attempt if args.resume_attempt is not None else
+            rollback_active_registration_attempt
+        )
         return action(
             suite_root, args.workspace, plan_id=recovery_id,
             state_root=args.state_root, configuration=configuration,
@@ -3486,12 +3500,19 @@ def main(
             elif result["format"] == "workbench-registration-result-v1":
                 print(_human_registration_result(result))
             elif result["format"] == "workbench-registration-recovery-v1":
-                recovered_as = "resumed" if args.resume_attempt is not None else "finalized"
-                print(
-                    f"Registration attempt {recovered_as}: {result['plan_id']}\n"
-                    f"Receipt: {result['receipt_uri']}\n"
-                    "Relaunch the selected instance to check Groovy compilation and registration."
-                )
+                if result["outcome"] == "source-restored":
+                    print(
+                        f"Registration source restored: {result['plan_id']}\n"
+                        f"Retained attempt: {result['attempt_uri']}\n"
+                        "Review the retained attempt and incomplete stages before cleanup."
+                    )
+                else:
+                    recovered_as = "resumed" if args.resume_attempt is not None else "finalized"
+                    print(
+                        f"Registration attempt {recovered_as}: {result['plan_id']}\n"
+                        f"Receipt: {result['receipt_uri']}\n"
+                        "Relaunch the selected instance to check Groovy compilation and registration."
+                    )
             elif not previewed_registration:
                 print(_human_registration_plan(result))
         elif args.command == "blueprint-stage":
