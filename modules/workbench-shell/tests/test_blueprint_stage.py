@@ -29,7 +29,9 @@ for source in (
 
 from workbench_shell.blueprint_stage import (  # noqa: E402
     BlueprintStageError,
+    _load_json,
     _prepare_stage_parent,
+    _write_json,
     plan_material_backed_fluid,
     stage_material_backed_fluid,
     validate_retained_blueprint_stage,
@@ -38,6 +40,7 @@ from workbench_shell.runtime_plan import plan_project_runtime  # noqa: E402
 from workbench_shell.cli import main as shell_main  # noqa: E402
 from workbench_api import ExecutionContext  # noqa: E402
 from workbench_shell import commands  # noqa: E402
+from workbench_core.host_services import install_local_host_services  # noqa: E402
 
 
 PACK_REVISION = "9d3aa7ae0294bf27f0b8acbb893d61da23a06972"
@@ -180,6 +183,25 @@ def _baseline_queries(_workspace, queries, **_kwargs):
 
 
 class BlueprintStageTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        install_local_host_services()
+
+    def test_stage_receipt_uses_core_create_once_with_historical_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipt.json"
+            value = {"format": "example", "name": "é", "state": "staged"}
+            _write_json(path, value)
+            self.assertEqual(
+                (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+                path.read_bytes(),
+            )
+            legacy = Path(directory) / "historical-receipt.json"
+            legacy.write_bytes(path.read_bytes())
+            self.assertEqual(value, _load_json(legacy))
+            with self.assertRaisesRegex(BlueprintStageError, "already exists"):
+                _write_json(path, value)
+
     def test_user_session_root_is_direct_and_passed_through_core_context(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
@@ -409,6 +431,18 @@ class BlueprintStageTest(unittest.TestCase):
                     validate_retained_blueprint_stage(rebound_summary, reviewed)
             finally:
                 receipt_path.write_bytes(original_receipt_bytes)
+            alias = receipt_path.with_name("receipt-hardlink.json")
+            os.link(receipt_path, alias)
+            try:
+                with self.assertRaisesRegex(BlueprintStageError, "receipt is invalid"):
+                    validate_retained_blueprint_stage(summary, reviewed)
+                with self.assertRaisesRegex(BlueprintStageError, "receipt is invalid"):
+                    stage_material_backed_fluid(
+                        SUITE_ROOT, project, name="Pilot Coolant", color="0x425d73",
+                        state_root=state,
+                    )
+            finally:
+                alias.unlink()
             self.assertEqual(
                 receipt["blueprint"]["effective_parameters"]["material_id"],
                 20008,

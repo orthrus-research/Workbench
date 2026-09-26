@@ -5,6 +5,10 @@ from __future__ import annotations
 from urllib.request import url2pathname
 
 from workbench_project_intelligence.working_tree import WorkingTreeError, copy_tracked_workspace
+from workbench_api.host_filesystem import (
+    publish_create_once_bytes,
+    read_bounded_single_link_bytes,
+)
 
 import base64
 import difflib
@@ -40,6 +44,7 @@ ATLAS_AUTHORITIES_PATH = Path(
     "modules/atlas/data/infrastructure-source-authorities-v1.json"
 )
 PACK_PROFILE_ID = "workbench-pack:supersymmetry"
+_MAX_STAGE_RECEIPT_BYTES = 4 * 1024 * 1024
 
 
 class BlueprintStageError(ValueError):
@@ -355,26 +360,16 @@ def _apply_sealed_operations(
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
     try:
-        with path.open("x", encoding="utf-8") as output:
-            json.dump(
-                value,
-                output,
-                ensure_ascii=False,
-                indent=2,
-                sort_keys=True,
-            )
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-    except OSError as exc:
+        raw = (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        publish_create_once_bytes(path, raw, byte_limit=_MAX_STAGE_RECEIPT_BYTES)
+    except (OSError, TypeError, ValueError) as exc:
         _fail(f"cannot retain Blueprint staging receipt: {exc}")
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    if not path.is_file() or path.is_symlink():
-        _fail("existing Blueprint stage lacks a regular receipt")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        raw = read_bounded_single_link_bytes(path, byte_limit=_MAX_STAGE_RECEIPT_BYTES)
+        value = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         _fail(f"existing Blueprint staging receipt is invalid: {exc}")
     if not isinstance(value, dict):
@@ -480,14 +475,14 @@ def validate_retained_blueprint_stage(
     receipt_path = _local_retained_path(
         stage_summary.get("receipt_uri"), "Blueprint stage receipt"
     )
-    if not receipt_path.is_file():
-        _fail("Blueprint stage receipt is not a regular file")
     try:
-        raw = receipt_path.read_bytes()
+        raw = read_bounded_single_link_bytes(
+            receipt_path, byte_limit=_MAX_STAGE_RECEIPT_BYTES,
+        )
         receipt = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         _fail(f"Blueprint stage receipt is invalid: {exc}")
-    if len(raw) > 4 * 1024 * 1024 or not isinstance(receipt, dict):
+    if not isinstance(receipt, dict):
         _fail("Blueprint stage receipt is malformed or exceeds its bound")
 
     source = receipt.get("source")
