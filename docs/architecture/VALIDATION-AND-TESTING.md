@@ -107,16 +107,17 @@ preflight, Python and any requested IDE stages separately, including later
 stages that never ran after a failure. It references the exact Python run ID
 and source fingerprint; a Python-only pass cannot stand in for a full pass.
 
-For the default path, Core registers the invocation namespace and publishes
-each V1 revision at the historical URI. It refuses a reused run ID, an
-interrupted publication stage, or a result changed between revisions. Failed
-and incomplete results remain retained. `--result PATH` continues to use its
-historical fresh-file adapter for an explicitly selected location, including
-locations outside the checkout. Explicit targets inside Core's
-`invocations/` namespace are refused; choose another ignored diagnostic path
-or omit `--result`. The arbitrary-path adapter is not a Core registered record
-store: its parent-path stability and compare-and-swap custody remain an open
-migration gate. Use the default path when Core custody is required.
+Core registers the invocation parent and publishes each V1 revision at the
+historical URI, including a fresh, explicitly named `--result PATH`. It refuses
+a reused path, an interrupted publication stage, or a result or parent changed
+between revisions. Failed and incomplete results remain retained. An explicit
+path inside the checkout must be ignored. Core can create or protect a parent
+under `.workbench/validation/`; any other selected parent must already exist
+with owner-private access. A shared or redirected external parent is refused
+before publication. Explicit targets inside Core's `invocations/`, `runs/`,
+`test-timings/`, or `ci/` namespaces are refused; choose another ignored
+diagnostic path or omit `--result`. Core does not delete or adopt an existing
+explicit result.
 
 Python runs retain their manifest, logs, and version 3 suite reports under
 `.workbench/validation/runs/`. The child collects once and waits for the scheduler

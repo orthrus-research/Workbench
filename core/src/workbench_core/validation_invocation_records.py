@@ -1,4 +1,4 @@
-"""Core custody for default, revisioned validation invocation results.
+"""Core custody for revisioned validation invocation results.
 
 The validator owns the V1 document and phase meaning. Core selects its
 historical directory, creates each run result once, and compares every later
@@ -46,9 +46,9 @@ def _identity(path: Path, *, directory: bool) -> tuple[int, ...]:
 class CoreValidationInvocationRecord:
     """One process's create-once result and its guarded in-process revisions."""
 
-    def __init__(self, store: RecordStoreReference, run_id: str):
+    def __init__(self, store: RecordStoreReference, run_id: str, *, target: Path | None = None):
         if (
-            store.family != "validation-invocations-v1"
+            store.family not in {"validation-invocations-v1", "validation-invocation-explicit-v1"}
             or store.owner_id != "validation"
             or not store.root.is_absolute()
             or type(run_id) is not str
@@ -58,7 +58,18 @@ class CoreValidationInvocationRecord:
             raise DurableRecordError("policy", "validation invocation requires a selected Core store and run ID")
         self.store = store
         self.run_id = run_id
-        self.path = store.root / f"{run_id}.json"
+        if store.family == "validation-invocations-v1":
+            if target is not None:
+                raise DurableRecordError("policy", "default invocation target is selected by Core")
+            self.path = store.root / f"{run_id}.json"
+        else:
+            if (
+                not isinstance(target, Path) or not target.is_absolute()
+                or target.parent != store.root or target.name in {"", ".", ".."}
+                or ".." in target.parts
+            ):
+                raise DurableRecordError("policy", "explicit invocation target must be one exact store child")
+            self.path = target
         self._store_identity = _identity(store.root, directory=True)
         self._last_bytes: bytes | None = None
         self._file_identity: tuple[int, ...] | None = None

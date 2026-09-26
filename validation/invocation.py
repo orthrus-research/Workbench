@@ -10,7 +10,6 @@ import time
 
 from core_run_custody import open_validation_invocation
 from orchestration import new_run_id
-from suite_execution import _atomic_write_json
 
 
 def now():
@@ -41,10 +40,7 @@ class Invocation:
                 ignored = subprocess.run(["git", "check-ignore", "--quiet", "--", str(relative)], cwd=root, check=False)
                 if ignored.returncode != 0:
                     raise OSError("result inside the checkout must use ignored diagnostic storage, such as .workbench/validation/")
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            # An explicit result path is a fresh invocation output, never a cache.
-            with self.path.open("x", encoding="utf-8"):
-                pass
+            self._core_record = open_validation_invocation(root, self.run_id, result=selected)
         self.document = {
             "format": "workbench-validation-invocation-v1", "run_id": self.run_id,
             "state": "running", "started_at": now(), "source_fingerprint": None,
@@ -56,12 +52,9 @@ class Invocation:
         self.write()
 
     def write(self):
-        if self._core_record is None:
-            _atomic_write_json(self.path, self.document)
-        else:
-            self._core_record.write(
-                (json.dumps(self.document, indent=2, sort_keys=True) + "\n").encode("utf-8")
-            )
+        self._core_record.write(
+            (json.dumps(self.document, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        )
 
     def __enter__(self):
         return self

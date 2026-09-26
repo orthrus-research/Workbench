@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -171,10 +172,107 @@ class InvocationCustodyTests(unittest.TestCase):
                     raise RuntimeError("intentional failure")
         retained = explicit.read_bytes()
         self.assertEqual("failed", json.loads(retained)["state"])
-        with self.assertRaises(FileExistsError):
+        with self.assertRaises(DurableRecordError) as refusal:
             self._new(result=explicit)
+        self.assertEqual("collision", refusal.exception.code)
         self.assertEqual(retained, explicit.read_bytes())
+        rows = ResourceCatalog(self.config).inventory(workspace=self.suite)["record_stores"]
+        self.assertEqual(
+            [("validation-invocation-explicit-v1", str(self.home))],
+            [(row["family"], row["path"]) for row in rows],
+        )
+
+    def test_explicit_ignored_checkout_result_keeps_ci_uri_and_v1_bytes(self) -> None:
+        subprocess.run(["git", "init", "-q", str(self.suite)], check=True)
+        (self.suite / ".gitignore").write_text(".workbench/\n", encoding="utf-8")
+        explicit = self.suite / ".workbench/validation/source-ci-result.json"
+        result = self._new(result=explicit)
+        self.assertEqual(explicit, result.path)
+        self.assertEqual(
+            (json.dumps(result.document, indent=2, sort_keys=True) + "\n").encode(),
+            explicit.read_bytes(),
+        )
+        self.assertEqual("running", json.loads(explicit.read_bytes())["state"])
+        self.assertEqual(0o700, explicit.parent.stat().st_mode & 0o777)
+        rows = ResourceCatalog(self.config).inventory(workspace=self.suite)["record_stores"]
+        self.assertEqual(
+            [("validation-invocation-explicit-v1", str(explicit.parent))],
+            [(row["family"], row["path"]) for row in rows],
+        )
+
+    def test_explicit_other_ignored_private_parent_keeps_selected_uri(self) -> None:
+        subprocess.run(["git", "init", "-q", str(self.suite)], check=True)
+        (self.suite / ".gitignore").write_text("local-results/\n", encoding="utf-8")
+        parent = self.suite / "local-results"
+        parent.mkdir(mode=0o700)
+        explicit = parent / "developer-result.json"
+        result = self._new(result=explicit)
+        self.assertEqual(explicit, result.path)
+        self.assertEqual("running", json.loads(explicit.read_bytes())["state"])
+        self.assertEqual(0o700, parent.stat().st_mode & 0o777)
+
+    def test_explicit_shared_or_redirected_parent_refuses_before_result(self) -> None:
+        shared = self.home / "shared"
+        shared.mkdir(mode=0o755)
+        redirected = self.home / "redirected"
+        redirected.symlink_to(shared, target_is_directory=True)
+        for target in (shared / "result.json", redirected / "result.json"):
+            with self.subTest(target=target):
+                with self.assertRaisesRegex(OSError, "Core invocation store is unavailable"):
+                    self._new(result=target)
+                self.assertFalse(target.exists())
+        self.assertEqual(0o755, shared.stat().st_mode & 0o777)
         self.assertFalse(self.config.exists())
+
+    def test_explicit_changed_result_and_parent_refuse_later_revision(self) -> None:
+        for changed_parent in (False, True):
+            with self.subTest(changed_parent=changed_parent):
+                parent = self.home / ("parent" if changed_parent else "bytes")
+                parent.mkdir(mode=0o700)
+                explicit = parent / "result.json"
+                result = self._new(result=explicit)
+                if changed_parent:
+                    moved = parent.with_name("moved")
+                    parent.rename(moved)
+                    parent.mkdir(mode=0o700)
+                    explicit.write_bytes(b"external\n")
+                    explicit.chmod(0o600)
+                else:
+                    explicit.write_bytes(b"external\n")
+                before = explicit.read_bytes()
+                with self.assertRaises(DurableRecordError) as refusal:
+                    result.write()
+                self.assertEqual("changed", refusal.exception.code)
+                self.assertEqual(before, explicit.read_bytes())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
+    def test_explicit_hard_exit_before_first_link_retains_stage(self) -> None:
+        explicit = self.home / "crashed.json"
+        writer = open_validation_invocation(
+            self.suite, RUN_ID, result=explicit, configuration_home=self.config,
+        )
+        original_link = durable_records.os.link
+
+        def exit_before_link(source: Path, destination: Path, *args: object, **kwargs: object):
+            if destination == explicit:
+                os._exit(71)
+            return original_link(source, destination, *args, **kwargs)
+
+        child = os.fork()
+        if child == 0:
+            with patch.object(durable_records.os, "link", side_effect=exit_before_link):
+                writer.write(b"{\"state\":\"running\"}\n")
+            os._exit(72)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(71, os.waitstatus_to_exitcode(status))
+        self.assertFalse(explicit.exists())
+        stages = list(self.home.glob(".crashed.json.*"))
+        self.assertEqual(1, len(stages))
+        before = stages[0].read_bytes()
+        with self.assertRaises(DurableRecordError) as refusal:
+            writer.write(b"{\"state\":\"running\"}\n")
+        self.assertEqual("incomplete", refusal.exception.code)
+        self.assertEqual(before, stages[0].read_bytes())
 
     def test_explicit_result_cannot_bypass_core_inside_invocation_store(self) -> None:
         for target in (
@@ -186,6 +284,17 @@ class InvocationCustodyTests(unittest.TestCase):
                     self._new(result=target)
                 self.assertFalse(target.exists())
         self.assertFalse(self._default_path.parent.exists())
+        self.assertFalse(self.config.exists())
+
+    def test_explicit_result_cannot_enter_other_validation_stores(self) -> None:
+        for namespace in ("runs", "test-timings", "ci"):
+            target = self.suite / ".workbench/validation" / namespace / "result.json"
+            with self.subTest(namespace=namespace):
+                with self.assertRaisesRegex(OSError, "overlaps Core validation storage"):
+                    open_validation_invocation(
+                        self.suite, RUN_ID, result=target, configuration_home=self.config,
+                    )
+                self.assertFalse(target.exists())
         self.assertFalse(self.config.exists())
 
 

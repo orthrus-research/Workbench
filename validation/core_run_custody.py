@@ -125,9 +125,10 @@ def publish_validation_timing(root: Path, suite_name: str, payload: bytes) -> Pa
 
 
 def open_validation_invocation(
-    root: Path, run_id: str, *, configuration_home: Path | None = None,
+    root: Path, run_id: str, *, result: Path | None = None,
+    configuration_home: Path | None = None,
 ) -> ValidationInvocationRecord:
-    """Compose Core's revisioned writer for the default V1 invocation URI."""
+    """Compose Core's revisioned writer for a default or exact explicit URI."""
 
     _source_core()
     from workbench_api import ModuleError
@@ -139,14 +140,19 @@ def open_validation_invocation(
     selected_root = Path(root).resolve(strict=True)
     selected_home = Path(configuration_home or default_user_config_home()).absolute()
     try:
-        store = CoreRecordStores(
+        provider = CoreRecordStores(
             workspace=selected_root,
             configuration_home=selected_home,
             owner_id="validation",
-        ).open("validation-invocations-v1", selected_root)
+        )
+        if result is None:
+            store = provider.open("validation-invocations-v1", selected_root)
+            return CoreValidationInvocationRecord(store, run_id)
+        selected_result = Path(os.path.abspath(Path(result).expanduser()))
+        store = provider.open_validation_invocation_target(selected_result)
+        return CoreValidationInvocationRecord(store, run_id, target=selected_result)
     except (DurableResourceError, ModuleError) as exc:
         raise OSError(f"Core invocation store is unavailable: {exc}") from exc
-    return CoreValidationInvocationRecord(store, run_id)
 
 
 def publish_ci_plan(
