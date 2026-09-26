@@ -73,6 +73,9 @@ class CoreRecordStores:
         elif self.owner_id == "validation" and family == "validation-ci-plan-v1" and selected == self.workspace:
             # The workflow uploads this exact historical plan directory.
             root = selected / ".workbench/validation/ci"
+        elif self.owner_id == "validation" and family == "validation-invocations-v1" and selected == self.workspace:
+            # Keep validation's per-invocation V1 result URI inside the checkout.
+            root = selected / ".workbench/validation/invocations"
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

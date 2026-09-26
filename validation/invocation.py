@@ -2,10 +2,13 @@
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import json
+import os
 from pathlib import Path
 import subprocess
 import time
 
+from core_run_custody import open_validation_invocation
 from orchestration import new_run_id
 from suite_execution import _atomic_write_json
 
@@ -17,16 +20,31 @@ def now():
 class Invocation:
     def __init__(self, root: Path, result: Path | None, phases: tuple[str, ...], selection=None):
         self.run_id = new_run_id()
-        self.path = result or root / ".workbench/validation/invocations" / f"{self.run_id}.json"
-        if result is not None and self.path.resolve().is_relative_to(root.resolve()):
-            relative = self.path.resolve().relative_to(root.resolve())
-            ignored = subprocess.run(["git", "check-ignore", "--quiet", "--", str(relative)], cwd=root, check=False)
-            if ignored.returncode != 0:
-                raise OSError("result inside the checkout must use ignored diagnostic storage, such as .workbench/validation/")
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        # An explicit result path is a fresh invocation output, never a cache.
-        with self.path.open("x", encoding="utf-8"):
-            pass
+        self._core_record = None
+        if result is None:
+            self._core_record = open_validation_invocation(root, self.run_id)
+            self.path = self._core_record.path
+        else:
+            self.path = result
+            managed = root.resolve(strict=True) / ".workbench/validation/invocations"
+            selected = Path(os.path.abspath(self.path.expanduser()))
+            if (
+                selected == managed or selected.is_relative_to(managed)
+                or self.path.resolve().is_relative_to(managed.resolve())
+            ):
+                raise OSError(
+                    "explicit --result cannot target Core-owned invocations; "
+                    "omit --result or choose another ignored diagnostic path"
+                )
+            if self.path.resolve().is_relative_to(root.resolve()):
+                relative = self.path.resolve().relative_to(root.resolve())
+                ignored = subprocess.run(["git", "check-ignore", "--quiet", "--", str(relative)], cwd=root, check=False)
+                if ignored.returncode != 0:
+                    raise OSError("result inside the checkout must use ignored diagnostic storage, such as .workbench/validation/")
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            # An explicit result path is a fresh invocation output, never a cache.
+            with self.path.open("x", encoding="utf-8"):
+                pass
         self.document = {
             "format": "workbench-validation-invocation-v1", "run_id": self.run_id,
             "state": "running", "started_at": now(), "source_fingerprint": None,
@@ -38,7 +56,12 @@ class Invocation:
         self.write()
 
     def write(self):
-        _atomic_write_json(self.path, self.document)
+        if self._core_record is None:
+            _atomic_write_json(self.path, self.document)
+        else:
+            self._core_record.write(
+                (json.dumps(self.document, indent=2, sort_keys=True) + "\n").encode("utf-8")
+            )
 
     def __enter__(self):
         return self

@@ -12,6 +12,10 @@ import os
 import re
 import stat
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from workbench_api.validation_invocations import ValidationInvocationRecord
 
 
 _SUITE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
@@ -120,6 +124,31 @@ def publish_validation_timing(root: Path, suite_name: str, payload: bytes) -> Pa
     return target
 
 
+def open_validation_invocation(
+    root: Path, run_id: str, *, configuration_home: Path | None = None,
+) -> ValidationInvocationRecord:
+    """Compose Core's revisioned writer for the default V1 invocation URI."""
+
+    _source_core()
+    from workbench_api import ModuleError
+    from workbench_api.durable_resources import DurableResourceError
+    from workbench_core.storage.record_stores import CoreRecordStores
+    from workbench_core.user_config_home import default_user_config_home
+    from workbench_core.validation_invocation_records import CoreValidationInvocationRecord
+
+    selected_root = Path(root).resolve(strict=True)
+    selected_home = Path(configuration_home or default_user_config_home()).absolute()
+    try:
+        store = CoreRecordStores(
+            workspace=selected_root,
+            configuration_home=selected_home,
+            owner_id="validation",
+        ).open("validation-invocations-v1", selected_root)
+    except (DurableResourceError, ModuleError) as exc:
+        raise OSError(f"Core invocation store is unavailable: {exc}") from exc
+    return CoreValidationInvocationRecord(store, run_id)
+
+
 def publish_ci_plan(
     root: Path, output: Path, payload: bytes, *,
     configuration_home: Path | None = None,
@@ -177,5 +206,5 @@ def publish_ci_plan(
 
 __all__ = [
     "allocate_validation_run", "allocate_validation_scratch", "publish_ci_plan",
-    "publish_validation_timing",
+    "publish_validation_timing", "open_validation_invocation",
 ]
