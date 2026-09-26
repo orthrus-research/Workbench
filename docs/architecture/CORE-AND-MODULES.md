@@ -48,6 +48,14 @@ Generic acquisition belongs in Core. Cleanroom or pack-specific selection and
 materialization policy belongs in the selected profile adapter. Core must not
 silently choose Supersymmetry when no profile is selected.
 
+Packwiz V2 materialization supplies the exact Packwiz and Installer commands,
+timeouts and historical log paths through the Core process API. Core supervises
+each child, bounds and publishes its merged log in private storage, preserves a
+previous log under its historical history name, and refuses an unpublished
+pending log. The module validates the refreshed pack, payload and V2 receipt;
+Core performs the Linux no-replace move of its prepared result directory.
+Packwiz source scratch and its disposal remain a separate migration boundary.
+
 Recipe capture reads and registers per-user runtime/JDK locations through the
 Core-bound fixture-selection API. The selected profile still validates their
 bytes before planning. An exact command override applies to that operation
