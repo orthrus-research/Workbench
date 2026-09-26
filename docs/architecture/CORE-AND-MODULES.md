@@ -88,6 +88,13 @@ check, no-clobber publication, compare-and-swap and directory flush. Generic
 bounded reads remain available for user-supplied inputs that are not
 Core-owned private records.
 
+Active-instance selections use the same Core filesystem port for bounded reads
+and locked preference updates. Core registers the selected namespace during
+module dispatch while Shell still validates the pack/runtime identity and
+retains the existing per-workspace selection URI. A prior ordinary-mode
+selection is upgraded to owner-private custody on its next successful update;
+hardlinked legacy files are refused.
+
 `workbench settings workspace list --json` reads the named workspace registry.
 `workbench settings workspace select NAME --profile-config PATH --java-home PATH`
 saves local profile and Java candidates for that workspace; `--clear-profile`

@@ -30,6 +30,10 @@ class CoreRecordStores:
             root = selected / ".workbench/sessions/work-session-v2"
         elif self.owner_id == "workbench-shell" and family == "feature-change-session-context-v1":
             root = default_product_spine_state_root(selected) / family
+        elif self.owner_id == "workbench-shell" and family == "active-instance-v1":
+            # Retain the per-workspace selector's existing file URIs while
+            # protecting its parent as a mutable Core record namespace.
+            root = selected / "active-instances"
         elif self.owner_id == "blueprints" and family == "blueprints-sealed-v1" and selected.name == "sealed":
             # Blueprints admits the target and protected session before it
             # requests this historical CAS namespace. Keep its V1 locators.

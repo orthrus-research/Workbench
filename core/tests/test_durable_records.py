@@ -17,6 +17,7 @@ from workbench_api.host_filesystem import (
     DurableRecordError, append_private_line, inspect_private_journal,
     private_record_lock, publish_immutable_bytes, read_bounded_bytes,
     read_private_bytes, remove_private_bytes, replace_private_bytes,
+    update_preference_bytes,
 )
 from workbench_core.host_services import install_local_host_services
 from workbench_core import durable_records
@@ -77,6 +78,30 @@ class DurableRecordTests(unittest.TestCase):
         with self.assertRaises(DurableRecordError) as redirected:
             read_bounded_bytes(link, byte_limit=1024)
         self.assertEqual("unsafe", redirected.exception.code)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX historical mode fixture")
+    def test_preference_update_privately_upgrades_ordinary_legacy_file(self) -> None:
+        self.path.write_bytes(b"legacy\n")
+        self.path.chmod(0o644)
+        observed = []
+        update_preference_bytes(
+            self.path, lambda previous: observed.append(previous) or b"current\n",
+            byte_limit=1024,
+        )
+        self.assertEqual([b"legacy\n"], observed)
+        self.assertEqual(b"current\n", read_private_bytes(self.path, byte_limit=1024))
+        self.assertEqual(0o600, self.path.stat().st_mode & 0o777)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX historical link fixture")
+    def test_preference_update_refuses_legacy_hardlink(self) -> None:
+        self.path.write_bytes(b"legacy\n")
+        self.path.chmod(0o644)
+        outside = self.root / "outside.json"
+        os.link(self.path, outside)
+        with self.assertRaisesRegex(ValueError, "single regular file"):
+            update_preference_bytes(self.path, lambda _previous: b"current\n", byte_limit=1024)
+        self.assertEqual(b"legacy\n", outside.read_bytes())
+        self.assertEqual(0o644, outside.stat().st_mode & 0o777)
 
     def test_private_removal_requires_exact_reviewed_bytes(self) -> None:
         content = b'{"active":true}\n'

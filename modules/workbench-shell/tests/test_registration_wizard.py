@@ -7,6 +7,7 @@ from __future__ import annotations
 from contextlib import redirect_stdout
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -31,6 +32,10 @@ from workbench_shell.active_instance import (  # noqa: E402
 )
 from workbench_shell.cli import main as cli_main  # noqa: E402
 from workbench_core.configuration import load_workbench_configuration  # noqa: E402
+from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
+from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
+from workbench_api.record_stores import record_store_scope  # noqa: E402
 from workbench_shell.registration_wizard import (  # noqa: E402
     RegistrationWizardError,
     apply_active_registration,
@@ -186,6 +191,87 @@ def _uri_path(value: str) -> Path:
 
 
 class RegistrationWizardTest(unittest.TestCase):
+    def setUp(self) -> None:
+        install_local_host_services()
+
+    def test_active_instance_core_store_keeps_historical_locator(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, _payload = _instance(root)
+            state = root / "state"
+            catalog_home = root / "catalog"
+            with record_store_scope(CoreRecordStores(
+                workspace=project, configuration_home=catalog_home,
+                owner_id="workbench-shell",
+            )):
+                result = initialize_active_instance(
+                    SUITE_ROOT, project, instance, state_root=state,
+                )
+            selection = _uri_path(result["selection_uri"])
+            self.assertEqual(state / "active-instances", selection.parent)
+            self.assertEqual(
+                result["selection"], json.loads(selection.read_text("utf-8"))
+            )
+            self.assertEqual(
+                result["selection"]["selection_id"],
+                load_active_instance(
+                    SUITE_ROOT, project, state_root=state,
+                )["selection_id"],
+            )
+            rows = ResourceCatalog(catalog_home).inventory(workspace=project)["record_stores"]
+            self.assertEqual([str(selection.parent)], [row["path"] for row in rows])
+            self.assertEqual("available", rows[0]["status"])
+            if os.name == "posix":
+                self.assertEqual(0o700, selection.parent.stat().st_mode & 0o777)
+                self.assertEqual(0o600, selection.stat().st_mode & 0o777)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX symlink fixture")
+    def test_active_instance_rejects_linked_selection_without_replacing_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, _payload = _instance(root)
+            state = root / "state"
+            selected = initialize_active_instance(
+                SUITE_ROOT, project, instance, state_root=state,
+            )
+            selection = _uri_path(selected["selection_uri"])
+            outside = root / "outside.json"
+            before = selection.read_bytes()
+            outside.write_bytes(before)
+            selection.unlink()
+            selection.symlink_to(outside)
+            with self.assertRaisesRegex(ActiveInstanceError, "cannot persist"):
+                initialize_active_instance(
+                    SUITE_ROOT, project, instance, state_root=state,
+                )
+            self.assertEqual(before, outside.read_bytes())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX historical mode fixture")
+    def test_active_instance_reselection_upgrades_ordinary_legacy_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, _payload = _instance(root)
+            state = root / "state"
+            first = initialize_active_instance(
+                SUITE_ROOT, project, instance, state_root=state,
+            )
+            selection = _uri_path(first["selection_uri"])
+            selection.chmod(0o644)
+            self.assertEqual(
+                first["selection"]["selection_id"],
+                load_active_instance(
+                    SUITE_ROOT, project, state_root=state,
+                )["selection_id"],
+            )
+            second = initialize_active_instance(
+                SUITE_ROOT, project, instance, state_root=state,
+            )
+            self.assertEqual(first["selection_uri"], second["selection_uri"])
+            self.assertEqual(first["selection"], second["selection"])
+            self.assertEqual(0o600, selection.stat().st_mode & 0o777)
 
     def test_all_ready_patterns_apply_directly_and_retain_backups(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

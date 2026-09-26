@@ -7,12 +7,17 @@ from urllib.request import url2pathname
 import configparser
 from hashlib import sha256
 import json
-import os
 from pathlib import Path
 import re
-import tempfile
 from typing import Any, NoReturn
 
+from workbench_api.host_filesystem import (
+    DurableRecordError,
+    HostFilesystemError,
+    read_bounded_bytes,
+    update_preference_bytes,
+)
+from workbench_api.record_stores import open_record_store
 from workbench_core.artifact_store import sha256_file
 from .bootstrap import inspect_project
 from workbench_core.configuration import (
@@ -57,9 +62,17 @@ def _read_regular(path: Path, label: str, limit: int = MAX_IDENTITY_BYTES) -> by
         _fail(f"cannot read {label}: {exc}")
 
 
-def _load_json(path: Path, label: str) -> dict[str, Any]:
+def _load_json(
+    path: Path, label: str, *, retained_selection: bool = False
+) -> dict[str, Any]:
     try:
-        value = json.loads(_read_regular(path, label).decode("utf-8"))
+        raw = (
+            read_bounded_bytes(path, byte_limit=MAX_IDENTITY_BYTES)
+            if retained_selection else _read_regular(path, label)
+        )
+        value = json.loads(raw.decode("utf-8"))
+    except (DurableRecordError, HostFilesystemError) as exc:
+        _fail(f"cannot read {label}: {exc}")
     except (UnicodeError, json.JSONDecodeError) as exc:
         _fail(f"{label} is not valid UTF-8 JSON: {exc}")
     if not isinstance(value, dict):
@@ -277,9 +290,14 @@ def _selection_id(
     })).hexdigest()
 
 
-def _selection_path(state: Path, workspace: Path) -> Path:
+def _selection_path(state: Path, workspace: Path, *, create: bool = False) -> Path:
     key = sha256(workspace.as_uri().encode("utf-8")).hexdigest()
-    return state / "active-instances" / f"{key}.json"
+    try:
+        managed = open_record_store("active-instance-v1", state) if create else None
+    except (OSError, ValueError) as exc:
+        _fail(f"cannot open active-instance state: {exc}")
+    directory = managed.root if managed is not None else state / "active-instances"
+    return directory / f"{key}.json"
 
 
 def _state_root(suite: Path, state_root: Path | str | None) -> Path:
@@ -288,37 +306,17 @@ def _state_root(suite: Path, state_root: Path | str | None) -> Path:
         if state_root is None
         else Path(state_root).expanduser().resolve()
     )
-    state.mkdir(parents=True, exist_ok=True)
-    if state.is_symlink() or not state.is_dir():
+    if state.is_symlink() or (state.exists() and not state.is_dir()):
         _fail("Workbench state root must be a regular directory")
     return state
 
 
 def _write_atomic_json(path: Path, value: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.parent.is_symlink():
-        _fail("active-instance state directory cannot be a symbolic link")
-    temporary_name: str | None = None
+    raw = (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            delete=False,
-        ) as output:
-            temporary_name = output.name
-            json.dump(value, output, ensure_ascii=False, indent=2, sort_keys=True)
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary_name, path)
-        temporary_name = None
-    except OSError as exc:
+        update_preference_bytes(path, lambda _previous: raw, byte_limit=MAX_IDENTITY_BYTES)
+    except (HostFilesystemError, ValueError) as exc:
         _fail(f"cannot persist active-instance selection: {exc}")
-    finally:
-        if temporary_name is not None:
-            Path(temporary_name).unlink(missing_ok=True)
 
 
 def initialize_active_instance(
@@ -373,7 +371,7 @@ def initialize_active_instance(
         },
     }
     state = _state_root(suite, state_root)
-    path = _selection_path(state, workspace)
+    path = _selection_path(state, workspace, create=True)
     _write_atomic_json(path, record)
     return {
         "format": "workbench-active-instance-result-v1",
@@ -410,7 +408,7 @@ def load_active_instance(
     path = _selection_path(state, workspace)
     if not path.exists():
         _fail("no active instance is selected; run workbench initialize first")
-    record = _load_json(path, "active-instance selection")
+    record = _load_json(path, "active-instance selection", retained_selection=True)
     if (
         record.get("format") != "workbench-active-instance-v1"
         or record.get("schema_version") != 1
