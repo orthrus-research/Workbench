@@ -36,6 +36,16 @@ class ManagedTreeReference:
     domain_id: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class ManagedTreeTarget:
+    """One exact cataloged target, including an incomplete publication."""
+
+    tree_id: str
+    status: str
+    path: Path
+    domain_id: str | None
+
+
 class ManagedTreeStage(Protocol):
     tree_id: str
     path: Path  # Absent until the owner creates the payload.
@@ -56,6 +66,10 @@ class ManagedTrees(Protocol):
     ) -> ContextManager[ManagedTreeStage]: ...
 
     def describe(self, tree_id: str) -> ManagedTreeReference: ...
+
+    def lookup_target(
+        self, role: str, path: Path, *, domain_id: str | None = None,
+    ) -> ManagedTreeTarget: ...
 
     def reconcile(self, tree_id: str) -> ManagedTreeReference: ...
 
@@ -80,6 +94,6 @@ def managed_trees() -> ManagedTrees:
 
 
 __all__ = [
-    "ManagedTreeError", "ManagedTreeReference", "ManagedTreeStage", "ManagedTrees",
+    "ManagedTreeError", "ManagedTreeReference", "ManagedTreeStage", "ManagedTreeTarget", "ManagedTrees",
     "managed_trees", "managed_trees_scope",
 ]

@@ -82,6 +82,14 @@ configuration home or registered output was never lost. Workspace cleanup
 therefore remains protected while historical catalog coverage is unproven;
 reconciling an interrupted root publication does not establish that coverage.
 
+Core's managed-tree API can locate one retained tree by its exact target path,
+workspace, owner and role, returning the catalog tree ID and publication state.
+An optional domain identity must match a prepared intent. Missing, duplicate,
+foreign or changed records fail closed; the path is a lookup key, not authority
+to adopt an uncataloged tree. Recovery still uses Core's ID-based reconcile.
+Direct Shell entry binding and the Feature Change V1 context writer are not yet
+ported to this lookup.
+
 ## Private records and workspace choices
 
 Core's filesystem host also exposes bounded reads, immutable publication,

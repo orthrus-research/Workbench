@@ -14,7 +14,9 @@ import sys
 from typing import Callable, Iterator, Mapping
 from uuid import uuid4
 
-from workbench_api.managed_trees import ManagedTreeError, ManagedTreeReference
+from workbench_api.managed_trees import (
+    ManagedTreeError, ManagedTreeReference, ManagedTreeTarget,
+)
 
 from . import check_lifecycle, check_storage
 from .durable_files import _directory as pinned_directory, read_verified
@@ -373,6 +375,58 @@ class CoreManagedTrees:
 
     def describe(self, tree_id: str) -> ManagedTreeReference:
         return self.catalog.trees.describe(tree_id, workspace=self.workspace)
+
+    def lookup_target(
+        self, role: str, path: Path, *, domain_id: str | None = None,
+    ) -> ManagedTreeTarget:
+        """Find one exact owned target, including an interrupted reservation.
+
+        A path is only a lookup key here. The returned tree ID is still subject
+        to the catalog's exact intent/commit checks during reconciliation.
+        """
+
+        if (type(role) is not str or role not in {"evidence", "artifacts"}
+                or role not in self.locations
+                or not isinstance(path, Path) or not path.is_absolute()
+                or any(part in {".", ".."} for part in path.parts)
+                or _NAME.fullmatch(path.name) is None
+                or path.name.split(".", 1)[0].upper() in _WINDOWS_RESERVED):
+            raise ManagedTreeError("tree.path", "managed tree target lookup requires one exact absolute path")
+        if domain_id is not None and (type(domain_id) is not str or not 0 < len(domain_id) <= 512):
+            raise ManagedTreeError("tree.domain", "managed tree target domain identity is invalid")
+        for component in (path, *path.parents):
+            if component.is_symlink() or getattr(component, "is_junction", lambda: False)():
+                raise ManagedTreeError("tree.path", "managed tree target traverses a redirect")
+        rows = [row for row in self.catalog.trees.inventory() if row["path"] == str(path)]
+        if not rows:
+            raise ManagedTreeError("tree.unavailable", "managed tree target has no catalog record")
+        if len(rows) != 1:
+            raise ManagedTreeError("tree.ambiguous", "managed tree target has multiple catalog records")
+        row = rows[0]
+        if (row["workspace"] != str(self.workspace) or row["owner_id"] != self.owner_id
+                or row["role"] != role):
+            raise ManagedTreeError("tree.foreign", "managed tree target belongs to another binding")
+        if row["status"] in {"conflict", "unavailable", "changed"}:
+            raise ManagedTreeError("tree.changed", "managed tree target cannot be reopened exactly")
+        tree_id = str(row["tree_id"])
+        try:
+            intent = self.catalog.trees.intent(tree_id)
+        except ManagedTreeError as exc:
+            if exc.code != "tree.unavailable":
+                raise
+            if domain_id is not None:
+                raise ManagedTreeError(
+                    "tree.unavailable", "managed tree target has no bound domain identity",
+                ) from exc
+            selected_domain = None
+        else:
+            selected_domain = intent["domain_id"]
+            if domain_id is not None and selected_domain != domain_id:
+                raise ManagedTreeError("tree.domain", "managed tree target has another domain identity")
+        return ManagedTreeTarget(
+            tree_id=tree_id, status=str(row["status"]), path=path,
+            domain_id=selected_domain,
+        )
 
     def reconcile(self, tree_id: str) -> ManagedTreeReference:
         def publish(staged: Path, target: Path, intent: Mapping[str, object]) -> None:

@@ -135,6 +135,62 @@ class ManagedTreeTests(unittest.TestCase):
         self.assertEqual("committed", inventory[0]["status"])
         self.assertEqual("graph-set:one", reference.domain_id)
 
+    def test_exact_target_lookup_scopes_committed_and_allocated_trees(self) -> None:
+        output = self.workspace / "graphs" / "selected"
+        reference = self._publish(output=output)
+        selected = self.host.lookup_target(
+            "evidence", output, domain_id="graph-set:one",
+        )
+        self.assertEqual((reference.tree_id, "committed", output, "graph-set:one"),
+                         (selected.tree_id, selected.status, selected.path, selected.domain_id))
+        with self.assertRaisesRegex(ManagedTreeError, "another domain identity"):
+            self.host.lookup_target("evidence", output, domain_id="other")
+        with self.assertRaisesRegex(ManagedTreeError, "no catalog record"):
+            self.host.lookup_target("evidence", self.workspace / "graphs" / "missing")
+
+        pending = self.workspace / "graphs" / "pending"
+        with self.host.stage("evidence", pending.name, requested_path=pending) as stage:
+            stage.path.mkdir()
+            row = self.host.lookup_target("evidence", pending)
+            self.assertEqual((stage.tree_id, "incomplete", None),
+                             (row.tree_id, row.status, row.domain_id))
+            with self.assertRaisesRegex(ManagedTreeError, "no bound domain identity"):
+                self.host.lookup_target("evidence", pending, domain_id="graph-set:pending")
+
+    def test_exact_target_lookup_refuses_foreign_duplicate_and_redirected_records(self) -> None:
+        output = self.workspace / "graphs" / "selected"
+        self._publish(output=output)
+        other_owner = CoreManagedTrees(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="another-owner",
+        )
+        with self.assertRaisesRegex(ManagedTreeError, "another binding"):
+            other_owner.lookup_target("evidence", output)
+        other_workspace = self.home / "other-workspace"
+        other_workspace.mkdir()
+        foreign = CoreManagedTrees(
+            workspace=other_workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="atlas",
+        )
+        with self.assertRaisesRegex(ManagedTreeError, "another binding"):
+            foreign.lookup_target("evidence", output)
+        with self.assertRaisesRegex(ManagedTreeError, "exact absolute path"):
+            self.host.lookup_target("evidence", Path("relative"))
+
+        alias = self.workspace / "redirect"
+        alias.symlink_to(output.parent, target_is_directory=True)
+        with self.assertRaisesRegex(ManagedTreeError, "redirect"):
+            self.host.lookup_target("evidence", alias / output.name)
+
+        abandoned = self.workspace / "graphs" / "reused"
+        with self.assertRaisesRegex(ValueError, "owner refused"):
+            with self.host.stage("evidence", abandoned.name, requested_path=abandoned) as stage:
+                stage.path.mkdir()
+                stage.publish(validate=lambda _: (_ for _ in ()).throw(ValueError("owner refused")))
+        self._publish(output=abandoned)
+        with self.assertRaisesRegex(ManagedTreeError, "multiple catalog records"):
+            self.host.lookup_target("evidence", abandoned)
+
     def test_owner_failure_retains_partial_stage_and_does_not_publish(self) -> None:
         output = self.workspace / "graphs" / "failed"
         with self.assertRaisesRegex(ValueError, "owner refused"):
@@ -233,6 +289,9 @@ class ManagedTreeTests(unittest.TestCase):
         catalog = ResourceCatalog(self.config)
         row = catalog.inventory()["trees"][0]
         self.assertEqual("published-uncommitted", row["status"])
+        selected = self.host.lookup_target("evidence", Path(row["path"]), domain_id="graph-set:one")
+        self.assertEqual((row["tree_id"], "published-uncommitted"),
+                         (selected.tree_id, selected.status))
         reference = catalog.trees.reconcile(row["tree_id"], workspace=self.workspace)
         self.assertEqual("committed", catalog.inventory()["trees"][0]["status"])
         self.assertEqual(reference, self.host.describe(reference.tree_id))
@@ -269,6 +328,9 @@ with host.stage("evidence", "recovered", requested_path=Path(os.environ["W3_OUTP
         self.assertEqual(73, result.returncode, result.stderr)
         row = ResourceCatalog(self.config).inventory()["trees"][0]
         self.assertEqual("incomplete", row["status"])
+        selected = self.host.lookup_target("evidence", output)
+        self.assertEqual((row["tree_id"], "incomplete"), (selected.tree_id, selected.status))
+        self.assertIsNone(selected.domain_id)
         self.assertFalse(output.exists())
         self.assertEqual(b"source\n", (Path(row["staging"]) / "source.jsonl").read_bytes())
         reference = self.host.reconcile(row["tree_id"])
