@@ -17,6 +17,12 @@ import sys
 from typing import Any, TextIO
 
 from .runtime_launch import RuntimeLaunchError, _probe_launcher
+from workbench_api.host_filesystem import (
+    DurableRecordError,
+    HostFilesystemError,
+    read_bounded_bytes,
+    update_preference_bytes,
+)
 from workbench_core.setup_cli import SetupCancelled, _prompt
 from workbench_core.user_config_home import default_user_record_path
 from workbench_core.tooling_provision import inspect_tools
@@ -114,22 +120,20 @@ def _validate_record(value: Any) -> dict[str, Any]:
 def load_launcher_record(path: Path | str) -> dict[str, Any] | None:
     """Load one bounded, non-symlink launcher binding."""
 
-    selected = Path(path).expanduser()
+    selected = _absolute(path)
     try:
-        info = selected.lstat()
-    except FileNotFoundError:
-        return None
-    except OSError as exc:
-        raise LauncherSetupError(f"cannot inspect launcher setup record: {exc}") from exc
-    if selected.is_symlink() or not selected.is_file():
-        raise LauncherSetupError(
-            "launcher setup record must be a regular non-symlink file"
-        )
-    if not 1 <= info.st_size <= MAX_RECORD_BYTES:
+        raw = read_bounded_bytes(selected, byte_limit=MAX_RECORD_BYTES)
+    except DurableRecordError as exc:
+        if exc.code == "unavailable" and not selected.exists() and not selected.is_symlink():
+            return None
+        raise LauncherSetupError(f"cannot read launcher setup record: {exc}") from exc
+    except HostFilesystemError as exc:
+        raise LauncherSetupError(f"cannot read launcher setup record: {exc}") from exc
+    if not raw:
         raise LauncherSetupError("launcher setup record is outside its byte limit")
     try:
-        value = json.loads(selected.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
         raise LauncherSetupError(
             "launcher setup record is not strict UTF-8 JSON"
         ) from exc
@@ -145,40 +149,14 @@ def _write_launcher_record(
         **payload,
         "record_id": _digest("workbench-launcher-setup", payload),
     }
-    parent = path.parent
-    if path.exists() and (path.is_symlink() or not path.is_file()):
-        raise LauncherSetupError(
-            "launcher setup destination must be a regular file"
-        )
-    if parent.exists() and (parent.is_symlink() or not parent.is_dir()):
-        raise LauncherSetupError(
-            "launcher setup parent must be a regular directory"
-        )
-    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    temporary = parent / f".{path.name}.{os.getpid()}.tmp"
-    if temporary.exists() or temporary.is_symlink():
-        raise LauncherSetupError("launcher setup staging path already exists")
-    descriptor: int | None = None
+    selected = _absolute(path)
+    raw = (json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
     try:
-        descriptor = os.open(
-            temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+        update_preference_bytes(
+            selected, lambda _previous: raw, byte_limit=MAX_RECORD_BYTES,
         )
-        raw = json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-            descriptor = None
-            stream.write(raw)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except OSError as exc:
+    except (HostFilesystemError, ValueError) as exc:
         raise LauncherSetupError(f"cannot publish launcher setup: {exc}") from exc
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
-        try:
-            temporary.unlink(missing_ok=True)
-        except OSError:
-            pass
     return record
 
 
@@ -660,6 +638,8 @@ def main(
 ) -> int:
     """Run the additive launcher setup journey."""
 
+    from workbench_core.host_services import install_local_host_services
+    install_local_host_services()
     del root  # Launcher setup owns no suite/profile authority.
     parser = _parser()
     args = parser.parse_args(list(sys.argv[1:] if argv is None else argv))

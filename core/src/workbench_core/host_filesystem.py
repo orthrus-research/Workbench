@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import stat
+from typing import Callable
 
 
 from workbench_api.host_filesystem import HostFilesystemError
@@ -356,6 +357,13 @@ def read_private_bytes(path: Path, *, byte_limit: int) -> bytes:
 def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
     from .durable_records import read_bounded_bytes as read
     return read(path, byte_limit=byte_limit)
+
+
+def update_preference_bytes(
+    path: Path, transform: Callable[[bytes | None], bytes], *, byte_limit: int,
+) -> bytes:
+    from .preference_records import update_preference_bytes as update
+    return update(path, transform, byte_limit=byte_limit)
 
 
 def publish_immutable_bytes(

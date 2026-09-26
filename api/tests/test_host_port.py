@@ -15,6 +15,8 @@ class HostPortTests(unittest.TestCase):
                 port.fsync_directory(Path("unused"))
             with self.assertRaisesRegex(port.HostFilesystemError, "no filesystem host"):
                 port.append_private_line(Path("unused"), b"event\n", expected_size=0, byte_limit=16)
+            with self.assertRaisesRegex(port.HostFilesystemError, "no filesystem host"):
+                port.update_preference_bytes(Path("unused"), lambda _old: b"new", byte_limit=16)
 
     def test_host_is_explicit_and_cannot_be_replaced(self):
         observed = []
@@ -33,6 +35,8 @@ class HostPortTests(unittest.TestCase):
                 port.file_lease(7, exclusive=True)
             with self.assertRaisesRegex(port.HostFilesystemError, "does not provide private journals"):
                 port.inspect_private_journal(Path("unused"), byte_limit=16)
+            with self.assertRaisesRegex(port.HostFilesystemError, "does not provide preference updates"):
+                port.update_preference_bytes(Path("unused"), lambda _old: b"new", byte_limit=16)
 
             @contextmanager
             def lease(descriptor, *, exclusive):

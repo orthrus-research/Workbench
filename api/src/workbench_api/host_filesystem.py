@@ -1,7 +1,7 @@
 """Filesystem security port. The host explicitly supplies its implementation."""
 
 from pathlib import Path
-from typing import ContextManager, Protocol
+from typing import Callable, ContextManager, Protocol
 
 
 class HostFilesystemError(OSError):
@@ -23,6 +23,10 @@ class HostFilesystem(Protocol):
     def fsync_directory(self, path: Path) -> None: ...
     def read_private_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
     def read_bounded_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
+    def update_preference_bytes(
+        self, path: Path, transform: Callable[[bytes | None], bytes],
+        *, byte_limit: int,
+    ) -> bytes: ...
     def publish_immutable_bytes(self, path: Path, data: bytes, *, byte_limit: int, idempotent: bool = False) -> None: ...
     def replace_private_bytes(
         self, path: Path, data: bytes, *, byte_limit: int,
@@ -100,6 +104,23 @@ def read_bounded_bytes(path: Path, *, byte_limit: int) -> bytes:
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide bounded input reads")
     return operation(path, byte_limit=byte_limit)
+
+
+def update_preference_bytes(
+    path: Path, transform: Callable[[bytes | None], bytes], *, byte_limit: int,
+) -> bytes:
+    """Ask Core to update a bounded private preference under its host lock.
+
+    The caller owns the record schema; Core owns home setup, the old-byte
+    comparison, publication and durability. A missing record passes None to
+    the transform. Historical ordinary records remain readable through the
+    separate bounded-read port.
+    """
+
+    operation = getattr(_filesystem(), "update_preference_bytes", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide preference updates")
+    return operation(path, transform, byte_limit=byte_limit)
 
 
 def publish_immutable_bytes(

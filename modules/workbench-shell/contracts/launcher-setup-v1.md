@@ -19,6 +19,11 @@ The record is `workbench-launcher-setup-record-v1` at `launcher-v1.json` beside
 `setup-v1.json`. Its content-addressed identity covers all three values. It is
 bounded, regular, non-symlink UTF-8 JSON and is published atomically after an
 exact reviewed plan.
+Core selects the user configuration home and performs the bounded read,
+private directory setup, locked compare-and-replace, and durable publication.
+Launcher Setup owns selection validation and the record identity. An explicit
+record path remains supported for local callers and historical records remain
+readable without rewriting them.
 
 ## Credential boundary
 

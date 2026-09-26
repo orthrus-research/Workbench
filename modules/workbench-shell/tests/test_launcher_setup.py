@@ -18,10 +18,14 @@ sys.path.insert(0, str(REPOSITORY_ROOT / "modules/project-intelligence/src"))
 sys.path.insert(0, str(MODULE_ROOT / "src"))
 
 from workbench_shell import launcher_setup, runtime_launch  # noqa: E402
+from workbench_core.host_services import install_local_host_services  # noqa: E402
 from workbench_core.user_config_migration import migrate_legacy_config  # noqa: E402
 
 
 class LauncherSetupTests(unittest.TestCase):
+    def setUp(self) -> None:
+        install_local_host_services()
+
     def test_legacy_launcher_record_requires_explicit_import(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
@@ -80,6 +84,44 @@ class LauncherSetupTests(unittest.TestCase):
                 os.umask(old_umask)
             self.assertEqual(0o700, record.parent.stat().st_mode & 0o777)
             self.assertEqual(0o600, record.stat().st_mode & 0o777)
+
+    def test_launcher_binding_follows_selected_user_home(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = root / "first"
+            second = root / "second"
+            first.mkdir()
+            second.mkdir()
+            first_record = launcher_setup.default_launcher_record_path(
+                environment={"HOME": str(first)}
+            )
+            second_record = launcher_setup.default_launcher_record_path(
+                environment={"HOME": str(second)}
+            )
+            launcher_setup._write_launcher_record(first_record, {
+                "family": "prism", "executable": str(first / "bin/prismlauncher"),
+                "root": str(first / "launcher-data"),
+            })
+            self.assertNotEqual(first_record, second_record)
+            self.assertIsNone(launcher_setup.load_launcher_record(second_record))
+            self.assertEqual(
+                ["runtime-launch", "/pack"],
+                launcher_setup.launcher_defaults_for_runtime(
+                    ["runtime-launch", "/pack"], environment={"HOME": str(second)}
+                ),
+            )
+            launcher_setup._write_launcher_record(second_record, {
+                "family": "multimc", "executable": str(second / "bin/multimc"),
+                "root": str(second / "launcher-data"),
+            })
+            selected = launcher_setup.launcher_defaults_for_runtime(
+                ["runtime-launch", "/pack"], environment={"HOME": str(second)}
+            )
+            self.assertEqual("multimc", selected[selected.index("--launcher") + 1])
+            self.assertEqual(
+                "prism",
+                launcher_setup.load_launcher_record(first_record)["selection"]["family"],
+            )
 
     def _fixture(self, root: Path, *, account: bool = True) -> tuple[Path, Path]:
         executable = root / "launcher-bin/prismlauncher"
