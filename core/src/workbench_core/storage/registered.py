@@ -710,15 +710,48 @@ class ResourceCatalog:
                     "retention": "protected-until-reviewed-policy",
                 }
                 rows.append(row)
+        record_stores = self._registered_record_stores(workspace)
+        overlay_envelopes: list[dict[str, object]] = []
+        for store in record_stores:
+            if store["family"] != "overlay-envelope-inputs":
+                continue
+            from ..overlay_envelope_inputs import CoreOverlayEnvelopeInputs
+            host = CoreOverlayEnvelopeInputs(
+                workspace=Path(store["workspace"]), configuration_home=self.configuration_home,
+                owner_id=store["owner_id"],
+            )
+            if store["path"] != str(host.root):
+                raise DurableResourceError("resource.changed", "overlay attempt store registration changed")
+            if store["status"] != "available":
+                overlay_envelopes.append({"store_id": store["store_id"], "status": "store-unavailable"})
+                continue
+            try:
+                overlay_envelopes.extend(host.inventory())
+            except (OSError, ValueError, TypeError) as exc:
+                raise DurableResourceError("resource.changed", "overlay attempt inventory changed") from exc
+        registered_overlay_roots = {
+            store["path"] for store in self._registered_record_stores(None)
+            if store["family"] == "overlay-envelope-inputs"
+        }
+        if self.configuration_home.is_dir():
+            for path in self.configuration_home.iterdir():
+                if re.fullmatch(r"overlay-envelope-inputs-v1-[0-9a-f]{64}", path.name) is None:
+                    continue
+                if str(path) in registered_overlay_roots:
+                    continue
+                if not private_path(path, directory=True):
+                    raise DurableResourceError("resource.changed", "unregistered overlay attempt root is unsafe")
+                overlay_envelopes.append({"path": str(path), "status": "unregistered-store"})
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,
             "workspace": str(workspace) if workspace is not None else None,
-            "resources": rows, "record_stores": self._registered_record_stores(workspace),
+            "resources": rows, "record_stores": record_stores,
             "trees": self.trees.inventory(workspace=workspace),
             "working_allocations": WorkingAllocationCatalog(self.root.parent).inventory_rows(
                 workspace=workspace,
             ),
+            "overlay_envelopes": overlay_envelopes,
         }
 
     def reconcile(self, resource_id: str) -> ResourceReference:

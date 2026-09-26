@@ -333,6 +333,49 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
                 expected_inventory_id=manifest["inventory_id"],
             )
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 Core copy uses Linux pinned handles")
+    def test_v2_inventory_streams_into_core_attempt_before_copy(self) -> None:
+        from workbench_core.managed_trees import CoreManagedTrees
+        from workbench_core.overlay_envelope_inputs import CoreOverlayEnvelopeInputs
+
+        report = self.build()
+        sidecar = self.config / "worldgen/vein/overworld/notes.txt"
+        sidecar.write_bytes(b"selected sidecar\n")
+        os.chmod(sidecar, 0o600)
+        workspace = self.root / "workspace"
+        workspace.mkdir()
+        artifacts = workspace / ".workbench"
+        configuration_home = self.root / "settings"
+        target = artifacts / "overlays" / "selected" / "config"
+        trees = CoreManagedTrees(
+            workspace=workspace, configuration_home=configuration_home,
+            locations={"artifacts": artifacts}, owner_id="crucible",
+        )
+        host = CoreOverlayEnvelopeInputs(
+            workspace=workspace, configuration_home=configuration_home,
+            owner_id="crucible",
+        )
+        with trees.stage("artifacts", "config", requested_path=target) as stage:
+            attempt = host.start(
+                stage=stage, source_root=self.config,
+                plan_chunks=(canonical_json_bytes({"operations": ["reviewed-placeholder"]}),),
+            )
+            manifest = build_gtceu_overlay_copy_inventory(
+                config_root=self.config, source_inventory=report,
+                emit_chunk=attempt.emit_chunk,
+            )
+            attempt.seal_inputs(manifest, validate_inventory=parse_gtceu_overlay_copy_inventory)
+            copied = attempt.copy_source(verify_source=lambda selected, chunks:
+                verify_gtceu_overlay_copy_source(
+                    config_root=self.config, source_inventory=report,
+                    manifest=selected, chunks=chunks,
+                    expected_inventory_id=manifest["inventory_id"],
+                ))
+            self.assertEqual(b"selected sidecar\n", (copied / "worldgen/vein/overworld/notes.txt").read_bytes())
+            self.assertEqual(0o600, (copied / "worldgen/vein/overworld/notes.txt").stat().st_mode & 0o7777)
+            self.assertFalse(target.exists())
+        self.assertEqual("copy-complete", host.inventory()[0]["status"])
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
     def test_v2_copy_inventory_refuses_external_symlink(self) -> None:
         report = self.build()

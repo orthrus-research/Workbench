@@ -56,10 +56,19 @@ no-follow source scan and rechecks the V1 definition binding. New or changed
 sidecars therefore invalidate the capture even when V1 JSON definitions are
 unchanged.
 
-This inventory is a prerequisite only. A later Core transaction must allocate
-and publish the complete overlay envelope, persist the emitted chunks and
-manifest, recheck the source while copying, verify the operation result and
-sibling receipt, and persist restart recovery. Core ManagedTrees V1 admits
+This inventory is a prerequisite only. Core now has an internal, registered
+overlay-envelope input store that can retain caller supplied plan bytes and these chunks
+before copying. Its copy step uses pinned Linux directory handles, compares
+each source file's bytes and mode to the retained rows, and keeps a failed or
+interrupted managed-tree stage for inspection. Core's catalog inventory reports
+pre-reservation orphans and incomplete copies. The store is registered as a
+separate protected record root, so the sealed `resources-v1` root manifest
+does not gain an invented historical namespace.
+
+There is not yet a V2 materializer command or complete output transaction.
+The remaining Core route must apply ordered operations, write and verify both
+sibling receipts, publish the whole envelope, and reconcile publication after
+restart. Core ManagedTrees V1 admits
 at most 4,096 members; the current Core TransportTrees V2 admits at most
 10,001 files and 136 MiB, with bounded path depth/length and fixed file and
 directory modes. The V2 domain inventory intentionally accepts some source
