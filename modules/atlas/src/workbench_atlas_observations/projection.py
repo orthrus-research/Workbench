@@ -7,10 +7,9 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
-import os
 from pathlib import Path
-import shutil
-import tempfile
+
+from workbench_api.managed_trees import managed_trees
 
 from workbench_atlas_categorical_graph import (
     CategoricalGraphBundleBuilder, validate_bundle_directory,
@@ -87,11 +86,8 @@ def project_retained_observations(reader, output, *, side="single",
         "native_outcome": manifest["native_outcome"], "coverage": manifest["coverage"],
         "sections": manifest["sections"], "projection_sources": code,
     }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(prefix=".atlas-observations-", dir=output.parent))
-    try:
-        staged = temporary / "graph"
-        builder = CategoricalGraphBundleBuilder(staged, scope=scope, evidence_binding=binding,
+    with managed_trees().stage("evidence", output.name, requested_path=output) as stage:
+        builder = CategoricalGraphBundleBuilder(stage.path, scope=scope, evidence_binding=binding,
             evidence_authority="retained-observations-v1", check_cancelled=check)
         builder.add_partition("initialization", classification="original retained initialization observations",
             dependencies=(), nodes=plan.iter_nodes(), edges=plan.iter_edges(),
@@ -101,22 +97,22 @@ def project_retained_observations(reader, output, *, side="single",
         builder.scope["family_coverage"] = coverage
         graph = builder.close()
         check()
-        validate_bundle_directory(staged, check_cancelled=check)
+        validate_bundle_directory(stage.path, check_cancelled=check)
         if _code_binding() != code:
             raise ObservationProjectionError("projection implementation changed during import")
         check()
-        if output.exists() or output.is_symlink():
-            raise ObservationProjectionError("observation graph output appeared during import")
-        os.rename(staged, output)
+        published = stage.publish(
+            validate=lambda path: validate_bundle_directory(path, check_cancelled=check),
+            domain_id=graph["graph_set_id"],
+            derived_members=("query-index.sqlite3",),
+        )
         return {"format": PROJECTION_FORMAT, "schema_version": 1, "state": "complete",
-            "root": str(output), "graph_set_id": graph["graph_set_id"],
+            "root": str(published.path), "tree_id": published.tree_id,
+            "graph_set_id": graph["graph_set_id"],
             "snapshot_id": manifest["id"], "selected_side": side,
             "native_outcome": manifest["native_outcome"],
             "capture_coverage": manifest["coverage"], "family_coverage": coverage,
             "summary": graph["summary"], "limitations": list(plan.limitations)}
-    finally:
-        # Only this invocation's unpublished staging directory is task-owned.
-        shutil.rmtree(temporary)
 
 
 def resolve_json_pointer(value, pointer):

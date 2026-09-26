@@ -111,6 +111,12 @@ read leases and Axiom's historical request/schema admission. It does not execute
 initialization again. Axiom and Shell remain unnecessary for querying a published
 observation graph.
 
+Core allocates and publishes the graph directory, catalogs its authoritative
+streams, and identifies the rebuildable query index separately. An interrupted
+import leaves its unpublished stage under Core custody for inspection; the
+selected output path remains absent. Import runs through the installed Workbench
+command so that Core binds the publication service.
+
 ```bash
 workbench atlas observations import-snapshot /path/to/check-attempt \
   --pack-profile supersymmetry --output /path/to/new-observation-graph --json

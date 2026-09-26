@@ -7,6 +7,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from workbench_api.managed_trees import managed_trees_scope
+from workbench_core.managed_trees import CoreManagedTrees
 from workbench_atlas_categorical_graph import CategoricalGraphQuery
 from workbench_atlas_observations.projection import (
     ObservationProjectionError, project_retained_observations,
@@ -39,6 +41,15 @@ def reader_fixture():
 
 
 class InitializationProjectionTests(unittest.TestCase):
+    def setUp(self):
+        self._custody = self.enterContext(tempfile.TemporaryDirectory())
+        root = Path(self._custody)
+        self._trees = CoreManagedTrees(
+            workspace=root / "workspace", configuration_home=root / "config",
+            locations={"evidence": root / "evidence"}, owner_id="atlas",
+        )
+        self.enterContext(managed_trees_scope(self._trees))
+
     def test_cli_accepts_parent_segments_and_symlinked_parent_receipts(self):
         reader, _ = reader_fixture()
         with tempfile.TemporaryDirectory() as tmp:
@@ -90,7 +101,8 @@ class InitializationProjectionTests(unittest.TestCase):
                     project_retained_observations(reader, root / "graph", profile_id="fixture", check_cancelled=cancel)
             self.assertIs(failure, raised.exception)
             self.assertEqual(3, state["checks"])
-            self.assertEqual([], list(root.iterdir()))
+            self.assertFalse((root / "graph").exists())
+            self.assertEqual("failed", self._trees.catalog.inventory()["trees"][0]["status"])
 
     def test_native_failure_and_incomplete_coverage_survive_successful_projection(self):
         reader, report = reader_fixture()
@@ -98,6 +110,7 @@ class InitializationProjectionTests(unittest.TestCase):
             output = Path(tmp) / "graph"
             receipt = project_retained_observations(reader, output, profile_id="supersymmetry")
             self.assertEqual(receipt["state"], "complete")
+            self.assertEqual(receipt["tree_id"], self._trees.catalog.inventory()["trees"][0]["tree_id"])
             self.assertEqual(receipt["native_outcome"], "native-failed")
             self.assertEqual(receipt["capture_coverage"], "incomplete")
             self.assertTrue(any(row["family"] == "furnace" and row["node_count"] > 0
@@ -121,7 +134,7 @@ class InitializationProjectionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "cancelled"):
                 project_retained_observations(reader, output, profile_id="supersymmetry", check_cancelled=cancel)
             self.assertFalse(output.exists())
-            self.assertEqual(list(Path(tmp).iterdir()), [])
+            self.assertEqual("failed", self._trees.catalog.inventory()["trees"][0]["status"])
 
     def test_unsupported_snapshot_and_wrong_side_refuse_before_publication(self):
         for mutation in (lambda r: setattr(r, "scope_supported", False),
