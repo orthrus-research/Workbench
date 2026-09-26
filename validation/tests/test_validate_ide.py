@@ -11,7 +11,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "validation"))
 import validate_ide as ide
-from validation_diagnostics import DiagnosticRun
+from validation_diagnostics import DiagnosticRun, load_diagnostic_report
 
 
 class IdeValidationTests(unittest.TestCase):
@@ -53,6 +53,17 @@ class IdeValidationTests(unittest.TestCase):
                 child = json.loads((root / "reports" / name / "report.json").read_text())
                 self.assertEqual("passed", child["state"])
                 self.assertEqual("checks", child["phases"][-1]["parent"])
+
+    def test_client_success_requires_matching_readback_report(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            def wrong_lane(path):
+                return {**load_diagnostic_report(path), "lane": "different-client"}
+            with patch.object(ide, "load_diagnostic_report", side_effect=wrong_lane):
+                with self.assertRaisesRegex(ide.IdeValidationFailure, "does not show a passed client"):
+                    with DiagnosticRun(root / "reports", "ide", ("vscode",)) as diagnostics:
+                        ide.run_clients(diagnostics, {"vscode": lambda: None}, jobs=1)
+            self.assertEqual("failed", load_diagnostic_report(root / "reports/report.json")["state"])
 
     def test_locked_node_and_npm_are_used_for_every_vscode_step(self):
         lock = {"node": {"version": "22.0.0"}, "npm": {"version": "11.0.0"}}

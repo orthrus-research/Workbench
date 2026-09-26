@@ -27,7 +27,7 @@ from build_release_clients import (  # noqa: E402
     VSCODE_STAGE_FILES,
     verify_vscode,
 )
-from validation_diagnostics import DiagnosticRun, default_directory  # noqa: E402
+from validation_diagnostics import DiagnosticRun, default_directory, load_diagnostic_report  # noqa: E402
 from native_distribution import source_identity  # noqa: E402
 
 DIAGNOSTICS = None
@@ -271,6 +271,19 @@ def run_clients(diagnostics, checks, *, jobs):
         futures = [executor.submit(execute, name, check) for name, check in checks.items()]
         for future in as_completed(futures):
             future.result()
+        for name, relative in diagnostics.document["client_reports"].items():
+            try:
+                report = load_diagnostic_report(diagnostics.directory / relative)
+            except (OSError, RuntimeError, ValueError) as exc:
+                raise IdeValidationFailure(f"{name} diagnostic report cannot be admitted: {exc}") from exc
+            phases = report["phases"]
+            if (report["run_id"] != children[name].document["run_id"]
+                    or report["lane"] != name or report["state"] != "passed"
+                    or not any(type(row) is dict and row.get("name") == "checks" and row.get("state") == "passed"
+                               for row in phases)
+                    or any(type(row) is not dict or (row.get("required") and row.get("state") != "passed")
+                           for row in phases)):
+                raise IdeValidationFailure(f"{name} diagnostic report does not show a passed client run")
     except BaseException:
         for child in children.values():
             child.cancel()

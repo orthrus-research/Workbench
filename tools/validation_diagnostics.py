@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,33 @@ import time
 import uuid
 
 OUTPUT_LIMIT = 1024 * 1024
+REPORT_LIMIT = 16 * 1024 * 1024
+
+
+def _core_records():
+    """Use source Core before installation, or the installed Core otherwise."""
+    root = Path(__file__).resolve().parents[1]
+    if (root / "api/src/workbench_api").is_dir() and (root / "core/src/workbench_core").is_dir():
+        for source in (root / "api/src", root / "core/src"):
+            if str(source) not in sys.path:
+                sys.path.insert(0, str(source))
+    from workbench_core.host_filesystem import (
+        fsync_directory, read_bounded_bytes, replace_private_bytes, secure_private_path,
+    )
+    return read_bounded_bytes, replace_private_bytes, fsync_directory, secure_private_path
+
+
+def load_diagnostic_report(path: Path) -> dict:
+    """Read a bounded V1 report, including reports from older nonprivate runs."""
+    read_bounded_bytes, _, _, _ = _core_records()
+    report = json.loads(read_bounded_bytes(Path(path).absolute(), byte_limit=REPORT_LIMIT))
+    if (type(report) is not dict or report.get("format") != "workbench-stage-diagnostics-v1"
+            or type(report.get("run_id")) is not str or type(report.get("lane")) is not str
+            or type(report.get("state")) is not str
+            or report["state"] not in {"running", "passed", "failed", "cancelled"}
+            or type(report.get("phases")) is not list):
+        raise ValueError("invalid stage diagnostic report")
+    return report
 
 
 def _now():
@@ -37,8 +65,11 @@ class DiagnosticRun:
     """A new directory per run; no old report can silently satisfy this run."""
 
     def __init__(self, directory: Path, lane: str, phases=(), *, metadata=None):
+        _, self._replace_record, fsync_directory, secure_private_path = _core_records()
         self.directory = Path(directory).absolute()
         self.directory.mkdir(parents=True, exist_ok=False)
+        secure_private_path(self.directory, directory=True)
+        fsync_directory(self.directory.parent)
         self.document = {
             "format": "workbench-stage-diagnostics-v1", "run_id": uuid.uuid4().hex,
             "lane": lane, "state": "running", "started_at": _now(),
@@ -52,13 +83,19 @@ class DiagnosticRun:
         self._cancelled = False
         self._next_command = 0
         self._started = time.perf_counter()
+        self._report_bytes = None
         self._write()
 
     def _write(self):
         with self._lock:
-            temporary = self.directory / "report.json.tmp"
-            temporary.write_text(json.dumps(self.document, indent=2) + "\n", encoding="utf-8")
-            temporary.replace(self.directory / "report.json")
+            data = (json.dumps(self.document, indent=2) + "\n").encode("utf-8")
+            previous = self._report_bytes
+            self._replace_record(
+                self.directory / "report.json", data, byte_limit=REPORT_LIMIT,
+                require_absent=previous is None,
+                expected_sha256=None if previous is None else "sha256:" + sha256(previous).hexdigest(),
+            )
+            self._report_bytes = data
 
     def __enter__(self):
         self._termination_handler = None

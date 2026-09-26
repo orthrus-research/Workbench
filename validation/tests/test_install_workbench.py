@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path, PureWindowsPath
 import platform
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,17 @@ class NativeInstallTests(unittest.TestCase):
     def save(self):
         (self.wheelhouse / "wheelhouse.json").write_text(json.dumps(self.manifest))
         (self.wheelhouse / "requirements.lock").write_text("".join(f"{row['name']}=={row['version']} --hash=sha256:{row['sha256']}\n" for row in self.manifest["wheels"]))
+
+    def test_copied_bootstrap_installer_does_not_require_core_or_diagnostics(self):
+        bootstrap = self.base / "bootstrap"
+        bootstrap.mkdir()
+        for filename in ("install_workbench.py", "verify_wheelhouse.py"):
+            shutil.copy2(ROOT / "tools" / filename, bootstrap / filename)
+        result = subprocess.run([sys.executable, "-S", str(bootstrap / "install_workbench.py"), "--help"],
+                                cwd=bootstrap, env={**os.environ, "PYTHONPATH": ""},
+                                text=True, capture_output=True)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("usage:", result.stdout)
 
     def include_tui(self):
         wheel = self.wheelhouse / "wheels/workbench_tui-0.0.1-py3-none-any.whl"
