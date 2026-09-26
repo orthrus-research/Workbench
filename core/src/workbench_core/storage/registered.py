@@ -49,6 +49,7 @@ INTENT_KIND = "workbench-resource-intent-v1"
 COMMIT_KIND = "workbench-resource-commit-v1"
 ABORT_KIND = "workbench-resource-abort-v1"
 _RESOURCE = re.compile(r"workbench-resource-v1:([0-9a-f]{32})\Z")
+_CATALOG_LEASE = re.compile(r"(?:[0-9a-f]{32}\.lock|[0-9a-f]{64}\.record-store\.lock)\Z")
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _OWNER = re.compile(r"[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*\Z")
 _MAX_BYTES = 32 * 1024 * 1024
@@ -661,6 +662,24 @@ class ResourceCatalog:
                         raise DurableResourceError("resource.changed", "registration attempt lease catalog has an unsafe entry")
             for name in ("reservations", "intents", "commits", "aborts", "leases"):
                 check_storage.ordinary(self._directory(name), directory=True)
+            try:
+                for path in self._directory("leases").iterdir():
+                    info = path.lstat()
+                    if (
+                        _CATALOG_LEASE.fullmatch(path.name) is None
+                        or not stat.S_ISREG(info.st_mode)
+                        or info.st_nlink != 1
+                        or not private_path(path, directory=False)
+                    ):
+                        raise DurableResourceError(
+                            "resource.changed", "resource catalog lease has an unknown or unsafe entry",
+                        )
+            except OSError as exc:
+                raise DurableResourceError(
+                    "resource.changed", "resource catalog leases cannot be inventoried",
+                ) from exc
+            # A lease can precede its reservation or record-store registration.
+            # Do not adopt an orphan lease as proof that a record ever existed.
             for name in ("reservations", "intents", "commits", "aborts"):
                 for path in self._directory(name).iterdir():
                     info = path.lstat()

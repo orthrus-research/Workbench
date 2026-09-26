@@ -377,6 +377,61 @@ class CatalogRootTests(unittest.TestCase):
             catalog.inventory(workspace=self.workspace)
         self.assertEqual(redirected.exception.code, "resource.changed")
 
+    def test_resource_catalog_accepts_exact_pre_record_leases_without_adopting_history(self) -> None:
+        reference = self.resources.publish_bytes("evidence", "retained.json", b"retained\n")
+        catalog = ResourceCatalog(self.config)
+        original = catalog._root_manifest().read_bytes()
+        leases = catalog.root / "leases"
+        existing = leases / (reference.resource_id.rsplit(":", 1)[1] + ".lock")
+        self.assertTrue(existing.is_file())
+        for name in ("a" * 32 + ".lock", "b" * 64 + ".record-store.lock"):
+            orphan = leases / name
+            orphan.write_bytes(b"")
+            orphan.chmod(0o600)
+        foreign_workspace = self.home / "another-workspace"
+        foreign_workspace.mkdir()
+        self.assertEqual(
+            [reference.resource_id],
+            [row["resource_id"] for row in catalog.inventory(workspace=self.workspace)["resources"]],
+        )
+        self.assertEqual([], catalog.inventory(workspace=foreign_workspace)["resources"])
+        self.assertEqual(catalog.verify_root(), "ready-unproven")
+        self.assertEqual(catalog._root_manifest().read_bytes(), original)
+
+    def test_resource_catalog_refuses_unsafe_lease_children_across_workspaces(self) -> None:
+        reference = self.resources.publish_bytes("evidence", "retained.json", b"retained\n")
+        catalog = ResourceCatalog(self.config)
+        leases = catalog.root / "leases"
+        source = leases / (reference.resource_id.rsplit(":", 1)[1] + ".lock")
+        foreign_workspace = self.home / "another-workspace"
+        foreign_workspace.mkdir()
+        cases = (
+            (leases / "unexpected.lock", lambda path: path.write_bytes(b"")),
+            (leases / ("c" * 64 + ".lock"), lambda path: path.write_bytes(b"")),
+            (leases / ("d" * 32 + ".lock"), lambda path: path.symlink_to(source)),
+            (leases / ("e" * 32 + ".lock"), lambda path: os.link(source, path)),
+            (leases / ("f" * 32 + ".lock"), lambda path: path.mkdir(mode=0o700)),
+            (leases / ("1" * 32 + ".lock"),
+             lambda path: (path.write_bytes(b""), path.chmod(0o644))),
+        )
+        for path, create in cases:
+            with self.subTest(path=path.name):
+                create(path)
+                try:
+                    with self.assertRaises(DurableResourceError) as changed:
+                        catalog.inventory(workspace=foreign_workspace)
+                    self.assertEqual(changed.exception.code, "resource.changed")
+                    self.assertEqual(catalog.verify_root(), "ready-unproven")
+                finally:
+                    if path.is_dir() and not path.is_symlink():
+                        path.rmdir()
+                    else:
+                        path.unlink()
+        self.assertEqual(
+            [reference.resource_id],
+            [row["resource_id"] for row in catalog.inventory(workspace=self.workspace)["resources"]],
+        )
+
     def test_cleanup_blocks_unregistered_workspace_items_with_unproven_history(self) -> None:
         from workbench_core.storage.manager import inventory_storage
 
