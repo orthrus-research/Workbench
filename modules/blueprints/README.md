@@ -11,6 +11,10 @@ history bytes through the filesystem port. The resumable session holds its
 historical exclusive marker through Core, so older Blueprints processes still
 exclude a concurrent writer. Blueprints retains plan admission and source
 semantics.
+For Cleanroom fresh-project V2, Core also registers the selected bootstrap
+state root and publishes, reads, revises, and removes its historical journal
+and retained receipt. Blueprints decides the V2 state transitions and the
+exact Git and project bytes involved in recovery.
 
 For native package development, install `api/` and `modules/blueprints/` in a
 dedicated virtual environment. Dependency declarations in `pyproject.toml`

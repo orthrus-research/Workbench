@@ -48,6 +48,37 @@ class CoreRecordStores:
             # Retain the per-workspace selector's existing file URIs while
             # protecting its parent as a mutable Core record namespace.
             root = selected / "active-instances"
+        elif self.owner_id == "workbench-shell" and family == "cleanroom-fresh-bootstrap-v2":
+            # The profile selects one V2 state root for its reviewed plan.
+            # Keep its journal and receipt paths intact, including recovery
+            # of a root created by the historical writer with mode 0755.
+            if not base.is_absolute() or ".." in base.parts:
+                raise DurableResourceError("resource.policy", "fresh bootstrap state root must be absolute")
+            configuration = self.catalog.configuration_home
+            if (
+                selected == self.workspace or self.workspace.is_relative_to(selected)
+                or selected == configuration or selected.is_relative_to(configuration)
+                or configuration.is_relative_to(selected)
+            ):
+                raise DurableResourceError("resource.policy", "fresh bootstrap state root overlaps a protected root")
+            try:
+                _state_root(selected)
+                if selected.exists():
+                    info = selected.lstat()
+                    if (
+                        not stat.S_ISDIR(info.st_mode)
+                        or (os.name != "nt" and (
+                            info.st_uid != os.geteuid() or info.st_mode & 0o022
+                        ))
+                    ):
+                        raise DurableResourceError(
+                            "resource.unsafe", "fresh bootstrap state root is not owner-controlled",
+                        )
+            except DurableResourceError:
+                raise
+            except (OSError, ValueError) as exc:
+                raise DurableResourceError("resource.unsafe", "fresh bootstrap state root is redirected") from exc
+            root = selected
         elif self.owner_id == "blueprints" and family == "blueprints-sealed-v1" and selected.name == "sealed":
             # Blueprints admits the target and protected session before it
             # requests this historical CAS namespace. Keep its V1 locators.

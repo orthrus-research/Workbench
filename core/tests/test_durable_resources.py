@@ -8,6 +8,7 @@ import io
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tempfile
@@ -119,6 +120,40 @@ class DurableResourceTests(unittest.TestCase):
         alias.symlink_to(target, target_is_directory=True)
         with self.assertRaises(DurableResourceError):
             host.open_target("project-qualification-v1", state, alias)
+
+    def test_fresh_bootstrap_registers_exact_historical_state_root(self) -> None:
+        provider = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="workbench-shell",
+        )
+        state = self.home / "fresh-state"
+        state.mkdir(mode=0o755)
+        state.chmod(0o755)
+        opened = provider.open("cleanroom-fresh-bootstrap-v2", state)
+        self.assertEqual(state, opened.root)
+        self.assertEqual(self.workspace, opened.workspace)
+        self.assertEqual(0o700, stat.S_IMODE(state.stat().st_mode))
+        self.assertEqual(opened, provider.open("cleanroom-fresh-bootstrap-v2", state))
+        rows = ResourceCatalog(self.config).inventory(workspace=self.workspace)["record_stores"]
+        self.assertEqual([(opened.store_id, str(state))], [
+            (row["store_id"], row["path"]) for row in rows
+        ])
+
+        shared = self.home / "shared"
+        shared.mkdir(mode=0o777)
+        shared.chmod(0o777)
+        with self.assertRaises(DurableResourceError):
+            provider.open("cleanroom-fresh-bootstrap-v2", shared)
+        self.assertEqual(0o777, stat.S_IMODE(shared.stat().st_mode))
+        with self.assertRaises(DurableResourceError):
+            provider.open("cleanroom-fresh-bootstrap-v2", self.home)
+        with self.assertRaises(DurableResourceError):
+            provider.open("cleanroom-fresh-bootstrap-v2", self.config / "state")
+        with self.assertRaises(DurableResourceError):
+            CoreRecordStores(
+                workspace=self.workspace, configuration_home=self.config,
+                owner_id="blueprints",
+            ).open("cleanroom-fresh-bootstrap-v2", state)
 
     def test_validation_timing_store_uses_historical_workspace_root(self) -> None:
         provider = CoreRecordStores(

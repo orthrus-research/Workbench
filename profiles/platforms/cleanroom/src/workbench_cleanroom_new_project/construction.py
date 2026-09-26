@@ -62,6 +62,14 @@ HISTORICAL_OWNER_ID = (
     "befe2af77e834818a6e2746ef9ddad70f740267330ddde2cbbf5f1730a1661ce"
 )
 HISTORICAL_OWNER_SHA256 = "a373d634f5daf5870d4f75a7ca90101fd9e7670406bcbdec349bea42590d0b1e"
+PREVIOUS_CORE_OWNER_RELATIVE = Path(
+    "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2-core-previous.json"
+)
+PREVIOUS_CORE_OWNER_ID = (
+    "workbench-cleanroom-mod-construction-owner:sha256:"
+    "f3ee0ed1c752f957ca8af12a98b5ef963205314436237d7c61ceb80e91ed25cd"
+)
+PREVIOUS_CORE_OWNER_SHA256 = "dbb7b84fcd42b8378082ad771dccd975b699af5425e55bb98fabfe88d93f6e7e"
 OWNER_SCHEMA_RELATIVE = Path(
     "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json"
 )
@@ -447,18 +455,26 @@ def validate_construction_owner(
     return owner
 
 
-def _historical_construction_owner(suite: Path) -> dict[str, Any]:
-    """Reopen the exact pre-Core owner only for an interrupted old plan."""
+def _historical_construction_owner(
+    suite: Path, owner_id: str = HISTORICAL_OWNER_ID,
+) -> dict[str, Any]:
+    """Reopen one exact retired owner only for an interrupted old plan."""
 
-    path = _suite_file(suite, HISTORICAL_OWNER_RELATIVE, "historical construction owner")
+    if owner_id == HISTORICAL_OWNER_ID:
+        relative, expected_sha256 = HISTORICAL_OWNER_RELATIVE, HISTORICAL_OWNER_SHA256
+    elif owner_id == PREVIOUS_CORE_OWNER_ID:
+        relative, expected_sha256 = PREVIOUS_CORE_OWNER_RELATIVE, PREVIOUS_CORE_OWNER_SHA256
+    else:
+        _fail("historical construction owner is not admitted")
+    path = _suite_file(suite, relative, "historical construction owner")
     raw = _read_regular(path, "historical construction owner")
-    if sha256(raw).hexdigest() != HISTORICAL_OWNER_SHA256:
+    if sha256(raw).hexdigest() != expected_sha256:
         _fail("historical construction owner bytes changed")
     owner = _load_json(path, "historical construction owner")
     _validate_schema(suite, OWNER_SCHEMA_RELATIVE, owner)
     body = dict(owner)
     supplied = body.pop("id", None)
-    if supplied != HISTORICAL_OWNER_ID or supplied != application_transaction.content_id(
+    if supplied != owner_id or supplied != application_transaction.content_id(
         "workbench-cleanroom-mod-construction-owner", body
     ):
         _fail("historical construction owner identity changed")
@@ -611,8 +627,10 @@ def validate_cleanroom_mod_plan(
     if supplied != application_transaction.content_id(PLAN_KIND, body):
         _fail("construction plan content identity changed")
     owner = (
-        _historical_construction_owner(suite)
-        if allow_historical_owner and plan.get("owner_record_id") == HISTORICAL_OWNER_ID
+        _historical_construction_owner(suite, plan["owner_record_id"])
+        if allow_historical_owner and plan.get("owner_record_id") in {
+            HISTORICAL_OWNER_ID, PREVIOUS_CORE_OWNER_ID,
+        }
         else validate_construction_owner(suite)
     )
     if (

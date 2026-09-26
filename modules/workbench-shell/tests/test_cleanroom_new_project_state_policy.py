@@ -12,11 +12,20 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from workbench_api.host_filesystem import bind_host_filesystem
+from workbench_api.record_stores import record_store_scope
+from workbench_api.source_transactions import source_transactions_scope
 from workbench_api.state_root_policies import (
     StateRootPolicyError, state_root_policies_scope,
 )
+from workbench_core import host_filesystem
 from workbench_core.durable_records import read_bounded_single_link_bytes
+from workbench_core.source_transactions import CoreSourceTransactions
+from workbench_core.storage.record_stores import CoreRecordStores
 from workbench_shell.cleanroom_new_project_cli import new_project_main
+
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 class _SelectedPolicy:
@@ -134,6 +143,63 @@ class CleanroomNewProjectStatePolicyTests(unittest.TestCase):
         self.assertEqual(status, 2)
         self.assertIn("cannot read Cleanroom construction plan", error)
         self.assertEqual(called, [])
+
+
+class CleanroomNewProjectCoreRouteTests(unittest.TestCase):
+    def test_shell_apply_and_interrupted_recover_keep_v2_state_paths(self) -> None:
+        bind_host_filesystem(host_filesystem)
+        with TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            provider = CoreRecordStores(
+                workspace=ROOT, configuration_home=home / "config",
+                owner_id="workbench-shell",
+            )
+
+            def invoke(*arguments: str) -> dict[str, object]:
+                output, error = StringIO(), StringIO()
+                status = new_project_main(
+                    ["cleanroom-mod", *arguments, "--json"],
+                    root=ROOT, output=output, error=error,
+                )
+                self.assertEqual((status, error.getvalue()), (0, ""))
+                return json.loads(output.getvalue())
+
+            with record_store_scope(provider), source_transactions_scope(
+                CoreSourceTransactions(owner_id="workbench-shell")
+            ):
+                target = home / "applied"
+                plan_path = home / "applied-plan.json"
+                invoke("preview", str(target), "--output-mode", "direct-apply",
+                       "--output", str(plan_path))
+                plan = json.loads(plan_path.read_text(encoding="utf-8"))
+                state = home / "applied-state"
+                applied = invoke(
+                    "apply", str(plan_path), "--state-root", str(state),
+                    "--consent-plan-id", plan["id"],
+                )
+                self.assertEqual("applied", applied["state"])
+                self.assertFalse((state / "fresh-bootstrap-v2.json").exists())
+                self.assertEqual(1, len(list((state / "bootstrap-receipts").glob("*.json"))))
+
+                interrupted = home / "interrupted"
+                interrupted_plan = home / "interrupted-plan.json"
+                invoke("preview", str(interrupted), "--output-mode", "direct-apply",
+                       "--output", str(interrupted_plan))
+                reviewed = json.loads(interrupted_plan.read_text(encoding="utf-8"))
+                recovery_state = home / "recovery-state"
+                from workbench_blueprints import fresh_project
+
+                fresh_project.prepare_fresh_target(
+                    interrupted, reviewed["target_observation"],
+                    recovery_state, plan_id=reviewed["id"],
+                )
+                recovered = invoke(
+                    "recover", str(interrupted_plan),
+                    "--state-root", str(recovery_state),
+                )
+                self.assertEqual("restored", recovered["state"])
+                self.assertFalse(interrupted.exists())
+                self.assertFalse((recovery_state / "fresh-bootstrap-v2.json").exists())
 
 
 if __name__ == "__main__":

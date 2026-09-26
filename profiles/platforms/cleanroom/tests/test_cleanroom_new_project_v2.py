@@ -1,17 +1,26 @@
 from __future__ import annotations
 
 import base64
+from contextlib import ExitStack
 import copy
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 
 from jsonschema import Draft202012Validator, FormatChecker
+from workbench_api.host_filesystem import bind_host_filesystem
+from workbench_api.record_stores import record_store_scope
+from workbench_api.source_transactions import source_transactions_scope
+from workbench_core import host_filesystem
+from workbench_core.source_transactions import CoreSourceTransactions
+from workbench_core.storage.record_stores import CoreRecordStores
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -28,6 +37,7 @@ PROFILE = ROOT / "profiles/platforms/cleanroom"
 SCHEMAS = PROFILE / "schemas"
 OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core.json"
 HISTORICAL_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2.json"
+PREVIOUS_CORE_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-previous.json"
 KIND = PROFILE / "new-project-kinds/cleanroom-mod.json"
 
 
@@ -62,7 +72,25 @@ def _git(target: Path, *arguments: str, check: bool = True) -> subprocess.Comple
     )
 
 
-class FreshProjectV2Tests(unittest.TestCase):
+class _CoreCustodyCase(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        temporary = tempfile.TemporaryDirectory(dir="/tmp")
+        self.addCleanup(temporary.cleanup)
+        bind_host_filesystem(host_filesystem)
+        scopes = ExitStack()
+        self.addCleanup(scopes.close)
+        scopes.enter_context(record_store_scope(CoreRecordStores(
+            workspace=ROOT,
+            configuration_home=Path(temporary.name) / "config",
+            owner_id="workbench-shell",
+        )))
+        scopes.enter_context(source_transactions_scope(CoreSourceTransactions(
+            owner_id="workbench-shell",
+        )))
+
+
+class FreshProjectV2Tests(_CoreCustodyCase):
     def test_observes_absent_empty_and_unborn_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             parent = Path(temporary)
@@ -124,10 +152,19 @@ class FreshProjectV2Tests(unittest.TestCase):
                         target, observation, state_root, plan_id=f"plan:{state_name}"
                     )
                     self.assertTrue((target / ".git").is_dir())
+                    journal_path = state_root / "fresh-bootstrap-v2.json"
+                    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+                    self.assertEqual("bootstrapped", journal["phase"])
+                    self.assertEqual(0o700, stat.S_IMODE(state_root.stat().st_mode))
+                    # The old V2 writer used an owner-controlled 0755 state
+                    # root. Core must reopen it for exact recovery in place.
+                    state_root.chmod(0o755)
                     restored = fresh_project.restore_fresh_target(
                         target, state_root, plan_id=f"plan:{state_name}"
                     )
                     self.assertEqual("restored", restored["outcome"])
+                    self.assertFalse(journal_path.exists())
+                    self.assertEqual(0o700, stat.S_IMODE(state_root.stat().st_mode))
                     if state_name == "absent":
                         self.assertFalse(target.exists())
                     elif state_name == "empty":
@@ -138,7 +175,7 @@ class FreshProjectV2Tests(unittest.TestCase):
                         )
 
 
-class CleanroomModConstructionV2Tests(unittest.TestCase):
+class CleanroomModConstructionV2Tests(_CoreCustodyCase):
     def _preview(self, target: Path, *, direct: bool = False) -> dict[str, object]:
         request = construction.build_cleanroom_mod_request(
             target,
@@ -152,6 +189,21 @@ class CleanroomModConstructionV2Tests(unittest.TestCase):
             target, output_mode="direct-apply", allow_direct_apply=True,
         )
         owner = construction._historical_construction_owner(ROOT)
+        return construction._sealed(
+            construction.PLAN_KIND,
+            construction._plan_body(
+                ROOT, request, owner, fresh_project.observe_fresh_target(target),
+                construction.cleanroom_mod_adapter_set(ROOT),
+            ),
+        )
+
+    def _previous_core_plan(self, target: Path) -> dict[str, object]:
+        request = construction.build_cleanroom_mod_request(
+            target, output_mode="direct-apply", allow_direct_apply=True,
+        )
+        owner = construction._historical_construction_owner(
+            ROOT, construction.PREVIOUS_CORE_OWNER_ID,
+        )
         return construction._sealed(
             construction.PLAN_KIND,
             construction._plan_body(
@@ -239,6 +291,13 @@ class CleanroomModConstructionV2Tests(unittest.TestCase):
                 state_root, plan_id=plan["id"]
             )
             self.assertEqual(result["bootstrap_receipt"], retained)
+            receipts = state_root / "bootstrap-receipts"
+            receipts.chmod(0o755)
+            self.assertEqual(result["bootstrap_receipt"],
+                             fresh_project.load_retained_bootstrap_receipt(
+                                 state_root, plan_id=plan["id"],
+                             ))
+            self.assertEqual(0o700, stat.S_IMODE(receipts.stat().st_mode))
 
     def test_wrong_consent_stale_target_and_missing_adapter_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
@@ -321,6 +380,35 @@ class CleanroomModConstructionV2Tests(unittest.TestCase):
                     ROOT, plan, allow_historical_owner=True,
                 ),
             )
+            fresh_project.prepare_fresh_target(
+                target, plan["target_observation"], state_root, plan_id=plan["id"],
+            )
+            recovered = construction.recover_cleanroom_mod_construction(
+                ROOT, plan, state_root,
+            )
+            self.assertEqual("restored", recovered["state"])
+            self.assertFalse(target.exists())
+
+    def test_previous_core_owner_plan_reopens_only_for_recovery(self) -> None:
+        self.assertEqual(
+            construction.PREVIOUS_CORE_OWNER_SHA256,
+            sha256(PREVIOUS_CORE_OWNER.read_bytes()).hexdigest(),
+        )
+        package = tomllib.loads((PROFILE / "pyproject.toml").read_text(encoding="utf-8"))
+        resources = package["tool"]["setuptools"]["package-data"][
+            "workbench_resources.profiles.platforms.cleanroom"
+        ]
+        self.assertIn("new-project-kinds/cleanroom-mod-construction-owner-v2-core-previous.json", resources)
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh-project"
+            state_root = root / "state"
+            plan = self._previous_core_plan(target)
+            with self.assertRaisesRegex(ValueError, "owner binding changed"):
+                construction.validate_cleanroom_mod_plan(ROOT, plan)
+            self.assertEqual(plan, construction.validate_cleanroom_mod_plan(
+                ROOT, plan, allow_historical_owner=True,
+            ))
             fresh_project.prepare_fresh_target(
                 target, plan["target_observation"], state_root, plan_id=plan["id"],
             )

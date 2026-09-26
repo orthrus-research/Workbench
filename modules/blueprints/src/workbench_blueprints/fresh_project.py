@@ -18,7 +18,12 @@ import stat
 import subprocess
 import tempfile
 from typing import Any, Mapping, NoReturn, Sequence, cast
-from workbench_api.host_filesystem import fsync_directory
+from workbench_api.host_filesystem import (
+    count_interrupted_create_once_stages, fsync_directory,
+    publish_create_once_bytes, publish_immutable_bytes, read_private_bytes,
+    remove_private_bytes, replace_private_bytes, secure_private_path,
+)
+from workbench_api.record_stores import open_record_store, record_store_host_bound
 
 from . import application_transaction
 
@@ -375,15 +380,42 @@ def _receipt_path(state_root: Path, plan_id: str) -> Path:
     return state_root / "bootstrap-receipts" / f"{digest}.json"
 
 
-def _write_journal(path: Path, value: Mapping[str, Any]) -> None:
-    _atomic_replace(
-        path,
-        application_transaction.canonical_json_bytes(dict(value)) + b"\n",
+def _state_store(state_root: Path) -> None:
+    selected = open_record_store("cleanroom-fresh-bootstrap-v2", state_root)
+    if selected is None or selected.root != state_root:
+        _fail("fresh-project state publication requires Workbench Core custody")
+
+
+def _state_json(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
+    raw = (
+        read_private_bytes(path, byte_limit=_MAXIMUM_GIT_METADATA_BYTES)
+        if record_store_host_bound()
+        else _read_regular(path, label, _MAXIMUM_GIT_METADATA_BYTES)
+    )
+    return _parse_json(raw, label), raw
+
+
+def _write_journal(path: Path, value: Mapping[str, Any], *, expected: bytes) -> None:
+    raw = application_transaction.canonical_json_bytes(dict(value)) + b"\n"
+    replace_private_bytes(
+        path, raw, byte_limit=_MAXIMUM_GIT_METADATA_BYTES,
+        expected_sha256="sha256:" + sha256(expected).hexdigest(),
+    )
+
+
+def _remove_journal(path: Path, *, expected: bytes) -> None:
+    remove_private_bytes(
+        path, expected_sha256="sha256:" + sha256(expected).hexdigest(),
+        byte_limit=_MAXIMUM_GIT_METADATA_BYTES,
     )
 
 
 def _load_json(path: Path, label: str) -> dict[str, Any]:
     raw = _read_regular(path, label, _MAXIMUM_GIT_METADATA_BYTES)
+    return _parse_json(raw, label)
+
+
+def _parse_json(raw: bytes, label: str) -> dict[str, Any]:
     try:
         value = json.loads(raw.decode("utf-8", errors="strict"))
     except (UnicodeError, json.JSONDecodeError) as exc:
@@ -394,11 +426,7 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
 
 
 def _validate_state_root(target: Path, state_root: Path) -> None:
-    _no_symlink_ancestors(state_root.parent, "fresh-project state root")
-    if state_root.is_symlink():
-        _fail("fresh-project state root is a symlink")
-    state_root.mkdir(parents=True, exist_ok=True)
-    _ordinary_directory(state_root, "fresh-project state root")
+    _no_symlink_ancestors(state_root, "fresh-project state root")
     target_resolved_parent = target.parent.resolve()
     state_resolved = state_root.resolve()
     if state_resolved == target_resolved_parent / target.name:
@@ -409,6 +437,8 @@ def _validate_state_root(target: Path, state_root: Path) -> None:
         pass
     else:
         _fail("fresh-project state root cannot be inside the target")
+    if (target_resolved_parent / target.name).is_relative_to(state_resolved):
+        _fail("fresh-project state root cannot contain the target")
 
 
 def _exclude_after(before: bytes | None) -> bytes:
@@ -435,6 +465,7 @@ def prepare_fresh_target(
     path = _absolute(target)
     state = _absolute(state_root)
     _validate_state_root(path, state)
+    _state_store(state)
     if observe_fresh_target(path) != reviewed:
         _fail("fresh target changed after preview")
     journal_path = _journal_path(state)
@@ -455,9 +486,11 @@ def prepare_fresh_target(
         "schema_version": 2,
         "target_uri": path.as_uri(),
     }
-    _atomic_new(
-        journal_path,
-        application_transaction.canonical_json_bytes(journal) + b"\n",
+    initial_journal = application_transaction.canonical_json_bytes(journal) + b"\n"
+    if count_interrupted_create_once_stages(journal_path):
+        _fail("interrupted fresh-project journal publication requires recovery review")
+    publish_create_once_bytes(
+        journal_path, initial_journal, byte_limit=_MAXIMUM_GIT_METADATA_BYTES,
     )
     try:
         if created_target:
@@ -498,7 +531,7 @@ def prepare_fresh_target(
             ),
             "phase": "bootstrapped",
         }
-        _write_journal(journal_path, journal)
+        _write_journal(journal_path, journal, expected=initial_journal)
         return journal
     except BaseException:
         try:
@@ -534,7 +567,7 @@ def verify_bootstrapped_target(
     path = _absolute(target)
     state = _absolute(state_root)
     try:
-        journal = _load_json(_journal_path(state), "fresh bootstrap journal")
+        journal, _ = _state_json(_journal_path(state), "fresh bootstrap journal")
         if (
             journal.get("format") != BOOTSTRAP_JOURNAL_FORMAT
             or journal.get("schema_version") != 2
@@ -617,8 +650,8 @@ def _remove_tree_no_symlinks(root: Path) -> None:
 
 def _load_bootstrap_journal(
     target: Path, state_root: Path, plan_id: str
-) -> dict[str, Any]:
-    journal = _load_json(_journal_path(state_root), "fresh bootstrap journal")
+) -> tuple[dict[str, Any], bytes]:
+    journal, raw = _state_json(_journal_path(state_root), "fresh bootstrap journal")
     expected = {
         "created_git",
         "created_target",
@@ -642,7 +675,7 @@ def _load_bootstrap_journal(
         or type(journal.get("created_target")) is not bool
     ):
         _fail("fresh bootstrap journal fields changed")
-    return journal
+    return journal, raw
 
 
 def restore_fresh_target(
@@ -655,7 +688,9 @@ def restore_fresh_target(
 
     path = _absolute(target)
     state = _absolute(state_root)
-    journal = _load_bootstrap_journal(path, state, plan_id)
+    _validate_state_root(path, state)
+    _state_store(state)
+    journal, journal_raw = _load_bootstrap_journal(path, state, plan_id)
     if path.exists() or path.is_symlink():
         _ordinary_directory(path, "bootstrap recovery target")
         marker_path = path / ".git/workbench-fresh-project-v2.json"
@@ -669,7 +704,7 @@ def restore_fresh_target(
                 _remove_tree_no_symlinks(entries[0])
             if journal["created_target"]:
                 path.rmdir()
-            _journal_path(state).unlink()
+            _remove_journal(_journal_path(state), expected=journal_raw)
             return {
                 "format": "workbench-blueprints-fresh-bootstrap-recovery-v2",
                 "outcome": "restored",
@@ -707,7 +742,7 @@ def restore_fresh_target(
             marker_path.unlink()
         if journal["created_target"]:
             path.rmdir()
-    _journal_path(state).unlink()
+    _remove_journal(_journal_path(state), expected=journal_raw)
     return {
         "format": "workbench-blueprints-fresh-bootstrap-recovery-v2",
         "outcome": "restored",
@@ -727,7 +762,9 @@ def finalize_fresh_target(
 
     path = _absolute(target)
     state = _absolute(state_root)
-    journal = _load_bootstrap_journal(path, state, plan_id)
+    _validate_state_root(path, state)
+    _state_store(state)
+    journal, journal_raw = _load_bootstrap_journal(path, state, plan_id)
     marker_path = path / ".git/workbench-fresh-project-v2.json"
     marker = _load_json(marker_path, "fresh bootstrap marker")
     if marker.get("plan_id") != plan_id or marker.get("observation_id") != journal["observation_id"]:
@@ -746,18 +783,19 @@ def finalize_fresh_target(
     }
     receipt = application_transaction.seal(BOOTSTRAP_RECEIPT_KIND, body)
     receipts = state / "bootstrap-receipts"
-    receipts.mkdir(exist_ok=True)
-    _ordinary_directory(receipts, "bootstrap receipt directory")
+    secure_private_path(receipts, directory=True)
     destination = _receipt_path(state, plan_id)
     if destination.exists() or destination.is_symlink():
-        if _load_json(destination, "bootstrap receipt") != receipt:
+        retained, _ = _state_json(destination, "bootstrap receipt")
+        if retained != receipt:
             _fail("retained bootstrap receipt identity changed")
     else:
-        _atomic_new(
+        publish_immutable_bytes(
             destination,
             application_transaction.canonical_json_bytes(receipt) + b"\n",
+            byte_limit=_MAXIMUM_GIT_METADATA_BYTES,
         )
-    _journal_path(state).unlink()
+    _remove_journal(_journal_path(state), expected=journal_raw)
     return receipt
 
 
@@ -767,7 +805,12 @@ def load_retained_bootstrap_receipt(
     """Load the exact retained bootstrap receipt for a completed plan."""
 
     state = _absolute(state_root)
-    value = _load_json(_receipt_path(state, plan_id), "bootstrap receipt")
+    if record_store_host_bound():
+        _state_store(state)
+        # The V2 writer created this child with the process umask. Reopen
+        # historical receipts through the same private Core read port.
+        secure_private_path(state / "bootstrap-receipts", directory=True)
+    value, _ = _state_json(_receipt_path(state, plan_id), "bootstrap receipt")
     body = dict(value)
     supplied = body.pop("id", None)
     if (

@@ -248,6 +248,10 @@ can finish or must restore exact applied bytes. Core can reopen those stages
 after a process exit; it preserves a later source edit instead of replacing
 it during recovery. Existing Cleanroom plans remain bound to their original
 sealed construction owner, while new plans use the current owner record.
+Core registers the selected Fresh Project V2 state root and handles physical
+journal and receipt publication, reads, and guarded removal at the existing
+paths. The original and previous Core construction owners reopen only for
+recovery of their already sealed plans.
 
 ## Source layout
 
