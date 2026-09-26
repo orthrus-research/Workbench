@@ -10,6 +10,14 @@ validated owner record and blocks fixture execution when those inputs drift.
 The profile's build input digest also binds its Python implementation and CLI
 entry point, so a retained Home cannot authorize changed owner code.
 
+The generic-mod fixture runner accepts `--core-supervised` for a local build.
+Core holds the existing source projection lease while Gradle runs as a child,
+reuses the separate project cache and Gradle home, and retains bounded raw
+stdout/stderr under the selected state root's `fixture-build-attempts` directory.
+It checks the pinned source and toolchain again after the child exits. The
+runner's existing no-flag behavior is also available as `--legacy-exec` for
+standalone profile use. Both modes require the fixture's Java 25 preflight.
+
 The active provisional native runtime is `0.6.12-alpha`, selected by
 `provisional.yaml` and the stable-named `runtime-toolchain.json`. The latter
 locks the actual platform JAR and CleanMix `0.7.2` plus its runtime dependencies.

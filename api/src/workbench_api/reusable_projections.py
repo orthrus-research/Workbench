@@ -35,7 +35,7 @@ class ReusableProjections(Protocol):
         self, family: str, path: Path, *, source_digest: str,
         project_relative: Path, source_files: tuple[dict[str, object], ...],
         generated_parts: tuple[str, ...], generated_suffixes: tuple[str, ...],
-        validate: Callable[[Path], object],
+        validate: Callable[[Path], object], generated_roots: tuple[Path, ...] = (),
     ) -> ReusableProjectionReference: ...
 
     def open(

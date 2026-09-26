@@ -36,13 +36,27 @@ class ReusableProjectionTests(unittest.TestCase):
             workspace=self.workspace, configuration_home=self.home / "config", owner_id="cleanroom",
         )
 
-    def _adopt(self):
+    def _adopt(self, *, generated_roots: tuple[Path, ...] = ()):
         return self.host.adopt(
             "cleanroom", self.root, source_digest=self.digest,
             project_relative=self.project_relative, source_files=self.rows,
             generated_parts=("build", ".gradle"), generated_suffixes=(".jar", ".class"),
             validate=lambda project: self.assertEqual(project, self.project),
+            generated_roots=generated_roots,
         )
+
+    def test_exact_generated_sibling_is_reusable_but_unrelated_sibling_is_rejected(self) -> None:
+        generated_root = Path(".workbench/build/cleanroom/0.6.8-alpha/generic-mod-daily-loop")
+        generated = self.root / generated_root / "libs/fixture.jar"
+        generated.parent.mkdir(parents=True)
+        generated.write_bytes(b"prior Gradle artifact")
+        reference = self._adopt(generated_roots=(generated_root,))
+        with self.host.open(reference.projection_id, validate=lambda _: None):
+            generated.write_bytes(b"new Gradle artifact")
+        (self.root / "unrelated").mkdir()
+        with self.assertRaisesRegex(ReusableProjectionError, "unexpected member"):
+            with self.host.open(reference.projection_id, validate=lambda _: None):
+                pass
 
     def test_historical_tree_is_adopted_in_place_and_generated_cache_reused(self) -> None:
         old_root_inode = self.root.stat().st_ino

@@ -16,6 +16,10 @@ import tempfile
 from typing import Any
 
 from workbench_api.resources import repository_root
+from workbench_api.reusable_fixture_builds import (
+    ReusableFixtureBuildError, reusable_fixture_builds,
+)
+from workbench_api.reusable_projections import ReusableProjectionError
 
 from . import profile
 
@@ -36,6 +40,9 @@ def entry_point_path() -> Path:
 
 GENERATED_PARTS = frozenset({".gradle", "__pycache__", "build", "out"})
 GENERATED_SUFFIXES = frozenset({".class", ".jar", ".pyc"})
+# The frozen Gradle build directory resolves beside `profiles` inside the
+# historical digest root, rather than beneath the project directory itself.
+GENERATED_ROOTS = (Path(".workbench/build/cleanroom/0.6.8-alpha/generic-mod-daily-loop"),)
 MAX_LOCK_BYTES = 2 * 1024 * 1024
 MAX_FIXTURE_FILE_BYTES = 16 * 1024 * 1024
 MAX_TOOL_RECORD_BYTES = 2 * 1024 * 1024
@@ -543,6 +550,53 @@ def build_argv(
     return argv, environment
 
 
+def _supervised_build(
+    *, command: list[str], environment: dict[str, str],
+    gradle_cmd: Path, java_home: Path, state_root: Path,
+) -> int:
+    """Give exact owner pins to Core and relay its verified child streams."""
+
+    inputs = inspect_build_inputs(gradle_cmd=gradle_cmd, java_home=java_home)
+    input_digest = build_input_digest(inputs)
+    rows = _locked_fixture_rows()
+    lock_bytes = _read_ordinary_bytes(
+        LOCK, label="canonical Cleanroom fixture lock", limit=MAX_LOCK_BYTES,
+    )
+    declared = tuple([
+        *rows,
+        {
+            "path": LOCK.name,
+            "sha256": "sha256:" + sha256(lock_bytes).hexdigest(),
+            "size": len(lock_bytes),
+        },
+    ])
+    project = Path(command[command.index("-p") + 1])
+    result = reusable_fixture_builds().run(
+        state_root=_managed_state_root(state_root),
+        source_digest=inputs["fixture_digest"], project=project,
+        source_files=declared,
+        generated_parts=tuple(GENERATED_PARTS),
+        generated_suffixes=tuple(GENERATED_SUFFIXES),
+        generated_roots=GENERATED_ROOTS,
+        argv=command, environment=environment, input_digest=input_digest,
+        verify_inputs=lambda: build_input_digest(
+            inspect_build_inputs(gradle_cmd=gradle_cmd, java_home=java_home)
+        ),
+        verify_source=lambda selected: _verify_fixture_projection(
+            selected, rows=_locked_fixture_rows(),
+        ),
+    )
+    for stream, raw in ((sys.stdout, result.stdout), (sys.stderr, result.stderr)):
+        binary = getattr(stream, "buffer", None)
+        if binary is not None:
+            binary.write(raw)
+            binary.flush()
+        else:  # A caller may supply a text-only test stream.
+            stream.write(raw.decode("utf-8", errors="replace"))
+            stream.flush()
+    return result.exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gradle-cmd", type=Path, required=True)
@@ -550,8 +604,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-input-digest")
     parser.add_argument("--state-root", type=Path, required=True)
     parser.add_argument("--check-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--core-supervised", action="store_true")
+    mode.add_argument("--legacy-exec", action="store_true")
     args = parser.parse_args(argv)
     try:
+        if args.core_supervised and not args.check_only:
+            early_inputs = inspect_build_inputs(
+                gradle_cmd=args.gradle_cmd, java_home=args.java_home,
+            )
+            if (args.expected_input_digest is not None
+                    and build_input_digest(early_inputs) != args.expected_input_digest):
+                raise FixtureBuildError(
+                    "the selected fixture build inputs changed after Home retained them"
+                )
+            reusable_fixture_builds().prepare(
+                state_root=_managed_state_root(args.state_root),
+            )
         command, environment = build_argv(
             gradle_cmd=args.gradle_cmd,
             java_home=args.java_home,
@@ -576,6 +645,12 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
+        if args.core_supervised:
+            return _supervised_build(
+                command=command, environment=environment,
+                gradle_cmd=args.gradle_cmd, java_home=args.java_home,
+                state_root=args.state_root,
+            )
         for directory in (
             _managed_state_root(args.state_root)
             / "gradle-project-cache/generic-mod-daily-loop",
@@ -585,7 +660,7 @@ def main(argv: list[str] | None = None) -> int:
             directory.mkdir(parents=True, exist_ok=True, mode=0o700)
             directory.chmod(0o700)
         os.execve(command[0], command, environment)
-    except (FixtureBuildError, OSError) as exc:
+    except (FixtureBuildError, ReusableFixtureBuildError, ReusableProjectionError, OSError) as exc:
         print(f"Cleanroom fixture build rejected: {exc}", file=sys.stderr)
         return 2
     return 2  # pragma: no cover - execve replaces the process

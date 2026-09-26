@@ -100,9 +100,18 @@ def _suffixes(parts: tuple[str, ...]) -> list[str]:
     return sorted(parts)
 
 
+def _generated_roots(roots: tuple[Path, ...]) -> list[str]:
+    if not isinstance(roots, tuple) or len(roots) > 8:
+        _fail("source", "generated root paths are invalid")
+    selected = [_relative(root) for root in roots]
+    if len(set(selected)) != len(selected):
+        _fail("source", "generated root paths are repeated")
+    return sorted(selected)
+
+
 def _scan_members(
     root: Path, project: Path, expected: dict[str, dict[str, object]],
-    generated: list[str], generated_suffixes: list[str],
+    generated: list[str], generated_suffixes: list[str], generated_roots: list[str],
 ) -> None:
     """Verify one complete source/member pass; safe to repeat after owner validation."""
     seen: set[str] = set()
@@ -128,7 +137,20 @@ def _scan_members(
             if stat.S_ISREG(info.st_mode) and info.st_nlink != 1:
                 _fail("unsafe", f"projection has a hard-linked member: {member}")
             if not member.is_relative_to(project):
-                if not project.is_relative_to(member):
+                if project.is_relative_to(member):
+                    continue
+                allowed = False
+                for relative_root in generated_roots:
+                    generated_root = root / relative_root
+                    if member.is_relative_to(generated_root):
+                        allowed = True
+                        if member == generated_root and not stat.S_ISDIR(info.st_mode):
+                            _fail("unsafe", f"generated root is not a directory: {member}")
+                        break
+                    if generated_root.is_relative_to(member):
+                        allowed = stat.S_ISDIR(info.st_mode)
+                        break
+                if not allowed:
                     _fail("source", f"projection has an unexpected member: {member}")
                 continue
             relative = member.relative_to(project)
@@ -163,7 +185,7 @@ def _scan_members(
 def _scan(
     root: Path, project: Path, rows: list[dict[str, object]], generated: list[str],
     generated_suffixes: list[str],
-    validate: Callable[[Path], object],
+    validate: Callable[[Path], object], generated_roots: list[str] | None = None,
 ) -> tuple[os.stat_result, os.stat_result]:
     # The state root can be outside the checkout. Reject redirection through all
     # ancestors, and require the adopted root itself to enforce private mode.
@@ -180,9 +202,10 @@ def _scan(
         cursor /= part
         _ordinary_directory(cursor)
     expected = {str(row["path"]): row for row in rows}
-    _scan_members(root, project, expected, generated, generated_suffixes)
+    declared_roots = [] if generated_roots is None else generated_roots
+    _scan_members(root, project, expected, generated, generated_suffixes, declared_roots)
     validate(project)
-    _scan_members(root, project, expected, generated, generated_suffixes)
+    _scan_members(root, project, expected, generated, generated_suffixes, declared_roots)
     observed_root = _ordinary_directory(root)
     observed_parent = _ordinary_directory(root.parent)
     if (observed_root.st_dev, observed_root.st_ino) != (root_info.st_dev, root_info.st_ino):
@@ -220,12 +243,14 @@ class CoreReusableProjections:
             row = check_storage.read_json(self._record_path(projection_id), byte_limit=_RECORD_LIMIT)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise ReusableProjectionError("projection.unavailable", "projection record is unavailable") from exc
-        if (not isinstance(row, dict) or set(row) != {
+        old_fields = {
                     "id", "format", "family", "path", "source_digest", "project_relative",
                     "source_files", "generated_parts", "generated_suffixes", "owner_id",
                     "workspace", "projection_id", "device", "inode", "parent_device",
                     "parent_inode", "retention",
-                } or row != check_storage.seal(KIND, {k: v for k, v in row.items() if k != "id"})
+                }
+        if (not isinstance(row, dict) or set(row) not in (old_fields, old_fields | {"generated_roots"})
+                or row != check_storage.seal(KIND, {k: v for k, v in row.items() if k != "id"})
                 or row.get("format") != KIND or row.get("projection_id") != projection_id
                 or row.get("owner_id") != self.owner_id or row.get("workspace") != str(self.workspace)
                 or row.get("retention") != "protected-until-reviewed-policy"
@@ -238,6 +263,8 @@ class CoreReusableProjections:
             "generated_parts", "generated_suffixes", "owner_id", "workspace",
         )
         binding = {key: row[key] for key in binding_keys}
+        if "generated_roots" in row:
+            binding["generated_roots"] = row["generated_roots"]
         if projection_id != "workbench-reusable-projection-v1:" + sha256(check_storage.canonical(binding)).hexdigest():
             _fail("changed", "projection record identity changed")
         return row
@@ -246,7 +273,7 @@ class CoreReusableProjections:
         self, family: str, path: Path, *, source_digest: str,
         project_relative: Path, source_files: tuple[dict[str, object], ...],
         generated_parts: tuple[str, ...], generated_suffixes: tuple[str, ...],
-        validate: Callable[[Path], object],
+        validate: Callable[[Path], object], generated_roots: tuple[Path, ...] = (),
     ) -> ReusableProjectionReference:
         if not isinstance(family, str) or _NAME.fullmatch(family) is None:
             _fail("path", "projection family is invalid")
@@ -260,6 +287,11 @@ class CoreReusableProjections:
         rows = _source_rows(source_files)
         generated = _generated(generated_parts)
         suffixes = _suffixes(generated_suffixes)
+        roots = _generated_roots(generated_roots)
+        if any((path / relative).is_relative_to(path / project_relative)
+               or (path / project_relative).is_relative_to(path / relative)
+               for relative in roots):
+            _fail("source", "generated root overlaps declared project")
         if any(set(Path(str(row["path"])).parts).intersection(generated) for row in rows):
             _fail("source", "declared source overlaps generated build state")
         if any(Path(str(row["path"])).suffix in suffixes for row in rows):
@@ -271,11 +303,13 @@ class CoreReusableProjections:
             "owner_id": self.owner_id,
             "workspace": str(self.workspace),
         }
+        if roots:
+            binding["generated_roots"] = roots
         nonce = sha256(check_storage.canonical(binding)).hexdigest()
         projection_id = f"workbench-reusable-projection-v1:{nonce}"
         self._ensure()
         with private_record_lock(self.root / "leases" / f"{nonce}.lock", wait=True):
-            root_info, parent_info = _scan(path, path / relative, rows, generated, suffixes, validate)
+            root_info, parent_info = _scan(path, path / relative, rows, generated, suffixes, validate, roots)
             body = {
                 **binding, "format": KIND, "projection_id": projection_id,
                 "device": root_info.st_dev, "inode": root_info.st_ino,
@@ -306,7 +340,8 @@ class CoreReusableProjections:
             rows = _source_rows(tuple(row["source_files"]))
             generated = _generated(tuple(row["generated_parts"]))
             suffixes = _suffixes(tuple(row["generated_suffixes"]))
-            root_info, parent_info = _scan(root, project, rows, generated, suffixes, validate)
+            roots = _generated_roots(tuple(Path(value) for value in row.get("generated_roots", ())))
+            root_info, parent_info = _scan(root, project, rows, generated, suffixes, validate, roots)
             if ((root_info.st_dev, root_info.st_ino) != (row["device"], row["inode"])
                     or (parent_info.st_dev, parent_info.st_ino) != (row["parent_device"], row["parent_inode"])):
                 _fail("changed", "projection directory was replaced after adoption")
