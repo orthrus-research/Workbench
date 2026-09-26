@@ -53,6 +53,10 @@ class CoreRecordStores:
             # Keep V1's recovery markers beside the history CAS. Their exact
             # selected root remains registered even after a failed rollback.
             root = selected
+        elif self.owner_id == "validation" and family == "validation-timings-v1" and selected == self.workspace:
+            # Keep the scheduler's historical latest-report lookup while
+            # registering its mutable diagnostic namespace with Core.
+            root = selected / ".workbench/validation/test-timings"
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

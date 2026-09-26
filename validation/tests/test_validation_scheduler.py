@@ -64,6 +64,39 @@ class ParallelValidationSchedulerTests(unittest.TestCase):
             if os.name == "posix":
                 self.assertEqual(0o700, historic.parent.parent.stat().st_mode & 0o777)
 
+    def test_timing_report_uses_core_store_and_upgrades_historical_file(self) -> None:
+        from workbench_core.storage.registered import ResourceCatalog
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old = root / ".workbench/validation/test-timings/alpha.json"
+            old.parent.mkdir(parents=True)
+            old.write_bytes(b'{"old":true}\n')
+            old.chmod(0o644)
+            with patch.object(scheduler, "ROOT", root):
+                scheduler._publish_timing_report({"run_id": "new-run"}, "alpha")
+            self.assertEqual({"run_id": "new-run"}, json.loads(old.read_bytes()))
+            self.assertEqual(0, old.stat().st_mode & 0o077)
+            rows = ResourceCatalog(self.configuration_home).inventory(
+                workspace=root,
+            )["record_stores"]
+            self.assertEqual(1, len(rows))
+            self.assertEqual("validation-timings-v1", rows[0]["family"])
+            self.assertEqual(str(old.parent), rows[0]["path"])
+
+    def test_timing_report_refuses_historical_hardlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            other = root / "other.txt"
+            other.write_bytes(b"unrelated\n")
+            store = root / ".workbench/validation/test-timings"
+            store.mkdir(parents=True)
+            os.link(other, store / "alpha.json")
+            with patch.object(scheduler, "ROOT", root):
+                with self.assertRaisesRegex(OSError, "not an ordinary file"):
+                    scheduler._publish_timing_report({"run_id": "new-run"}, "alpha")
+            self.assertEqual(b"unrelated\n", other.read_bytes())
+
     def test_parent_retains_admission_when_child_rewrites_its_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

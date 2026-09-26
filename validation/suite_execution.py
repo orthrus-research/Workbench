@@ -34,7 +34,7 @@ from orchestration import (
     select_runnable,
     validate_run_id,
 )
-from core_run_custody import allocate_validation_run
+from core_run_custody import allocate_validation_run, publish_validation_timing
 from suite_measurement import environment_provenance, inventory_digest
 from suite_catalog import (
     SUITES_BY_NAME,
@@ -361,8 +361,8 @@ def _log_excerpt(path: Path, *, limit: int = 12000) -> str:
 
 
 def _publish_timing_report(document: dict, suite_name: str) -> None:
-    target = ROOT / ".workbench/validation/test-timings" / f"{suite_name}.json"
-    _atomic_write_json(target, document)
+    payload = (json.dumps(document, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    publish_validation_timing(ROOT, suite_name, payload)
 
 
 def _cleanup_run_temporary(paths: ValidationRunPaths) -> list[str]:
@@ -531,7 +531,7 @@ def _finish_run(
         try:
             for suite in selected_suites:
                 _publish_timing_report(dict(reports[suite.name].document), suite.name)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             failures.append(f"could not publish diagnostic timing reports: {exc}")
     if failures:
         _write_run_manifest(
