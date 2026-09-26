@@ -29,6 +29,11 @@ class HostFilesystem(Protocol):
         expected_sha256: str | None = None, require_absent: bool = False,
     ) -> None: ...
     def private_record_lock(self, path: Path, *, wait: bool = False) -> ContextManager[None]: ...
+    def append_private_line(
+        self, path: Path, line: bytes, *, expected_size: int, byte_limit: int,
+        journal_byte_limit: int | None = None,
+    ) -> int: ...
+    def inspect_private_journal(self, path: Path, *, byte_limit: int) -> dict: ...
 
 
 _host: HostFilesystem | None = None
@@ -119,3 +124,33 @@ def private_record_lock(path: Path, *, wait: bool = False) -> ContextManager[Non
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide private record locks")
     return operation(path, wait=wait)
+
+
+def append_private_line(
+    path: Path, line: bytes, *, expected_size: int, byte_limit: int,
+    journal_byte_limit: int | None = None,
+) -> int:
+    """Append one fsynced line after Core verifies the expected journal length.
+
+    `byte_limit` bounds this line. `journal_byte_limit`, when supplied, bounds
+    the entire file after append. The owner selects limits from its contract.
+    An expected size of zero creates a fresh journal. A partial final line is
+    retained for recovery inspection and cannot be extended by this port.
+    """
+
+    operation = getattr(_filesystem(), "append_private_line", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide private journals")
+    return operation(
+        path, line, expected_size=expected_size, byte_limit=byte_limit,
+        journal_byte_limit=journal_byte_limit,
+    )
+
+
+def inspect_private_journal(path: Path, *, byte_limit: int) -> dict:
+    """Inspect the complete prefix and any incomplete tail without modifying it."""
+
+    operation = getattr(_filesystem(), "inspect_private_journal", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide private journals")
+    return operation(path, byte_limit=byte_limit)

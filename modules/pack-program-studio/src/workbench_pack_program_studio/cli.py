@@ -376,6 +376,8 @@ def run(
     baseline_git_binding: Mapping[str, Any] | None = None,
     result_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> int:
+    """Run a command; session callers bind Core first (as `main` does)."""
+
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
@@ -528,13 +530,18 @@ def run(
 
 
 def main(argv: list[str] | None = None, *, root: Path | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "session":
+        # A direct module entry uses the same physical host as Core dispatch.
+        from workbench_core.host_services import install_local_host_services
+        install_local_host_services()
     repository = (
         _repository_resource_root(__file__)
         if root is None
         else root.expanduser().resolve()
     )
     return run(
-        list(sys.argv[1:] if argv is None else argv),
+        arguments,
         root=repository,
         output=sys.stdout,
         error=sys.stderr,

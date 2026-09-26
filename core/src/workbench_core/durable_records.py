@@ -270,4 +270,122 @@ def replace_private_bytes(
         fsync_directory(path.parent)
 
 
-__all__ = ["read_private_bytes", "read_bounded_bytes", "publish_immutable_bytes", "replace_private_bytes", "private_record_lock"]
+def append_private_line(
+    path: Path, line: bytes, *, expected_size: int, byte_limit: int,
+    journal_byte_limit: int | None = None,
+) -> int:
+    """Create or append one owner-private journal line with an exact-size precondition.
+
+    The append lock serializes cooperating writers. A torn final line is left
+    intact for owner recovery and prevents a later append from hiding it.
+    """
+
+    _parent(path)
+    _check_data(line, byte_limit)
+    if not line or not line.endswith(b"\n") or b"\n" in line[:-1]:
+        raise DurableRecordError("bounds", "private journal append needs one complete line")
+    if type(expected_size) is not int or expected_size < 0:
+        raise DurableRecordError("bounds", "private journal expected size is invalid")
+    if journal_byte_limit is not None and (
+        type(journal_byte_limit) is not int
+        or journal_byte_limit < 0
+        or expected_size + len(line) > journal_byte_limit
+    ):
+        raise DurableRecordError("bounds", "private journal exceeds its total byte bound")
+    with private_record_lock(path.parent / f".{path.name}.append.lock"):
+        if expected_size == 0:
+            if path.is_symlink():
+                raise DurableRecordError("unsafe", "private journal is a symbolic link")
+            if path.exists():
+                raise DurableRecordError("collision", "private journal already exists")
+            flags = os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_EXCL
+        else:
+            flags = os.O_RDWR | os.O_APPEND
+        flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_BINARY", 0)
+        try:
+            descriptor = os.open(path, flags, 0o600)
+        except FileExistsError as exc:
+            raise DurableRecordError("collision", "private journal already exists") from exc
+        except FileNotFoundError as exc:
+            raise DurableRecordError("unavailable", "private journal is unavailable") from exc
+        except OSError as exc:
+            raise DurableRecordError("write", f"cannot open private journal: {exc}") from exc
+        try:
+            if expected_size == 0:
+                secure_private_path(path, directory=False)
+            visible = _ordinary(path, byte_limit=max(expected_size, path.lstat().st_size))
+            opened = os.fstat(descriptor)
+            if opened.st_nlink != 1 or _identity(opened) != _identity(visible):
+                raise DurableRecordError("changed", "private journal changed before append")
+            if opened.st_size != expected_size:
+                raise DurableRecordError("stale", "private journal length changed after review")
+            if expected_size:
+                os.lseek(descriptor, expected_size - 1, os.SEEK_SET)
+                if os.read(descriptor, 1) != b"\n":
+                    raise DurableRecordError("incomplete", "private journal has an incomplete final line")
+            remaining = memoryview(line)
+            while remaining:
+                count = os.write(descriptor, remaining)
+                if count <= 0:
+                    raise OSError("private journal append made no progress")
+                remaining = remaining[count:]
+            os.fsync(descriptor)
+            finished = os.fstat(descriptor)
+            published = _ordinary(path, byte_limit=expected_size + len(line))
+            if (
+                finished.st_nlink != 1
+                or finished.st_size != expected_size + len(line)
+                or _identity(finished) != _identity(published)
+            ):
+                raise DurableRecordError("changed", "private journal changed during append")
+            os.lseek(descriptor, expected_size, os.SEEK_SET)
+            chunks: list[bytes] = []
+            remaining_bytes = len(line)
+            while remaining_bytes:
+                chunk = os.read(descriptor, min(remaining_bytes, 65536))
+                if not chunk:
+                    raise DurableRecordError("changed", "private journal append could not be read back")
+                chunks.append(chunk)
+                remaining_bytes -= len(chunk)
+            if b"".join(chunks) != line:
+                raise DurableRecordError("changed", "private journal append differs on readback")
+            if _identity(os.fstat(descriptor)) != _identity(
+                _ordinary(path, byte_limit=expected_size + len(line))
+            ):
+                raise DurableRecordError("changed", "private journal changed after readback")
+            if expected_size == 0:
+                fsync_directory(path.parent)
+            return finished.st_size
+        except DurableRecordError:
+            raise
+        except HostFilesystemError as exc:
+            raise DurableRecordError("unsafe", f"cannot secure private journal: {exc}") from exc
+        except OSError as exc:
+            raise DurableRecordError("write", f"cannot append private journal: {exc}") from exc
+        finally:
+            os.close(descriptor)
+
+
+def inspect_private_journal(path: Path, *, byte_limit: int) -> dict:
+    """Report a complete prefix and retained torn tail without editing either."""
+
+    raw = read_private_bytes(path, byte_limit=byte_limit)
+    complete_size = raw.rfind(b"\n") + 1
+    tail = raw[complete_size:]
+    return {
+        "format": "workbench-private-journal-inspection-v1",
+        "size": len(raw),
+        "sha256": sha256(raw).hexdigest(),
+        "complete_size": complete_size,
+        "complete_sha256": sha256(raw[:complete_size]).hexdigest(),
+        "incomplete_size": len(tail),
+        "incomplete_sha256": sha256(tail).hexdigest() if tail else None,
+    }
+
+
+__all__ = [
+    "read_private_bytes", "read_bounded_bytes", "publish_immutable_bytes",
+    "replace_private_bytes", "private_record_lock", "append_private_line",
+    "inspect_private_journal",
+]

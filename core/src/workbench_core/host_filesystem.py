@@ -379,6 +379,22 @@ def private_record_lock(path: Path, *, wait: bool = False):
     return lock(path, wait=wait)
 
 
+def append_private_line(
+    path: Path, line: bytes, *, expected_size: int, byte_limit: int,
+    journal_byte_limit: int | None = None,
+) -> int:
+    from .durable_records import append_private_line as append
+    return append(
+        path, line, expected_size=expected_size, byte_limit=byte_limit,
+        journal_byte_limit=journal_byte_limit,
+    )
+
+
+def inspect_private_journal(path: Path, *, byte_limit: int) -> dict:
+    from .durable_records import inspect_private_journal as inspect
+    return inspect(path, byte_limit=byte_limit)
+
+
 def secure_private_endpoint(path: Path) -> None:
     """Protect one already-bound local endpoint without assuming file kind."""
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 from pathlib import Path
 import os
 import subprocess
@@ -13,8 +14,9 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api.host_filesystem import (
-    DurableRecordError, private_record_lock, publish_immutable_bytes,
-    read_bounded_bytes, read_private_bytes, replace_private_bytes,
+    DurableRecordError, append_private_line, inspect_private_journal,
+    private_record_lock, publish_immutable_bytes, read_bounded_bytes,
+    read_private_bytes, replace_private_bytes,
 )
 from workbench_core.host_services import install_local_host_services
 from workbench_core import durable_records
@@ -107,3 +109,117 @@ class DurableRecordTests(unittest.TestCase):
             thread.join(5)
             self.assertFalse(thread.is_alive())
         self.assertEqual(["busy"], [error.code for error in errors])
+
+    def test_append_journal_reopens_exact_bytes_and_refuses_stale_or_torn_tail(self) -> None:
+        first = b'{"sequence":1}\n'
+        second = b'{"sequence":2}\n'
+        size = append_private_line(self.path, first, expected_size=0, byte_limit=1024)
+        self.assertEqual(len(first), size)
+        with self.assertRaises(DurableRecordError) as aggregate:
+            append_private_line(
+                self.path, second, expected_size=size, byte_limit=1024,
+                journal_byte_limit=size + len(second) - 1,
+            )
+        self.assertEqual("bounds", aggregate.exception.code)
+        self.assertEqual(first, self.path.read_bytes())
+        size = append_private_line(self.path, second, expected_size=size, byte_limit=1024)
+        self.assertEqual(first + second, read_private_bytes(self.path, byte_limit=size))
+        self.assertEqual({
+            "format": "workbench-private-journal-inspection-v1",
+            "size": size,
+            "sha256": sha256(first + second).hexdigest(),
+            "complete_size": size,
+            "complete_sha256": sha256(first + second).hexdigest(),
+            "incomplete_size": 0,
+            "incomplete_sha256": None,
+        }, inspect_private_journal(self.path, byte_limit=size))
+        with self.assertRaises(DurableRecordError) as stale:
+            append_private_line(self.path, b'{"sequence":3}\n', expected_size=len(first), byte_limit=1024)
+        self.assertEqual("stale", stale.exception.code)
+        with self.assertRaises(DurableRecordError) as collision:
+            append_private_line(self.path, first, expected_size=0, byte_limit=1024)
+        self.assertEqual("collision", collision.exception.code)
+
+        # Simulate a process dying after a partial write. Inspection preserves
+        # all bytes, but the next append must not disguise the incomplete event.
+        with self.path.open("ab") as stream:
+            stream.write(b'{"sequence":')
+            stream.flush()
+            os.fsync(stream.fileno())
+        partial = inspect_private_journal(self.path, byte_limit=1024)
+        self.assertEqual(size, partial["complete_size"])
+        self.assertEqual(len(b'{"sequence":'), partial["incomplete_size"])
+        with self.assertRaises(DurableRecordError) as incomplete:
+            append_private_line(
+                self.path, b'{"sequence":3}\n', expected_size=partial["size"], byte_limit=1024,
+            )
+        self.assertEqual("incomplete", incomplete.exception.code)
+        self.assertEqual(first + second + b'{"sequence":', self.path.read_bytes())
+        code = (
+            "import json, sys; from pathlib import Path; "
+            "from workbench_core.host_services import install_local_host_services; "
+            "from workbench_api.host_filesystem import inspect_private_journal; "
+            "install_local_host_services(); "
+            "print(json.dumps(inspect_private_journal(Path(sys.argv[1]), byte_limit=1024)))"
+        )
+        roots = Path(__file__).resolve().parents
+        environment = {**os.environ, "PYTHONPATH": os.pathsep.join((
+            str(roots[2] / "api/src"), str(roots[1] / "src"),
+        ))}
+        reopened = subprocess.run(
+            [sys.executable, "-c", code, str(self.path)], env=environment,
+            capture_output=True, text=True, check=True,
+        )
+        self.assertEqual(partial, json.loads(reopened.stdout))
+
+    def test_append_journal_is_bounded_and_refuses_redirects(self) -> None:
+        with self.assertRaises(DurableRecordError) as malformed:
+            append_private_line(self.path, b"one\ntwo\n", expected_size=0, byte_limit=1024)
+        self.assertEqual("bounds", malformed.exception.code)
+        with self.assertRaises(DurableRecordError) as oversized:
+            append_private_line(self.path, b"1234\n", expected_size=0, byte_limit=4)
+        self.assertEqual("bounds", oversized.exception.code)
+        self.assertFalse(self.path.exists())
+        other = self.root / "other"
+        other.write_bytes(b"outside\n")
+        self.path.symlink_to(other)
+        with self.assertRaises(DurableRecordError) as redirected:
+            append_private_line(self.path, b"inside\n", expected_size=0, byte_limit=1024)
+        self.assertEqual("unsafe", redirected.exception.code)
+        self.assertEqual(b"outside\n", other.read_bytes())
+        self.path.unlink()
+        original = durable_records.private_path
+
+        def simulated_mount(path: Path, *, directory: bool) -> bool:
+            return False if directory and path == self.root else original(path, directory=directory)
+
+        with patch.object(durable_records, "private_path", side_effect=simulated_mount):
+            with self.assertRaises(DurableRecordError) as unsafe:
+                append_private_line(self.path, b"inside\n", expected_size=0, byte_limit=1024)
+        self.assertEqual("unsafe", unsafe.exception.code)
+        self.assertFalse(self.path.exists())
+
+    def test_append_journal_expected_length_excludes_racing_writer(self) -> None:
+        size = append_private_line(self.path, b"0\n", expected_size=0, byte_limit=1024)
+        barrier = threading.Barrier(3)
+        outcomes: list[str] = []
+
+        def competing_writer(value: bytes) -> None:
+            barrier.wait()
+            try:
+                append_private_line(self.path, value, expected_size=size, byte_limit=1024)
+                outcomes.append("written")
+            except DurableRecordError as exc:
+                outcomes.append(exc.code)
+
+        threads = [threading.Thread(target=competing_writer, args=(value,))
+                   for value in (b"a\n", b"b\n")]
+        for thread in threads:
+            thread.start()
+        barrier.wait()
+        for thread in threads:
+            thread.join(5)
+            self.assertFalse(thread.is_alive())
+        self.assertEqual(1, outcomes.count("written"))
+        self.assertEqual(1, sum(code in {"busy", "stale"} for code in outcomes))
+        self.assertIn(self.path.read_bytes(), {b"0\na\n", b"0\nb\n"})

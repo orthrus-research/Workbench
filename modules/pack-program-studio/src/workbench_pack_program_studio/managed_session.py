@@ -23,6 +23,8 @@ from urllib.parse import quote, urlsplit
 from urllib.request import url2pathname
 import uuid
 
+from workbench_api.host_filesystem import append_private_line
+
 from .analyzer import AnalysisContext, analyze_program
 from .language_profile import LoadedLanguageProfile
 from .language_service import inventory_language_runtime
@@ -266,32 +268,32 @@ class EventJournal:
         self.path = path
         self.session_id = session_id
         self.sequence = 0
-        descriptor = os.open(
-            path,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
-            0o600,
-        )
-        self.handle = os.fdopen(descriptor, "w", encoding="utf-8", newline="\n")
+        self.size = 0
+        self.closed = False
 
     def emit(self, state: str, **details: Any) -> dict[str, Any]:
-        self.sequence += 1
+        if self.closed:
+            raise PackProgramError("managed session journal is closed")
+        sequence = self.sequence + 1
         event = {
             "format": "workbench-groovy-language-session-event-v1",
             "schema_version": 1,
             "session_id": self.session_id,
-            "sequence": self.sequence,
+            "sequence": sequence,
             "observed_at": _utc(),
             "state": state,
             "details": details,
         }
-        self.handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-        self.handle.flush()
-        os.fsync(self.handle.fileno())
+        line = (json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
+        self.size = append_private_line(
+            self.path, line, expected_size=self.size, byte_limit=_MAX_CONTROL_BYTES,
+            journal_byte_limit=_MAX_CONTROL_BYTES,
+        )
+        self.sequence = sequence
         return event
 
     def close(self) -> None:
-        if not self.handle.closed:
-            self.handle.close()
+        self.closed = True
 
 
 class WindowsStdioTcpBridge:
@@ -481,7 +483,11 @@ def run_managed_language_session(
     on_event: Callable[[Mapping[str, Any]], None] | None = None,
     on_ready: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
-    """Launch, prove, expose, supervise, and close one exact client session."""
+    """Launch and close one client session with a Core filesystem host bound.
+
+    The first journal line is emitted immediately after session allocation,
+    before endpoint reservation or any projection overlay mutation.
+    """
 
     if context.side != "client":
         raise PackProgramError("managed Groovy language sessions require client side")

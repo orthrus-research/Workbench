@@ -108,8 +108,11 @@ Every action revalidates PID, process creation time, and executable path before
 requesting `CloseMainWindow` or force-stopping after the grace period. The Prism
 launcher process is also reaped.
 
-Every transition is fsync-retained in a JSONL journal. The final content-addressed
-receipt binds the command, process identities, endpoint allocation and route,
+The module encodes each transition; Core appends one complete JSONL line under
+an exact-length precondition and fsyncs it. An incomplete final line remains
+visible for recovery inspection and blocks further appends to that journal.
+The final content-addressed receipt binds the command, process identities,
+endpoint allocation and route,
 local/server URI mapping, readiness, descriptor, overlays and restore results,
 shutdown path, orphan inventory, and event-journal hash. `complete` requires
 exact process ownership, at least one owned client identity, zero orphans, and

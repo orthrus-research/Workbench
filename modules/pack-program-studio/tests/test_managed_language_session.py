@@ -18,11 +18,14 @@ import jsonschema
 
 ROOT = Path(__file__).resolve().parents[3]
 SOURCE = ROOT / "modules/pack-program-studio/src"
+CORE_SOURCE = ROOT / "core/src"
 PROJECT_INTELLIGENCE_SOURCE = ROOT / "modules/project-intelligence/src"
 if str(PROJECT_INTELLIGENCE_SOURCE) not in sys.path:
     sys.path.insert(0, str(PROJECT_INTELLIGENCE_SOURCE))
 if str(SOURCE) not in sys.path:
     sys.path.insert(0, str(SOURCE))
+if str(CORE_SOURCE) not in sys.path:
+    sys.path.insert(0, str(CORE_SOURCE))
 
 from workbench_pack_program_studio import (  # noqa: E402
     AnalysisContext,
@@ -34,7 +37,7 @@ from workbench_pack_program_studio import (  # noqa: E402
     validate_managed_session_receipt,
     validate_session_descriptor,
 )
-from workbench_pack_program_studio.cli import run as cli_run  # noqa: E402
+from workbench_pack_program_studio.cli import main as cli_main, run as cli_run  # noqa: E402
 from workbench_pack_program_studio.managed_model import (  # noqa: E402
     descriptor_identity,
     receipt_identity,
@@ -44,6 +47,8 @@ from workbench_pack_program_studio.managed_session import (  # noqa: E402
     _windows_helper_environment,
     _windows_path_file_uri,
 )
+from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_api.host_filesystem import inspect_private_journal  # noqa: E402
 
 
 PACK_PROFILE = ROOT / "profiles/packs/supersymmetry/groovy/groovy-program-profile-v1.json"
@@ -180,6 +185,7 @@ while True:
 class ManagedLanguageSessionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        install_local_host_services()
         cls.pack_profile = load_profile(PACK_PROFILE)
         cls.managed_profile = load_managed_session_profile(MANAGED_PROFILE)
 
@@ -381,6 +387,15 @@ class ManagedLanguageSessionTests(unittest.TestCase):
             self.assertEqual(config_before, (environment["runtime"] / "config/groovyscript.cfg").read_bytes())
             self.assertEqual(receipt_before, environment["launch_receipt"].read_bytes())
             self.assertFalse((environment["instance"] / ".workbench-groovy-language-service.lock").exists())
+            events_path = Path(result["events"]["path"])
+            events_raw = events_path.read_bytes()
+            events = [json.loads(line) for line in events_raw.splitlines()]
+            self.assertEqual(result["events"]["count"], len(events))
+            self.assertEqual(list(range(1, len(events) + 1)), [row["sequence"] for row in events])
+            self.assertEqual(hashlib.sha256(events_raw).hexdigest(), result["events"]["sha256"])
+            inspection = inspect_private_journal(events_path, byte_limit=len(events_raw))
+            self.assertEqual(len(events_raw), inspection["complete_size"])
+            self.assertEqual(0, inspection["incomplete_size"])
 
         self.assertEqual(result, validate_managed_session_receipt(result))
         self.assertEqual("complete", result["state"])
@@ -478,6 +493,17 @@ class ManagedLanguageSessionTests(unittest.TestCase):
             )
         self.assertEqual(0, code, error.getvalue())
         self.assertEqual("complete", json.loads(output.getvalue())["state"])
+
+    def test_direct_session_entry_binds_core_host(self) -> None:
+        with patch(
+            "workbench_core.host_services.install_local_host_services",
+            wraps=install_local_host_services,
+        ) as install, patch(
+            "workbench_pack_program_studio.cli.run", return_value=0,
+        ) as run:
+            self.assertEqual(0, cli_main(["session"], root=ROOT))
+        install.assert_called_once_with()
+        self.assertEqual(["session"], run.call_args.args[0])
 
 
 if __name__ == "__main__":
