@@ -76,6 +76,12 @@ publisher currently requires POSIX descriptor-relative file operations and
 refuses unsupported hosts. The older `output_path` allocator remains for
 owners awaiting migration.
 
+The catalog root has a sealed identity marker and rejects unknown or unsafe
+file records during inventory. Its present marker cannot prove that an earlier
+configuration home or registered output was never lost. Workspace cleanup
+therefore remains protected while historical catalog coverage is unproven;
+reconciling an interrupted root publication does not establish that coverage.
+
 ## Private records and workspace choices
 
 Core's filesystem host also exposes bounded reads, immutable publication,
@@ -97,9 +103,11 @@ hardlinked legacy files are refused.
 
 Project qualification retains its reviewed plan and external binding path.
 Its private binding reader and revisioned replacement use the Core filesystem
-port while Shell keeps the profile and workspace validation. The explicit
-qualification target can differ from Core's selected workspace, so this
-family awaits a target-aware Core namespace registration contract.
+port while Shell keeps the profile and workspace validation. Core registers
+the historical binding namespace against the explicitly reviewed qualification
+target, which can differ from the dispatch workspace. Workspace Home adoption
+uses the same target-aware registration. Direct invocations without a bound
+record-store scope remain a compatibility route.
 
 `workbench settings workspace list --json` reads the named workspace registry.
 `workbench settings workspace select NAME --profile-config PATH --java-home PATH`
