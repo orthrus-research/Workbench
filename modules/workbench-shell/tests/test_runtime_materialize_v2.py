@@ -10,6 +10,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import patch
 from urllib.parse import unquote, urlparse
 from zipfile import ZipFile
 
@@ -30,8 +31,10 @@ from workbench_shell import (  # noqa: E402
 )
 from workbench_core.host_services import install_local_host_services  # noqa: E402
 from workbench_core.packwiz_scratch import CorePackwizScratch  # noqa: E402
+from workbench_core.packwiz_tree_scope import direct_packwiz_tree_scope  # noqa: E402
 from workbench_api.temporary_leases import temporary_scratch_scope  # noqa: E402
 from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
+from workbench_core.storage.tree_catalog import TreeCatalog  # noqa: E402
 
 
 JAVA_IDENTITY = {
@@ -490,10 +493,16 @@ def _materialize(
     case: dict[str, object],
     *,
     seed_roots: tuple[Path, ...] = (),
+    configuration_home: Path | None = None,
 ) -> dict[str, object]:
+    selected_home = configuration_home or Path(case["root"]) / "config"
     with temporary_scratch_scope(CorePackwizScratch(
-        configuration_home=Path(case["root"]) / "config",
-    )):
+        configuration_home=selected_home,
+    )), direct_packwiz_tree_scope(
+        workspace=Path(case["workspace"]),
+        state_root=Path(case["root"]) / "state",
+        configuration_home=selected_home,
+    ):
         return materialize_packwiz_workspace_v2(
             case["plan"],
             workspace_root=case["workspace"],
@@ -619,6 +628,38 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
             )
             target = _local_path(receipt["target"]["fixture_root_uri"])
             payload = target / "instance/.minecraft"
+            catalog = ResourceCatalog(Path(case["root"]) / "config")
+            trees = catalog.inventory(workspace=Path(case["workspace"]))["trees"]
+            self.assertEqual(1, len(trees))
+            self.assertEqual("committed", trees[0]["status"])
+            self.assertEqual(str(target), trees[0]["path"])
+            self.assertGreater(trees[0]["member_count"], 1)
+            self.assertEqual(1, len(trees[0]["references"]))
+            witness = json.loads(catalog.read_bytes(trees[0]["references"][0]))
+            self.assertEqual(
+                "workbench-packwiz-v2-dependencies-v1", witness["format"],
+            )
+            self.assertEqual(receipt["materialization_id"], witness["materialization_id"])
+            self.assertEqual(
+                sha256((target / "receipts/packwiz-materialization-v2.json").read_bytes()).hexdigest(),
+                witness["receipt_sha256"],
+            )
+            self.assertEqual(receipt["bootstrap_source"], witness["bootstrap_source"])
+            self.assertEqual(receipt["source_snapshot"], witness["source_snapshot"])
+            self.assertEqual(receipt["tools"], witness["tools"])
+            self.assertEqual(receipt["payload"], witness["payload"])
+            source_lease = _local_path(witness["source_scratch_uri"]).parent
+            self.assertEqual(
+                [(str(source_lease), "retained-unproven")],
+                [(row["path"], row["status"]) for row in catalog.inventory(
+                    workspace=Path(case["workspace"]),
+                )["temporary_leases"]],
+            )
+            for row in witness["logs"].values():
+                self.assertEqual(
+                    row["sha256"],
+                    sha256(catalog.read_bytes(row["resource_id"])).hexdigest(),
+                )
             self.assertNotEqual(target, bootstrap_fixture)
             self.assertTrue(
                 target.is_relative_to(
@@ -644,6 +685,7 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                 _tree_bytes(bootstrap_fixture),
                 bootstrap_before,
             )
+
             rows = {
                 row["metadata_path"]: row
                 for row in receipt["packwiz_options"]["files"]
@@ -678,6 +720,70 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                 _tree_bytes(bootstrap_fixture),
                 bootstrap_before,
             )
+
+    def test_uncataloged_historical_target_requires_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            case = _case(Path(temporary))
+            created = _materialize(case)
+            target = _local_path(created["receipt"]["target"]["fixture_root_uri"])
+            with self.assertRaisesRegex(
+                PackwizMaterializationError,
+                "historical ownership requires review",
+            ):
+                _materialize(
+                    case, configuration_home=Path(temporary) / "other-config",
+                )
+            self.assertTrue(target.is_dir())
+
+    def test_interrupted_post_move_publication_reconciles_without_reinstall(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            case = _case(Path(temporary))
+            original_write = TreeCatalog._write
+
+            def interrupt_commit(self, name, nonce, kind, body):
+                if name == "commits":
+                    raise RuntimeError("simulated exit after Core moved the fixture")
+                return original_write(self, name, nonce, kind, body)
+
+            with patch.object(TreeCatalog, "_write", interrupt_commit):
+                with self.assertRaisesRegex(RuntimeError, "simulated exit"):
+                    _materialize(case)
+            catalog = ResourceCatalog(Path(case["root"]) / "config")
+            trees = catalog.inventory(workspace=Path(case["workspace"]))["trees"]
+            self.assertEqual("published-uncommitted", trees[0]["status"])
+            target = Path(trees[0]["path"])
+            receipt_bytes = (target / "receipts/packwiz-materialization-v2.json").read_bytes()
+
+            reused = _materialize(case)
+            self.assertEqual("reused", reused["outcome"])
+            self.assertEqual(
+                receipt_bytes,
+                (target / "receipts/packwiz-materialization-v2.json").read_bytes(),
+            )
+            self.assertEqual(
+                "committed",
+                catalog.inventory(workspace=Path(case["workspace"]))["trees"][0]["status"],
+            )
+
+    def test_changed_retained_log_reference_blocks_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            case = _case(Path(temporary))
+            _materialize(case)
+            catalog = ResourceCatalog(Path(case["root"]) / "config")
+            inventory = catalog.inventory(workspace=Path(case["workspace"]))
+            witness_id = inventory["trees"][0]["references"][0]
+            witness = json.loads(catalog.read_bytes(witness_id))
+            refresh_id = witness["logs"]["refresh"]["resource_id"]
+            retained = next(
+                row for row in inventory["resources"] if row["resource_id"] == refresh_id
+            )
+            Path(retained["path"]).write_bytes(b"changed retained log\n")
+
+            with self.assertRaisesRegex(
+                PackwizMaterializationError,
+                "earlier Core Packwiz V2 result requires review",
+            ):
+                _materialize(case)
 
     def test_reuse_rejects_decision_pack_tool_and_payload_drift(self) -> None:
         for drift in ("decision", "pack", "tool", "payload"):
@@ -727,7 +833,7 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                     expected_error = (
                         "does not bind the refreshed pack"
                         if drift == "pack"
-                        else "different materialization|drifted"
+                        else "different materialization|drifted|Core cannot inspect Packwiz V2 result custody"
                     )
                     with self.assertRaisesRegex(
                         PackwizMaterializationError,
@@ -763,7 +869,7 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                     prepared = list(variants.iterdir())
                     self.assertEqual(len(prepared), 1)
                     self.assertTrue(prepared[0].name.startswith("."))
-                    self.assertTrue((prepared[0] / "variant/instance/.minecraft/packwiz.json").is_file())
+                    self.assertTrue((prepared[0] / "payload/instance/.minecraft/packwiz.json").is_file())
                     self.assertEqual(
                         _tree_bytes(bootstrap_fixture),
                         bootstrap_before,
@@ -791,13 +897,13 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
             prepared = list(variants.iterdir())
             self.assertEqual(len(prepared), 1)
             self.assertTrue(prepared[0].name.startswith("."))
-            self.assertTrue((prepared[0] / "variant/instance/.minecraft/packwiz.json").is_file())
+            self.assertTrue((prepared[0] / "payload/instance/.minecraft/packwiz.json").is_file())
             (Path(case["java"]).with_name("installer-mode")).write_text(
                 "normal\n", encoding="utf-8",
             )
             with self.assertRaisesRegex(
                 PackwizMaterializationError,
-                "earlier Packwiz V2 prepared stage requires review",
+                "earlier Core Packwiz V2 result requires review",
             ):
                 _materialize(case)
             self.assertEqual(prepared, list(variants.iterdir()))

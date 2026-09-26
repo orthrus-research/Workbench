@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from workbench_project_intelligence.working_tree import copy_tracked_workspace
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from hashlib import sha256
 import hashlib
 import json
@@ -38,6 +38,7 @@ from workbench_api.processes import ProcessError, execute_logged_process
 from workbench_api.temporary_leases import (
     TemporaryScratchError, packwiz_source_scratch,
 )
+from workbench_api.managed_trees import ManagedTreeError, managed_trees
 from workbench_core.artifact_store import DOWNLOAD_CHUNK_BYTES, sha256_file
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
@@ -84,6 +85,69 @@ def _source_scratch(*, workspace: Path, state: Path, plan_digest: str):
             yield path
     except TemporaryScratchError as exc:
         raise PackwizMaterializationError(str(exc)) from exc
+
+
+def _packwiz_tree_host(workspace: Path):
+    try:
+        host = managed_trees()
+    except ManagedTreeError as exc:
+        raise PackwizMaterializationError(
+            "Core Packwiz V2 result custody is unavailable: " + str(exc)
+        ) from exc
+    if host.workspace != workspace or host.owner_id != "workbench-shell":
+        raise PackwizMaterializationError(
+            "Core Packwiz V2 result custody belongs to another workspace or owner"
+        )
+    return host
+
+
+def _retain_v2_dependencies(
+    tree_host, *, receipt: Mapping[str, Any], receipt_bytes: bytes,
+    staged_source: Path, refresh_log: Path, installer_log: Path,
+) -> str:
+    """Preserve the exact tool logs and immutable V2 input identity evidence."""
+
+    try:
+        log_rows = {}
+        log_references = []
+        for label, path in (("refresh", refresh_log), ("installer", installer_log)):
+            digest, size = sha256_file(path)
+            reference = tree_host.retain_file_reference(
+                "evidence", f"packwiz-v2-{label}.log", path,
+                sha256=digest, size=size,
+                domain_id=str(receipt["materialization_id"]) + ":" + label,
+            )
+            log_rows[label] = {
+                "historical_uri": path.as_uri(),
+                "resource_id": reference.resource_id,
+                "sha256": digest,
+                "size": size,
+            }
+            log_references.append(reference.resource_id)
+        witness = {
+            "format": "workbench-packwiz-v2-dependencies-v1",
+            "schema_version": 1,
+            "materialization_id": receipt["materialization_id"],
+            "receipt_sha256": sha256(receipt_bytes).hexdigest(),
+            "source_scratch_uri": staged_source.as_uri(),
+            "source_snapshot": receipt["source_snapshot"],
+            "refreshed_pack": receipt["refreshed_pack"],
+            "bootstrap_source": receipt["bootstrap_source"],
+            "tools": receipt["tools"],
+            "payload": receipt["payload"],
+            "logs": log_rows,
+        }
+        reference = tree_host.retain_bytes_reference(
+            "evidence", "packwiz-v2-dependencies.json",
+            _canonical_bytes(witness) + b"\n",
+            references=tuple(log_references),
+            domain_id=str(receipt["materialization_id"]),
+        )
+    except (ManagedTreeError, OSError, ValueError) as exc:
+        raise PackwizMaterializationError(
+            "Core cannot retain Packwiz V2 dependencies: " + str(exc)
+        ) from exc
+    return reference.resource_id
 
 
 def _canonical_bytes(value: Any) -> bytes:
@@ -1861,6 +1925,41 @@ def materialize_packwiz_workspace_v2(
         receipt_path = fixture_root / RECEIPT_V2_PATH
         instance_root = fixture_root / "instance"
         payload_root = instance_root / ".minecraft"
+        tree_host = _packwiz_tree_host(workspace) if os.name == "posix" else None
+        cataloged = None
+        if tree_host is not None:
+            try:
+                target = tree_host.lookup_target("artifacts", fixture_root)
+            except ManagedTreeError as exc:
+                if exc.code != "tree.unavailable":
+                    raise PackwizMaterializationError(
+                        "Core cannot inspect Packwiz V2 result custody: " + str(exc)
+                    ) from exc
+                if fixture_root.exists() or fixture_root.is_symlink():
+                    raise PackwizMaterializationError(
+                        "existing Packwiz V2 target has no Core catalog record; "
+                        "historical ownership requires review"
+                    ) from exc
+            else:
+                if target.status in {"failed", "allocated", "conflict", "unavailable", "changed"}:
+                    raise PackwizMaterializationError(
+                        "earlier Core Packwiz V2 result requires review"
+                    )
+                try:
+                    cataloged = tree_host.reconcile(target.tree_id)
+                except (ManagedTreeError, OSError, ValueError) as exc:
+                    raise PackwizMaterializationError(
+                        "earlier Core Packwiz V2 result requires review: " + str(exc)
+                    ) from exc
+                if (
+                    cataloged.path != fixture_root
+                    or cataloged.workspace != workspace
+                    or cataloged.owner_id != "workbench-shell"
+                    or cataloged.inventory_policy != "posix-exact-v1"
+                ):
+                    raise PackwizMaterializationError(
+                        "Core cataloged another Packwiz V2 result"
+                    )
         if fixture_root.exists() or fixture_root.is_symlink():
             if (
                 fixture_root.is_dir()
@@ -1880,7 +1979,7 @@ def materialize_packwiz_workspace_v2(
                 launcher_digest, _launcher_size = sha256_file(
                     instance_root / "mmc-pack.json"
                 )
-                return _reuse_existing_v2(
+                reopened = _reuse_existing_v2(
                     plan,
                     variant_id=variant_id,
                     receipt_path=receipt_path,
@@ -1893,6 +1992,11 @@ def materialize_packwiz_workspace_v2(
                     decisions=decisions,
                     decisions_sha256=decisions_sha256,
                 )
+                if cataloged is not None and cataloged.domain_id != reopened["receipt"]["materialization_id"]:
+                    raise PackwizMaterializationError(
+                        "Core Packwiz V2 result identity differs from its receipt"
+                    )
+                return reopened
             raise PackwizMaterializationError(
                 "existing Packwiz V2 target is incomplete or unrecorded"
             )
@@ -1911,127 +2015,182 @@ def materialize_packwiz_workspace_v2(
                     "earlier Packwiz V2 prepared stage requires review"
                 )
 
-        # The native process still uses its separate source scratch. The
-        # prepared result is adjacent to the historical fixture target so
-        # Core can pin both parents for its no-replace move. An interrupted
-        # result stage stays visible for owner recovery.
-        prepared_stage = Path(tempfile.mkdtemp(
-            prefix=f".{plan_digest[:16]}.", dir=fixture_parent,
-        ))
-        staged_fixture = prepared_stage / "variant"
-        staged_instance = staged_fixture / "instance"
-        launcher_tree = _copy_launcher_base(base_instance, staged_instance)
-        if launcher_tree != bootstrap_source["launcher_tree"]:
-            raise PackwizMaterializationError(
-                "Cleanroom launcher base changed during V2 projection"
+        # Windows keeps its historical direct rename route. On POSIX hosts,
+        # Core allocates and catalogs the exact fixture before publication.
+        with ExitStack() as publication_scope:
+            tree_stage = None
+            if tree_host is None:  # pragma: no cover - Windows compatibility route
+                prepared_stage = Path(tempfile.mkdtemp(
+                    prefix=f".{plan_digest[:16]}.", dir=fixture_parent,
+                ))
+                staged_fixture = prepared_stage / "variant"
+            else:
+                try:
+                    tree_stage = publication_scope.enter_context(tree_host.stage(
+                        "artifacts", fixture_root.name, requested_path=fixture_root,
+                    ))
+                except (ManagedTreeError, OSError, ValueError) as exc:
+                    raise PackwizMaterializationError(
+                        "Core cannot prepare Packwiz V2 result custody: " + str(exc)
+                    ) from exc
+                staged_fixture = tree_stage.path
+            staged_instance = staged_fixture / "instance"
+            launcher_tree = _copy_launcher_base(base_instance, staged_instance)
+            if launcher_tree != bootstrap_source["launcher_tree"]:
+                raise PackwizMaterializationError(
+                    "Cleanroom launcher base changed during V2 projection"
+                )
+            launcher_manifest = staged_instance / "mmc-pack.json"
+            launcher_digest, _launcher_size = sha256_file(launcher_manifest)
+            staged_payload = staged_instance / ".minecraft"
+            staged_payload.mkdir()
+            disabled_outputs = frozenset(
+                str(row["output_path"])
+                for row in decisions
+                if not bool(row["declared_default"])
             )
-        launcher_manifest = staged_instance / "mmc-pack.json"
-        launcher_digest, _launcher_size = sha256_file(launcher_manifest)
-        staged_payload = staged_instance / ".minecraft"
-        staged_payload.mkdir()
-        disabled_outputs = frozenset(
-            str(row["output_path"])
-            for row in decisions
-            if not bool(row["declared_default"])
-        )
-        seeds = _seed_payload(
-            staged_source,
-            staged_payload,
-            seed_roots,
-            excluded_outputs=disabled_outputs,
-        )
-        initial_state = _write_packwiz_initial_state(
-            staged_payload,
-            decisions,
-        )
-        launcher_sentinel = staging / "launcher-sentinel"
-        launcher_sentinel.mkdir()
-        installer_log = evidence_root / "packwiz-installer.log"
-        _run_logged(
-            [
-                str(java_path),
-                "-cp",
-                str(installer),
-                INSTALLER_MAIN_CLASS,
-                "--no-gui",
-                "--side",
-                "client",
-                "--pack-folder",
-                str(staged_payload),
-                "--multimc-folder",
-                str(launcher_sentinel),
-                (staged_source / "pack.toml").as_uri(),
-            ],
-            cwd=staged_payload,
-            log_path=installer_log,
-            timeout_seconds=install_timeout_seconds,
-            label="Packwiz Installer",
-        )
-        launcher_after, _launcher_size = sha256_file(launcher_manifest)
-        if launcher_after != launcher_digest:
-            raise PackwizMaterializationError(
-                "Packwiz Installer changed Cleanroom launcher metadata"
+            seeds = _seed_payload(
+                staged_source,
+                staged_payload,
+                seed_roots,
+                excluded_outputs=disabled_outputs,
             )
-        final_state, option_rows = _verify_packwiz_final_state(
-            staged_payload,
-            decisions,
-            pack,
-        )
-        options = _v2_packwiz_options(
-            payload_root=staged_payload,
-            published_payload_root=payload_root,
-            decisions=decisions,
-            decisions_sha256=decisions_sha256,
-            initial=initial_state,
-            final=final_state,
-            rows=option_rows,
-        )
-        payload_identity, _payload_hashes = _tree_identity(staged_payload)
-        if payload_identity["file_count"] == 0:
-            raise PackwizMaterializationError(
-                "Packwiz Installer produced an empty client payload"
+            initial_state = _write_packwiz_initial_state(
+                staged_payload,
+                decisions,
             )
-        receipt = _v2_receipt(
-            plan,
-            variant_id=variant_id,
-            fixture_root=fixture_root,
-            source=source,
-            exclusions=exclusions,
-            pack=pack,
-            staged_tree=staged_tree,
-            seeds=seeds,
-            tools=tools,
-            launcher_manifest_sha256=launcher_digest,
-            payload=payload_identity,
-            evidence_root=evidence_root,
-            bootstrap_source=bootstrap_source,
-            packwiz_options=options,
-        )
-        _write_receipt(staged_fixture / RECEIPT_V2_PATH, receipt)
-        _rename_directory_no_replace(staged_fixture, fixture_root)
-        if _launcher_tree_identity(instance_root) != bootstrap_source["launcher_tree"]:
-            raise PackwizMaterializationError(
-                "published Packwiz V2 launcher base changed"
+            launcher_sentinel = staging / "launcher-sentinel"
+            launcher_sentinel.mkdir()
+            installer_log = evidence_root / "packwiz-installer.log"
+            _run_logged(
+                [
+                    str(java_path),
+                    "-cp",
+                    str(installer),
+                    INSTALLER_MAIN_CLASS,
+                    "--no-gui",
+                    "--side",
+                    "client",
+                    "--pack-folder",
+                    str(staged_payload),
+                    "--multimc-folder",
+                    str(launcher_sentinel),
+                    (staged_source / "pack.toml").as_uri(),
+                ],
+                cwd=staged_payload,
+                log_path=installer_log,
+                timeout_seconds=install_timeout_seconds,
+                label="Packwiz Installer",
             )
-        reopened = _reuse_existing_v2(
-            plan,
-            variant_id=variant_id,
-            receipt_path=receipt_path,
-            fixture_root=fixture_root,
-            source=source,
-            pack=pack,
-            tools=tools,
-            launcher_manifest_sha256=launcher_digest,
-            bootstrap_source=bootstrap_source,
-            decisions=decisions,
-            decisions_sha256=decisions_sha256,
-        )
-        return {
-            "format": "workbench-packwiz-materialization-result-v2",
-            "schema_version": 2,
-            "outcome": "installed",
-            "receipt": reopened["receipt"],
-        }
+            launcher_after, _launcher_size = sha256_file(launcher_manifest)
+            if launcher_after != launcher_digest:
+                raise PackwizMaterializationError(
+                    "Packwiz Installer changed Cleanroom launcher metadata"
+                )
+            final_state, option_rows = _verify_packwiz_final_state(
+                staged_payload,
+                decisions,
+                pack,
+            )
+            options = _v2_packwiz_options(
+                payload_root=staged_payload,
+                published_payload_root=payload_root,
+                decisions=decisions,
+                decisions_sha256=decisions_sha256,
+                initial=initial_state,
+                final=final_state,
+                rows=option_rows,
+            )
+            payload_identity, _payload_hashes = _tree_identity(staged_payload)
+            if payload_identity["file_count"] == 0:
+                raise PackwizMaterializationError(
+                    "Packwiz Installer produced an empty client payload"
+                )
+            receipt = _v2_receipt(
+                plan,
+                variant_id=variant_id,
+                fixture_root=fixture_root,
+                source=source,
+                exclusions=exclusions,
+                pack=pack,
+                staged_tree=staged_tree,
+                seeds=seeds,
+                tools=tools,
+                launcher_manifest_sha256=launcher_digest,
+                payload=payload_identity,
+                evidence_root=evidence_root,
+                bootstrap_source=bootstrap_source,
+                packwiz_options=options,
+            )
+            _write_receipt(staged_fixture / RECEIPT_V2_PATH, receipt)
+            if tree_stage is None:  # pragma: no cover - Windows compatibility route
+                _rename_directory_no_replace(staged_fixture, fixture_root)
+            else:
+                expected_receipt_bytes = (staged_fixture / RECEIPT_V2_PATH).read_bytes()
+                dependency_reference = _retain_v2_dependencies(
+                    tree_host,
+                    receipt=receipt,
+                    receipt_bytes=expected_receipt_bytes,
+                    staged_source=staged_source,
+                    refresh_log=refresh_log,
+                    installer_log=installer_log,
+                )
+
+                def validate_staged_tree(root: Path) -> None:
+                    if (root / RECEIPT_V2_PATH).read_bytes() != expected_receipt_bytes:
+                        raise PackwizMaterializationError(
+                            "staged Packwiz V2 receipt changed before Core publication"
+                        )
+                    if _launcher_tree_identity(root / "instance") != bootstrap_source["launcher_tree"]:
+                        raise PackwizMaterializationError(
+                            "staged Packwiz V2 launcher base changed before Core publication"
+                        )
+                    observed_payload, _ = _tree_identity(root / "instance/.minecraft")
+                    if observed_payload != payload_identity:
+                        raise PackwizMaterializationError(
+                            "staged Packwiz V2 payload changed before Core publication"
+                        )
+
+                try:
+                    reference = tree_stage.publish(
+                        validate=validate_staged_tree,
+                        domain_id=receipt["materialization_id"],
+                        references=(dependency_reference,),
+                        inventory_policy="posix-exact-v1",
+                    )
+                except (ManagedTreeError, OSError, ValueError) as exc:
+                    raise PackwizMaterializationError(
+                        "Core cannot publish Packwiz V2 result: " + str(exc)
+                    ) from exc
+                if (reference.path != fixture_root
+                        or reference.domain_id != receipt["materialization_id"]
+                        or reference.inventory_policy != "posix-exact-v1"):
+                    raise PackwizMaterializationError(
+                        "Core published another Packwiz V2 result"
+                    )
+            if _launcher_tree_identity(instance_root) != bootstrap_source["launcher_tree"]:
+                raise PackwizMaterializationError(
+                    "published Packwiz V2 launcher base changed"
+                )
+            reopened = _reuse_existing_v2(
+                plan,
+                variant_id=variant_id,
+                receipt_path=receipt_path,
+                fixture_root=fixture_root,
+                source=source,
+                pack=pack,
+                tools=tools,
+                launcher_manifest_sha256=launcher_digest,
+                bootstrap_source=bootstrap_source,
+                decisions=decisions,
+                decisions_sha256=decisions_sha256,
+            )
+            return {
+                "format": "workbench-packwiz-materialization-result-v2",
+                "schema_version": 2,
+                "outcome": "installed",
+                "receipt": reopened["receipt"],
+            }
 
 
 def _installer_lock(

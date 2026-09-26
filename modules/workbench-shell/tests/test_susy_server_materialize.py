@@ -50,6 +50,7 @@ from workbench_core.host_services import (  # noqa: E402
     install_local_host_services, suite_managed_tree_scope,
 )
 from workbench_core.packwiz_scratch import CorePackwizScratch  # noqa: E402
+from workbench_core.packwiz_tree_scope import direct_packwiz_tree_scope  # noqa: E402
 from workbench_api.temporary_leases import temporary_scratch_scope  # noqa: E402
 
 
@@ -744,7 +745,11 @@ class _MaterializationFixture:
         }
         with temporary_scratch_scope(CorePackwizScratch(
             configuration_home=self.suite / ".config",
-        )):
+        )), direct_packwiz_tree_scope(
+            workspace=self.pack,
+            state_root=self.suite / ".workbench",
+            configuration_home=self.suite / ".config",
+        ):
             self.client_materialization = materialize_packwiz_workspace_v2(
                 self.client_plan,
                 workspace_root=self.pack,

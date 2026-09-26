@@ -17,6 +17,7 @@ from uuid import uuid4
 from workbench_api.managed_trees import (
     ManagedTreeError, ManagedTreeReference, ManagedTreeTarget,
 )
+from workbench_api.durable_resources import DurableResourceError, ResourceReference
 
 from . import check_lifecycle, check_storage
 from .durable_files import _directory as pinned_directory, read_verified
@@ -278,12 +279,57 @@ class CoreManagedTrees:
         if not isinstance(owner_id, str) or _OWNER.fullmatch(owner_id) is None:
             raise ManagedTreeError("tree.policy", "managed tree owner is invalid")
         self.workspace = workspace
+        self.configuration_home = configuration_home
         self.locations = dict(locations)
         self.owner_id = owner_id
         self.policy_id = policy_id
         self.location_sources = dict(location_sources or {})
         self.check_cancelled = check_cancelled
         self.catalog = ResourceCatalog(configuration_home)
+
+    def _resource_host(self):
+        from .storage.registered import CoreDurableResources
+
+        return CoreDurableResources(
+            workspace=self.workspace,
+            configuration_home=self.configuration_home,
+            locations=self.locations,
+            owner_id=self.owner_id,
+            policy_id=self.policy_id,
+            location_sources=self.location_sources,
+            check_cancelled=self.check_cancelled,
+        )
+
+    def retain_file_reference(
+        self, role: str, name: str, source: Path, *,
+        sha256: str, size: int, domain_id: str | None = None,
+    ) -> ResourceReference:
+        """Snapshot an exact external input into the existing resource catalog."""
+
+        if (not isinstance(source, Path) or not source.is_absolute()
+                or type(sha256) is not str or re.fullmatch(r"[0-9a-f]{64}", sha256) is None
+                or type(size) is not int or not 0 <= size <= 32 * 1024 * 1024):
+            raise ManagedTreeError("tree.references", "dependency file identity is invalid")
+        try:
+            data = read_verified(source, expected_size=size, expected_sha256=sha256)
+            return self._resource_host().publish_bytes(
+                role, name, data, domain_id=domain_id,
+            )
+        except (DurableResourceError, OSError) as exc:
+            raise ManagedTreeError("tree.references", "dependency file cannot be retained exactly") from exc
+
+    def retain_bytes_reference(
+        self, role: str, name: str, data: bytes, *,
+        references: tuple[str, ...] = (), domain_id: str | None = None,
+    ) -> ResourceReference:
+        """Publish owner-defined dependency evidence through the resource catalog."""
+
+        try:
+            return self._resource_host().publish_bytes(
+                role, name, data, references=references, domain_id=domain_id,
+            )
+        except (DurableResourceError, OSError) as exc:
+            raise ManagedTreeError("tree.references", "dependency evidence cannot be retained") from exc
 
     def _cancelled(self) -> bool:
         try:
@@ -329,17 +375,27 @@ class CoreManagedTrees:
                 or len(set(references)) != len(references)):
             raise ManagedTreeError("tree.references", "managed tree references must be unique Core resources")
         with ExitStack() as stack:
+            held_resources: set[str] = set()
+
+            def hold_resource(resource_id: str) -> None:
+                if resource_id in held_resources:
+                    return
+                held_resources.add(resource_id)
+                stack.enter_context(self.catalog.lease(resource_id))
+                intent = self.catalog._intent(resource_id)
+                self.catalog._commit(resource_id, intent)
+                if intent["workspace"] != str(self.workspace):
+                    raise ManagedTreeError("tree.references", "referenced resource belongs to another workspace")
+                read_verified(
+                    self.catalog._target(intent), expected_size=int(intent["bytes"]),
+                    expected_sha256=str(intent["sha256"]),
+                )
+                for child in intent["references"]:
+                    hold_resource(str(child))
+
             for reference in sorted(references):
                 if _FILE_ID.fullmatch(reference):
-                    stack.enter_context(self.catalog.lease(reference))
-                    intent = self.catalog._intent(reference)
-                    self.catalog._commit(reference, intent)
-                    if intent["workspace"] != str(self.workspace):
-                        raise ManagedTreeError("tree.references", "referenced resource belongs to another workspace")
-                    read_verified(
-                        self.catalog._target(intent), expected_size=int(intent["bytes"]),
-                        expected_sha256=str(intent["sha256"]),
-                    )
+                    hold_resource(reference)
                 elif _TREE_ID.fullmatch(reference):
                     stack.enter_context(self.catalog.trees.lease(reference))
                     intent = self.catalog.trees.intent(reference)
@@ -461,18 +517,19 @@ class CoreManagedTrees:
 
     def reconcile(self, tree_id: str) -> ManagedTreeReference:
         def publish(staged: Path, target: Path, intent: Mapping[str, object]) -> None:
-            with self._references(tuple(intent["references"])):
-                self.check_cancelled()
-                _rename_no_replace(
-                    staged, target,
-                    parent_identity=(intent["parent_device"], intent["parent_inode"]),
-                    payload_identity=(intent["device"], intent["inode"]),
-                )
-                fsync_directory(target.parent)
+            self.check_cancelled()
+            _rename_no_replace(
+                staged, target,
+                parent_identity=(intent["parent_device"], intent["parent_inode"]),
+                payload_identity=(intent["device"], intent["inode"]),
+            )
+            fsync_directory(target.parent)
 
-        return self.catalog.trees.reconcile(
-            tree_id, workspace=self.workspace, publish_prepared=publish,
-        )
+        intent = self.catalog.trees.intent(tree_id)
+        with self._references(tuple(intent["references"])):
+            return self.catalog.trees.reconcile(
+                tree_id, workspace=self.workspace, publish_prepared=publish,
+            )
 
 
 __all__ = ["CoreManagedTrees"]

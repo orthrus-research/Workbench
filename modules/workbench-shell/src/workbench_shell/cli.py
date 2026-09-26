@@ -3276,8 +3276,13 @@ def main(
                 args.workspace,
                 args.seed,
             )
-            from workbench_core.host_services import direct_packwiz_scratch_scope
-            with direct_packwiz_scratch_scope(configuration_home=runtime_configuration_home):
+            from workbench_core.packwiz_tree_scope import direct_packwiz_custody_scope
+            with direct_packwiz_custody_scope(
+                workspace=Path(args.workspace).expanduser().resolve(),
+                suite_root=suite_root,
+                state_root=runtime_state_root,
+                configuration_home=runtime_configuration_home,
+            ):
                 result = materialize_project_runtime(
                     suite_root,
                     args.workspace,
@@ -3296,8 +3301,13 @@ def main(
                 args.workspace,
                 args.seed,
             )
-            from workbench_core.host_services import direct_packwiz_scratch_scope
-            with direct_packwiz_scratch_scope(configuration_home=runtime_configuration_home):
+            from workbench_core.packwiz_tree_scope import direct_packwiz_custody_scope
+            with direct_packwiz_custody_scope(
+                workspace=Path(args.workspace).expanduser().resolve(),
+                suite_root=suite_root,
+                state_root=runtime_state_root,
+                configuration_home=runtime_configuration_home,
+            ):
                 result = launch_project_runtime(
                     suite_root,
                     args.workspace,
@@ -3325,8 +3335,13 @@ def main(
                 args.workspace,
                 args.seed,
             )
-            from workbench_core.host_services import direct_packwiz_scratch_scope
-            with direct_packwiz_scratch_scope(configuration_home=runtime_configuration_home):
+            from workbench_core.packwiz_tree_scope import direct_packwiz_custody_scope
+            with direct_packwiz_custody_scope(
+                workspace=Path(args.workspace).expanduser().resolve(),
+                suite_root=suite_root,
+                state_root=runtime_state_root,
+                configuration_home=runtime_configuration_home,
+            ):
                 result = observe_project_runtime(
                     suite_root,
                     args.workspace,

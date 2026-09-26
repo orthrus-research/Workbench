@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, ContextManager, Iterator, Protocol
 
+from .durable_resources import ResourceReference
+
 
 class ManagedTreeError(ValueError):
     def __init__(self, code: str, message: str):
@@ -69,6 +71,16 @@ class ManagedTrees(Protocol):
     workspace: Path  # Exact workspace bound by the host.
     owner_id: str  # Module owner selected by the host.
 
+    def retain_file_reference(
+        self, role: str, name: str, source: Path, *,
+        sha256: str, size: int, domain_id: str | None = None,
+    ) -> ResourceReference: ...
+
+    def retain_bytes_reference(
+        self, role: str, name: str, data: bytes, *,
+        references: tuple[str, ...] = (), domain_id: str | None = None,
+    ) -> ResourceReference: ...
+
     def stage(
         self, role: str, name: str, *, requested_path: Path | None = None,
     ) -> ContextManager[ManagedTreeStage]: ...
@@ -101,7 +113,11 @@ def managed_trees() -> ManagedTrees:
     return provider
 
 
+def managed_trees_bound() -> bool:
+    return _bound.get() is not None
+
+
 __all__ = [
     "ManagedTreeError", "ManagedTreeReference", "ManagedTreeStage", "ManagedTreeTarget", "ManagedTrees",
-    "managed_trees", "managed_trees_scope",
+    "managed_trees", "managed_trees_bound", "managed_trees_scope",
 ]

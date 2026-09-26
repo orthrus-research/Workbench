@@ -93,6 +93,19 @@ separately retains every admitted seed byte and root.
 Reuse remeasures the whole payload, launcher tree, optional outputs, and final
 installer state and requires them to match the receipt.
 
+On Linux, Core inventories the complete fixture tree before publishing it at
+the existing target path. The catalog binds that tree to the V2
+`materialization_id`; reuse first reopens or reconciles the exact Core record.
+Core retains exact refresh and Installer log snapshots and a dependency record
+linked from that tree. The record binds the receipt bytes and names the source
+scratch, bootstrap, tools, payload, and retained logs. The historical V2
+receipt and log paths stay the same.
+An interrupted publication with a complete Core intent can be reconciled. A
+target without a Core record, or a failed or ambiguous prepared stage, requires
+review before another materialization. The Windows compatibility route retains
+its existing publication behavior. A fixture that exceeds Core's exact tree
+inventory limits remains unpublished for review.
+
 The result format is `workbench-packwiz-materialization-result-v2`, schema
 version `2`, with outcome `installed` or `reused`. Its nested receipt format is
 `workbench-packwiz-materialization-receipt-v2`, schema version `2`.
