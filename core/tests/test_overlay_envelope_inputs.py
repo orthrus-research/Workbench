@@ -106,6 +106,34 @@ class OverlayEnvelopeInputTests(unittest.TestCase):
             workspace=self.workspace)["overlay_envelopes"])
         self.assertTrue(stage.path.is_dir())
 
+    def test_v3_preflight_checks_copied_tree_and_planned_add_before_copy(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, manifest = self._attempt(stage)
+            effect = {"op": "add", "relative_path": "worldgen/vein/new/sub/ore.json",
+                      "expected_sha256": None, "data": b"{}\n"}
+            capacity = attempt.preflight_v3((effect,))
+            self.assertEqual(manifest["inventory_id"], capacity["inventory_id"])
+            self.assertEqual("posix-exact-v1", capacity["inventory_policy"])
+            self.assertEqual(6, capacity["maximum_files"])
+            self.assertEqual(6, capacity["maximum_directories"])
+            self.assertEqual(1, capacity["effect_count"])
+            with patch("workbench_core.overlay_envelope_inputs.MAX_FILES", 5):
+                with self.assertRaisesRegex(OverlayEnvelopeInputError, "V3 bound") as raised:
+                    attempt.preflight_v3((effect,))
+                self.assertEqual("overlay.unsupported", raised.exception.code)
+            self.assertFalse((attempt.root / "copy-attempted.json").exists())
+            self.assertFalse(stage.path.exists())
+
+    def test_v3_preflight_refuses_oversized_source_row_before_copy(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, _manifest = self._attempt(stage)
+            with patch("workbench_core.overlay_envelope_inputs.MAX_FILE_BYTES", 3):
+                with self.assertRaisesRegex(OverlayEnvelopeInputError, "source file exceeds") as raised:
+                    attempt.preflight_v3(({"op": "add", "relative_path": "worldgen/vein/ore.json",
+                                           "expected_sha256": None, "data": b"{}\n"},))
+                self.assertEqual("overlay.unsupported", raised.exception.code)
+            self.assertFalse((attempt.root / "copy-attempted.json").exists())
+
     def test_source_drift_leaves_unpublished_recoverable_stage(self) -> None:
         with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
             attempt, manifest = self._attempt(stage)

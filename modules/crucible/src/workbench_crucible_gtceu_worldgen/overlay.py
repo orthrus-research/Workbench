@@ -117,6 +117,64 @@ def parse_overlay_plan(
     return plan
 
 
+def planned_overlay_effects(
+    *, plan: Mapping[str, Any], source_inventory: Mapping[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    """Evaluate V1 operations as bytes without writing an output directory."""
+
+    selected = parse_gtceu_worldgen_inventory(source_inventory)
+    checked = parse_overlay_plan(plan, selected)
+    effects = []
+    for operation in checked["operations"]:
+        data = (
+            (json.dumps(operation["definition"], indent=2, sort_keys=True) + "\n").encode("utf-8")
+            if operation["op"] in {"add", "replace"} else None
+        )
+        effects.append({
+            "op": operation["op"], "relative_path": operation["relative_path"],
+            "expected_sha256": operation.get("expected_sha256"), "data": data,
+        })
+    return tuple(effects)
+
+
+def build_overlay_materialization(
+    *, source_inventory: Mapping[str, Any], output_inventory: Mapping[str, Any],
+    plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build the exact V1 receipt after an independently verified output read."""
+
+    source = parse_gtceu_worldgen_inventory(source_inventory)
+    output = parse_gtceu_worldgen_inventory(output_inventory)
+    checked = parse_overlay_plan(plan, source)
+    applied = [{key: operation[key] for key in ("op", "kind", "relative_path")}
+               for operation in checked["operations"]]
+    materialization: dict[str, Any] = {
+        "format": MATERIALIZATION_FORMAT,
+        "schema_version": 1,
+        "materialization_id": "",
+        "source_inventory_id": source["inventory_id"],
+        "output_inventory_id": output["inventory_id"],
+        "operation_count": len(applied),
+        "operations": applied,
+        "output_inventory": "gtceu-worldgen-inventory-v1.json",
+        "boundaries": dict(MATERIALIZATION_BOUNDARIES),
+    }
+    identity = deepcopy(materialization)
+    identity["materialization_id"] = ""
+    materialization["materialization_id"] = MATERIALIZATION_PREFIX + hashlib.sha256(
+        canonical_json_bytes(identity)
+    ).hexdigest()
+    return parse_overlay_materialization(materialization)
+
+
+def overlay_inventory_bytes(report: Mapping[str, Any]) -> bytes:
+    return (json.dumps(parse_gtceu_worldgen_inventory(report), indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def overlay_materialization_bytes(receipt: Mapping[str, Any]) -> bytes:
+    return (json.dumps(parse_overlay_materialization(receipt), indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
 def materialize_overlay(
     *,
     jar_path: Path,
@@ -169,7 +227,6 @@ def materialize_overlay(
         _require(source.is_dir(), f"missing source directory: {source}")
         shutil.copytree(source, output_root / relative)
 
-    applied = []
     for operation in checked_plan["operations"]:
         target = output_root / PurePosixPath(operation["relative_path"])
         if operation["op"] == "remove":
@@ -180,37 +237,16 @@ def materialize_overlay(
                 json.dumps(operation["definition"], indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
-        applied.append(
-            {
-                "op": operation["op"],
-                "kind": operation["kind"],
-                "relative_path": operation["relative_path"],
-            }
-        )
-
     output_inventory = build_gtceu_worldgen_inventory(
         jar_path=jar_path,
         config_root=output_root,
     )
     inventory_path = output_root.parent / "gtceu-worldgen-inventory-v1.json"
     write_gtceu_worldgen_inventory(inventory_path, output_inventory)
-    materialization: dict[str, Any] = {
-        "format": MATERIALIZATION_FORMAT,
-        "schema_version": 1,
-        "materialization_id": "",
-        "source_inventory_id": source_inventory["inventory_id"],
-        "output_inventory_id": output_inventory["inventory_id"],
-        "operation_count": len(applied),
-        "operations": applied,
-        "output_inventory": inventory_path.name,
-        "boundaries": dict(MATERIALIZATION_BOUNDARIES),
-    }
-    identity = deepcopy(materialization)
-    identity["materialization_id"] = ""
-    materialization["materialization_id"] = MATERIALIZATION_PREFIX + hashlib.sha256(
-        canonical_json_bytes(identity)
-    ).hexdigest()
-    return parse_overlay_materialization(materialization)
+    return build_overlay_materialization(
+        source_inventory=source_inventory, output_inventory=output_inventory,
+        plan=checked_plan,
+    )
 
 
 def parse_overlay_materialization(value: Mapping[str, Any]) -> dict[str, Any]:

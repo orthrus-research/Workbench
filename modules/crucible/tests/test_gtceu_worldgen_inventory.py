@@ -24,6 +24,10 @@ from workbench_crucible_gtceu_worldgen import (  # noqa: E402
     parse_overlay_materialization,
     parse_gtceu_worldgen_inventory,
     build_gtceu_overlay_copy_inventory,
+    planned_overlay_effects,
+    build_overlay_materialization,
+    overlay_inventory_bytes,
+    overlay_materialization_bytes,
     parse_gtceu_overlay_copy_inventory,
     verify_gtceu_overlay_copy_source,
 )
@@ -210,6 +214,33 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
             plan=plan,
             output_config_root=output,
         )
+        effects = planned_overlay_effects(plan=plan, source_inventory=report)
+        self.assertEqual(1, len(effects))
+        self.assertEqual("replace", effects[0]["op"])
+        self.assertEqual(
+            (json.dumps(definition, indent=2, sort_keys=True) + "\n").encode(),
+            effects[0]["data"],
+        )
+        self.assertEqual(
+            effects[0]["data"], (output / effects[0]["relative_path"]).read_bytes(),
+        )
+        output_inventory = build_gtceu_worldgen_inventory(
+            jar_path=self.jar, config_root=output,
+        )
+        self.assertEqual(
+            materialization,
+            build_overlay_materialization(
+                source_inventory=report, output_inventory=output_inventory, plan=plan,
+            ),
+        )
+        self.assertEqual(
+            overlay_inventory_bytes(output_inventory),
+            (output.parent / "gtceu-worldgen-inventory-v1.json").read_bytes(),
+        )
+        self.assertEqual(
+            overlay_materialization_bytes(materialization),
+            (json.dumps(materialization, indent=2, sort_keys=True) + "\n").encode(),
+        )
         self.assertEqual(json.loads(self.ore_path.read_text())["weight"], 80)
         self.assertEqual(
             json.loads(
@@ -335,8 +366,11 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "V2 Core copy uses Linux pinned handles")
     def test_v2_inventory_streams_into_core_attempt_before_copy(self) -> None:
-        from workbench_core.managed_trees import CoreManagedTrees
-        from workbench_core.overlay_envelope_inputs import CoreOverlayEnvelopeInputs
+        try:
+            from workbench_core.managed_trees import CoreManagedTrees
+            from workbench_core.overlay_envelope_inputs import CoreOverlayEnvelopeInputs
+        except ModuleNotFoundError:
+            self.skipTest("Core source is unavailable in this standalone Crucible test run")
 
         report = self.build()
         sidecar = self.config / "worldgen/vein/overworld/notes.txt"

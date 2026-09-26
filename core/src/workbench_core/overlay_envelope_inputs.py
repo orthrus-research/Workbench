@@ -24,6 +24,9 @@ from .durable_records import publish_immutable_bytes, read_private_bytes
 from .host_filesystem import private_path, secure_private_path
 from .managed_trees import _CoreTreeStage
 from .output_routing import _private_directory
+from .storage.exact_tree_inventory import (
+    MAX_DIRECTORIES, MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES,
+)
 from .storage.registered import ResourceCatalog
 from .transport_trees import _mount_id
 
@@ -32,6 +35,11 @@ _CHUNK_BYTES = 1024 * 1024
 _MANIFEST_BYTES = 16 * 1024
 _RECORD_BYTES = 1024 * 1024
 _PLAN_CHUNK_BYTES = 1024 * 1024
+# The two sibling V1 JSON files have not been built at the pre-copy boundary.
+# Reserve their full V3 per-file allowance, then enforce the actual bytes at
+# publication. This is a conservative, opt-in Core profile, not V1 parity.
+_SIBLING_COUNT = 2
+_SIBLING_RESERVE_BYTES = _SIBLING_COUNT * MAX_FILE_BYTES
 _NONCE = re.compile(r"[0-9a-f]{32}\Z")
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _PART = re.compile(r"[^/\\\0\r\n:]+\Z")
@@ -442,6 +450,94 @@ class CoreOverlayEnvelopeInputAttempt:
                 raise OverlayEnvelopeInputError("overlay.inventory", "copy inventory chunk has a partial row")
             for line in chunk.splitlines(keepends=True):
                 yield _checked_row(line)
+
+    def preflight_v3(self, effects: Iterable[Mapping[str, object]]) -> dict[str, object]:
+        """Refuse known V3 publication overflow before the first Core copy.
+
+        This checks the retained copied-tree rows and the domain's exact
+        proposed output bytes. The caller still has to validate those effects
+        against its retained plan and validate the final staged envelope.
+        """
+        if (self.root / "copy-attempted.json").exists():
+            raise OverlayEnvelopeInputError("overlay.state", "overlay capacity check followed copy")
+        manifest = self._verified_inputs()
+        files: dict[str, dict[str, object]] = {}
+        directories = {str(self.reservation["content_root"])}
+        source_bytes = 0
+        for row in self._rows(manifest):
+            path = str(row["path"])
+            if row["kind"] == "directory":
+                directories.add(f"{self.reservation['content_root']}/{path}")
+            else:
+                files[path] = row
+                size = int(row["size_bytes"])
+                if size > MAX_FILE_BYTES:
+                    raise OverlayEnvelopeInputError("overlay.unsupported", "source file exceeds V3 bound")
+                source_bytes += size
+            if len(files) + _SIBLING_COUNT > MAX_FILES or len(directories) > MAX_DIRECTORIES:
+                raise OverlayEnvelopeInputError("overlay.unsupported", "source exceeds V3 member bound")
+        if source_bytes + _SIBLING_RESERVE_BYTES > MAX_TOTAL_BYTES:
+            raise OverlayEnvelopeInputError("overlay.unsupported", "source exceeds V3 byte reserve")
+
+        count = additions = planned_bytes = 0
+        seen: set[str] = set()
+        digest = sha256()
+        for effect in effects:
+            if (type(effect) is not dict
+                    or set(effect) != {"op", "relative_path", "expected_sha256", "data"}
+                    or effect["op"] not in {"add", "replace", "remove"}):
+                raise OverlayEnvelopeInputError("overlay.plan", "overlay operation shape is invalid")
+            path = effect["relative_path"]
+            try:
+                parts = _parts(path)
+            except OverlayEnvelopeInputError as exc:
+                raise OverlayEnvelopeInputError("overlay.unsupported", "operation path is outside V3 profile") from exc
+            if path in seen:
+                raise OverlayEnvelopeInputError("overlay.plan", "overlay operation target repeats")
+            seen.add(path)
+            prior = files.get(path)
+            expected = effect["expected_sha256"]
+            action = effect["op"]
+            data = effect["data"]
+            if action == "add":
+                if prior is not None or expected is not None:
+                    raise OverlayEnvelopeInputError("overlay.plan", "overlay add precondition is invalid")
+                additions += 1
+                for depth in range(1, len(parts)):
+                    directories.add(f"{self.reservation['content_root']}/{'/'.join(parts[:depth])}")
+            elif (prior is None or expected != prior["sha256"]
+                  or type(expected) is not str or _DIGEST.fullmatch(expected) is None):
+                raise OverlayEnvelopeInputError("overlay.plan", "overlay existing-file precondition is invalid")
+            if action == "remove":
+                if data is not None:
+                    raise OverlayEnvelopeInputError("overlay.plan", "overlay remove has output bytes")
+            elif type(data) is not bytes:
+                raise OverlayEnvelopeInputError("overlay.plan", "overlay write bytes are invalid")
+            else:
+                if len(data) > MAX_FILE_BYTES:
+                    raise OverlayEnvelopeInputError("overlay.unsupported", "operation file exceeds V3 bound")
+                planned_bytes += len(data)
+            digest.update(_canonical({
+                "index": count, "op": action, "relative_path": path,
+                "expected_sha256": expected,
+                "data_sha256": sha256(data).hexdigest() if data is not None else None,
+                "data_bytes": len(data) if data is not None else None,
+            }) + b"\n")
+            count += 1
+            if (len(files) + additions + _SIBLING_COUNT > MAX_FILES
+                    or len(directories) > MAX_DIRECTORIES
+                    or source_bytes + planned_bytes + _SIBLING_RESERVE_BYTES > MAX_TOTAL_BYTES):
+                raise OverlayEnvelopeInputError("overlay.unsupported", "planned envelope exceeds V3 bound")
+        if count == 0:
+            raise OverlayEnvelopeInputError("overlay.plan", "overlay plan has no operations")
+        return {
+            "inventory_id": manifest["inventory_id"],
+            "effect_count": count, "effects_sha256": digest.hexdigest(),
+            "maximum_files": len(files) + additions + _SIBLING_COUNT,
+            "maximum_directories": len(directories),
+            "reserved_bytes": source_bytes + planned_bytes + _SIBLING_RESERVE_BYTES,
+            "inventory_policy": "posix-exact-v1",
+        }
 
     def copy_source(self, *, verify_source: Callable[[Mapping[str, object], Iterable[bytes]], object]) -> Path:
         """Copy exactly the sealed rows; retain an incomplete stage after failure."""
