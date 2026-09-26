@@ -29,10 +29,12 @@ from ..durable_records import (
 )
 from ..host_filesystem import file_lease, private_path, secure_private_path
 from ..output_routing import _WINDOWS_RESERVED, _private_directory
+from . import issuance
 
 
 CATALOG_FORMAT = "workbench-resource-catalog-v1"
 ROOT_FORMAT = "workbench-resource-catalog-root-v1"
+ROOT_V2_FORMAT = "workbench-resource-catalog-root-v2"
 ROOT_MANIFEST_NAME = "resource-catalog-root-v1.json"
 ROOT_ANCHOR_NAME = ".resource-catalog-root-v1.json"
 ROOT_LOCK_NAME = ".resource-catalog-root-v1.lock"
@@ -131,9 +133,10 @@ class ResourceCatalog:
             raise DurableResourceError("resource.changed", "resource catalog root or namespace is unavailable") from exc
         return root_info
 
-    def _root_record(self, origin: str, root_info: os.stat_result) -> dict:
-        return _sealed(ROOT_FORMAT, {
-            "format": ROOT_FORMAT, "schema_version": 1,
+    def _root_record(self, origin: str, root_info: os.stat_result, *, epoch: str | None = None) -> dict:
+        kind = ROOT_V2_FORMAT if epoch is not None else ROOT_FORMAT
+        body = {
+            "format": kind, "schema_version": 2 if epoch is not None else 1,
             "catalog_format": CATALOG_FORMAT, "generation": 1,
             "migration_origin": origin,
             "configuration_home": str(self.configuration_home),
@@ -141,7 +144,80 @@ class ResourceCatalog:
             "root_device": root_info.st_dev, "root_inode": root_info.st_ino,
             "required_namespaces": list(_ROOT_REQUIRED),
             "known_namespaces": list(_ROOT_KNOWN),
-        })
+        }
+        if epoch is not None:
+            body["root_epoch"] = epoch
+        return _sealed(kind, body)
+
+    def _root_identity(self, record: object, root_info: os.stat_result) -> bool:
+        if not isinstance(record, dict):
+            return False
+        origin = record.get("migration_origin")
+        if origin not in {"empty-home-first-use", "legacy-v1", "unproven-first-use"}:
+            return False
+        if any(type(record.get(key)) is not int for key in (
+            "schema_version", "generation", "root_device", "root_inode",
+        )):
+            return False
+        kind = record.get("format")
+        epoch = record.get("root_epoch") if kind == ROOT_V2_FORMAT else None
+        if kind == ROOT_V2_FORMAT:
+            if origin == "legacy-v1" or not isinstance(epoch, str) or re.fullmatch(r"[0-9a-f]{32}", epoch) is None:
+                return False
+        elif kind != ROOT_FORMAT:
+            return False
+        return record == self._root_record(origin, root_info, epoch=epoch)
+
+    def fresh_root_epoch(self) -> dict | None:
+        """Return an exact new-root epoch; V1 and historical roots have none."""
+        if self.verify_root() != "ready-unproven":
+            return None
+        outer = read_private_single_link_bytes(self._root_manifest(), byte_limit=4096)
+        inner = read_private_single_link_bytes(self._root_anchor(), byte_limit=4096)
+        record = json.loads(outer)
+        if (outer != inner or not self._root_identity(record, self._check_root_directories())
+                or outer != check_storage.canonical(record) + b"\n"):
+            raise DurableResourceError("resource.changed", "fresh root epoch changed")
+        return record if record["format"] == ROOT_V2_FORMAT else None
+
+    def post_birth_coverage(
+        self, resource_id: str, *, workspace: Path, owner_id: str, target: Path,
+    ) -> str:
+        """Verify one issued file's exact current custody without promoting cleanup."""
+        _resource_nonce(resource_id)
+        if (not isinstance(workspace, Path) or not workspace.is_absolute()
+                or not isinstance(target, Path) or not target.is_absolute()
+                or not isinstance(owner_id, str) or _OWNER.fullmatch(owner_id) is None):
+            raise DurableResourceError("resource.policy", "select an exact post-birth candidate")
+        root_record = self.fresh_root_epoch()
+        if root_record is None:
+            return "unproven"
+        with issuance.verified_candidate(
+            self, root_record, workspace=workspace, resource_id=resource_id,
+            owner_id=owner_id, target=target,
+        ) as row:
+            if row is None:
+                return "unproven"
+            with self.lease(resource_id):
+                intent = self._intent(resource_id)
+                self._commit(resource_id, intent)
+                if (intent["workspace"] != str(workspace) or intent["owner_id"] != owner_id
+                        or self._target(intent) != target or intent["reservation_id"] != row["reservation_id"]):
+                    raise DurableResourceError("resource.changed", "post-birth candidate differs from issued output")
+                try:
+                    info = target.lstat()
+                    if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                            or (info.st_dev, info.st_ino) != (intent["device"], intent["inode"])):
+                        raise DurableResourceError("resource.changed", "post-birth output identity changed")
+                    read_verified(target, expected_size=int(intent["bytes"]), expected_sha256=str(intent["sha256"]))
+                    after = target.lstat()
+                    if (after.st_dev, after.st_ino) != (intent["device"], intent["inode"]):
+                        raise DurableResourceError("resource.changed", "post-birth output changed during verification")
+                except OSError as exc:
+                    raise DurableResourceError("resource.changed", "post-birth output is unavailable or changed") from exc
+            if self.fresh_root_epoch() != root_record:
+                raise DurableResourceError("resource.changed", "post-birth root epoch changed during verification")
+        return "post-birth-covered"
 
     def verify_root(self) -> str:
         """Read-only root check; no local state proves historical completeness.
@@ -177,15 +253,7 @@ class ResourceCatalog:
             if outer != inner:
                 raise DurableResourceError("resource.changed", "resource catalog root bindings differ")
             record = json.loads(outer)
-            origin = record.get("migration_origin") if isinstance(record, dict) else None
-            if (
-                origin not in {"empty-home-first-use", "legacy-v1", "unproven-first-use"}
-                or any(
-                    type(record.get(key)) is not int
-                    for key in ("schema_version", "generation", "root_device", "root_inode")
-                )
-                or record != self._root_record(origin, root_info)
-            ):
+            if not self._root_identity(record, root_info):
                 raise DurableResourceError("resource.changed", "resource catalog root manifest changed")
             if outer != check_storage.canonical(record) + b"\n":
                 raise DurableResourceError("resource.changed", "resource catalog root manifest is not canonical")
@@ -223,16 +291,7 @@ class ResourceCatalog:
                 root_info = self._check_root_directories()
                 raw = read_private_single_link_bytes(anchor, byte_limit=4096)
                 record = json.loads(raw)
-                origin = record.get("migration_origin") if isinstance(record, dict) else None
-                if (
-                    origin not in {"empty-home-first-use", "legacy-v1", "unproven-first-use"}
-                    or any(
-                        type(record.get(key)) is not int
-                        for key in ("schema_version", "generation", "root_device", "root_inode")
-                    )
-                    or record != self._root_record(origin, root_info)
-                    or raw != check_storage.canonical(record) + b"\n"
-                ):
+                if not self._root_identity(record, root_info) or raw != check_storage.canonical(record) + b"\n":
                     raise DurableResourceError("resource.changed", "resource catalog anchor changed")
                 publish_immutable_bytes(manifest, raw, byte_limit=4096)
                 if self.verify_root() != "ready-unproven":
@@ -256,7 +315,7 @@ class ResourceCatalog:
         self.verify_root()
         return TreeCatalog(self.root)
 
-    def _ensure(self) -> None:
+    def _ensure(self, *, fresh_epoch: bool = False) -> None:
         initial_state = self.verify_root()
         _private_directory(self.configuration_home)
         secure_private_path(self.configuration_home, directory=True)
@@ -276,7 +335,8 @@ class ResourceCatalog:
                 if state != "legacy":
                     raise DurableResourceError("resource.unavailable", "resource catalog root cannot be initialized")
                 origin = "legacy-v1"
-            record = self._root_record(origin, self._check_root_directories())
+            epoch = uuid4().hex if fresh_epoch and origin != "legacy-v1" else None
+            record = self._root_record(origin, self._check_root_directories(), epoch=epoch)
             raw = check_storage.canonical(record) + b"\n"
             publish_immutable_bytes(self._root_anchor(), raw, byte_limit=4096)
             publish_immutable_bytes(self._root_manifest(), raw, byte_limit=4096)
@@ -891,6 +951,7 @@ class CoreDurableResources:
         locations: Mapping[str, Path], owner_id: str,
         policy_id: str | None = None, location_sources: Mapping[str, str] | None = None,
         check_cancelled=lambda: None,
+        post_birth_issuance: bool = False,
     ):
         if _OWNER.fullmatch(owner_id) is None:
             raise DurableResourceError("resource.policy", "invalid owner identity")
@@ -902,6 +963,9 @@ class CoreDurableResources:
         self.policy_id = policy_id or _policy_id(workspace, self.locations)
         self.location_sources = dict(location_sources or {})
         self.check_cancelled = check_cancelled
+        if type(post_birth_issuance) is not bool:
+            raise DurableResourceError("resource.policy", "post-birth issuance selection must be explicit")
+        self.post_birth_issuance = post_birth_issuance
         self.catalog = ResourceCatalog(configuration_home)
 
     def _destination(self, role: str, name: str, requested_path: Path | None, nonce: str) -> tuple[Path, Path]:
@@ -947,7 +1011,14 @@ class CoreDurableResources:
         resource_id = f"workbench-resource-v1:{nonce}"
         target, store_root = self._destination(role, name, requested_path, nonce)
         self.check_cancelled()
-        self.catalog._ensure()
+        if self.post_birth_issuance:
+            issuance.preflight_workspace(self.workspace)
+        self.catalog._ensure(fresh_epoch=self.post_birth_issuance)
+        root_epoch = self.catalog.fresh_root_epoch() if self.post_birth_issuance else None
+        if self.post_birth_issuance and root_epoch is None:
+            raise DurableResourceError(
+                "resource.unsupported", "post-birth issuance requires a newly born V2 catalog root",
+            )
         with ExitStack() as stack:
             for reference in sorted(references):
                 stack.enter_context(self.catalog.lease(reference))
@@ -961,7 +1032,7 @@ class CoreDurableResources:
                     expected_sha256=str(other["sha256"]),
                 )
             stack.enter_context(self.catalog.lease(resource_id, exclusive=True, create=True))
-            reservation = self.catalog._write("reservations", nonce, RESERVATION_KIND, {
+            reservation_body = {
                 "format": RESERVATION_KIND, "resource_id": resource_id,
                 "store_id": _store_id(store_root), "store_root": str(store_root),
                 "relative_path": target.relative_to(store_root).as_posix(),
@@ -971,7 +1042,17 @@ class CoreDurableResources:
                 "bytes": len(data), "sha256": sha256(data).hexdigest(),
                 "temporary": f".workbench-resource-{nonce}.pending",
                 "references": list(references), "allocated_at": _now(),
-            })
+            }
+            if root_epoch is not None:
+                try:
+                    issuance.issue(self.catalog, root_epoch, _sealed(RESERVATION_KIND, reservation_body))
+                except DurableResourceError:
+                    raise
+                except (OSError, ValueError) as exc:
+                    raise DurableResourceError(
+                        "resource.unavailable", "post-birth issuance could not be durably recorded",
+                    ) from exc
+            reservation = self.catalog._write("reservations", nonce, RESERVATION_KIND, reservation_body)
             stage = None
             try:
                 stage = StagedFile(target, data, nonce)

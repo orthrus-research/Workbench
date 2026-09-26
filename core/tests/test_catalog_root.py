@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from workbench_api import DurableResourceError
 from workbench_core.durable_records import publish_immutable_bytes
+from workbench_core.storage import issuance
 from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
 from workbench_core.temporary_leases import CoreTemporaryLeases
 
@@ -29,6 +33,12 @@ class CatalogRootTests(unittest.TestCase):
             locations={"evidence": self.evidence}, owner_id="sample",
             policy_id="fixture-policy", location_sources={"evidence": "user-settings"},
         )
+        self.witnessed = CoreDurableResources(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="sample",
+            policy_id="fixture-policy", location_sources={"evidence": "user-settings"},
+            post_birth_issuance=True,
+        )
 
     def test_catalog_root_manifest_marks_first_install_and_survives_restart(self) -> None:
         catalog = ResourceCatalog(self.config)
@@ -40,6 +50,7 @@ class CatalogRootTests(unittest.TestCase):
         self.assertEqual(original, inner.read_bytes())
         marker = json.loads(original)
         self.assertEqual(marker["format"], "workbench-resource-catalog-root-v1")
+        self.assertEqual(marker["schema_version"], 1)
         self.assertEqual(marker["generation"], 1)
         self.assertEqual(marker["migration_origin"], "empty-home-first-use")
         self.assertEqual(marker["catalog_format"], "workbench-resource-catalog-v1")
@@ -48,6 +59,205 @@ class CatalogRootTests(unittest.TestCase):
         self.assertEqual(ResourceCatalog(self.config).read_bytes(reference.resource_id), b"first\n")
         self.resources.publish_bytes("evidence", "second.json", b"second\n")
         self.assertEqual(outer.read_bytes(), original)
+
+    def test_fresh_root_issues_exact_file_before_publication_and_reopens_candidate(self) -> None:
+        first = self.witnessed.publish_bytes("evidence", "first.json", b"first\n")
+        second = self.witnessed.publish_bytes("evidence", "second.json", b"second\n")
+        catalog = ResourceCatalog(self.config)
+        marker = catalog.fresh_root_epoch()
+        self.assertIsNotNone(marker)
+        self.assertEqual("workbench-resource-catalog-root-v2", marker["format"])
+        self.assertRegex(marker["root_epoch"], r"^[0-9a-f]{32}$")
+        workspace_rows = self.workspace / ".workbench/resource-issuance-v2" / marker["root_epoch"]
+        config_rows = (self.config / "resource-issuance-v2" / marker["root_epoch"]
+                       / sha256(os.fsencode(self.workspace)).hexdigest())
+        self.assertEqual(["0000000000000001.json", "0000000000000002.json"],
+                         sorted(path.name for path in workspace_rows.iterdir()))
+        for name in ("0000000000000001.json", "0000000000000002.json"):
+            self.assertEqual((workspace_rows / name).read_bytes(), (config_rows / name).read_bytes())
+        for reference in (first, second):
+            self.assertEqual("post-birth-covered", ResourceCatalog(self.config).post_birth_coverage(
+                reference.resource_id, workspace=self.workspace, owner_id="sample", target=reference.path,
+            ))
+        self.assertEqual("unproven", catalog.post_birth_coverage(
+            first.resource_id, workspace=self.workspace, owner_id="other", target=first.path,
+        ))
+        self.assertEqual("ready-unproven", catalog.inventory(workspace=self.workspace)["root_state"])
+
+    def test_default_file_route_does_not_claim_post_birth_coverage(self) -> None:
+        reference = self.resources.publish_bytes("evidence", "ordinary.json", b"ordinary\n")
+        self.assertIsNone(ResourceCatalog(self.config).fresh_root_epoch())
+        self.assertEqual("unproven", ResourceCatalog(self.config).post_birth_coverage(
+            reference.resource_id, workspace=self.workspace, owner_id="sample", target=reference.path,
+        ))
+
+    def test_unissued_file_under_v2_root_remains_unproven(self) -> None:
+        covered = self.witnessed.publish_bytes("evidence", "covered.json", b"covered\n")
+        ordinary = self.resources.publish_bytes("evidence", "ordinary.json", b"ordinary\n")
+        catalog = ResourceCatalog(self.config)
+        self.assertEqual("post-birth-covered", catalog.post_birth_coverage(
+            covered.resource_id, workspace=self.workspace, owner_id="sample", target=covered.path,
+        ))
+        self.assertEqual("unproven", catalog.post_birth_coverage(
+            ordinary.resource_id, workspace=self.workspace, owner_id="sample", target=ordinary.path,
+        ))
+
+    def test_issuance_gap_after_workspace_row_blocks_future_publication(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        script = """
+import os
+from pathlib import Path
+import sys
+from workbench_core.storage import issuance
+from workbench_core.storage.registered import CoreDurableResources
+
+original = issuance.publish_immutable_bytes
+def interrupt_config(path, data, *, byte_limit, idempotent=False):
+    if path.is_relative_to(Path(sys.argv[2]) / 'resource-issuance-v2'):
+        os._exit(73)
+    original(path, data, byte_limit=byte_limit, idempotent=idempotent)
+issuance.publish_immutable_bytes = interrupt_config
+provider = CoreDurableResources(
+    workspace=Path(sys.argv[1]), configuration_home=Path(sys.argv[2]),
+    locations={'evidence': Path(sys.argv[3])}, owner_id='sample',
+    post_birth_issuance=True,
+)
+provider.publish_bytes('evidence', 'interrupted.json', b'pending\\n')
+"""
+        project = Path(__file__).resolve().parents[2]
+        environment = dict(os.environ)
+        environment["PYTHONPATH"] = os.pathsep.join((
+            str(project / "api/src"), str(project / "core/src"),
+            environment.get("PYTHONPATH", ""),
+        ))
+        child = subprocess.run(
+            [sys.executable, "-c", script, str(self.workspace), str(self.config), str(self.evidence)],
+            env=environment, capture_output=True, text=True, timeout=10, check=False,
+        )
+        self.assertEqual(73, child.returncode, child.stderr)
+        self.assertFalse(self.evidence.exists())
+        epoch = catalog.fresh_root_epoch()["root_epoch"]
+        workspace_issue = (self.workspace / ".workbench/resource-issuance-v2" / epoch
+                           / "0000000000000001.json")
+        orphan = json.loads(workspace_issue.read_bytes())
+        with self.assertRaises(DurableResourceError) as unreadable:
+            catalog.post_birth_coverage(
+                orphan["resource_id"], workspace=self.workspace,
+                owner_id="sample", target=Path(orphan["target"]),
+            )
+        self.assertEqual("resource.changed", unreadable.exception.code)
+        with self.assertRaises(DurableResourceError) as gap:
+            self.witnessed.publish_bytes("evidence", "later.json", b"later\n")
+        self.assertEqual("resource.changed", gap.exception.code)
+        self.assertEqual([], catalog.inventory(workspace=self.workspace)["resources"])
+
+    def test_missing_earlier_issue_row_refuses_later_candidate(self) -> None:
+        self.witnessed.publish_bytes("evidence", "first.json", b"first\n")
+        second = self.witnessed.publish_bytes("evidence", "second.json", b"second\n")
+        epoch = ResourceCatalog(self.config).fresh_root_epoch()["root_epoch"]
+        row = self.workspace / ".workbench/resource-issuance-v2" / epoch / "0000000000000001.json"
+        held = self.home / "held-issue.json"
+        row.rename(held)
+        try:
+            with self.assertRaises(DurableResourceError) as gap:
+                ResourceCatalog(self.config).post_birth_coverage(
+                    second.resource_id, workspace=self.workspace, owner_id="sample", target=second.path,
+                )
+            self.assertEqual("resource.changed", gap.exception.code)
+        finally:
+            held.rename(row)
+        self.assertEqual("post-birth-covered", ResourceCatalog(self.config).post_birth_coverage(
+            second.resource_id, workspace=self.workspace, owner_id="sample", target=second.path,
+        ))
+
+    def test_issued_without_reservation_blocks_later_opt_in_publication(self) -> None:
+        original = ResourceCatalog._write
+
+        def interrupt_reservation(catalog, name, *arguments):
+            if name == "reservations":
+                raise RuntimeError("simulated exit after write-ahead issue")
+            return original(catalog, name, *arguments)
+
+        with patch.object(ResourceCatalog, "_write", interrupt_reservation):
+            with self.assertRaisesRegex(RuntimeError, "write-ahead issue"):
+                self.witnessed.publish_bytes("evidence", "pending.json", b"pending\n")
+        with self.assertRaises(DurableResourceError) as incomplete:
+            self.witnessed.publish_bytes("evidence", "later.json", b"later\n")
+        self.assertEqual("resource.incomplete", incomplete.exception.code)
+        self.assertFalse(self.evidence.exists())
+
+    @unittest.skipIf(os.name == "nt", "POSIX workspace mode admission")
+    def test_writable_workspace_refuses_opt_in_but_default_file_route_stays_available(self) -> None:
+        self.workspace.chmod(0o777)
+        with self.assertRaises(DurableResourceError) as unsafe:
+            self.witnessed.publish_bytes("evidence", "witnessed.json", b"witnessed\n")
+        self.assertEqual("resource.changed", unsafe.exception.code)
+        self.assertFalse(self.config.exists())
+        ordinary = self.resources.publish_bytes("evidence", "ordinary.json", b"ordinary\n")
+        self.assertEqual(b"ordinary\n", ordinary.path.read_bytes())
+        self.assertIsNone(ResourceCatalog(self.config).fresh_root_epoch())
+        self.assertEqual("unproven", ResourceCatalog(self.config).post_birth_coverage(
+            ordinary.resource_id, workspace=self.workspace, owner_id="sample", target=ordinary.path,
+        ))
+
+    def test_fresh_epoch_survives_inner_anchor_only_reconciliation(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        outer = catalog._root_manifest()
+
+        def interrupt_outer(path: Path, data: bytes, *, byte_limit: int,
+                            idempotent: bool = False) -> None:
+            if path == outer:
+                raise RuntimeError("simulated exit before outer root marker")
+            publish_immutable_bytes(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+        with patch("workbench_core.storage.registered.publish_immutable_bytes", side_effect=interrupt_outer):
+            with self.assertRaisesRegex(RuntimeError, "simulated exit"):
+                catalog._ensure(fresh_epoch=True)
+        anchored_epoch = json.loads(catalog._root_anchor().read_bytes())["root_epoch"]
+        self.assertEqual("ready-unproven", catalog.reconcile_interrupted_root_publication())
+        self.assertEqual(anchored_epoch, catalog.fresh_root_epoch()["root_epoch"])
+        reference = self.witnessed.publish_bytes("evidence", "after.json", b"after\n")
+        self.assertEqual("post-birth-covered", catalog.post_birth_coverage(
+            reference.resource_id, workspace=self.workspace, owner_id="sample", target=reference.path,
+        ))
+
+    def test_post_birth_proof_refuses_alternate_home_and_prior_epoch(self) -> None:
+        old = self.witnessed.publish_bytes("evidence", "old.json", b"old\n")
+        alternate_home = self.home / "alternate-config"
+        alternate = CoreDurableResources(
+            workspace=self.workspace, configuration_home=alternate_home,
+            locations={"evidence": self.evidence}, owner_id="sample",
+            post_birth_issuance=True,
+        )
+        other = alternate.publish_bytes("evidence", "other.json", b"other\n")
+        self.assertEqual("unproven", ResourceCatalog(alternate_home).post_birth_coverage(
+            old.resource_id, workspace=self.workspace, owner_id="sample", target=old.path,
+        ))
+        self.assertEqual("post-birth-covered", ResourceCatalog(alternate_home).post_birth_coverage(
+            other.resource_id, workspace=self.workspace, owner_id="sample", target=other.path,
+        ))
+
+        catalog = ResourceCatalog(self.config)
+        catalog.root.rename(self.config / "resources-lost")
+        catalog._root_manifest().rename(self.config / "resource-catalog-root-lost.json")
+        new = self.witnessed.publish_bytes("evidence", "new.json", b"new\n")
+        self.assertEqual("unproven", catalog.post_birth_coverage(
+            old.resource_id, workspace=self.workspace, owner_id="sample", target=old.path,
+        ))
+        self.assertEqual("post-birth-covered", catalog.post_birth_coverage(
+            new.resource_id, workspace=self.workspace, owner_id="sample", target=new.path,
+        ))
+
+    def test_post_birth_proof_refuses_same_bytes_replacement(self) -> None:
+        reference = self.witnessed.publish_bytes("evidence", "first.json", b"first\n")
+        replacement = self.home / "replacement.json"
+        replacement.write_bytes(b"first\n")
+        replacement.replace(reference.path)
+        with self.assertRaises(DurableResourceError) as changed:
+            ResourceCatalog(self.config).post_birth_coverage(
+                reference.resource_id, workspace=self.workspace, owner_id="sample", target=reference.path,
+            )
+        self.assertEqual("resource.changed", changed.exception.code)
 
     def test_historical_v1_catalog_gains_root_manifest_without_rewriting_records(self) -> None:
         catalog = ResourceCatalog(self.config)
@@ -69,6 +279,7 @@ class CatalogRootTests(unittest.TestCase):
         original = historical.read_bytes()
         catalog._ensure()
         self.assertEqual(catalog.verify_root(), "ready-unproven")
+        self.assertIsNone(catalog.fresh_root_epoch())
         self.assertEqual(historical.read_bytes(), original)
         self.assertEqual(
             json.loads((self.config / "resource-catalog-root-v1.json").read_bytes())["migration_origin"],
@@ -78,6 +289,14 @@ class CatalogRootTests(unittest.TestCase):
             [row["store_id"] for row in catalog.inventory(workspace=self.workspace)["record_stores"]],
             [store_id],
         )
+        with self.assertRaises(DurableResourceError) as unsupported:
+            self.witnessed.publish_bytes("evidence", "requires-v2.json", b"no\n")
+        self.assertEqual("resource.unsupported", unsupported.exception.code)
+        issued_under_legacy = self.resources.publish_bytes("evidence", "legacy.json", b"legacy\n")
+        self.assertEqual("unproven", catalog.post_birth_coverage(
+            issued_under_legacy.resource_id, workspace=self.workspace,
+            owner_id="sample", target=issued_under_legacy.path,
+        ))
 
     def test_missing_or_split_root_binding_never_initializes_empty_catalog(self) -> None:
         reference = self.resources.publish_bytes("evidence", "retained.json", b"retained\n")

@@ -82,6 +82,22 @@ configuration home or registered output was never lost. Workspace cleanup
 therefore remains protected while historical catalog coverage is unproven;
 reconciling an interrupted root publication does not establish that coverage.
 
+For a newly created catalog, a Core host can opt in before first use to a V2
+root epoch and write-ahead file issuance. An opt-in requested after V1 catalog
+birth is refused without publishing a file. Older Core binaries that only read
+V1 root markers cannot open an opt-in V2 root in the same configuration home;
+the default CLI and module dispatch do not elect V2. Core records each selected file's
+workspace, owner, target and reservation in matching, ordered records under
+the configuration home and workspace before publishing it. The read-only
+`ResourceCatalog.post_birth_coverage` verifier can report
+`post-birth-covered` for one exact committed file while its original inode and
+bytes survive. Default and historical V1 roots, files without an issue record,
+and files from another configuration home remain unproven. A detectable gap
+or interrupted issuance blocks further opt-in issuance pending review.
+This candidate proof does not change the catalog's `ready-unproven` state or
+workspace cleanup protection. Opt-in witness storage requires an owner-private
+workspace location; WSL Windows-mounted workspaces have not been qualified.
+
 Core's managed-tree API can locate one retained tree by its exact target path,
 workspace, owner and role, returning the catalog tree ID and publication state.
 An optional domain identity must match a prepared intent. Missing, duplicate,
