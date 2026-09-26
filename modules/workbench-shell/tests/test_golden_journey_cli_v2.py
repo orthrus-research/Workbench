@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from unittest.mock import patch
 
 from workbench_crucible.runtime_pair import FeatureRuntimePairPorts
 from workbench_api import ExecutionContext
+from workbench_api.managed_trees import managed_trees, managed_trees_scope
 from workbench_shell import commands
 from workbench_shell.golden_journey_cli import (
     _installed_supersymmetry_runtime_ports,
@@ -21,6 +23,28 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class GoldenJourneyCliV2Tests(unittest.TestCase):
+    def test_direct_context_entry_receives_core_tree_custody(self) -> None:
+        observed: list[tuple[Path, str]] = []
+
+        def select(_root: Path, _session_id: str) -> dict[str, str]:
+            host = managed_trees()
+            observed.append((host.workspace, host.owner_id))
+            return {"state": "open"}
+
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            output, error = StringIO(), StringIO()
+            with (
+                patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(Path(temporary) / "config")}),
+                patch("workbench_shell.golden_journey_cli.select_material_fluid_recipe_session_context", side_effect=select),
+            ):
+                code = change_main(
+                    ["material-fluid-recipe", "select-context", "work-session-v2-" + "a" * 32, "--json"],
+                    root=ROOT, output=output, error=error,
+                )
+            self.assertEqual(0, code, error.getvalue())
+            self.assertEqual([(ROOT, "workbench-shell")], observed)
+            self.assertEqual("open", json.loads(output.getvalue())["state"])
+
     def test_core_fixture_location_reaches_the_owner_plan(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             fixture_root = Path(temporary) / "chosen-fixture-instances"

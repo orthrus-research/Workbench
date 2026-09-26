@@ -5,6 +5,7 @@ from __future__ import annotations
 from workbench_crucible.runtime_pair import FeatureRuntimePairPorts, runtime_pair_owner
 
 import argparse
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -34,6 +35,7 @@ from .feature_change_workspace import (
     verify_feature_change,
 )
 from workbench_api.state_paths import default_product_spine_state_root
+from workbench_api.managed_trees import ManagedTreeError, managed_trees
 
 
 MAX_RECORD_BYTES = 64 * 1024 * 1024
@@ -313,6 +315,7 @@ def change_main(
     output: TextIO = sys.stdout,
     error: TextIO = sys.stderr,
     runtime_ports: FeatureRuntimePairPorts | None = None,
+    configuration_home: Path | None = None,
 ) -> int:
     arguments = list(argv)
     if (
@@ -325,6 +328,45 @@ def change_main(
     ):
         arguments = [arguments[1], arguments[0], *arguments[2:]]
     args = _change_parser().parse_args(arguments)
+    context_action = (
+        args.action in {"select-context", "close-context"}
+        or args.action == "start" and args.session_record is not None
+        or args.action in {"open", "test", "apply", "verify", "rollback", "recover"}
+        and args.change_id is None
+    )
+    custody = nullcontext()
+    tree_custody = nullcontext()
+    if context_action:
+        try:
+            managed_trees()
+        except ManagedTreeError as exc:
+            if exc.code != "tree.host":
+                error.write(f"Workbench change failed: {exc}\n")
+                return 2
+            from workbench_core.host_services import direct_module_custody_scope
+            custody = direct_module_custody_scope(
+                workspace=Path(root).resolve(strict=True), owner_id="workbench-shell",
+            )
+        from workbench_core.host_services import suite_managed_tree_scope
+        tree_custody = suite_managed_tree_scope(
+            workspace=Path(root).resolve(strict=True),
+            configuration_home=configuration_home,
+        )
+    try:
+        with custody, tree_custody:
+            return _change_main_bound(
+                args, root=root, output=output, error=error,
+                runtime_ports=runtime_ports,
+            )
+    except (OSError, ValueError) as exc:
+        error.write(f"Workbench change failed: {exc}\n")
+        return 2
+
+
+def _change_main_bound(
+    args: argparse.Namespace, *, root: Path, output: TextIO, error: TextIO,
+    runtime_ports: FeatureRuntimePairPorts | None,
+) -> int:
     try:
         context = None
         if args.action == "select-context":

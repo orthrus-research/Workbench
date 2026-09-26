@@ -92,7 +92,9 @@ def dev(argv, *, context):
 def change(argv, *, context):
     context.check_cancelled()
     from workbench_shell.golden_journey_cli import change_main
-    return change_main(list(argv), root=ROOT)
+    return change_main(
+        list(argv), root=ROOT, configuration_home=context.configuration_home,
+    )
 
 
 def new(argv, *, context):

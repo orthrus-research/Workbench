@@ -49,6 +49,9 @@ from .developer_feature import (
 )
 from workbench_api.state_paths import default_product_spine_state_root
 from workbench_api.record_stores import open_record_store
+from workbench_api.managed_trees import (
+    ManagedTreeError, ManagedTreeReference, ManagedTrees, managed_trees,
+)
 from .work_session import validate_work_session_record
 
 
@@ -205,10 +208,14 @@ def _ordinary_bytes(path: Path, label: str, *, private: bool = False) -> bytes:
         raise FeatureChangeWorkspaceError(f"cannot read {label}: {exc}") from exc
 
 
-def _write_immutable(path: Path, value: Mapping[str, Any]) -> None:
-    payload = json.dumps(
+def _pretty_record_bytes(value: Mapping[str, Any]) -> bytes:
+    return json.dumps(
         value, ensure_ascii=False, allow_nan=False, indent=2, sort_keys=True
     ).encode("utf-8") + b"\n"
+
+
+def _write_immutable(path: Path, value: Mapping[str, Any]) -> None:
+    payload = _pretty_record_bytes(value)
     try:
         publish_immutable_bytes(path, payload, byte_limit=_MAX_RECORD_BYTES)
     except DurableRecordError as exc:
@@ -469,6 +476,70 @@ def _session_context_directory(suite_root: Path | str, session_id: str) -> Path:
     return _session_context_root(suite_root) / "contexts" / session_id
 
 
+def _context_tree_domain(session_id: str) -> str:
+    return f"workbench-feature-change-session-context-v1:{session_id}"
+
+
+def _context_tree_host() -> ManagedTrees:
+    try:
+        return managed_trees()
+    except ManagedTreeError as exc:
+        raise FeatureChangeWorkspaceError(
+            f"feature change context requires Core tree custody: {exc}"
+        ) from exc
+
+
+def _context_tree_reference(directory: Path, session_id: str) -> ManagedTreeReference | None:
+    """Reconcile an exact Core context tree before a V1 path is trusted.
+
+    A directory without a catalog entry may be a historical V1 context. New
+    publications always use Core. A reservation without an intent cannot be
+    safely restarted because its owner payload has not been admitted yet.
+    """
+
+    try:
+        host = _context_tree_host()
+        target = host.lookup_target("artifacts", directory)
+    except ManagedTreeError as exc:
+        if exc.code == "tree.unavailable":
+            return None
+        raise FeatureChangeWorkspaceError(
+            f"cannot locate feature change context custody: {exc}"
+        ) from exc
+    domain_id = _context_tree_domain(session_id)
+    if target.domain_id != domain_id:
+        _fail("feature change context has an incomplete or different Core publication")
+    try:
+        reference = host.reconcile(target.tree_id)
+    except ManagedTreeError as exc:
+        raise FeatureChangeWorkspaceError(
+            f"cannot reconcile feature change context custody: {exc}"
+        ) from exc
+    if (
+        reference.path != directory
+        or reference.owner_id != "workbench-shell"
+        or reference.role != "artifacts"
+        or reference.domain_id != domain_id
+        or reference.derived_status != "current"
+        or reference.references
+        or len(reference.members) != 1
+        or reference.members[0].get("kind") != "file"
+        or reference.members[0].get("classification") != "authoritative"
+    ):
+        _fail("feature change context Core tree differs from its owner contract")
+    return reference
+
+
+def _validate_staged_context(
+    directory: Path, *, filename: str, expected_bytes: bytes,
+) -> None:
+    _ordinary_directory(directory, "staged feature change Work Session context")
+    if [path.name for path in directory.iterdir()] != [filename]:
+        _fail("staged feature change Work Session context has unexpected members")
+    if _ordinary_bytes(directory / filename, "staged feature change Work Session context") != expected_bytes:
+        _fail("staged feature change Work Session context bytes changed")
+
+
 def _contexts_root(suite_root: Path | str) -> Path:
     root = _session_context_root(suite_root) / "contexts"
     root.mkdir(mode=0o700, exist_ok=True)
@@ -486,6 +557,7 @@ def _session_owner_directory(suite_root: Path | str, session_id: str) -> Path:
 
 def _context_for_session(suite_root: Path | str, session_id: str) -> Path:
     directory = _session_context_directory(suite_root, session_id)
+    reference = _context_tree_reference(directory, session_id)
     try:
         _ordinary_directory(directory, "feature change Work Session context directory")
         matches = [
@@ -499,6 +571,8 @@ def _context_for_session(suite_root: Path | str, session_id: str) -> Path:
         ) from exc
     if len(matches) != 1 or matches[0].is_symlink() or not matches[0].is_file():
         _fail("feature change Work Session does not have one immutable context")
+    if reference is not None and reference.members[0]["path"] != matches[0].name:
+        _fail("feature change Work Session context differs from its Core inventory")
     return matches[0]
 
 
@@ -882,6 +956,7 @@ def bind_material_fluid_recipe_session_context(
         or runtime.get("schema_version") != 1
     ):
         _fail("runtime configuration is not the installed Supersymmetry owner contract")
+    tree_host = _context_tree_host()
     session_id = session["session_id"]
     contexts = _contexts_root(suite)
     context_directory = _session_context_directory(suite, session_id)
@@ -891,6 +966,7 @@ def bind_material_fluid_recipe_session_context(
     session_sha256 = _sha256_file(session_path, "Work Session record")
     bind_lock = contexts / f".{session_id}.bind.lock"
     with _exclusive_record_lock(bind_lock, "feature change Work Session setup lock"):
+        _context_tree_reference(context_directory, session_id)
         if context_directory.exists() or context_directory.is_symlink():
             context_path = _context_for_session(suite, session_id)
             validated = validate_feature_change_session_context(
@@ -914,8 +990,7 @@ def bind_material_fluid_recipe_session_context(
                 owner_directory,
                 "incomplete feature change Work Session owner directory",
             )
-            staging = contexts / f".{session_id}.staging-{secrets.token_hex(16)}"
-            staging.mkdir(mode=0o700)
+            tree_started = False
             try:
                 owner_directory.mkdir(mode=0o700)
                 state_root = owner_directory / "owner-state"
@@ -962,22 +1037,39 @@ def bind_material_fluid_recipe_session_context(
                     **body,
                     "context_id": _content_id(SESSION_CONTEXT_ID_PREFIX, body),
                 }
-                staged_context_path = staging / (
+                context_name = (
                     "context-"
                     + context["context_id"].removeprefix(SESSION_CONTEXT_ID_PREFIX)
                     + ".json"
                 )
-                _write_immutable(staged_context_path, context)
                 validated = validate_feature_change_session_context(context)
-                os.rename(staging, context_directory)
-                fsync_directory(contexts)
-                context_path = context_directory / staged_context_path.name
+                tree_started = True
+                try:
+                    with tree_host.stage(
+                        "artifacts", context_directory.name,
+                        requested_path=context_directory,
+                    ) as stage:
+                        stage.path.mkdir(mode=0o700)
+                        _write_immutable(stage.path / context_name, context)
+                        reference = stage.publish(
+                            validate=lambda staged: _validate_staged_context(
+                                staged, filename=context_name,
+                                expected_bytes=_pretty_record_bytes(context),
+                            ),
+                            domain_id=_context_tree_domain(session_id),
+                        )
+                except ManagedTreeError as exc:
+                    raise FeatureChangeWorkspaceError(
+                        f"cannot publish feature change context through Core: {exc}"
+                    ) from exc
+                if (
+                    reference.path != context_directory
+                    or reference.domain_id != _context_tree_domain(session_id)
+                ):
+                    _fail("feature change context Core publication changed its destination")
+                context_path = context_directory / context_name
             except BaseException:
-                if not context_directory.exists():
-                    _remove_incomplete_setup(
-                        staging,
-                        "feature change Work Session staging directory",
-                    )
+                if not context_directory.exists() and not tree_started:
                     _remove_incomplete_setup(
                         owner_directory,
                         "feature change Work Session owner directory",

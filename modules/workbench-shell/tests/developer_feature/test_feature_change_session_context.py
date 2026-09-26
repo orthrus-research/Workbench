@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from contextvars import copy_context
 from hashlib import sha256
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -33,10 +35,16 @@ from workbench_shell.feature_change_workspace import (
     validate_feature_change_session_context,
 )
 from workbench_shell.work_session import SESSION_RECORD_NAME, WorkSessionStore
+from workbench_shell.golden_journey_cli import change_main
+from workbench_shell import commands
+from workbench_api.modules import ExecutionContext
 from workbench_core.host_services import install_local_host_services
 from workbench_api.record_stores import record_store_scope
 from workbench_core.storage.record_stores import CoreRecordStores
 from workbench_core.storage.registered import ResourceCatalog
+from workbench_api.managed_trees import managed_trees_scope
+from workbench_core.managed_trees import CoreManagedTrees
+import workbench_core.managed_trees as core_managed_trees
 
 install_local_host_services()
 
@@ -72,6 +80,12 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(dir=parent)
         self.root = Path(self.temporary.name)
         self.machine_state = self.root / "machine-state"
+        self.tree_provider = CoreManagedTrees(
+            workspace=ROOT, configuration_home=self.root / "config",
+            locations={"artifacts": ROOT}, owner_id="workbench-shell",
+        )
+        self.tree_scope = managed_trees_scope(self.tree_provider)
+        self.tree_scope.__enter__()
         self.environment = patch.dict(
             os.environ,
             {"WORKBENCH_STATE_ROOT": str(self.machine_state)},
@@ -96,6 +110,7 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.environment.stop()
+        self.tree_scope.__exit__(None, None, None)
         self.temporary.cleanup()
 
     @staticmethod
@@ -348,6 +363,143 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
             resolve_material_fluid_recipe_session_context(ROOT)[0]["context_id"],
         )
 
+    def test_context_tree_is_cataloged_and_historical_reader_remains_available(self) -> None:
+        context, created = self._bind("cataloged")
+        target = self._context_root / "contexts" / str(created["session_id"])
+        selected = self.tree_provider.lookup_target("artifacts", target)
+        self.assertEqual("committed", selected.status)
+        self.assertEqual(
+            f"workbench-feature-change-session-context-v1:{created['session_id']}",
+            selected.domain_id,
+        )
+        reference = self.tree_provider.describe(selected.tree_id)
+        self.assertEqual(target, reference.path)
+        self.assertEqual("workbench-shell", reference.owner_id)
+        self.assertEqual(1, len(reference.members))
+
+        # V1 contexts made before Core cataloging still resolve through their
+        # historical URI and content digest under a bound host.
+        legacy = CoreManagedTrees(
+            workspace=ROOT, configuration_home=self.root / "legacy-config",
+            locations={"artifacts": ROOT}, owner_id="workbench-shell",
+        )
+        with managed_trees_scope(legacy):
+            reopened = resolve_material_fluid_recipe_session_context(ROOT)[0]
+        self.assertEqual(context["context_id"], reopened["context_id"])
+
+    def test_external_dispatch_workspace_reopens_suite_tree_from_same_catalog(self) -> None:
+        context, created = self._bind("externaldispatch")
+        external_workspace = self.root / "selected-project"
+        external_workspace.mkdir()
+        foreign = CoreManagedTrees(
+            workspace=external_workspace,
+            configuration_home=self.root / "config",
+            locations={"artifacts": external_workspace},
+            owner_id="workbench-shell",
+        )
+        output, error = StringIO(), StringIO()
+        original_change_main = change_main
+
+        def routed_change_main(*args: object, **kwargs: object) -> int:
+            return original_change_main(*args, **kwargs, output=output, error=error)
+
+        with managed_trees_scope(foreign):
+            with patch.object(commands, "ROOT", ROOT), patch(
+                "workbench_shell.golden_journey_cli.change_main", side_effect=routed_change_main,
+            ):
+                code = commands.change(
+                    ["material-fluid-recipe", "select-context", str(created["session_id"]), "--json"],
+                    context=ExecutionContext(
+                        external_workspace, self.root / "external-state",
+                        configuration_home=self.root / "config",
+                    ),
+                )
+        self.assertEqual(0, code, error.getvalue())
+        self.assertEqual(context["context_id"], json.loads(output.getvalue())["context_id"])
+
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
+    def test_exit_after_tree_intent_reconciles_before_context_reuse(self) -> None:
+        record, created = self._session("intent-crash")
+        request = self._request("Thermal Solvent Intent Crash")
+        child = os.fork()
+        if child == 0:
+            with patch.object(core_managed_trees, "_rename_no_replace", side_effect=lambda *_a, **_k: os._exit(71)):
+                bind_material_fluid_recipe_session_context(ROOT, record, self.runtime_config, **request)
+            os._exit(72)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(71, os.waitstatus_to_exitcode(status))
+        target = self._context_root / "contexts" / str(created["session_id"])
+        selected = self.tree_provider.lookup_target("artifacts", target)
+        self.assertEqual("incomplete", selected.status)
+        self.assertFalse(target.exists())
+        context = bind_material_fluid_recipe_session_context(ROOT, record, self.runtime_config, **request)
+        self.assertEqual("committed", self.tree_provider.lookup_target("artifacts", target).status)
+        self.assertEqual(context["context_id"], resolve_material_fluid_recipe_session_context(ROOT)[0]["context_id"])
+
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
+    def test_exit_after_tree_rename_commits_before_context_reuse(self) -> None:
+        record, created = self._session("rename-crash")
+        request = self._request("Thermal Solvent Rename Crash")
+        target = self._context_root / "contexts" / str(created["session_id"])
+        original_sync = core_managed_trees.fsync_directory
+
+        def exit_after_rename(path: Path) -> None:
+            if path == target.parent:
+                os._exit(71)
+            original_sync(path)
+
+        child = os.fork()
+        if child == 0:
+            with patch.object(core_managed_trees, "fsync_directory", side_effect=exit_after_rename):
+                bind_material_fluid_recipe_session_context(ROOT, record, self.runtime_config, **request)
+            os._exit(72)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(71, os.waitstatus_to_exitcode(status))
+        self.assertTrue(target.is_dir())
+        self.assertEqual("published-uncommitted", self.tree_provider.lookup_target("artifacts", target).status)
+        context = bind_material_fluid_recipe_session_context(ROOT, record, self.runtime_config, **request)
+        self.assertEqual("committed", self.tree_provider.lookup_target("artifacts", target).status)
+        self.assertEqual(context["context_id"], resolve_material_fluid_recipe_session_context(ROOT)[0]["context_id"])
+
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
+    def test_exit_after_tree_reservation_fails_closed_without_owner_adoption(self) -> None:
+        record, created = self._session("reservation-crash")
+        request = self._request("Thermal Solvent Reservation Crash")
+        original = core_managed_trees._CoreTreeStage.__init__
+
+        def exit_after_reservation(stage: object, *args: object, **kwargs: object) -> None:
+            original(stage, *args, **kwargs)
+            os._exit(71)
+
+        child = os.fork()
+        if child == 0:
+            with patch.object(core_managed_trees._CoreTreeStage, "__init__", exit_after_reservation):
+                bind_material_fluid_recipe_session_context(ROOT, record, self.runtime_config, **request)
+            os._exit(72)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(71, os.waitstatus_to_exitcode(status))
+        target = self._context_root / "contexts" / str(created["session_id"])
+        self.assertEqual("allocated", self.tree_provider.lookup_target("artifacts", target).status)
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "incomplete or different Core publication"):
+            bind_material_fluid_recipe_session_context(ROOT, record, self.runtime_config, **request)
+        self.assertFalse(target.exists())
+        self.assertFalse((self._context_root / "selected-context-v1.json").exists())
+
+    def test_core_context_reader_rejects_changed_or_foreign_target(self) -> None:
+        context, created = self._bind("refusal")
+        target = self._context_root / "contexts" / str(created["session_id"])
+        foreign = CoreManagedTrees(
+            workspace=self.root / "foreign", configuration_home=self.root / "config",
+            locations={"artifacts": self.root / "foreign"}, owner_id="workbench-shell",
+        )
+        with managed_trees_scope(foreign):
+            with self.assertRaisesRegex(FeatureChangeWorkspaceError, "custody"):
+                resolve_material_fluid_recipe_session_context(ROOT)
+        context_path = next(target.glob("context-*.json"))
+        context_path.write_text("{}\n", encoding="utf-8")
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "custody"):
+            resolve_material_fluid_recipe_session_context(ROOT)
+
     def test_selection_lock_contention_rejects_second_writer(self) -> None:
         first, first_created = self._bind("first")
         self._bind("second")
@@ -374,7 +526,8 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
             except BaseException as exc:  # retained for the main test thread
                 failure.append(exc)
 
-        thread = threading.Thread(target=first_writer)
+        context = copy_context()
+        thread = threading.Thread(target=lambda: context.run(first_writer))
         thread.start()
         self.assertTrue(entered.wait(10))
         self.assertTrue(lock.is_file())
