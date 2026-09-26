@@ -290,6 +290,11 @@ def build_parser(*, prog: str = "workbench groovy") -> argparse.ArgumentParser:
         help="explicit retained session store under a Core-selected evidence or workspace location",
     )
     session.add_argument(
+        "--require-restartable-process-custody",
+        action="store_true",
+        help="require Core to bind a restartable client scope before any instance overlay",
+    )
+    session.add_argument(
         "--port",
         type=int,
         help="explicit free loopback port; otherwise Workbench reserves a random port",
@@ -502,6 +507,9 @@ def run(
                         session_timeout=args.session_timeout,
                         connect_timeout=args.connect_timeout,
                         diagnostic_timeout=args.diagnostic_timeout,
+                        require_restartable_process_custody=(
+                            args.require_restartable_process_custody
+                        ),
                         stop_event=stop,
                         on_event=event_callback,
                     )

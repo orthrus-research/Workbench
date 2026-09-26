@@ -127,6 +127,16 @@ Every action revalidates PID, process creation time, and executable path before
 requesting `CloseMainWindow` or force-stopping after the grace period. The Prism
 launcher process is also reaped.
 
+The V1 process-group and Windows process inventory are live-session mechanisms.
+They do not prove that every detached descendant has exited after the owner
+process fails. A launcher exit alone must not be used as restart recovery
+evidence. The optional `--require-restartable-process-custody` session flag asks
+Core for a retained process scope before changing the instance. A host without
+that scope refuses the session before overlay mutation. This strict route has
+no supported host broker yet; the default V1 route remains available with its
+live-session limitation. Retained overlay inspection reports process state as
+`unknown` and does not restore or release the instance lock.
+
 The module encodes each transition; Core appends one complete JSONL line under
 an exact-length precondition and fsyncs it. An incomplete final line remains
 visible for recovery inspection and blocks further appends to that journal.

@@ -6,6 +6,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
+import signal
 import shutil
 import socket
 import subprocess
@@ -65,6 +66,7 @@ from workbench_core.working_allocations import resolve_direct_working_allocation
 from workbench_api.host_filesystem import (  # noqa: E402
     inspect_private_journal, private_path, read_private_bytes,
 )
+from workbench_api.long_lived_processes import ProcessAbsence  # noqa: E402
 from workbench_api.modules import ExecutionContext  # noqa: E402
 from workbench_api.source_transactions import (  # noqa: E402
     SourceImage, SourceTransactionError, source_transactions_scope,
@@ -347,6 +349,119 @@ os._exit(99)
                 "overlay restoration deferred until client absence is proven",
                 result["limitations"],
             )
+
+    def test_strict_core_custody_refuses_before_instance_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment = self._environment(directory)
+            instance_config = environment["instance"] / "instance.cfg"
+            runtime_config = environment["runtime"] / "config/groovyscript.cfg"
+            original = (instance_config.read_bytes(), runtime_config.read_bytes())
+            custody = self._custody(Path(directory))
+            with self.assertRaisesRegex(PackProgramError, "Core restartable process custody"):
+                run_in_core_session_allocation(
+                    custody,
+                    requested_storage=None,
+                    run_session=lambda allocation: self._run(
+                        environment,
+                        allocation=allocation,
+                        require_restartable_process_custody=True,
+                    ),
+                )
+            self.assertEqual(original, (instance_config.read_bytes(), runtime_config.read_bytes()))
+            self.assertFalse((environment["instance"] / ".workbench-groovy-language-service.lock").exists())
+            (description,) = custody.inventory()
+            self.assertEqual("failed", description.status)
+            self.assertFalse((description.reference.path / "overlay-attempt-v1.json").exists())
+            self.assertTrue((description.reference.path / "events-v1.jsonl").exists())
+
+    def test_strict_unknown_process_state_retains_overlay_and_lock(self) -> None:
+        class UnknownLease:
+            def __init__(self, request):
+                self.request = request
+                self.closed = False
+
+            def launch(self):
+                return subprocess.Popen(
+                    list(self.request.command), cwd=self.request.cwd,
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, start_new_session=True,
+                )
+
+            def observe_absence(self):
+                return ProcessAbsence("unknown", "detached descendants are unverifiable")
+
+            def close(self):
+                self.closed = True
+
+        with tempfile.TemporaryDirectory() as directory:
+            environment = self._environment(directory)
+            leases = []
+
+            def reserve(request):
+                lease = UnknownLease(request)
+                leases.append(lease)
+                return lease
+
+            with patch(
+                "workbench_pack_program_studio.managed_session.reserve_long_lived_process",
+                side_effect=reserve,
+            ):
+                result = self._run(
+                    environment, require_restartable_process_custody=True,
+                )
+            self.assertEqual("blocked", result["state"])
+            self.assertEqual(1, len(leases))
+            self.assertTrue(leases[0].closed)
+            self.assertTrue((environment["instance"] / ".workbench-groovy-language-service.lock").exists())
+            self.assertTrue(all(row["restore"]["state"] == "conflict" for row in result["overlays"]))
+            self.assertIn(
+                "Core process absence is unknown: detached descendants are unverifiable",
+                result["limitations"],
+            )
+
+    @unittest.skipUnless(os.name == "posix", "detached POSIX child regression")
+    def test_legacy_leader_exit_cannot_prove_detached_child_absence(self) -> None:
+        launcher = subprocess.Popen(
+            [
+                sys.executable, "-c",
+                "import subprocess,sys; child=subprocess.Popen([sys.executable, '-c', "
+                "'import time; time.sleep(30)'], stdin=subprocess.DEVNULL, "
+                "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, "
+                "start_new_session=True); print(child.pid, flush=True)",
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        child_pid = None
+        try:
+            assert launcher.stdout is not None
+            child_pid = int(launcher.stdout.readline().decode("ascii").strip())
+            self.assertEqual(0, launcher.wait(timeout=5))
+            # The legacy shutdown inventory is empty even though the detached
+            # process still runs. It cannot be promoted into Core absence proof.
+            _graceful, _forced, orphaned, _discovered = _shutdown(
+                launcher,
+                binding=type("Binding", (), {"host_os": "linux"})(),
+                known_windows_processes={}, port=0,
+                graceful_seconds=0.1, force_seconds=0.1,
+            )
+            self.assertEqual([], orphaned)
+            os.kill(child_pid, 0)
+        finally:
+            if child_pid is not None:
+                try:
+                    os.kill(child_pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            if launcher.poll() is None:
+                launcher.kill()
+                launcher.wait(timeout=5)
+            if launcher.stdout is not None:
+                launcher.stdout.close()
+            if launcher.stderr is not None:
+                launcher.stderr.close()
 
     def _retained_overlay(self, directory: str):
         root = Path(directory)
@@ -650,6 +765,7 @@ os._exit(99)
         self, environment: dict[str, Path], *, ready_stop: bool = True,
         allocation: WorkingAllocationReference | None = None,
         interrupt_on_ready: bool = False,
+        require_restartable_process_custody: bool = False,
     ) -> dict[str, object]:
         if allocation is None:
             return run_in_core_session_allocation(
@@ -658,6 +774,7 @@ os._exit(99)
                 run_session=lambda selected: self._run(
                     environment, ready_stop=ready_stop, allocation=selected,
                     interrupt_on_ready=interrupt_on_ready,
+                    require_restartable_process_custody=require_restartable_process_custody,
                 ),
             )
         stop = threading.Event()
@@ -683,6 +800,7 @@ os._exit(99)
             session_timeout=0.15,
             connect_timeout=0.2,
             diagnostic_timeout=2,
+            require_restartable_process_custody=require_restartable_process_custody,
             stop_event=stop,
             on_event=lambda event: events.append(dict(event)),
             on_ready=on_ready,
@@ -1009,6 +1127,29 @@ os._exit(99)
             )
         self.assertEqual(0, code, error.getvalue())
         self.assertEqual("complete", json.loads(output.getvalue())["state"])
+
+    def test_cli_strict_process_custody_refuses_before_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment = self._environment(directory)
+            original = (environment["instance"] / "instance.cfg").read_bytes()
+            output = StringIO()
+            error = StringIO()
+            code = cli_run(
+                [
+                    "session", "--profile", "supersymmetry",
+                    "--language-profile", str(environment["language_profile"]),
+                    "--source", str(environment["source"]),
+                    "--runtime-root", str(environment["runtime"]),
+                    "--launch-receipt", str(environment["launch_receipt"]),
+                    "--require-restartable-process-custody",
+                ],
+                root=ROOT, output=output, error=error,
+                session_custody=self._custody(Path(directory)),
+            )
+            self.assertEqual(2, code)
+            self.assertIn("Core restartable process custody is unavailable", error.getvalue())
+            self.assertEqual(original, (environment["instance"] / "instance.cfg").read_bytes())
+            self.assertFalse((environment["instance"] / ".workbench-groovy-language-service.lock").exists())
 
     def test_installed_session_cli_uses_core_selected_evidence_store(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -85,6 +85,12 @@ Prism projection, reserves a loopback port, applies checked temporary overlays,
 proves compiler readiness, publishes terminal/IntelliJ/VS Code endpoint data,
 supervises the exact process, and restores owned configuration on stop.
 
+For a fail-closed preflight, `workbench groovy session` accepts
+`--require-restartable-process-custody`. Core refuses this opt-in route until a
+restartable host process scope is available, before the disposable instance is
+changed. The current default V1 session can supervise its live launcher but
+cannot establish absence of a detached child after owner failure.
+
 ## Recipe review
 
 The separate reviewer-facing route reuses the same bounded analyzer:

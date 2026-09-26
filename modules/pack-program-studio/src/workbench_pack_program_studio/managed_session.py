@@ -30,6 +30,13 @@ from workbench_api.host_filesystem import (
     secure_private_path,
 )
 from workbench_api.processes import ProcessError, execute_process
+from workbench_api.long_lived_processes import (
+    LongLivedProcessError,
+    LongLivedProcessLease,
+    LongLivedProcessRequest,
+    observe_process_absence,
+    reserve_long_lived_process,
+)
 from workbench_api.source_transactions import (
     SourceImage, SourceStage, SourceTransaction, open_source_transaction,
 )
@@ -493,6 +500,7 @@ def run_managed_language_session(
     session_timeout: float | None,
     connect_timeout: float,
     diagnostic_timeout: float,
+    require_restartable_process_custody: bool = False,
     stop_event: threading.Event | None = None,
     on_event: Callable[[Mapping[str, Any]], None] | None = None,
     on_ready: Callable[[Mapping[str, Any]], None] | None = None,
@@ -601,10 +609,36 @@ def run_managed_language_session(
         ],
     )
 
-    reservation, endpoint_port, upstream_port, allocation = _reserve_managed_endpoint(
-        requested_port,
-        bridge_required=bridge_required,
-    )
+    process_lease: LongLivedProcessLease | None = None
+    if require_restartable_process_custody:
+        try:
+            instance_identity = binding.instance_root.lstat()
+            process_lease = reserve_long_lived_process(LongLivedProcessRequest(
+                session_id=session_id,
+                host_os=binding.host_os,
+                instance_root=binding.instance_root,
+                cwd=binding.cwd,
+                instance_device=instance_identity.st_dev,
+                instance_inode=instance_identity.st_ino,
+                launch_receipt_sha256=binding.receipt_sha256,
+                command=binding.command,
+            ))
+        except (OSError, LongLivedProcessError) as exc:
+            journal.close()
+            raise PackProgramError(
+                f"Core restartable process custody is unavailable: {_safe_text(str(exc), 1024)}"
+            ) from exc
+
+    try:
+        reservation, endpoint_port, upstream_port, allocation = _reserve_managed_endpoint(
+            requested_port,
+            bridge_required=bridge_required,
+        )
+    except BaseException:
+        if process_lease is not None:
+            process_lease.close()
+        journal.close()
+        raise
     endpoint = {
         "host": "127.0.0.1",
         "port": endpoint_port,
@@ -637,6 +671,8 @@ def run_managed_language_session(
         )
     except Exception:
         reservation.close()
+        if process_lease is not None:
+            process_lease.close()
         journal.close()
         raise
     lock_path = binding.instance_root / _LOCK_NAME
@@ -707,7 +743,12 @@ def run_managed_language_session(
         else:
             reservation.close()
             reservation = None
-        process = _launch(binding)
+        process = (
+            process_lease.launch()
+            if process_lease is not None else _launch(binding)
+        )
+        if not isinstance(process, subprocess.Popen):
+            raise LongLivedProcessError("Core process lease returned no launched process")
         emitted(
             "client-launch-started",
             launcher_pid=process.pid,
@@ -769,7 +810,8 @@ def run_managed_language_session(
             )
             outcome = "ready-session-closed"
             final_state = "complete"
-    except (OSError, ValueError, PackProgramError, subprocess.SubprocessError) as exc:
+    except (OSError, ValueError, PackProgramError, LongLivedProcessError,
+            subprocess.SubprocessError) as exc:
         outcome = "session-failed"
         shutdown_reason = "session-failed"
         readiness["failure"] = {
@@ -797,6 +839,20 @@ def run_managed_language_session(
                 process_cleared = not orphaned and process.poll() is not None
             except (OSError, ValueError, PackProgramError, subprocess.SubprocessError) as exc:
                 cleanup_errors.append(f"process shutdown failed: {_safe_text(str(exc), 2048)}")
+        if process_lease is not None:
+            try:
+                observation = observe_process_absence(process_lease)
+                process_cleared = observation.state == "absent"
+                if not process_cleared:
+                    cleanup_errors.append(
+                        f"Core process absence is {observation.state}: "
+                        f"{_safe_text(observation.reason, 1024)}"
+                    )
+            except Exception as exc:
+                process_cleared = False
+                cleanup_errors.append(
+                    f"Core process absence is unknown: {_safe_text(str(exc), 1024)}"
+                )
         if process_cleared:
             for record in reversed(overlay_records):
                 try:
@@ -830,6 +886,13 @@ def run_managed_language_session(
             except (OSError, ValueError) as exc:
                 cleanup_errors.append(
                     f"overlay attempt record could not be closed: {_safe_text(str(exc), 2048)}"
+                )
+        if process_lease is not None:
+            try:
+                process_lease.close()
+            except Exception as exc:
+                cleanup_errors.append(
+                    f"Core process lease close failed: {_safe_text(str(exc), 1024)}"
                 )
         if cleanup_errors:
             final_state = "blocked"
