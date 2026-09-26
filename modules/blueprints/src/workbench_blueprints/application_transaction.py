@@ -13,10 +13,14 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import stat
-import tempfile
 from typing import Any, Callable, Mapping, NoReturn, Sequence, cast
 import uuid
-from workbench_api.host_filesystem import fsync_directory as _fsync_directory
+from workbench_api.host_filesystem import (
+    DurableRecordError,
+    fsync_directory as _fsync_directory,
+    publish_immutable_bytes,
+    replace_private_bytes,
+)
 from workbench_api.source_transactions import (
     SourceImage, SourceStage, SourceTransaction, open_source_transaction,
 )
@@ -141,45 +145,29 @@ def _read_regular(path: Path, label: str) -> bytes:
 
 
 def _atomic_new(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
+    if mode != 0o600:
+        _fail("retained qualification artifacts require owner-private mode")
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        dir=path.parent,
-    )
     try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(raw)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.chmod(temporary_name, mode)
-        try:
-            os.link(temporary_name, path)
-        except FileExistsError:
-            _fail(f"retained qualification artifact already exists: {path}")
-    finally:
-        Path(temporary_name).unlink(missing_ok=True)
+        publish_immutable_bytes(path, raw, byte_limit=len(raw))
+    except DurableRecordError as exc:
+        raise ApplicationTransactionError(
+            f"cannot publish retained qualification artifact: {exc}"
+        ) from exc
 
 
 def _atomic_replace(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
-    """Replace one mutable operational record and fsync its directory."""
+    """Ask Core to replace one mutable owner-private operational record."""
 
+    if mode != 0o600:
+        _fail("transaction records require owner-private mode")
     _ordinary_directory(path.parent, "transaction record parent")
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        dir=path.parent,
-    )
     try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(raw)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.chmod(temporary_name, mode)
-        os.replace(temporary_name, path)
-        _fsync_directory(path.parent)
-    finally:
-        Path(temporary_name).unlink(missing_ok=True)
+        replace_private_bytes(path, raw, byte_limit=len(raw))
+    except DurableRecordError as exc:
+        raise ApplicationTransactionError(
+            f"cannot replace retained transaction record: {exc}"
+        ) from exc
 
 
 def _read_json_record(path: Path, label: str) -> dict[str, Any]:
