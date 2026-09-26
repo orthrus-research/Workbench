@@ -14,6 +14,7 @@ from workbench_core.ide_toolchain_admissions import (
     CoreIdeToolchainAdmissions, IdeToolchainAdmissionError,
 )
 from workbench_core.storage.registered import ResourceCatalog
+from workbench_core.temporary_leases import CoreTemporaryLeases
 
 
 class IdeToolchainAdmissionTests(unittest.TestCase):
@@ -76,12 +77,40 @@ class IdeToolchainAdmissionTests(unittest.TestCase):
         self.assertEqual("present", inventory["ide_toolchain_admissions"][0]["parent_store_registration"])
 
     def test_original_stage_provenance_survives_later_reuse(self) -> None:
-        stage = "workbench-temporary-lease-v1:" + "a" * 32
-        first = self.admit(stage_lease_id=stage)
-        self.assertEqual(stage, first["stage_lease_id"])
+        stages = CoreTemporaryLeases(
+            workspace=self.host.workspace,
+            configuration_home=self.host.configuration_home,
+            locations={"ide-toolchain": self.root}, owner_id="validation",
+        )
+        stage = stages.allocate("ide-toolchain", f"ide-{self.digest}-source")
+        with stages.execution(stage):
+            first = self.admit(stage_lease_id=stage.lease_id)
+            stages.retain(stage, outcome="completed")
+        self.assertEqual(stage.lease_id, first["stage_lease_id"])
         self.assertEqual(first, self.admit())
         with self.assertRaisesRegex(IdeToolchainAdmissionError, "differs"):
             self.admit(stage_lease_id="workbench-temporary-lease-v1:" + "b" * 32)
+
+    def test_lost_admission_with_retained_stage_cannot_be_reborn_as_historical(self) -> None:
+        stages = CoreTemporaryLeases(
+            workspace=self.host.workspace,
+            configuration_home=self.host.configuration_home,
+            locations={"ide-toolchain": self.root}, owner_id="validation",
+        )
+        stage = stages.allocate("ide-toolchain", f"ide-{self.digest}-source")
+        with stages.execution(stage):
+            self.admit(stage_lease_id=stage.lease_id)
+            stages.retain(stage, outcome="completed")
+        record = self.record()
+        held = self.home / "held-admission.json"
+        record.rename(held)
+        try:
+            with self.assertRaisesRegex(IdeToolchainAdmissionError, "missing IDE admission"):
+                self.admit()
+            self.assertFalse(record.exists())
+            self.assertTrue(self.target.is_dir())
+        finally:
+            held.rename(record)
 
     def test_changed_bytes_and_replaced_root_refuse_without_rewriting_admission(self) -> None:
         self.admit()

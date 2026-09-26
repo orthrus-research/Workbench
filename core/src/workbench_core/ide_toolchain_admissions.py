@@ -25,6 +25,7 @@ from .durable_records import (
 from .ide_toolchain_reader import inspect_ide_toolchain_tree
 from .host_filesystem import private_path
 from .storage.record_stores import CoreRecordStores
+from .temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
 
 _FORMAT = "workbench-ide-toolchain-admission-v1"
@@ -75,6 +76,23 @@ class CoreIdeToolchainAdmissions:
         self.toolchain_root = toolchain_root
         self.workspace = toolchain_root.parent
         self.configuration_home = self.workspace / ".ide-toolchain-core"
+
+    def _source_stages(self, destination: Path, archive_sha256: str) -> list[dict]:
+        """Read matching Core stages; a missing admission cannot adopt one."""
+
+        try:
+            rows = CoreTemporaryLeases.inventory_catalog(
+                self.configuration_home, workspace=self.workspace,
+            )
+        except TemporaryLeaseError as exc:
+            raise IdeToolchainAdmissionError("IDE toolchain source stages need review") from exc
+        prefix = f"ide-{archive_sha256}-"
+        return [row for row in rows if (
+            row["owner_id"] == "validation"
+            and row["role"] == "ide-toolchain"
+            and Path(row["path"]).parent == destination.parent
+            and Path(row["path"]).name.startswith(prefix)
+        )]
 
     def inventory_catalog(self) -> list[dict[str, Any]]:
         """Read current admission rows and interrupted stages without opening trees."""
@@ -184,6 +202,36 @@ class CoreIdeToolchainAdmissions:
             ).open("validation-ide-toolchain-admissions-v1", self.workspace)
             path = _record_path(store.root, destination)
             with private_record_lock(path.with_suffix(".lock"), wait=True):
+                stages = self._source_stages(destination, archive_sha256)
+                live = [row for row in stages if row["status"] != "disposed"]
+                retained = _read_record(path) if path.exists() or path.is_symlink() else None
+                if retained is None:
+                    if stage_lease_id is None and live:
+                        raise IdeToolchainAdmissionError(
+                            "missing IDE admission has a retained Core source stage",
+                        )
+                    if stage_lease_id is not None and (
+                        len(live) != 1
+                        or live[0]["lease_id"] != stage_lease_id
+                        or live[0]["status"] != "active-or-abandoned"
+                    ):
+                        raise IdeToolchainAdmissionError(
+                            "fresh IDE admission differs from its active Core source stage",
+                        )
+                else:
+                    original_stage = retained.get("stage_lease_id")
+                    if original_stage is None and live:
+                        raise IdeToolchainAdmissionError(
+                            "historical IDE admission has an unclaimed Core source stage",
+                        )
+                    if original_stage is not None and (
+                        len(live) != 1
+                        or live[0]["lease_id"] != original_stage
+                        or live[0]["status"] != "retained-unproven"
+                    ):
+                        raise IdeToolchainAdmissionError(
+                            "IDE admission source stage is unavailable or changed",
+                        )
                 readback = inspect_ide_toolchain_tree(
                     archive, destination, archive_sha256=archive_sha256,
                     archive_size=archive_size, expected_root=expected_root,
@@ -206,8 +254,7 @@ class CoreIdeToolchainAdmissions:
                     "retention": "protected-until-reviewed-policy",
                 }
                 expected = check_storage.seal(_FORMAT, body)
-                if path.exists() or path.is_symlink():
-                    retained = _read_record(path)
+                if retained is not None:
                     # The first successful admission retains its provenance.
                     # Later callers need only match its physical/lock binding.
                     if any(
