@@ -11,8 +11,10 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api import Capability, ExecutionContext, Module, ModuleError
+from workbench_api.host_filesystem import HostFilesystemError
 from workbench_core.modules import discover, dispatch
 from workbench_core.module_cli import disabled_modules, _set_disabled, main, configuration_path
+from workbench_core import preference_records
 
 
 def entry(name="sample", *, module=None, failure=None, distribution=None):
@@ -130,6 +132,33 @@ class ModuleConfigurationTests(unittest.TestCase):
             _set_disabled(root,"other",True)
             _set_disabled(root,"sample",False)
             self.assertEqual(("other",),disabled_modules(root))
+
+    def test_external_change_after_review_refuses_preference_replacement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _set_disabled(root, "sample", True)
+            path = configuration_path(root, "modules")
+            external = b'{"disabled": ["external"], "schema_version": 1}\n'
+            replace = preference_records.replace_private_bytes
+
+            def changed_before_compare(selected, payload, **options):
+                selected.write_bytes(external)
+                replace(selected, payload, **options)
+
+            with patch.object(preference_records, "replace_private_bytes", side_effect=changed_before_compare):
+                with self.assertRaisesRegex(ModuleError, "changed after review"):
+                    _set_disabled(root, "other", True)
+            self.assertEqual(external, path.read_bytes())
+
+    def test_preference_refuses_mount_without_private_metadata_before_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = configuration_path(root, "modules")
+            with patch.object(preference_records, "secure_private_path",
+                              side_effect=HostFilesystemError("private metadata unavailable")):
+                with self.assertRaisesRegex(ModuleError, "private metadata unavailable"):
+                    _set_disabled(root, "sample", True)
+            self.assertFalse(path.exists())
 
     def test_invalid_configuration_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

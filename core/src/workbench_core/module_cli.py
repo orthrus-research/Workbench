@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import configparser
 from dataclasses import dataclass
 import email.parser
+from hashlib import sha256
 from importlib import metadata
 import json
 import os
@@ -19,10 +20,13 @@ import tempfile
 import zipfile
 
 from workbench_api import ModuleError
+from workbench_api.host_filesystem import DurableRecordError
 from workbench_api.state_paths import default_runtime_state_root
 from workbench_api.profiles import profile_scope, profile_status
 from .modules import discover
 from .package_operations import PackageOperation, PackageOperationStore
+from .preference_records import update_preference_bytes
+from .durable_records import read_bounded_bytes
 from .dependencies import dependency_errors, reverse_dependency_errors
 from .package_ownership import validate_wheel_ownership
 from packaging.specifiers import SpecifierSet
@@ -38,21 +42,34 @@ def configuration_path(state_root: Path, kind: str) -> Path:
     return state_root / "environments" / environment_id() / kind / "disabled.json"
 
 
-def disabled_components(state_root: Path, kind: str) -> tuple[str, ...]:
-    path = configuration_path(state_root, kind)
-    if any(parent.is_symlink() for parent in path.parents):
-        raise ModuleError("module configuration directory must not traverse symlinks")
-    if not path.exists() and not path.is_symlink():
+MAX_DISABLED_BYTES = 65536
+
+
+def _disabled_ids(raw: bytes | None) -> tuple[str, ...]:
+    if raw is None:
         return ()
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 65536:
-        raise ModuleError("module configuration is not a bounded ordinary file")
-    value = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ModuleError("module configuration is not valid UTF-8 JSON") from exc
     if type(value) is not dict or set(value) != {"disabled", "schema_version"} or value["schema_version"] != 1:
         raise ModuleError("invalid module configuration")
     ids = value["disabled"]
     if type(ids) is not list or any(type(v) is not str or not re.fullmatch(r"[a-z][a-z0-9.-]*", v) for v in ids) or len(ids) != len(set(ids)):
         raise ModuleError("invalid disabled module identifiers")
     return tuple(ids)
+
+
+def disabled_components(state_root: Path, kind: str) -> tuple[str, ...]:
+    path = configuration_path(state_root, kind).absolute()
+    if any(parent.is_symlink() for parent in (path, *path.parents)):
+        raise ModuleError("module configuration directory must not traverse symlinks")
+    if not path.exists():
+        return ()
+    try:
+        return _disabled_ids(read_bounded_bytes(path, byte_limit=MAX_DISABLED_BYTES))
+    except DurableRecordError as exc:
+        raise ModuleError(f"module configuration is not a bounded ordinary file: {exc}") from exc
 
 
 def disabled_modules(state_root: Path) -> tuple[str, ...]:
@@ -77,29 +94,23 @@ def _profile_status(state_root: Path, *, disabled=None):
         return profile_status(disabled=disabled)
 
 
-def _set_disabled(state_root: Path, module_id: str, disabled: bool, *, kind: str = "modules") -> None:
-    # Reuse Core's cross-process setup lock for compare/read/write exclusion.
-    from .setup_cli import setup_record_lock
-    path = configuration_path(state_root, kind)
-    if any(parent.is_symlink() for parent in (path.parent, *path.parent.parents)):
-        raise ModuleError("module configuration directory must not traverse symlinks")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with setup_record_lock(path):
-        ids = set(disabled_components(state_root, kind))
+def _set_disabled(state_root: Path, module_id: str, disabled: bool, *, kind: str = "modules") -> bytes:
+    path = configuration_path(state_root, kind).absolute()
+
+    def change(previous: bytes | None) -> bytes:
+        ids = set(_disabled_ids(previous))
         if disabled:
             ids.add(module_id)
         else:
             ids.discard(module_id)
-        raw = json.dumps({"schema_version": 1, "disabled": sorted(ids)}, sort_keys=True) + "\n"
-        descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=".disabled-", suffix=".tmp")
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-                stream.write(raw)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, path)
-        finally:
-            Path(temporary).unlink(missing_ok=True)
+        return (json.dumps({"schema_version": 1, "disabled": sorted(ids)}, sort_keys=True) + "\n").encode("utf-8")
+
+    try:
+        return update_preference_bytes(path, change, byte_limit=MAX_DISABLED_BYTES)
+    except ValueError as exc:
+        if isinstance(exc, ModuleError):
+            raise
+        raise ModuleError(f"module configuration update failed: {exc}") from exc
 
 
 @dataclass(frozen=True)
@@ -249,24 +260,27 @@ def main(argv, *, root: Path, kind: str = "modules") -> int:
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     package_change = args.action in {"install", "update", "remove"}
+    setting_change = args.action in {"enable", "disable"}
     if package_change and sys.prefix == sys.base_prefix:
         raise ModuleError("package changes require a dedicated Workbench virtual environment")
     from .package_guard import PackageActivity, package_change as mutation_guard
     # Enable/disable affect running code just as installation does.
     with (PackageActivity() if args.action == "list" else mutation_guard()):
-        if package_change:
+        state = default_runtime_state_root(root) if setting_change else None
+        if package_change or setting_change:
             target = (
                 str(args.wheel.expanduser().absolute())
                 if args.action in {"install", "update"} else args.component_id
             )
             operation = PackageOperationStore.current().begin(
                 kind=kind, action=args.action, target=target,
+                settings_path=(configuration_path(state, kind).absolute() if state is not None else None),
             )
             try:
-                result = _execute(args, root=root, kind=kind, operation=operation)
+                result = _execute(args, root=root, kind=kind, operation=operation, state=state)
             except BaseException as exc:
                 operation.finish(
-                    "incomplete" if operation.external_started else "rejected",
+                    "incomplete" if operation.external_started or operation.setting_started else "rejected",
                     error=f"{type(exc).__name__}: {exc}",
                 )
                 raise
@@ -276,12 +290,13 @@ def main(argv, *, root: Path, kind: str = "modules") -> int:
                 error=None if result == 0 else f"package command exited with code {result}",
             )
             return result
-        return _execute(args, root=root, kind=kind)
+        return _execute(args, root=root, kind=kind, state=state)
 
 
 def _execute(args, *, root: Path, kind: str = "modules",
-             operation: PackageOperation | None = None) -> int:
-    state = default_runtime_state_root(root)
+             operation: PackageOperation | None = None,
+             state: Path | None = None) -> int:
+    state = default_runtime_state_root(root) if state is None else state
     # Do not import the old plugin into this process before replacing its wheel.
     modules = () if args.action in {"install", "update"} else (
         discover(disabled=disabled_modules(state)) if kind == "modules" else _profile_status(state))
@@ -298,7 +313,14 @@ def _execute(args, *, root: Path, kind: str = "modules",
                 proposed = discover(disabled=disabled) if kind == "modules" else _profile_status(state, disabled=disabled)
                 if not any(row.id == args.component_id and row.state == "available" for row in proposed):
                     raise ModuleError("component cannot be enabled until admission failures are repaired")
-            _set_disabled(state, args.component_id, args.action == "disable", kind=kind)
+            if operation is not None:
+                operation.before_setting_change()
+            written = _set_disabled(state, args.component_id, args.action == "disable", kind=kind)
+            observed = read_bounded_bytes(configuration_path(state, kind).absolute(), byte_limit=MAX_DISABLED_BYTES)
+            if observed != written or (args.component_id in _disabled_ids(observed)) != (args.action == "disable"):
+                raise ModuleError("component setting changed but readback did not match the requested state")
+            if operation is not None:
+                operation.bind_setting_readback(sha256(observed).hexdigest())
             return 0
         distribution = matches[0].distribution
         if re.sub(r"[-_.]+", "-", distribution).lower() in {"workbench-core", "workbench-api"}:

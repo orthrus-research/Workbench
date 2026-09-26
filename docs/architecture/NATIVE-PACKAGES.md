@@ -135,9 +135,12 @@ workbench modules update /absolute/path/to/newer-module.whl
 workbench modules disable module-id
 workbench modules enable module-id
 workbench modules remove module-id
+workbench modules operations --json
+workbench modules operations operation-id
 workbench profiles list --json
 workbench profiles disable profile-id
 workbench profiles enable profile-id
+workbench profiles operations --json
 ```
 
 Profiles also support install, update and remove. Package installation is
@@ -155,6 +158,12 @@ These are environment-ownership safeguards, not a sandbox for untrusted Python.
 Enable/disable choices are scoped to the canonical Python environment under
 `state/environments/<environment-id>/`. Legacy unscoped enable-state files are
 not imported: review and reapply explicit choices for the new installation.
+Core compares and replaces these preference files under a cross-process lock.
+Package and enable/disable changes retain private operation receipts under the
+fixed account-and-environment package guard; `operations` remains readable
+when an optional module is broken. Completed setting receipts name the selected
+state file and hash its verified readback. On WSL, use a Linux filesystem for
+state when a Windows-mounted directory cannot enforce owner-private permissions.
 
 Commands and services hold environment activity leases. Package changes are
 refused while other Workbench work uses that environment. A service retains its

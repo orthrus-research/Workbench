@@ -1,6 +1,7 @@
 """Core package mutation receipts survive failed installs and broken modules."""
 
 from contextlib import redirect_stdout
+from hashlib import sha256
 from io import StringIO
 import json
 from pathlib import Path
@@ -78,6 +79,76 @@ class PackageOperationTests(unittest.TestCase):
         self.assertEqual(row, json.loads(output.getvalue()))
         with self.assertRaisesRegex(ModuleError, "another component kind"):
             module_cli.main(["operations", row["operation_id"]], root=self.base, kind="profiles")
+
+    def test_setting_receipt_binds_selected_state_and_verified_readback(self):
+        module = SimpleNamespace(id="sample", state="available")
+        with patch.object(module_cli, "discover", return_value=(module,)):
+            self.assertEqual(0, module_cli.main(["disable", "sample"], root=self.base))
+        first, = self.store.list(kind="modules")
+        selected = module_cli.configuration_path(self.base / "state", "modules")
+        self.assertEqual("workbench-component-setting-operation-v1", first["format"])
+        self.assertTrue(first["record_id"].startswith("workbench-component-setting-operation:sha256:"))
+        self.assertEqual("completed", first["state"])
+        self.assertEqual("disable", first["action"])
+        self.assertEqual("sample", first["target"])
+        self.assertEqual(str(selected), first["settings_path"])
+        self.assertEqual(sha256(selected.read_bytes()).hexdigest(), first["settings_sha256"])
+        self.assertFalse(first["external_started"])
+        with patch.object(module_cli, "discover", side_effect=AssertionError("optional module was loaded")), \
+             redirect_stdout(StringIO()) as output:
+            self.assertEqual(0, module_cli.main(["operations", first["operation_id"]], root=self.base))
+        self.assertEqual(first, json.loads(output.getvalue()))
+
+        with patch.object(module_cli, "discover", return_value=(module,)):
+            self.assertEqual(0, module_cli.main(["enable", "sample"], root=self.base))
+        enabled = next(row for row in self.store.list(kind="modules") if row["action"] == "enable")
+        self.assertEqual("completed", enabled["state"])
+        self.assertEqual(str(selected), enabled["settings_path"])
+        self.assertEqual(sha256(selected.read_bytes()).hexdigest(), enabled["settings_sha256"])
+        self.assertEqual((), module_cli.disabled_modules(self.base / "state"))
+
+        other = self.base / "other-state"
+        with patch.object(module_cli, "default_runtime_state_root", return_value=other), \
+             patch.object(module_cli, "discover", return_value=(module,)):
+            self.assertEqual(0, module_cli.main(["disable", "sample"], root=self.base))
+        paths = {row["settings_path"] for row in self.store.list(kind="modules")}
+        self.assertEqual({str(selected), str(module_cli.configuration_path(other, "modules"))}, paths)
+        with self.assertRaisesRegex(ModuleError, "identity or state"):
+            PackageOperationStore(self.guard, "b" * 64).inspect(first["operation_id"])
+
+    def test_profile_setting_receipt_keeps_component_kind(self):
+        profile = SimpleNamespace(id="pack", state="available")
+        with patch.object(module_cli, "_profile_status", return_value=(profile,)):
+            self.assertEqual(0, module_cli.main(["disable", "pack"], root=self.base, kind="profiles"))
+        row, = self.store.list(kind="profiles")
+        self.assertEqual("completed", row["state"])
+        self.assertEqual("profiles", row["kind"])
+        self.assertEqual(("pack",), module_cli.disabled_profiles(self.base / "state"))
+
+    def test_setting_preflight_and_post_start_failure_have_distinct_receipts(self):
+        with patch.object(module_cli, "discover", return_value=()):
+            with self.assertRaisesRegex(ModuleError, "select exactly one"):
+                module_cli.main(["disable", "missing"], root=self.base)
+        rejected, = self.store.list(kind="modules")
+        self.assertEqual("rejected", rejected["state"])
+        self.assertFalse(module_cli.configuration_path(self.base / "state", "modules").exists())
+
+        module = SimpleNamespace(id="sample", state="available")
+        observed = []
+
+        def interrupted(*_args, **_kwargs):
+            observed.extend(row for row in self.store.list(kind="modules") if row["target"] == "sample")
+            raise RuntimeError("fixture write interrupted")
+
+        with patch.object(module_cli, "discover", return_value=(module,)), \
+             patch.object(module_cli, "_set_disabled", side_effect=interrupted):
+            with self.assertRaisesRegex(RuntimeError, "fixture write interrupted"):
+                module_cli.main(["disable", "sample"], root=self.base)
+        self.assertEqual("setting-running", observed[0]["state"])
+        interrupted = next(row for row in self.store.list(kind="modules") if row["target"] == "sample")
+        self.assertEqual("incomplete", interrupted["state"])
+        self.assertIsNone(interrupted["settings_sha256"])
+        self.assertIn("fixture write interrupted", interrupted["error"])
 
     def test_preflight_refusal_is_distinct_from_post_pip_uncertainty(self):
         with patch.object(module_cli, "discover", return_value=()), \
