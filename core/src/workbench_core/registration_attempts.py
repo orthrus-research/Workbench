@@ -365,9 +365,11 @@ class _Attempt:
                 )
                 state = transaction.classify(reference)
                 staged = self.payload.joinpath(*PurePosixPath(stage["staged_relative"]).parts)
-                if (not attempted and not staged.exists()) or (state == "after" and staged.exists()):
+                stage_present = staged.exists() or staged.is_symlink()
+                if (not attempted and not stage_present) or (state == "after" and stage_present):
                     review_required = True
             else:
+                stage_present = False
                 state = "other"
                 for label, image in (("after", after), ("before", before)):
                     try:
@@ -385,11 +387,27 @@ class _Attempt:
                     "path": relative, "staging_token": token,
                 }:
                     _fail("record", "registration source attempt record changed")
+            prefix = f".{target.name}.workbench-{token}-"
+            expected_stage = (
+                PurePosixPath(stages[ordinal]["staged_relative"]).name
+                if stage_recorded else None
+            )
+            extra_stage_present = any(
+                member.name != expected_stage
+                for member in target.parent.iterdir()
+                if member.name.startswith(prefix) and member.name.endswith(".tmp")
+            )
+            if [row["parent_device"], row["parent_inode"]] != list(_identity(target.parent)):
+                _fail("changed", "registration source parent changed during stage inventory")
+            if extra_stage_present:
+                review_required = True
             if state == "other" or (state == "after" and not attempted):
                 review_required = True
             classified.append({
                 "path": relative, "source_state": state,
                 "stage_recorded": stage_recorded, "attempted": attempted,
+                "stage_present": stage_present,
+                "extra_stage_present": extra_stage_present,
             })
         if receipt_state == "applied" and (
             stage_exists or len(attempts) != len(rows)
@@ -400,7 +418,9 @@ class _Attempt:
         return {
             "format": "workbench-registration-attempt-inspection-v1",
             "plan_id": self.plan_id, "selection_id": self.selection_id,
-            "attempt_uri": retained.as_uri(), "receipt_state": receipt_state,
+            "attempt_uri": retained.as_uri(),
+            "receipt_uri": (self.transaction_path / "receipt.json").as_uri(),
+            "receipt_state": receipt_state,
             "journal_status": "review-required" if review_required else "consistent",
             "operations": classified,
             "outstanding_checks": [
@@ -408,6 +428,76 @@ class _Attempt:
                 "Relaunch the selected instance to check Groovy compilation and registration.",
             ],
         }
+
+    def finalize_committed(self) -> dict:
+        """Finish receipt publication after every ordered source edit is proven.
+
+        This restart action never rewrites the installed payload. Partial or
+        changed source edits stay protected for separate review or recovery.
+        """
+
+        def complete(inspection: dict) -> bool:
+            return bool(inspection["operations"]) and all(
+                row["source_state"] == "after" and row["stage_recorded"]
+                and row["attempted"] and not row["stage_present"]
+                and not row["extra_stage_present"]
+                for row in inspection["operations"]
+            )
+
+        staged = self.path.exists() or self.path.is_symlink()
+        retained = self.path if staged else self.transaction_path
+        retained_identity = _identity(retained)
+        inspected = self.inspect()
+        if not complete(inspected):
+            _fail("incomplete", "registration source edits are not all proven committed")
+        if not staged:
+            if (inspected["receipt_state"] != "applied"
+                    or inspected["journal_status"] != "consistent"):
+                _fail("state", "retained registration is not a completed application")
+            return inspected
+        if (inspected["receipt_state"] == "prepared"
+                and inspected["journal_status"] != "consistent"):
+            _fail("review", "registration attempt requires review before receipt publication")
+        self._check_roots()
+        if _identity(retained) != retained_identity:
+            _fail("changed", "registration attempt changed after inspection")
+        path = retained / "receipt.json"
+        observed = read_private_bytes(path, byte_limit=_MAX_RECEIPT)
+        receipt = _receipt(
+            observed, plan_id=self.plan_id,
+            state=inspected["receipt_state"], final=self.transaction_path,
+        )
+        if inspected["receipt_state"] == "prepared":
+            applied = _canonical(dict(receipt, state="applied"))
+            replace_private_bytes(
+                path, applied, byte_limit=_MAX_RECEIPT,
+                expected_sha256="sha256:" + sha256(observed).hexdigest(),
+            )
+            if read_private_bytes(path, byte_limit=_MAX_RECEIPT) != applied:
+                _fail("changed", "applied registration receipt did not reopen exactly")
+        # Recheck source and receipt immediately before the no-replace rename.
+        reviewed = self.inspect()
+        if (
+            reviewed["receipt_state"] != "applied"
+            or not complete(reviewed)
+            or _identity(retained) != retained_identity
+        ):
+            _fail("changed", "registration attempt changed before promotion")
+        if self.transaction_path.exists() or self.transaction_path.is_symlink():
+            _fail("exists", "registration destination appeared after review")
+        try:
+            _rename_noreplace(retained, self.transaction_path)
+        except OSError as exc:
+            raise RegistrationAttemptError(
+                "registration.publish", "registration attempt could not be promoted without replacement",
+            ) from exc
+        fsync_directory(self.root)
+        final = self.inspect()
+        if (final["receipt_state"] != "applied"
+                or final["journal_status"] != "consistent"
+                or not complete(final)):
+            _fail("changed", "promoted registration changed before final verification")
+        return final
 
     def record_stage(self, ordinal: int, staged_relative: str | None) -> None:
         self._check_roots()

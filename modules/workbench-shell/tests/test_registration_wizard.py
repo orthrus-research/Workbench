@@ -44,6 +44,7 @@ from workbench_api.record_stores import record_store_scope  # noqa: E402
 from workbench_shell.registration_wizard import (  # noqa: E402
     RegistrationWizardError,
     apply_active_registration,
+    finalize_active_registration_attempt,
     inspect_active_registration_attempt,
     plan_active_registration,
     registration_capabilities,
@@ -343,6 +344,155 @@ class RegistrationWizardTest(unittest.TestCase):
                 ["after"] * len(plan["operations"]),
                 [row["source_state"] for row in inspected["operations"]],
             )
+            completed = finalize_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            )
+            self.assertEqual("applied", completed["outcome"])
+            final = state / "registrations" / plan["plan_id"].removeprefix("sha256:")
+            self.assertEqual("applied", json.loads((final / "receipt.json").read_bytes())["state"])
+            self.assertFalse((state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            )).exists())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_finishes_all_committed_source_edits_without_rewriting_them(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            pid = os.fork()
+            if pid == 0:
+                with patch.object(_Attempt, "publish_applied", lambda _attempt, _receipt: os._exit(86)):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+                os._exit(87)
+            _, status = os.waitpid(pid, 0)
+            self.assertEqual(86, os.waitstatus_to_exitcode(status))
+            before = {row["path"]: (payload / row["path"]).read_bytes()
+                      for row in plan["operations"]}
+            inspected = inspect_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            )
+            self.assertEqual("prepared", inspected["receipt_state"])
+            self.assertEqual("consistent", inspected["journal_status"])
+            completed = finalize_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            )
+            self.assertEqual("applied", completed["outcome"])
+            self.assertEqual(before, {path: (payload / path).read_bytes() for path in before})
+            final = state / "registrations" / plan["plan_id"].removeprefix("sha256:")
+            self.assertEqual((final / "receipt.json").as_uri(), completed["receipt_uri"])
+            self.assertEqual("applied", json.loads((final / "receipt.json").read_bytes())["state"])
+            self.assertEqual(completed, finalize_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            ))
+            output = io.StringIO()
+            with redirect_stdout(output):
+                code = cli_main([
+                    "register", str(project), "--suite-root", str(SUITE_ROOT),
+                    "--state-root", str(state), "--finalize-attempt", plan["plan_id"],
+                    "--json",
+                ])
+            self.assertEqual(0, code)
+            self.assertEqual("applied", json.loads(output.getvalue())["outcome"])
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_does_not_report_applied_if_source_changes_after_promotion(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            pid = os.fork()
+            if pid == 0:
+                with patch.object(_Attempt, "publish_applied", lambda _attempt, _receipt: os._exit(86)):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+                os._exit(87)
+            _, status = os.waitpid(pid, 0)
+            self.assertEqual(86, os.waitstatus_to_exitcode(status))
+            source = payload / plan["operations"][0]["path"]
+            original_rename = registration_attempt_core._rename_noreplace
+
+            def rename_then_edit(before: Path, after: Path) -> None:
+                original_rename(before, after)
+                source.write_bytes(b"later user edit\n")
+
+            with patch.object(registration_attempt_core, "_rename_noreplace", rename_then_edit):
+                with self.assertRaisesRegex(RegistrationWizardError, "review"):
+                    finalize_active_registration_attempt(
+                        SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                    )
+            final = state / "registrations" / plan["plan_id"].removeprefix("sha256:")
+            self.assertTrue((final / "receipt.json").is_file())
+            self.assertEqual(b"later user edit\n", source.read_bytes())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_completion_refuses_partial_changed_or_extra_stage(self) -> None:
+        for condition in ("partial", "later-edit", "extra-stage"):
+            with self.subTest(condition=condition):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    if condition == "partial":
+                        project, payload, state, plan, _answers = self._interrupted_material_apply(
+                            root, ordinal=0, after_replace=True,
+                        )
+                    else:
+                        project = _project(root)
+                        instance, payload = _instance(root)
+                        state = root / "state"
+                        initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+                        answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+                        plan = plan_active_registration(
+                            SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                            answers=answers, state_root=state,
+                        )
+                        pid = os.fork()
+                        if pid == 0:
+                            with patch.object(_Attempt, "publish_applied", lambda _attempt, _receipt: os._exit(86)):
+                                apply_active_registration(
+                                    SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                                    answers=answers, state_root=state,
+                                )
+                            os._exit(87)
+                        _, status = os.waitpid(pid, 0)
+                        self.assertEqual(86, os.waitstatus_to_exitcode(status))
+                        first = payload / plan["operations"][0]["path"]
+                        if condition == "later-edit":
+                            first.write_bytes(b"later user edit\n")
+                        else:
+                            retained = state / "registrations" / (
+                                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                            )
+                            token = json.loads((retained / "attempt.json").read_bytes())["staging_token"]
+                            (first.parent / f".{first.name}.workbench-{token}-extra.tmp").write_bytes(
+                                b"unrecorded stage\n"
+                            )
+                    with self.assertRaisesRegex(RegistrationWizardError, "review"):
+                        finalize_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                    retained = state / "registrations" / (
+                        ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                    )
+                    self.assertTrue((retained / "attempt.json").is_file())
 
     @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
     def test_restart_flags_orphan_stage_before_journal_record(self) -> None:

@@ -97,6 +97,7 @@ from .runtime_plan import RuntimePlanError, plan_project_runtime
 from .registration_wizard import (
     RegistrationWizardError,
     apply_active_registration,
+    finalize_active_registration_attempt,
     plan_active_registration,
     registration_capabilities,
 )
@@ -652,6 +653,11 @@ def _parser(*, feature_program: str | None = None) -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="apply the previewed edits directly to the active instance",
+    )
+    register.add_argument(
+        "--finalize-attempt",
+        metavar="PLAN_ID",
+        help="finish an interrupted attempt only if Core proves all edits completed",
     )
     register.add_argument(
         "--yes",
@@ -1762,6 +1768,15 @@ def _run_registration(
     *,
     configuration: WorkbenchConfiguration,
 ) -> tuple[dict[str, Any], bool]:
+    if args.finalize_attempt is not None:
+        if args.list or args.pattern is not None or args.answers is not None or args.apply or args.yes:
+            raise RegistrationWizardError(
+                "--finalize-attempt cannot be combined with planning or application options"
+            )
+        return finalize_active_registration_attempt(
+            suite_root, args.workspace, plan_id=args.finalize_attempt,
+            state_root=args.state_root, configuration=configuration,
+        ), False
     if args.yes and not args.apply:
         raise RegistrationWizardError("--yes is valid only with --apply")
     if args.list and (args.answers is not None or args.apply or args.yes):
@@ -3459,6 +3474,12 @@ def main(
                 print(_human_registration_capabilities(result))
             elif result["format"] == "workbench-registration-result-v1":
                 print(_human_registration_result(result))
+            elif result["format"] == "workbench-registration-recovery-v1":
+                print(
+                    f"Registration attempt finalized: {result['plan_id']}\n"
+                    f"Receipt: {result['receipt_uri']}\n"
+                    "Relaunch the selected instance to check Groovy compilation and registration."
+                )
             elif not previewed_registration:
                 print(_human_registration_plan(result))
         elif args.command == "blueprint-stage":

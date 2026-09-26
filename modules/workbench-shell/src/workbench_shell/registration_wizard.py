@@ -566,9 +566,49 @@ def inspect_active_registration_attempt(
         _fail(f"registration attempt requires review: {exc}")
 
 
+def finalize_active_registration_attempt(
+    suite_root: Path | str,
+    workspace_root: Path | str,
+    *,
+    plan_id: str,
+    state_root: Path | str | None = None,
+    configuration: WorkbenchConfiguration | None = None,
+    config_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Complete a proven source application interrupted before publication."""
+
+    suite = Path(suite_root).resolve()
+    active_configuration = _active_configuration(suite, configuration, config_path)
+    selection = load_active_instance(
+        suite, workspace_root, state_root=state_root,
+        configuration=active_configuration,
+    )
+    try:
+        with registration_attempts().open(
+            state_root=_state_root(suite, state_root),
+            workspace=Path(workspace_root).expanduser().resolve(),
+            payload=selection["payload_path"], plan_id=plan_id,
+            selection_id=selection["selection_id"],
+        ) as attempt:
+            inspected = attempt.finalize_committed()
+    except (OSError, DurableResourceError, ModuleError) as exc:
+        _fail(f"registration attempt requires review: {exc}")
+    return {
+        "format": "workbench-registration-recovery-v1",
+        "schema_version": 1,
+        "outcome": "applied",
+        "plan_id": plan_id,
+        "receipt_uri": inspected["receipt_uri"],
+        "outstanding_checks": [
+            "Relaunch the selected instance to check Groovy compilation and registration.",
+        ],
+    }
+
+
 __all__ = [
     "RegistrationWizardError",
     "apply_active_registration",
+    "finalize_active_registration_attempt",
     "inspect_active_registration_attempt",
     "plan_active_registration",
     "registration_capabilities",

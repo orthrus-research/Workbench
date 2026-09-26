@@ -74,3 +74,17 @@ selected installed payload itself.
 These patterns are still experimental. A successful file transaction does
 not prove Groovy compilation, recipe-map slot compatibility, or runtime
 registration; the returned plan names the required launch checks.
+
+## Interrupted completion
+
+If the wizard exits after every ordered source replacement but before the
+applied receipt reaches its final path, `workbench register WORKSPACE
+--finalize-attempt PLAN_ID` asks Core to finish publication. Core reopens the
+retained attempt under its private lease and verifies the selected instance,
+workspace, state root, original receipt, ordered journal, retained images and
+exact current source bytes. This action does not rewrite the installed source.
+It is repeatable after successful promotion.
+
+Partial attempts, changed source, remaining staged files and changed retained
+evidence stay protected for review. This completion action does not assert
+Groovy compilation or runtime registration; launch checks are still required.
