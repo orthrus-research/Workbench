@@ -218,6 +218,10 @@ class WorkspaceChoicesScreen(Screen[None]):
                 "Bind the selected pack source lock in the exported share",
                 id="choice-bind-source-lock",
             )
+            yield Checkbox(
+                "Bind Core's exact managed-tool policy and source lock",
+                id="choice-bind-managed-tools",
+            )
             with Horizontal(classes="button-row"):
                 yield Button("Find Java", id="choice-find-java")
                 yield Button("Save choices", id="choice-save", variant="primary",
@@ -379,21 +383,29 @@ class WorkspaceChoicesScreen(Screen[None]):
         self.query_one("#choice-export", Button).disabled = True
         self.query_one("#choice-status", Static).update("Asking Core to export the saved environment selection…")
         try:
-            bind_source = self.query_one("#choice-bind-source-lock", Checkbox).value
+            bind_tools = self.query_one("#choice-bind-managed-tools", Checkbox).value
+            bind_source = self.query_one("#choice-bind-source-lock", Checkbox).value or bind_tools
             result = await self.core.export_environment_share(
                 self.selected_name,
                 **({"bind_project_source_lock": True} if bind_source else {}),
+                **({"bind_managed_tools": True} if bind_tools else {}),
             )
             source_lock = result["share"].get("lock", {}).get("project_source_lock")
+            tool_lock = result["share"].get("lock", {}).get("managed_tool_lock")
             source_line = (
                 f"Project source lock: {source_lock['sha256']}\n"
                 if isinstance(source_lock, dict) else ""
+            )
+            tool_line = (
+                f"Managed-tool policy lock: {tool_lock['lock_id']}\n"
+                if isinstance(tool_lock, dict) else ""
             )
             self.query_one("#choice-status", Static).update(
                 f"Share: {result['resource']['path']}\n"
                 f"Identity: {result['share']['share_id']}\n"
                 f"{source_line}"
-                "Project, fixture and tool bytes must be supplied separately."
+                f"{tool_line}"
+                "Project, fixture and tool bytes remain separate inputs."
             )
         except (CoreClientError, TimeoutError) as exc:
             self.query_one("#choice-status", Static).update(str(exc))
@@ -505,6 +517,10 @@ class EnvironmentImportScreen(Screen[None]):
                     f"Project source lock: {source_lock.get('sha256', '?')} "
                     f"(commit {source_lock.get('revision', '?')})"
                 )
+            tool_lock = plan.get("managed_tool_lock")
+            if isinstance(tool_lock, dict):
+                lines.append(f"Managed-tool policy lock: {tool_lock.get('lock_id', '?')}")
+                lines.append("Managed-tool bytes are not acquired by this import.")
             lines.extend(f"Blocked: {item}" for item in plan["blockers"])
             lines.extend(f"Additional input: {item}" for item in plan["unresolved_inputs"])
             self.query_one("#import-detail", Static).update("\n".join(lines))
@@ -534,6 +550,12 @@ class EnvironmentImportScreen(Screen[None]):
             f"Commit: {source_lock.get('revision', '?')}\n\n"
             if isinstance(source_lock, dict) else ""
         )
+        tool_lock = plan.get("managed_tool_lock")
+        tool_review = (
+            f"Managed-tool policy lock\n{tool_lock.get('lock_id', '?')}\n"
+            "Tool bytes remain unresolved after binding.\n\n"
+            if isinstance(tool_lock, dict) else ""
+        )
         body = (
             f"Plan ID\n{plan['plan_id']}\n\n"
             f"Share\n{source}\n\n"
@@ -542,6 +564,7 @@ class EnvironmentImportScreen(Screen[None]):
             f"Java home: {java or 'shared managed choice'}\n\n"
             f"Acquire managed Java: {'yes' if acquire else 'no'}\n\n"
             f"{source_review}"
+            f"{tool_review}"
             "Core will recheck the exact lock and registry revision before saving the selection."
         )
         approved = await self.app.push_screen_wait(

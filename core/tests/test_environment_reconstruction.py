@@ -764,6 +764,12 @@ class EnvironmentReconstructionTests(TestCase):
         )
         self.assertEqual(bound, exported["share"])
         self.assertEqual(bound, load_share(exported["resource"]["path"]))
+        with patch.dict(os.environ, self.source_environment, clear=False), redirect_stdout(StringIO()) as stream:
+            self.assertEqual(0, settings_cli.main([
+                "environment", "export", "pack", "--bind-project-source-lock",
+                "--bind-managed-tools", "--json",
+            ], suite_root=self.source_suite))
+        self.assertEqual(bound, json.loads(stream.getvalue())["share"])
 
         plan = plan_import(
             self.target_suite, bound, workspace_name="shared", workspace=self.target_workspace,

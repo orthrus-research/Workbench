@@ -1,9 +1,10 @@
-# Portable environment selections V1 and V2
+# Portable environment selections V1–V3
 
 Status: Core export, read-only plan, local Configuration V1 generation and
 selection import are implemented. Import can also acquire the exact managed
 Java release. An explicit V2 export can bind a selected project source-lock
-file. Project, fixture and tool bytes remain separate inputs.
+file; V3 also binds Core's exact managed-tool policy for the selected host.
+Project, fixture and tool bytes remain separate inputs.
 
 ## Share and local authority
 
@@ -74,6 +75,15 @@ lock, so this explicit export choice reports the missing prerequisite. V2 does
 not download project source or claim the workspace's project bytes match that
 Git tree.
 
+Add both `--bind-project-source-lock` and `--bind-managed-tools` to export a
+[V3 share](../../core/src/workbench_core/schemas/workbench-environment-share-v3.schema.json).
+Its lock identifies the exact Core Prism and Go archive policy and Packwiz
+executable/source policy for a supported Linux or Windows host. Core checks
+policy parity on import and records it in V4 plan, attempt and result records.
+This is an opt-in identity lock, not an installed-tool receipt; import does not
+acquire tool bytes. Textual exposes the same opt-in export choice and shows the
+policy lock in its import review.
+
 Add `--acquire-managed-java` to both plan and import to acquire the locked
 managed Java release before binding the workspace choice. The flag is part of
 the reviewed V2 plan identity; selection-only V1 plans and receipts retain their
@@ -104,6 +114,11 @@ A fresh configuration home and state root are supported when a compatible
 checked-out suite and workspace directory already exist. The project source
 and external dependency bytes must be obtained separately.
 
+Core also offers a separate reviewed project-byte import API for V2/V3 shares.
+It verifies the exact Git commit and tree in a managed checkout and retains an
+acquisition receipt; ordinary selection import still leaves project bytes
+unresolved.
+
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
 names the exact import plan, local blockers and missing acquisition inputs. The
@@ -116,13 +131,17 @@ file as a local, unbound candidate and shows its current SHA-256. V2 reports
 lock, while project bytes remain unresolved. Optional module packages and
 profile fixture/tool artifacts likewise need exact identities and hashes. The
 report does not inspect or reject a user-supplied Java path; managed Java
-acquisition remains the reviewed import
-operation.
+acquisition remains the reviewed import operation.
 
-WSL is a Linux managed-Java host. A WSL-mounted Windows path is a local binding and
-never enters the share. Windows execution from WSL is a different host variant;
-this V1 import reports that lock as unsupported rather than reusing a Linux
-runtime receipt across the boundary.
+The [V2 feasibility report](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v2.schema.json)
+for a V3 share additionally reports whether the locked managed-tool policy
+matches Core and whether its bytes are present. Package and profile fixture
+locks remain missing.
+
+WSL is a Linux managed-Java and managed-tool host. A WSL-mounted Windows path is
+a local binding and never enters the share. Windows execution from WSL is a
+different host variant; share import reports that lock as unsupported rather
+than reusing Linux runtime or tool custody across the boundary.
 
 ## Remaining reconstruction work
 
@@ -131,8 +150,10 @@ but still repeats its pack-variant/platform binding check. A later Core cleanup
 should expose one pure profile-snapshot parser for both manifest loading and
 intent admission.
 
-Provisioning must connect the exact lock to project source, fixtures and tool
-receipts, preserving incomplete outcomes and reporting unavailable inputs.
+Provisioning must connect the exact lock to optional packages, profile fixtures
+and tool receipts, preserving incomplete outcomes and reporting unavailable
+inputs. Exact project-byte import exists separately; incomplete project
+acquisition still needs restart reconciliation.
 Textual presents the same reviewed managed Java acquisition choice during
 import. Its checkbox change invalidates the prior plan and requires a new
 review before any download or binding.

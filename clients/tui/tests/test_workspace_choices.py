@@ -219,6 +219,61 @@ class WorkspaceChoiceClientTests(IsolatedAsyncioTestCase):
         )
         self.assertEqual(source_lock, result["project_source_lock"])
 
+    async def test_client_accepts_v3_managed_tool_lock_and_v4_review(self) -> None:
+        client = CoreClient(("workbench",))
+        source_lock = {
+            "relative_path": "profiles/packs/example/source-lock.json",
+            "sha256": "sha256:" + "a" * 64,
+            "repository": "https://example.com/pack.git",
+            "revision": "b" * 40, "tree": "c" * 40,
+        }
+        tool_lock = {
+            "format": "workbench-managed-tool-policy-lock-v1",
+            "lock_id": "workbench-managed-tool-policy:sha256:" + "d" * 64,
+            "host_variant": {"os": "linux", "architecture": "x64"},
+            "assets": {"prism": {}, "go": {}, "packwiz": {}},
+        }
+        client.json_record = AsyncMock(side_effect=[
+            {"format": "workbench-environment-share-export-v1",
+             "share": {"format": "workbench-environment-share-v3", "share_id": "share-id",
+                       "lock": {"project_source_lock": source_lock,
+                                "managed_tool_lock": tool_lock}},
+             "resource": {"path": "/share.json"}},
+            {"format": "workbench-environment-import-plan-v4", "state": "ready",
+             "plan_id": "bound-plan", "project_source_lock": source_lock,
+             "managed_tool_lock": tool_lock,
+             "blockers": [], "unresolved_inputs": ["managed-tool-bytes"]},
+            {"format": "workbench-environment-import-result-v4", "outcome": "bound",
+             "plan_id": "bound-plan", "project_source_lock": source_lock,
+             "managed_tool_lock": tool_lock,
+             "resource": {"path": "/receipt.json"},
+             "unresolved_inputs": ["managed-tool-bytes"]},
+        ])
+        await client.export_environment_share(
+            "beta", bind_project_source_lock=True, bind_managed_tools=True,
+        )
+        client.json_record.assert_any_await(
+            "settings", "environment", "export", "beta", "--bind-project-source-lock",
+            "--bind-managed-tools", "--json",
+        )
+        plan = await client.plan_environment_import("/share.json", "shared", "/workspace")
+        self.assertEqual(tool_lock, plan["managed_tool_lock"])
+        result = await client.import_environment_share(
+            "/share.json", "shared", "/workspace", expected_plan_id="bound-plan",
+        )
+        self.assertEqual(tool_lock, result["managed_tool_lock"])
+        with self.assertRaisesRegex(CoreClientError, "requires a project source lock"):
+            await client.export_environment_share("beta", bind_managed_tools=True)
+
+    async def test_client_rejects_v4_without_managed_tool_lock(self) -> None:
+        client = CoreClient(("workbench",))
+        client.json_record = AsyncMock(return_value={
+            "format": "workbench-environment-import-plan-v4", "state": "ready",
+            "plan_id": "bound-plan", "blockers": [], "unresolved_inputs": [],
+        })
+        with self.assertRaisesRegex(CoreClientError, "compatible environment import plan"):
+            await client.plan_environment_import("/share.json", "shared", "/workspace")
+
 
 class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
     async def _settle(self, pilot, predicate) -> None:
@@ -364,6 +419,31 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
                 screen.query_one("#choice-status").render()
             ))
 
+    async def test_export_opt_in_managed_tools_also_binds_source_lock(self) -> None:
+        core = _core()
+        core.export_environment_share.return_value = {
+            "share": {"share_id": "tool-share", "lock": {
+                "project_source_lock": {"sha256": "sha256:" + "a" * 64},
+                "managed_tool_lock": {"lock_id": "tool-policy-id"},
+            }},
+            "resource": {"path": "/exports/tool-share.json"},
+        }
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            app.push_screen(WorkspaceChoicesScreen(_record()))
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen)
+                               and bool(app.screen.query("#choice-bind-managed-tools")))
+            screen = app.screen
+            screen.query_one("#choice-bind-managed-tools", Checkbox).value = True
+            screen.query_one("#choice-export", Button).press()
+            await self._settle(pilot, lambda: core.export_environment_share.await_count == 1)
+            core.export_environment_share.assert_awaited_with(
+                "alpha", bind_project_source_lock=True, bind_managed_tools=True,
+            )
+            await self._settle(pilot, lambda: "tool-policy-id" in str(
+                screen.query_one("#choice-status").render()
+            ))
+
     async def test_import_requires_current_ready_plan_and_review(self) -> None:
         core = _core()
         app = WorkbenchApp(core)
@@ -422,6 +502,32 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
             screen.query_one("#import-apply", Button).press()
             await self._settle(pilot, lambda: bool(app.screen.query("#review-body")))
             self.assertIn(source_lock["revision"], str(app.screen.query_one("#review-body").render()))
+
+    async def test_import_reviews_v3_managed_tool_policy_and_unresolved_bytes(self) -> None:
+        core = _core()
+        tool_id = "workbench-managed-tool-policy:sha256:" + "d" * 64
+        core.plan_environment_import.return_value = {
+            "format": "workbench-environment-import-plan-v4", "state": "ready",
+            "plan_id": "tool-plan", "action": "create", "blockers": [],
+            "unresolved_inputs": ["managed-tool-bytes"],
+            "managed_tool_lock": {"lock_id": tool_id},
+        }
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 44)) as pilot:
+            app.push_screen(EnvironmentImportScreen())
+            await self._settle(pilot, lambda: isinstance(app.screen, EnvironmentImportScreen)
+                               and bool(app.screen.query("#import-share")))
+            screen = app.screen
+            screen.query_one("#import-share", Input).value = "/share.json"
+            screen.query_one("#import-name", Input).value = "shared"
+            screen.query_one("#import-workspace", Input).value = "/workspace"
+            screen.query_one("#import-plan", Button).press()
+            await self._settle(pilot, lambda: screen.plan is not None)
+            self.assertIn(tool_id, str(screen.query_one("#import-detail").render()))
+            screen.query_one("#import-apply", Button).press()
+            await self._settle(pilot, lambda: bool(app.screen.query("#review-body")))
+            self.assertIn(tool_id, str(app.screen.query_one("#review-body").render()))
+            self.assertIn("Tool bytes remain unresolved", str(app.screen.query_one("#review-body").render()))
 
     async def test_import_acquisition_choice_invalidates_plan_and_is_reviewed(self) -> None:
         core = _core()

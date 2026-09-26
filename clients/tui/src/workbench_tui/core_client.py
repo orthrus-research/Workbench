@@ -13,6 +13,7 @@ from typing import Any, Mapping, Sequence
 
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _GIT_ID = re.compile(r"[0-9a-f]{40}\Z")
+_TOOL_POLICY_ID = re.compile(r"workbench-managed-tool-policy:sha256:[0-9a-f]{64}\Z")
 _RESOLUTION_ID = re.compile(r"workbench-environment-resolution:sha256:[0-9a-f]{64}\Z")
 _SETUP_CHECK_FORMATS = {"workbench-setup-check-v1", "workbench-setup-check-v2"}
 _SETUP_PLAN_FORMATS = {
@@ -45,6 +46,19 @@ def _project_source_lock_record(value: object) -> bool:
         and _GIT_ID.fullmatch(value["revision"]) is not None
         and isinstance(value["tree"], str)
         and _GIT_ID.fullmatch(value["tree"]) is not None
+    )
+
+
+def _managed_tool_lock_record(value: object) -> bool:
+    return (
+        isinstance(value, dict)
+        and value.get("format") == "workbench-managed-tool-policy-lock-v1"
+        and isinstance(value.get("lock_id"), str)
+        and _TOOL_POLICY_ID.fullmatch(value["lock_id"]) is not None
+        and isinstance(value.get("assets"), dict)
+        and set(value["assets"]) == {"prism", "go", "packwiz"}
+        and isinstance(value.get("host_variant"), dict)
+        and set(value["host_variant"]) == {"os", "architecture"}
     )
 
 
@@ -284,12 +298,16 @@ class CoreClient:
 
     async def export_environment_share(
         self, name: str, *, bind_project_source_lock: bool = False,
+        bind_managed_tools: bool = False,
     ) -> Mapping[str, Any]:
         if not name:
             raise CoreClientError("choose a saved workspace to share")
+        if bind_managed_tools and not bind_project_source_lock:
+            raise CoreClientError("managed-tool lock requires a project source lock")
         record = await self.json_record(
             "settings", "environment", "export", name,
             *(("--bind-project-source-lock",) if bind_project_source_lock else ()),
+            *(("--bind-managed-tools",) if bind_managed_tools else ()),
             "--json",
         )
         if (
@@ -298,11 +316,17 @@ class CoreClient:
             or not isinstance(record.get("share"), dict)
             or not isinstance(record["share"].get("share_id"), str)
             or (bind_project_source_lock and (
-                record["share"].get("format") != "workbench-environment-share-v2"
+                record["share"].get("format") != (
+                    "workbench-environment-share-v3" if bind_managed_tools
+                    else "workbench-environment-share-v2"
+                )
                 or not isinstance(record["share"].get("lock"), dict)
                 or not _project_source_lock_record(
                     record["share"]["lock"].get("project_source_lock")
                 )
+            ))
+            or (bind_managed_tools and not _managed_tool_lock_record(
+                record["share"]["lock"].get("managed_tool_lock")
             ))
             or not isinstance(record.get("resource"), dict)
             or not isinstance(record["resource"].get("path"), str)
@@ -341,12 +365,16 @@ class CoreClient:
         if (
             not isinstance(record, dict)
             or record.get("format") not in {
+                "workbench-environment-import-plan-v4",
                 "workbench-environment-import-plan-v3",
                 ("workbench-environment-import-plan-v2"
                  if acquire_managed_java else "workbench-environment-import-plan-v1"),
             }
             or (record.get("format") == "workbench-environment-import-plan-v3"
                 and not _project_source_lock_record(record.get("project_source_lock")))
+            or (record.get("format") == "workbench-environment-import-plan-v4"
+                and (not _project_source_lock_record(record.get("project_source_lock"))
+                     or not _managed_tool_lock_record(record.get("managed_tool_lock"))))
             or (acquire_managed_java and record.get("acquire_managed_java") is not True)
             or record.get("state") not in {"ready", "blocked"}
             or not isinstance(record.get("plan_id"), str)
@@ -377,12 +405,16 @@ class CoreClient:
         if (
             not isinstance(record, dict)
             or record.get("format") not in {
+                "workbench-environment-import-result-v4",
                 "workbench-environment-import-result-v3",
                 ("workbench-environment-import-result-v2"
                  if acquire_managed_java else "workbench-environment-import-result-v1"),
             }
             or (record.get("format") == "workbench-environment-import-result-v3"
                 and not _project_source_lock_record(record.get("project_source_lock")))
+            or (record.get("format") == "workbench-environment-import-result-v4"
+                and (not _project_source_lock_record(record.get("project_source_lock"))
+                     or not _managed_tool_lock_record(record.get("managed_tool_lock"))))
             or (
                 acquire_managed_java and (
                     not isinstance(record.get("managed_java"), dict)
