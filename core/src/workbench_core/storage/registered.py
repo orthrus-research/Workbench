@@ -193,6 +193,15 @@ class ResourceCatalog:
         """Read retained workspace epoch evidence, including after home loss."""
         return issuance.inspect_workspace_epoch(self, workspace)
 
+    def inspect_current_file_issuance(self, *, workspace: Path) -> dict[str, object]:
+        """Join current V2 file rows to issues without asserting complete history."""
+        if not isinstance(workspace, Path) or not workspace.is_absolute():
+            raise DurableResourceError("resource.policy", "select an absolute issuance workspace")
+        root_record = self.fresh_root_epoch()
+        if root_record is None:
+            raise DurableResourceError("resource.unsupported", "file issuance inspection requires a V2 root")
+        return issuance.inspect_current_resource_join(self, root_record, workspace)
+
     def post_birth_coverage(
         self, resource_id: str, *, workspace: Path, owner_id: str, target: Path,
     ) -> str:

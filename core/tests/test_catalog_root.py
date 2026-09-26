@@ -100,6 +100,9 @@ class CatalogRootTests(unittest.TestCase):
         with self.assertRaises(DurableResourceError) as unsupported:
             ResourceCatalog(self.config).inspect_post_birth_issue_gap(workspace=self.workspace)
         self.assertEqual("resource.unsupported", unsupported.exception.code)
+        with self.assertRaises(DurableResourceError) as unsupported_join:
+            ResourceCatalog(self.config).inspect_current_file_issuance(workspace=self.workspace)
+        self.assertEqual("resource.unsupported", unsupported_join.exception.code)
         self.assertEqual("unproven", ResourceCatalog(self.config).post_birth_coverage(
             reference.resource_id, workspace=self.workspace, owner_id="sample", target=reference.path,
         ))
@@ -128,6 +131,92 @@ class CatalogRootTests(unittest.TestCase):
         self.assertEqual("unproven", catalog.post_birth_coverage(
             ordinary.resource_id, workspace=self.workspace, owner_id="sample", target=ordinary.path,
         ))
+        witness = self.workspace / ".workbench/resource-issuance-v2" / issuance.WORKSPACE_EPOCH_NAME
+        original_witness = witness.read_bytes()
+        observed = catalog.inspect_current_file_issuance(workspace=self.workspace)
+        by_resource = {row["resource_id"]: row for row in observed["resources"]}
+        self.assertEqual({covered.resource_id, ordinary.resource_id}, set(by_resource))
+        self.assertEqual("committed", by_resource[covered.resource_id]["catalog_status"])
+        self.assertIsNotNone(by_resource[covered.resource_id]["retained_issue_id"])
+        self.assertIsNone(by_resource[ordinary.resource_id]["retained_issue_id"])
+        self.assertEqual([ordinary.resource_id], observed["unmatched_resource_ids"])
+        self.assertEqual("ready-unproven", observed["root_state"])
+        self.assertEqual("unproven", observed["historical_completeness"])
+        self.assertEqual("none", observed["cleanup_authority"])
+        self.assertFalse(observed["resource_inventory_fenced"])
+        self.assertEqual(original_witness, witness.read_bytes())
+
+    def test_current_file_join_never_treats_missing_witness_as_empty_history(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        catalog._ensure(fresh_epoch=True)
+        ordinary = self.resources.publish_bytes("evidence", "ordinary.json", b"ordinary\n")
+        observed = catalog.inspect_current_file_issuance(workspace=self.workspace)
+        self.assertEqual("no-witness", observed["witness_state"])
+        self.assertEqual([ordinary.resource_id], observed["unmatched_resource_ids"])
+        self.assertEqual("unproven", observed["historical_completeness"])
+        self.assertEqual("none", observed["cleanup_authority"])
+
+    def test_current_file_join_is_selected_workspace_only(self) -> None:
+        selected = self.witnessed.publish_bytes("evidence", "selected.json", b"selected\n")
+        other_workspace = self.home / "other-workspace"
+        other_workspace.mkdir()
+        other = CoreDurableResources(
+            workspace=other_workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="sample",
+            post_birth_issuance=True,
+        ).publish_bytes("evidence", "other.json", b"other\n")
+        catalog = ResourceCatalog(self.config)
+        selected_join = catalog.inspect_current_file_issuance(workspace=self.workspace)
+        other_join = catalog.inspect_current_file_issuance(workspace=other_workspace)
+        self.assertEqual([selected.resource_id], [row["resource_id"] for row in selected_join["resources"]])
+        self.assertEqual([other.resource_id], [row["resource_id"] for row in other_join["resources"]])
+        self.assertEqual([], selected_join["unmatched_resource_ids"])
+        self.assertEqual([], other_join["unmatched_resource_ids"])
+        self.assertEqual("unproven", selected_join["historical_completeness"])
+
+    def test_current_file_join_refuses_broken_mirror_and_missing_reservation(self) -> None:
+        reference = self.witnessed.publish_bytes("evidence", "first.json", b"first\n")
+        catalog = ResourceCatalog(self.config)
+        epoch = catalog.fresh_root_epoch()["root_epoch"]
+        row = self.workspace / ".workbench/resource-issuance-v2" / epoch / "0000000000000001.json"
+        held = self.home / "held-row.json"
+        row.rename(held)
+        try:
+            with self.assertRaises(DurableResourceError) as broken:
+                catalog.inspect_current_file_issuance(workspace=self.workspace)
+            self.assertEqual("resource.changed", broken.exception.code)
+        finally:
+            held.rename(row)
+        reservation = catalog.root / "reservations" / (reference.resource_id.rsplit(":", 1)[1] + ".json")
+        reservation.rename(held)
+        try:
+            with self.assertRaises(DurableResourceError) as missing:
+                catalog.inspect_current_file_issuance(workspace=self.workspace)
+            self.assertEqual("resource.incomplete", missing.exception.code)
+        finally:
+            held.rename(reservation)
+        self.assertEqual([], catalog.inspect_current_file_issuance(
+            workspace=self.workspace,
+        )["unmatched_resource_ids"])
+
+    def test_current_file_join_keeps_issued_but_uncommitted_output_visible(self) -> None:
+        original = ResourceCatalog._write
+
+        def interrupt_commit(catalog, name, *arguments):
+            if name == "commits":
+                raise RuntimeError("simulated interruption after output publication")
+            return original(catalog, name, *arguments)
+
+        with patch.object(ResourceCatalog, "_write", interrupt_commit):
+            with self.assertRaisesRegex(RuntimeError, "after output publication"):
+                self.witnessed.publish_bytes("evidence", "pending.json", b"pending\n")
+        observed = ResourceCatalog(self.config).inspect_current_file_issuance(
+            workspace=self.workspace,
+        )
+        self.assertEqual(1, len(observed["resources"]))
+        self.assertEqual("published-uncommitted", observed["resources"][0]["catalog_status"])
+        self.assertIsNotNone(observed["resources"][0]["retained_issue_id"])
+        self.assertEqual("none", observed["cleanup_authority"])
 
     def test_issuance_gap_after_workspace_row_blocks_future_publication(self) -> None:
         catalog = ResourceCatalog(self.config)

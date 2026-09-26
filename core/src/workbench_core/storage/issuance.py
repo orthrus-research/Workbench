@@ -6,7 +6,7 @@ log upgrades the V1 cleanup guard or claims that pre-epoch output is known.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from hashlib import sha256
 import json
 import os
@@ -368,6 +368,61 @@ def inspect_gap(catalog, root_record: Mapping[str, object], workspace: Path) -> 
             "resource_id": trailing["resource_id"] if trailing is not None else None,
             "historical_completeness": "unproven",
         }
+
+
+def inspect_current_resource_join(
+    catalog, root_record: Mapping[str, object], workspace: Path,
+) -> dict[str, object]:
+    """Join retained V2 issues to one current catalog view without certifying history.
+
+    The leases fence opt-in issue appends. Ordinary file publication and other
+    catalog families do not share them, so even an empty unmatched list is not
+    a complete-history or cleanup claim.
+    """
+    _, _, issue_lock = _paths(catalog, root_record, workspace)
+    epoch_lock = _workspace_root(workspace) / WORKSPACE_EPOCH_LOCK
+    with ExitStack() as stack:
+        if epoch_lock.exists() or epoch_lock.is_symlink():
+            stack.enter_context(_read_lock(epoch_lock))
+        before = _workspace_epoch_state(catalog, workspace, root_record)
+        if before["status"] not in {"no-witness", "selected-epoch", "unanchored-selected-epoch"}:
+            raise DurableResourceError(
+                "resource.changed", "resource issuance workspace retains another root epoch",
+            )
+        if issue_lock.exists() or issue_lock.is_symlink():
+            stack.enter_context(_read_lock(issue_lock))
+        rows = _paired_rows(catalog, root_record, workspace)
+        _match_reservations(catalog, rows)
+        inventory = catalog.inventory(workspace=workspace)
+        resources = inventory["resources"]
+        issue_by_resource = {row["resource_id"]: row for row in rows}
+        if len(issue_by_resource) != len(rows):
+            raise DurableResourceError("resource.changed", "resource issuance identity was reused")
+        resource_by_id = {row["resource_id"]: row for row in resources}
+        if len(resource_by_id) != len(resources) or set(issue_by_resource) - set(resource_by_id):
+            raise DurableResourceError("resource.changed", "resource issuance is missing from current catalog")
+        if (_paired_rows(catalog, root_record, workspace) != rows
+                or _workspace_epoch_state(catalog, workspace, root_record) != before
+                or catalog.fresh_root_epoch() != root_record):
+            raise DurableResourceError("resource.changed", "resource issuance changed during inspection")
+    return {
+        "format": "workbench-resource-issuance-current-join-v1",
+        "workspace": str(workspace), "root_epoch": root_record["root_epoch"],
+        "root_state": inventory["root_state"],
+        "witness_state": before["status"],
+        "historical_completeness": "unproven", "cleanup_authority": "none",
+        "resource_inventory_fenced": False,
+        "resources": [
+            {
+                "resource_id": resource_id,
+                "catalog_status": resource_by_id[resource_id]["status"],
+                "retained_issue_id": issue_by_resource[resource_id]["id"]
+                if resource_id in issue_by_resource else None,
+            }
+            for resource_id in sorted(resource_by_id)
+        ],
+        "unmatched_resource_ids": sorted(set(resource_by_id) - set(issue_by_resource)),
+    }
 
 
 def issue(catalog, root_record: Mapping[str, object], reservation: Mapping[str, object]) -> dict:
