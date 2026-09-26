@@ -48,7 +48,9 @@ from workbench_pack_program_studio.managed_session import (  # noqa: E402
     _windows_path_file_uri,
 )
 from workbench_core.host_services import install_local_host_services  # noqa: E402
-from workbench_api.host_filesystem import inspect_private_journal  # noqa: E402
+from workbench_api.host_filesystem import (  # noqa: E402
+    inspect_private_journal, private_path, read_private_bytes,
+)
 
 
 PACK_PROFILE = ROOT / "profiles/packs/supersymmetry/groovy/groovy-program-profile-v1.json"
@@ -396,6 +398,31 @@ class ManagedLanguageSessionTests(unittest.TestCase):
             inspection = inspect_private_journal(events_path, byte_limit=len(events_raw))
             self.assertEqual(len(events_raw), inspection["complete_size"])
             self.assertEqual(0, inspection["incomplete_size"])
+            session_dir = events_path.parent
+            self.assertTrue(private_path(session_dir, directory=True))
+            self.assertTrue(private_path(session_dir / "overlay-originals", directory=True))
+            self.assertEqual(
+                result,
+                json.loads(read_private_bytes(
+                    session_dir / "session-receipt-v1.json", byte_limit=64 * 1024 * 1024,
+                )),
+            )
+            self.assertEqual(
+                result["handoff"],
+                json.loads(read_private_bytes(
+                    session_dir / "session-descriptor-v1.json", byte_limit=64 * 1024 * 1024,
+                )),
+            )
+            originals = {
+                "launcher-jvm": instance_before,
+                "language-server-port": config_before,
+            }
+            for overlay in result["overlays"]:
+                backup = Path(overlay["original"]["backup_path"])
+                self.assertEqual(
+                    originals[overlay["role"]],
+                    read_private_bytes(backup, byte_limit=4 * 1024 * 1024),
+                )
 
         self.assertEqual(result, validate_managed_session_receipt(result))
         self.assertEqual("complete", result["state"])

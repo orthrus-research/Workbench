@@ -52,8 +52,10 @@ with bounded size and exact byte preconditions:
 2. GroovyScript's Forge config, where it replaces exactly one integer
    `languageServerPort` property with the direct or Windows upstream port.
 
-Original bytes are retained privately in the fresh session directory. Writes
-are same-directory atomic replacements preserving file mode. If either
+Original bytes are retained privately in the fresh session directory. Core
+secures the session and backup directories and publishes the original bytes,
+ready descriptor, and final receipt as private immutable records. Projection
+writes are same-directory atomic replacements preserving file mode. If either
 precondition changes, application stops. On shutdown, an unchanged file is
 restored byte-for-byte. If Prism or Forge rewrote unrelated fields, Workbench
 performs a checked three-way field merge: every owned field must still be

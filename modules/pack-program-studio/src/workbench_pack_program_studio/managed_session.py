@@ -23,7 +23,11 @@ from urllib.parse import quote, urlsplit
 from urllib.request import url2pathname
 import uuid
 
-from workbench_api.host_filesystem import append_private_line
+from workbench_api.host_filesystem import (
+    append_private_line,
+    publish_immutable_bytes,
+    secure_private_path,
+)
 
 from .analyzer import AnalysisContext, analyze_program
 from .language_profile import LoadedLanguageProfile
@@ -1005,6 +1009,7 @@ def _prepare_overlays(
     )
     backup_root = session_dir / "overlay-originals"
     backup_root.mkdir(mode=0o700)
+    secure_private_path(backup_root, directory=True)
     records = [
         OverlayRecord(
             role="launcher-jvm",
@@ -1022,7 +1027,9 @@ def _prepare_overlays(
         ),
     ]
     for record in records:
-        _write_fresh_bytes(record.backup_path, record.original, mode=0o600)
+        publish_immutable_bytes(
+            record.backup_path, record.original, byte_limit=_MAX_OVERLAY_BYTES,
+        )
     return records
 
 
@@ -1773,10 +1780,10 @@ def _write_fresh_bytes(path: Path, payload: bytes, *, mode: int) -> None:
 
 
 def _write_fresh_json(path: Path, value: Mapping[str, Any]) -> None:
-    _write_fresh_bytes(
+    publish_immutable_bytes(
         path,
         json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n",
-        mode=0o600,
+        byte_limit=_MAX_CONTROL_BYTES,
     )
 
 
@@ -1808,6 +1815,7 @@ def _create_session_directory(storage: Path, session_id: str) -> Path:
     leaf = session_id.rsplit(":", 1)[-1]
     destination = resolved / leaf
     destination.mkdir(mode=0o700)
+    secure_private_path(destination, directory=True)
     return destination
 
 
