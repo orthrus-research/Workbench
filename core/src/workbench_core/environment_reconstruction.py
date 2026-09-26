@@ -1277,8 +1277,22 @@ def apply_project_import(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def plan_tool_import(*args, **kwargs) -> dict[str, Any]:
+    """Review the separate V3-share Core-managed tool byte acquisition."""
+
+    from .environment_tool_import import plan_tool_import as operation
+    return operation(*args, **kwargs)
+
+
+def apply_tool_import(*args, **kwargs) -> dict[str, Any]:
+    """Acquire or reuse only the reviewed Prism and Packwiz bytes."""
+
+    from .environment_tool_import import apply_tool_import as operation
+    return operation(*args, **kwargs)
+
+
 __all__ = [
     "ReconstructionError", "apply_import", "assess_reconstruction_feasibility",
     "build_share", "export_share", "load_share", "plan_import", "validate_share",
-    "plan_project_import", "apply_project_import",
+    "plan_project_import", "apply_project_import", "plan_tool_import", "apply_tool_import",
 ]

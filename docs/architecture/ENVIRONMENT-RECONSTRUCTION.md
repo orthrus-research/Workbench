@@ -4,7 +4,7 @@ Status: Core export, read-only plan, local Configuration V1 generation and
 selection import are implemented. Import can also acquire the exact managed
 Java release. An explicit V2 export can bind a selected project source-lock
 file; V3 also binds Core's exact managed-tool policy for the selected host.
-Project, fixture and tool bytes remain separate inputs.
+Project, fixture and tool bytes remain separate inputs to selection import.
 
 ## Share and local authority
 
@@ -80,9 +80,9 @@ Add both `--bind-project-source-lock` and `--bind-managed-tools` to export a
 Its lock identifies the exact Core Prism and Go archive policy and Packwiz
 executable/source policy for a supported Linux or Windows host. Core checks
 policy parity on import and records it in V4 plan, attempt and result records.
-This is an opt-in identity lock, not an installed-tool receipt; import does not
-acquire tool bytes. Textual exposes the same opt-in export choice and shows the
-policy lock in its import review.
+This is an opt-in identity lock, not an installed-tool receipt; selection import
+does not acquire tool bytes. Textual exposes the same opt-in export choice and
+shows the policy lock in its import review.
 
 Add `--acquire-managed-java` to both plan and import to acquire the locked
 managed Java release before binding the workspace choice. The flag is part of
@@ -119,6 +119,19 @@ It verifies the exact Git commit and tree in a managed checkout and retains an
 acquisition receipt; ordinary selection import still leaves project bytes
 unresolved.
 
+For V3 shares, `plan_tool_import` and `apply_tool_import` provide a separate
+reviewed Core API for the locked Prism and Packwiz bytes. The plan binds the
+share, local workspace and state root, host, exact Core policy, retained tool
+state and any explicit seed or Go selection. Apply requires that plan ID,
+retains a prepared attempt before Core's fixed provisioner runs, verifies both
+managed tools on reopening and publishes a result. A failed acquisition leaves
+the prepared attempt for recovery. Repeat import verifies and reuses the tools
+without rebuilding. This operation does not bind a workspace selection,
+acquire Java, obtain project or package bytes, or clear the combined profile
+fixture and tool input from the share's unresolved list. Linux and WSL use the
+Linux tool policy; a selected state root that cannot enforce owner-private
+custody is refused before provisioning.
+
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
 names the exact import plan, local blockers and missing acquisition inputs. The
@@ -150,10 +163,10 @@ but still repeats its pack-variant/platform binding check. A later Core cleanup
 should expose one pure profile-snapshot parser for both manifest loading and
 intent admission.
 
-Provisioning must connect the exact lock to optional packages, profile fixtures
-and tool receipts, preserving incomplete outcomes and reporting unavailable
-inputs. Exact project-byte import exists separately; incomplete project
-acquisition still needs restart reconciliation.
+Provisioning must connect the exact lock to optional packages and profile
+fixtures, preserving incomplete outcomes and reporting unavailable inputs.
+Exact project and managed-tool byte imports exist separately; joining them to
+selection import and reconciling interrupted acquisition still need work.
 Textual presents the same reviewed managed Java acquisition choice during
 import. Its checkbox change invalidates the prior plan and requires a new
 review before any download or binding.
