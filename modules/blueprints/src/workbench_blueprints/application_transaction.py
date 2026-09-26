@@ -163,7 +163,11 @@ def _atomic_replace(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
         _fail("transaction records require owner-private mode")
     _ordinary_directory(path.parent, "transaction record parent")
     try:
-        replace_private_bytes(path, raw, byte_limit=len(raw))
+        prior_size = path.lstat().st_size
+    except FileNotFoundError:
+        prior_size = 0
+    try:
+        replace_private_bytes(path, raw, byte_limit=max(len(raw), prior_size))
     except DurableRecordError as exc:
         raise ApplicationTransactionError(
             f"cannot replace retained transaction record: {exc}"

@@ -46,3 +46,11 @@ class PublicationFilesystemTests(unittest.TestCase):
                         owner._atomic_replace(target, b'published')
                 self.assertEqual(b'published', target.read_bytes())
                 self.assertFalse(any(path.suffix == '.tmp' for path in target.parent.iterdir()))
+
+    def test_core_record_replacement_allows_a_shorter_revision(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / 'record.json'
+            target.write_bytes(b'older, longer retained journal')
+            target.chmod(0o600)
+            application_transaction._atomic_replace(target, b'new')
+            self.assertEqual(b'new', target.read_bytes())
