@@ -1023,6 +1023,8 @@ def compose_feature_studio_service_v3(
     repository_root: Path,
     service_root: Path,
     *,
+    configuration_home: Path | None = None,
+    workspace: Path | None = None,
     execution_ports: Mapping[str, FeatureExecutionPort] | None = None,
     maximum_workers: int = 4,
     maximum_pending_jobs: int = 32,
@@ -1277,7 +1279,19 @@ def compose_feature_studio_service_v3(
         ),
     )
 
-    runtime = ServiceRuntimeV3(store, registrations=tuple(registrations), physical_leases=local_service_physical_lease_ports(), maximum_workers=maximum_workers, maximum_pending_jobs=maximum_pending_jobs, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=_context_publication_validator))
+    runtime = ServiceRuntimeV3(
+        store, registrations=tuple(registrations),
+        physical_leases=local_service_physical_lease_ports(),
+        maximum_workers=maximum_workers, maximum_pending_jobs=maximum_pending_jobs,
+        store_factory=lambda root, leases: DurableJobStore(
+            root, physical_leases=leases,
+            record_backend=CoreServiceRecordBackend(
+                root, physical_leases=leases,
+                configuration_home=configuration_home, workspace=workspace,
+            ),
+            context_publication_validator=_context_publication_validator,
+        ),
+    )
     authenticator = LocalServiceAuthenticator(credentials)
     try:
         host = ServiceHostV3(

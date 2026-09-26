@@ -198,7 +198,11 @@ def service_host_v3(argv, *, context):
     from .cli import main
     arguments = ['service-host-v3', *argv]
     arguments += ["--suite-root", str(ROOT)]
-    return main(arguments)
+    return main(
+        arguments,
+        runtime_configuration_home=context.configuration_home,
+        runtime_workspace=context.workspace,
+    )
 
 
 def service_probe_v3(argv, *, context):

@@ -10,6 +10,7 @@ from workbench_api.service import ServicePhysicalLeasePorts, ServiceV3Error
 from workbench_core.service.record_backend import (
     CoreServiceRecordBackend, inspect_service_record_root,
 )
+from workbench_core.storage.registered import ResourceCatalog
 
 
 class ServiceRecordBackendTests(unittest.TestCase):
@@ -69,6 +70,28 @@ class ServiceRecordBackendTests(unittest.TestCase):
             row["status"] for row in inspect_service_record_root(self.root)["records"]
             if row["path"] == "jobs"
         ))
+
+    def test_core_catalog_protects_service_root_across_restart(self) -> None:
+        configuration = self.base / "configuration"
+        workspace = self.base / "workspace"
+        first = CoreServiceRecordBackend(
+            self.root, physical_leases=self.leases,
+            configuration_home=configuration, workspace=workspace,
+        )
+        second = CoreServiceRecordBackend(
+            self.root, physical_leases=self.leases,
+            configuration_home=configuration, workspace=workspace,
+        )
+        self.assertEqual(first.store_id, second.store_id)
+        inventory = ResourceCatalog(configuration).inventory(workspace=workspace)
+        self.assertEqual([first.store_id], [row["store_id"] for row in inventory["record_stores"]])
+        self.assertEqual(str(self.root), inventory["record_stores"][0]["path"])
+        self.assertEqual("service-jobs", inventory["record_stores"][0]["family"])
+        with self.assertRaisesRegex(ServiceV3Error, "both configuration and workspace"):
+            CoreServiceRecordBackend(
+                self.root, physical_leases=self.leases,
+                configuration_home=configuration,
+            )
 
 
 if __name__ == "__main__":

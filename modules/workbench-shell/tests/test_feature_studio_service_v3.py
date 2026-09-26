@@ -64,6 +64,8 @@ from workbench_core.service.host import (  # noqa: E402
     LocalServiceClientV3,
     LocalServiceEndpointV3,
 )
+from workbench_core.storage.registered import ResourceCatalog
+from workbench_core.host_services import install_local_host_services
 
 
 PATHS = (
@@ -183,6 +185,36 @@ def _request(
 class FeatureStudioServiceV3Tests(unittest.TestCase):
     def setUp(self) -> None:
         self.publication = build_synthetic_job_publication()
+
+    def test_core_catalog_reopens_service_store_for_selected_workspace(self) -> None:
+        install_local_host_services()
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            base = Path(temporary).resolve()
+            service = base / "service"
+            configuration = base / "configuration"
+            workspace = base / "workspace"
+            for _ in range(2):
+                composition = compose_feature_studio_service_v3(
+                    SUITE_ROOT, service,
+                    configuration_home=configuration, workspace=workspace,
+                )
+                composition.close()
+            stores = ResourceCatalog(configuration).inventory(workspace=workspace)["record_stores"]
+            self.assertEqual(1, len(stores))
+            self.assertEqual((stores[0]["family"], stores[0]["path"], stores[0]["status"]),
+                             ("service-jobs", str(service / "store"), "available"))
+
+    def test_installed_service_command_passes_core_catalog_binding(self) -> None:
+        from workbench_shell.commands import service_host_v3
+
+        configuration = Path("/selected/configuration")
+        workspace = Path("/selected/workspace")
+        context = Mock(configuration_home=configuration, workspace=workspace)
+        with patch("workbench_shell.cli.main", return_value=0) as main:
+            self.assertEqual(0, service_host_v3(["--help"], context=context))
+        context.check_cancelled.assert_called_once_with()
+        self.assertEqual(configuration, main.call_args.kwargs["runtime_configuration_home"])
+        self.assertEqual(workspace, main.call_args.kwargs["runtime_workspace"])
 
     def _register(self, client: FeatureStudioServiceClientV3) -> dict:
         result = client.register_context(

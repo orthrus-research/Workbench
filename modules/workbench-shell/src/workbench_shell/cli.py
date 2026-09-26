@@ -2714,6 +2714,8 @@ def main(
     resolved_locations: Mapping[str, Path] | None = None,
     runtime_java_service: ManagedJava | None = None,
     runtime_state_root: Path | None = None,
+    runtime_configuration_home: Path | None = None,
+    runtime_workspace: Path | None = None,
 ) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     from workbench_core.host_services import install_local_host_services
@@ -2801,6 +2803,8 @@ def main(
                 endpoint_path=args.endpoint.absolute(),
                 ready_path=args.ready_file.absolute(),
                 process_nonce=args.process_nonce,
+                configuration_home=runtime_configuration_home,
+                workspace=runtime_workspace,
             )
         elif args.command == "service-probe-v3":
             from .installed_service import probe_installed_service_v3

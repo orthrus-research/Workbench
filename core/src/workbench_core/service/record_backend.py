@@ -37,12 +37,29 @@ def _directory(path: Path) -> None:
 class CoreServiceRecordBackend:
     """One physical backend; a service owner still controls its record schema."""
 
-    def __init__(self, root: Path, *, physical_leases: ServicePhysicalLeasePorts):
+    def __init__(
+        self, root: Path, *, physical_leases: ServicePhysicalLeasePorts,
+        configuration_home: Path | None = None, workspace: Path | None = None,
+    ):
         if type(physical_leases) is not ServicePhysicalLeasePorts:
             raise ServiceV3Error("service.invalid-physical-lease-provider", "service record backend requires Host Adapter leases")
+        if (configuration_home is None) != (workspace is None):
+            raise ServiceV3Error("service.invalid-root", "service catalog binding requires both configuration and workspace roots")
+        if configuration_home is not None and (
+            not isinstance(configuration_home, Path) or not configuration_home.is_absolute()
+            or not isinstance(workspace, Path) or not workspace.is_absolute()
+        ):
+            raise ServiceV3Error("service.invalid-root", "service catalog roots must be absolute")
         _directory(root)
         self.root = root
         self.physical_leases = physical_leases
+        self.store_id = None
+        if configuration_home is not None:
+            from ..storage.registered import ResourceCatalog
+            self.store_id = ResourceCatalog(configuration_home).register_record_store(
+                family="service-jobs", owner_id="crucible", workspace=workspace,
+                root=root,
+            )
         self.namespace("locks")
 
     def namespace(self, name: str) -> Path:

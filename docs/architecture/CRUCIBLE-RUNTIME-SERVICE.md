@@ -10,7 +10,8 @@ jobs. Workbench Shell hosts those mechanics for CLI and IDE clients. The
 embedded, local endpoint, and stdio paths all dispatch through the same Service
 V3 runtime.
 
-Crucible owns custody and deterministic mechanics; it does not acquire the
+Crucible owns job semantics and deterministic mechanics; Core owns physical
+record custody and local store registration. Crucible does not acquire the
 meaning owned by Atlas, the construction authority owned by Blueprints, or the
 support policy owned by a selected profile.
 
@@ -25,7 +26,8 @@ There is one supported service generation:
   exact context custody, durable jobs, cancellation, recovery, subscriptions,
   and bounded query leases;
 - `workbench_core.service.host` implements authentication, protocol
-  negotiation, local endpoint hosting, and stdio adaptation; and
+  negotiation, local endpoint hosting, and stdio adaptation; Core's record
+  backend publishes and reopens the service's generic physical bytes; and
 - registered owner handlers implement domain meaning and policy.
 
 The `v2` suffixes on retained graph, context, and job packages identify stable
@@ -52,7 +54,8 @@ record formats used by the service. They are not alternate service editions.
 
 | Concern | Owner |
 | --- | --- |
-| Canonical bytes, structural validation, immutable graph mechanics, pinned reads, and job custody | Crucible |
+| Canonical graph mechanics, context and job admission, pinned reads, and job semantics | Crucible |
+| Physical service records, store registration, and retention protection | Core |
 | Mechanical interpretation, recipes, causal semantics, and query meaning | Atlas |
 | Construction plans and approval meaning | Blueprints |
 | Platform and pack support policy | Selected profile |
@@ -102,6 +105,9 @@ The closed shapes are defined by the
 Service V3 records queued work, attempts, progress, cancellation, and terminal
 outcomes as append-only job records. Recovery validates that history rather
 than inferring success from a process disappearing or a mutable status file.
+The installed host registers its private job-record store with Core for the
+selected workspace before service work begins. Core can inventory those bytes
+without importing Crucible; Crucible still validates historical C02 job meaning.
 
 Generated state is separated by trust class under `.workbench/`, including
 service leases, job state, managed runtimes, captures, and worlds. Handler-owned

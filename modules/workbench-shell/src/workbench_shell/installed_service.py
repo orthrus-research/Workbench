@@ -396,6 +396,8 @@ def run_installed_service_daemon_v3(
     endpoint_path: Path,
     ready_path: Path,
     process_nonce: str,
+    configuration_home: Path | None = None,
+    workspace: Path | None = None,
 ) -> int:
     """Run until a graceful process signal closes the exact local endpoint."""
 
@@ -420,7 +422,10 @@ def run_installed_service_daemon_v3(
     )
     from .feature_studio_service import compose_feature_studio_service_v3
 
-    composition = compose_feature_studio_service_v3(repository_root, root)
+    composition = compose_feature_studio_service_v3(
+        repository_root, root,
+        configuration_home=configuration_home, workspace=workspace,
+    )
     stop = threading.Event()
     previous_handlers: dict[int, Any] = {}
 
