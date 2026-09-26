@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -11,6 +12,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 for source in (
+    ROOT / "api/src",
+    ROOT / "core/src",
     ROOT / "modules/atlas/src",
     ROOT / "modules/crucible/src",
     ROOT / "modules/project-intelligence/src",
@@ -33,6 +36,11 @@ from workbench_runtime_explorer import (  # noqa: E402
     ExplorerSource,
 )
 from workbench_runtime_explorer.query import InterpretedIdentity  # noqa: E402
+from workbench_api.host_filesystem import bind_host_filesystem  # noqa: E402
+from workbench_core import host_filesystem  # noqa: E402
+
+
+bind_host_filesystem(host_filesystem)
 
 
 def _result(*, ambiguous: bool = False, runtime: bool = True) -> dict:
@@ -183,6 +191,40 @@ def _snapshot() -> dict:
 
 
 class RelayCliTests(unittest.TestCase):
+    def test_relative_explorer_result_path_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "explorer.json"
+            path.write_text(json.dumps(_result()) + "\n", encoding="utf-8")
+            code = main(
+                [
+                    "machine:example:press", "--explorer-result",
+                    os.path.relpath(path, Path.cwd()),
+                ],
+                output=StringIO(),
+                error=StringIO(),
+            )
+        self.assertEqual(0, code)
+
+    def test_explorer_result_rejects_symbolic_link(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            retained = root / "explorer.json"
+            retained.write_text(json.dumps(_result()) + "\n", encoding="utf-8")
+            alias = root / "alias.json"
+            try:
+                alias.symlink_to(retained)
+            except (OSError, NotImplementedError):
+                self.skipTest("host does not allow test symbolic links")
+            errors = StringIO()
+            code = main(
+                ["machine:example:press", "--explorer-result", str(alias)],
+                output=StringIO(),
+                error=errors,
+            )
+
+        self.assertEqual(2, code)
+        self.assertIn("cannot read Explorer result", errors.getvalue())
+
     def test_complete_explorer_result_resolves_and_preserves_context(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "explorer.json"

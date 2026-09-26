@@ -6,10 +6,8 @@ from copy import deepcopy
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
-import stat
 import sys
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
@@ -26,6 +24,7 @@ from workbench_runtime_explorer.providers import (
 )
 from workbench_runtime_explorer.query import InterpretedIdentity, parse_query
 from workbench_api.events import sanitize_terminal
+from workbench_api.host_filesystem import HostFilesystemError, read_bounded_bytes
 
 
 FORMAT = "workbench-relay-location-v1"
@@ -167,52 +166,13 @@ def _strict_object(raw: bytes, label: str) -> dict[str, Any]:
 
 
 def _read_regular(path: Path, label: str) -> bytes:
-    descriptor = -1
     try:
-        before = path.lstat()
-        if (
-            stat.S_ISLNK(before.st_mode)
-            or not stat.S_ISREG(before.st_mode)
-            or not 1 <= before.st_size <= MAX_EXPLORER_RESULT_BYTES
-        ):
-            raise RelayError(f"{label} is not one bounded regular non-symlink file")
-        descriptor = os.open(
-            path,
-            os.O_RDONLY
-            | getattr(os, "O_CLOEXEC", 0)
-            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
-        )
-        opened = os.fstat(descriptor)
-        if (
-            not stat.S_ISREG(opened.st_mode)
-            or (before.st_dev, before.st_ino, before.st_size)
-            != (opened.st_dev, opened.st_ino, opened.st_size)
-        ):
-            raise RelayError(f"{label} changed while opening")
-        chunks: list[bytes] = []
-        remaining = opened.st_size
-        while remaining:
-            block = os.read(descriptor, min(1024 * 1024, remaining))
-            if not block:
-                raise RelayError(f"{label} ended while reading")
-            chunks.append(block)
-            remaining -= len(block)
-        after = os.fstat(descriptor)
-        visible = path.lstat()
-        identity = lambda row: (
-            row.st_dev,
-            row.st_ino,
-            row.st_size,
-            row.st_mtime_ns,
-        )
-        if identity(opened) != identity(after) or identity(after) != identity(visible):
-            raise RelayError(f"{label} changed while reading")
-        return b"".join(chunks)
-    except OSError as exc:
+        data = read_bounded_bytes(path.absolute(), byte_limit=MAX_EXPLORER_RESULT_BYTES)
+    except HostFilesystemError as exc:
         raise RelayError(f"cannot read {label}: {exc}") from exc
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
+    if not data:
+        raise RelayError(f"{label} must be nonempty")
+    return data
 
 
 def _load_explorer_result(path: Path) -> dict[str, Any]:
@@ -626,4 +586,7 @@ def main(
 
 
 if __name__ == "__main__":
+    from workbench_core.host_services import install_local_host_services
+
+    install_local_host_services()
     raise SystemExit(main())
