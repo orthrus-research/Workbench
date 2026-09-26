@@ -21,14 +21,13 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 import unicodedata
 from typing import Any, Mapping, Sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATION_SOURCE = ROOT / "validation"
-for source in (ROOT / "tools", VALIDATION_SOURCE):
+for source in (ROOT / "tools", VALIDATION_SOURCE, ROOT / "api/src", ROOT / "core/src"):
     if str(source) not in sys.path:
         sys.path.insert(0, str(source))
 
@@ -38,6 +37,8 @@ from repository_policy import (  # noqa: E402
     load_public_repository,
 )
 from validate_public_tree import private_reason, private_markdown_reason  # noqa: E402
+from workbench_core.transport_trees import CoreTransportTrees  # noqa: E402
+from workbench_core.user_config_home import default_user_config_home  # noqa: E402
 
 
 MAX_SOURCE_FILES = 10_000
@@ -709,6 +710,27 @@ def _write_tree_from_git(root: Path, tree: Path, files: Sequence[Mapping[str, An
             os.chmod(Path(directory) / name, 0o755)
 
 
+def _transport_host(root: Path) -> CoreTransportTrees:
+    return CoreTransportTrees(
+        workspace=root, configuration_home=default_user_config_home(),
+        owner_id="public-export",
+    )
+
+
+def _verify_scan_input_stage(path: Path, plan: Mapping[str, Any],
+                             manifest_bytes: bytes) -> None:
+    if {entry.name for entry in path.iterdir()} != {"scan-input-manifest.json", "tree"}:
+        raise PublicExportError("secret-scan input root inventory drifted")
+    selected = path / "scan-input-manifest.json"
+    if (selected.is_symlink() or not selected.is_file()
+            or stat.S_IMODE(selected.stat().st_mode) != 0o644
+            or selected.read_bytes() != manifest_bytes):
+        raise PublicExportError("secret-scan input manifest drifted")
+    total_bytes = _verify_materialized_tree(path / "tree", plan["files"])
+    if total_bytes != plan["total_bytes"] or _tree_digest(plan["files"]) != plan["tree_sha256"]:
+        raise PublicExportError("secret-scan input aggregate identity drifted")
+
+
 def _validated_manifest_files(value: object) -> list[dict[str, Any]]:
     if type(value) is not list or not value or len(value) > MAX_SOURCE_FILES:
         raise PublicExportError("export manifest file inventory is invalid")
@@ -964,12 +986,9 @@ def stage_secret_scan_input(
             "secret-scan input is ineligible: " + ", ".join(blockers)
         )
     output = _safe_output(root, output_value)
-    temporary = Path(
-        tempfile.mkdtemp(prefix=f".{output.name}.tmp-", dir=output.parent)
-    )
-    os.chmod(temporary, 0o700)
-    published = False
-    try:
+    with _transport_host(root).stage(output) as stage:
+        temporary = stage.path
+        temporary.mkdir(mode=0o700)
         tree = temporary / "tree"
         _write_tree_from_git(root, tree, plan["files"])
         total_bytes = _verify_materialized_tree(tree, plan["files"])
@@ -992,23 +1011,14 @@ def stage_secret_scan_input(
             "tree_sha256": plan["tree_sha256"],
         }
         manifest_path = temporary / "scan-input-manifest.json"
-        manifest_path.write_bytes(_canonical_pretty_json(manifest))
+        manifest_bytes = _canonical_pretty_json(manifest)
+        manifest_path.write_bytes(manifest_bytes)
         os.chmod(manifest_path, 0o644)
-        if {path.name for path in temporary.iterdir()} != {
-            "scan-input-manifest.json",
-            "tree",
-        }:
-            raise PublicExportError("secret-scan input root inventory drifted")
-        if os.path.lexists(output):
-            raise PublicExportError(
-                f"secret-scan input appeared during build: {output}"
-            )
-        os.rename(temporary, output)
-        published = True
+        stage.publish(
+            validate=lambda path: _verify_scan_input_stage(path, plan, manifest_bytes),
+            domain_id=f"scan-input:{plan['source_revision']}:{plan['tree_sha256']}",
+        )
         return {key: value for key, value in manifest.items() if key != "files"}
-    finally:
-        if not published and temporary.exists():
-            shutil.rmtree(temporary)
 
 
 def build_export(
@@ -1025,12 +1035,9 @@ def build_export(
             "public export is ineligible: " + ", ".join(plan["blockers"])
         )
     output = _safe_output(root, output_value)
-    temporary = Path(
-        tempfile.mkdtemp(prefix=f".{output.name}.tmp-", dir=output.parent)
-    )
-    os.chmod(temporary, 0o700)
-    published = False
-    try:
+    with _transport_host(root).stage(output) as stage:
+        temporary = stage.path
+        temporary.mkdir(mode=0o700)
         _write_tree_from_git(root, temporary / "tree", plan["files"])
         manifest = dict(plan)
         manifest["format"] = "workbench-public-export-manifest-v1"
@@ -1038,15 +1045,13 @@ def build_export(
         manifest_path = temporary / "export-manifest.json"
         manifest_path.write_bytes(_canonical_pretty_json(manifest))
         os.chmod(manifest_path, 0o644)
-        verify_export(temporary)
-        if os.path.lexists(output):
-            raise PublicExportError(f"export output appeared during build: {output}")
-        os.rename(temporary, output)
-        published = True
+        scan = plan["secret_scan"]
+        stage.publish(
+            validate=verify_export,
+            domain_id=(f"public-export:{plan['source_revision']}:{plan['tree_sha256']}:"
+                       f"{scan['receipt_sha256']}"),
+        )
         return verify_export(output)
-    finally:
-        if not published and temporary.exists():
-            shutil.rmtree(temporary)
 
 
 def _write_json(value: object) -> None:
@@ -1062,14 +1067,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     plan_parser = subparsers.add_parser("plan")
     plan_parser.add_argument("--revision", required=True)
+    plan_parser.add_argument("--root", type=Path, default=ROOT)
     plan_parser.add_argument("--secret-scan-receipt", type=Path)
     plan_parser.add_argument("--json", action="store_true")
     plan_parser.add_argument("--require-ready", action="store_true")
     scan_parser = subparsers.add_parser("stage-scan")
     scan_parser.add_argument("--revision", required=True)
+    scan_parser.add_argument("--root", type=Path, default=ROOT)
     scan_parser.add_argument("--output", type=Path, required=True)
     build_parser = subparsers.add_parser("build")
     build_parser.add_argument("--revision", required=True)
+    build_parser.add_argument("--root", type=Path, default=ROOT)
     build_parser.add_argument("--secret-scan-receipt", type=Path, required=True)
     build_parser.add_argument("--output", type=Path, required=True)
     verify_parser = subparsers.add_parser("verify")
@@ -1077,7 +1085,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = parser.parse_args(argv)
         if args.command == "plan":
-            plan = public_export_plan(args.revision, args.secret_scan_receipt)
+            plan = public_export_plan(args.revision, args.secret_scan_receipt, root=args.root)
             if args.json:
                 _write_json(_plan_summary(plan))
             else:
@@ -1090,13 +1098,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.require_ready and not plan["eligible"]:
                 return 1
         elif args.command == "stage-scan":
-            _write_json(stage_secret_scan_input(args.output, args.revision))
+            _write_json(stage_secret_scan_input(args.output, args.revision, root=args.root))
         elif args.command == "build":
             _write_json(
                 build_export(
                     args.output,
                     args.revision,
                     args.secret_scan_receipt,
+                    root=args.root,
                 )
             )
         else:

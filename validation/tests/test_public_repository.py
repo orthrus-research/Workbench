@@ -226,6 +226,11 @@ class PublicExportHardeningTests(unittest.TestCase):
             dir="/tmp",
         )
         self.base = Path(self.temporary.name)
+        config_patch = mock.patch.dict(
+            os.environ, {"WORKBENCH_CONFIG_HOME": str(self.base / "configuration")},
+        )
+        config_patch.start()
+        self.addCleanup(config_patch.stop)
         self.repository = self.base / "repository"
         self.repository.mkdir()
         self.git("init", "-q", "-b", "main")
@@ -492,6 +497,47 @@ class PublicExportHardeningTests(unittest.TestCase):
             PUBLIC_EXPORT._canonical_pretty_json(expected_manifest),
             (output / "export-manifest.json").read_bytes(),
         )
+        catalog = PUBLIC_EXPORT._transport_host(self.repository)
+        rows = catalog.inventory()
+        self.assertEqual({scan_input, output}, {row["path"] for row in rows})
+        self.assertEqual({"committed"}, {row["status"] for row in rows})
+        selected = next(row for row in rows if row["path"] == output)
+        reference = catalog.describe(selected["tree_id"])
+        self.assertEqual(plan["file_count"] + 1, reference.file_count)
+        self.assertIn(expected_manifest["secret_scan"]["receipt_sha256"], reference.domain_id)
+        self.assertEqual({"export-manifest.json", "tree"}, {part.name for part in output.iterdir()})
+
+    def test_source_only_cli_stages_and_builds_without_installed_workbench(self) -> None:
+        self.add_public_authority()
+        (self.repository / "README.md").write_text("reviewed\n", encoding="utf-8")
+        commit = self.commit()
+        plan = PUBLIC_EXPORT.public_export_plan(commit, root=self.repository)
+        receipt = self.base / "receipt.json"
+        receipt.write_bytes(PUBLIC_EXPORT._canonical_pretty_json(plan["secret_scan"]["template"]))
+        command = [sys.executable, "-I", str(ROOT / "tools/prepare_public_export.py")]
+        environment = dict(os.environ)
+        environment.pop("PYTHONPATH", None)
+        environment["PYTHONNOUSERSITE"] = "1"
+
+        def invoke(*arguments: str) -> dict:
+            completed = subprocess.run(
+                [*command, *arguments, "--root", str(self.repository)],
+                cwd=self.repository, env=environment, capture_output=True,
+                text=True, timeout=30, check=False,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            return json.loads(completed.stdout)
+
+        scan_input = self.base / "cli-scan"
+        staged = invoke("stage-scan", "--revision", commit, "--output", str(scan_input))
+        self.assertEqual(plan["tree_sha256"], staged["tree_sha256"])
+        output = self.base / "cli-export"
+        built = invoke(
+            "build", "--revision", commit, "--secret-scan-receipt", str(receipt),
+            "--output", str(output),
+        )
+        self.assertEqual(built, PUBLIC_EXPORT.verify_export(output))
+        self.assertEqual({"export-manifest.json", "tree"}, {part.name for part in output.iterdir()})
 
     def test_receipt_for_another_tree_is_rejected(self) -> None:
         self.add_public_authority()
