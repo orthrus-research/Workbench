@@ -26,6 +26,7 @@ from .environment_package_import import reopen_package_import
 from .environment_package_install import _commands, reopen_package_install
 from .environment_package_install_plan import _wheel_targets, plan_package_install_preflight
 from .environment_reconstruction import ReconstructionError, _canonical, _resource_host, _seal
+from .environment_retained_wheel import opened_retained_wheel
 from .environment_resolution import resolve_environment
 from .storage.exact_tree_inventory import exact_content_sha256, inventory_exact_members
 from .storage.registered import DurableResourceError
@@ -281,7 +282,7 @@ def _snapshot(
         raise ReconstructionError("installed package tree has missing or extra directories")
     try:
         for row in closure_plan["wheels"]:
-            with zipfile.ZipFile(source / "wheels" / row["filename"]) as archive:
+            with opened_retained_wheel(source / "wheels" / row["filename"], row) as archive:
                 for path, item in file_map.items():
                     if item["owner"] != row["name"] or item["wheel_member"] is None:
                         continue

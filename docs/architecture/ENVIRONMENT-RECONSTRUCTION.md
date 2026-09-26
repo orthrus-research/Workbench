@@ -270,8 +270,10 @@ reopens the retained wheelhouse, the prepared install result and the Core
 working allocation, then inventories the isolated site and launcher trees
 through exact POSIX no-follow reads. Both process captures must bind the exact
 install and check command identities; earlier captures without that binding
-remain readable but cannot gain package admission. Every installed source wheel member except
-pip-regenerated `RECORD` must match its retained bytes. Each distribution's
+remain readable but cannot gain package admission. Preflight and admission hold
+each retained wheel's parent and file descriptors through ZIP inspection and
+recheck its exact bytes and visible inode afterward. Every installed source
+wheel member except pip-regenerated `RECORD` must match its retained bytes. Each distribution's
 installed `RECORD` must name exactly its wheel files, pip installer metadata
 and declared launchers, with valid hashes and sizes. Extra files, links,
 missing distributions and changed

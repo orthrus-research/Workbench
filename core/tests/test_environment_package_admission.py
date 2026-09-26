@@ -6,6 +6,7 @@ import base64
 import csv
 from hashlib import sha256
 import io
+import os
 from pathlib import Path
 import sys
 from unittest import TestCase, skipIf
@@ -16,6 +17,7 @@ from workbench_core import environment_package_admission as admission
 from workbench_core import environment_package_install as install
 from workbench_core import environment_package_install_plan as preflight
 from workbench_core.environment_reconstruction import ReconstructionError
+from workbench_core.environment_retained_wheel import opened_retained_wheel
 from workbench_core.storage.registered import CoreDurableResources
 
 import test_environment_package_install as install_fixture
@@ -154,6 +156,34 @@ class EnvironmentPackageAdmissionTests(TestCase):
         with patch.object(preflight, "_mount_type", return_value="9p"):
             with self.assertRaises(ReconstructionError):
                 self._admit()
+
+    def test_same_byte_wheel_replacement_during_comparison_refuses(self) -> None:
+        wheel = Path(self.package["tree_path"]) / "wheels/helper-1.0-py3-none-any.whl"
+        original = admission._source_digest
+        replaced = False
+
+        def replace_during_read(*args):
+            nonlocal replaced
+            if not replaced:
+                replacement = wheel.with_suffix(".replacement")
+                replacement.write_bytes(wheel.read_bytes())
+                os.replace(replacement, wheel)
+                replaced = True
+            return original(*args)
+
+        with patch.object(admission, "_source_digest", replace_during_read):
+            with self.assertRaisesRegex(ReconstructionError, "source path changed during ZIP inspection"):
+                self._admit()
+
+    def test_wheel_parent_redirect_during_zip_use_refuses(self) -> None:
+        wheel = Path(self.package["tree_path"]) / "wheels/helper-1.0-py3-none-any.whl"
+        row = next(row for row in self.closure["wheels"] if row["filename"] == wheel.name)
+        parked = wheel.parent.with_name("wheels-parked")
+        with self.assertRaisesRegex(ReconstructionError, "source path changed during ZIP inspection"):
+            with opened_retained_wheel(wheel, row) as archive:
+                self.assertTrue(archive.namelist())
+                wheel.parent.rename(parked)
+                wheel.parent.mkdir(mode=0o700)
 
     def test_unmatched_or_missing_command_identity_refuses(self) -> None:
         with patch.object(admission, "_commands", install._commands):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -28,7 +29,9 @@ def _wheel(path: Path, name: str, *, members: dict[str, str] | None = None,
                              "[console_scripts]\n" + "".join(f"{script} = {name}:main\n" for script in scripts))
         for member, data in (members or {}).items():
             archive.writestr(member, data)
-    return {"name": name, "filename": path.name}
+    payload = path.read_bytes()
+    return {"name": name, "filename": path.name,
+            "size": len(payload), "sha256": sha256(payload).hexdigest()}
 
 
 @skipIf(not sys.platform.startswith("linux"), "Linux/WSL isolated preflight")

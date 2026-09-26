@@ -21,6 +21,7 @@ import zipfile
 
 from .environment_package_import import reopen_package_import
 from .environment_reconstruction import ReconstructionError, _canonical, _seal
+from .environment_retained_wheel import opened_retained_wheel
 from .environment_resolution import resolve_environment
 from .host_filesystem import private_path
 
@@ -164,7 +165,7 @@ def _wheel_targets(wheelhouse: Path, rows: list[dict[str, Any]],
     for row in sorted(rows, key=lambda item: item["name"]):
         wheel = wheelhouse / "wheels" / row["filename"]
         try:
-            with zipfile.ZipFile(wheel) as archive:
+            with opened_retained_wheel(wheel, row) as archive:
                 names = archive.namelist()
                 scheme_names = [name for name in names if name.endswith(".dist-info/WHEEL")]
                 if len(scheme_names) != 1 or archive.getinfo(scheme_names[0]).file_size > 65536:
