@@ -189,6 +189,10 @@ class ResourceCatalog:
             raise DurableResourceError("resource.unsupported", "issuance inspection requires a fresh V2 root")
         return issuance.inspect_gap(self, root_record, workspace)
 
+    def inspect_workspace_issuance_epoch(self, *, workspace: Path) -> dict[str, object]:
+        """Read retained workspace epoch evidence, including after home loss."""
+        return issuance.inspect_workspace_epoch(self, workspace)
+
     def post_birth_coverage(
         self, resource_id: str, *, workspace: Path, owner_id: str, target: Path,
     ) -> str:
@@ -1096,6 +1100,7 @@ class CoreDurableResources:
         self.check_cancelled()
         if self.post_birth_issuance:
             issuance.preflight_workspace(self.workspace)
+            issuance.preflight_workspace_epoch(self.catalog, self.workspace)
         self.catalog._ensure(fresh_epoch=self.post_birth_issuance)
         root_epoch = self.catalog.fresh_root_epoch() if self.post_birth_issuance else None
         if self.post_birth_issuance and root_epoch is None:

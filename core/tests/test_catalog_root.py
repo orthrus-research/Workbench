@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
 import json
 import os
@@ -68,6 +69,11 @@ class CatalogRootTests(unittest.TestCase):
         self.assertIsNotNone(marker)
         self.assertEqual("workbench-resource-catalog-root-v2", marker["format"])
         self.assertRegex(marker["root_epoch"], r"^[0-9a-f]{32}$")
+        self.assertEqual({
+            "status": "selected-epoch", "selected_epoch": marker["root_epoch"],
+            "witness_epoch": marker["root_epoch"], "witness_root_id": marker["id"],
+            "historical_completeness": "unproven",
+        }, catalog.inspect_workspace_issuance_epoch(workspace=self.workspace))
         workspace_rows = self.workspace / ".workbench/resource-issuance-v2" / marker["root_epoch"]
         config_rows = (self.config / "resource-issuance-v2" / marker["root_epoch"]
                        / sha256(os.fsencode(self.workspace)).hexdigest())
@@ -289,32 +295,150 @@ provider.publish_bytes('evidence', 'interrupted.json', b'pending\\n')
             reference.resource_id, workspace=self.workspace, owner_id="sample", target=reference.path,
         ))
 
-    def test_post_birth_proof_refuses_alternate_home_and_prior_epoch(self) -> None:
+    def test_retained_workspace_epoch_refuses_alternate_home_and_lost_home_rebirth(self) -> None:
         old = self.witnessed.publish_bytes("evidence", "old.json", b"old\n")
+        old_root = ResourceCatalog(self.config).fresh_root_epoch()
         alternate_home = self.home / "alternate-config"
         alternate = CoreDurableResources(
             workspace=self.workspace, configuration_home=alternate_home,
             locations={"evidence": self.evidence}, owner_id="sample",
             post_birth_issuance=True,
         )
-        other = alternate.publish_bytes("evidence", "other.json", b"other\n")
-        self.assertEqual("unproven", ResourceCatalog(alternate_home).post_birth_coverage(
-            old.resource_id, workspace=self.workspace, owner_id="sample", target=old.path,
-        ))
-        self.assertEqual("post-birth-covered", ResourceCatalog(alternate_home).post_birth_coverage(
-            other.resource_id, workspace=self.workspace, owner_id="sample", target=other.path,
-        ))
-
+        with self.assertRaises(DurableResourceError) as foreign:
+            alternate.publish_bytes("evidence", "other.json", b"other\n")
+        self.assertEqual("resource.changed", foreign.exception.code)
+        self.assertFalse(alternate_home.exists())
         catalog = ResourceCatalog(self.config)
-        catalog.root.rename(self.config / "resources-lost")
-        catalog._root_manifest().rename(self.config / "resource-catalog-root-lost.json")
+        held_home = self.home / "held-config"
+        self.config.rename(held_home)
+        self.assertEqual({
+            "status": "foreign-or-lost-epoch", "selected_epoch": None,
+            "witness_epoch": old_root["root_epoch"], "witness_root_id": old_root["id"],
+            "historical_completeness": "unproven",
+        }, catalog.inspect_workspace_issuance_epoch(workspace=self.workspace))
+        with self.assertRaises(DurableResourceError) as rebirth:
+            self.witnessed.publish_bytes("evidence", "new.json", b"new\n")
+        self.assertEqual("resource.changed", rebirth.exception.code)
+        self.assertFalse(self.config.exists())
+        self.assertEqual(b"old\n", old.path.read_bytes())
+        held_home.rename(self.config)
         new = self.witnessed.publish_bytes("evidence", "new.json", b"new\n")
-        self.assertEqual("unproven", catalog.post_birth_coverage(
+        self.assertEqual("post-birth-covered", catalog.post_birth_coverage(
+            new.resource_id, workspace=self.workspace, owner_id="sample", target=new.path,
+        ))
+        self.assertEqual("ready-unproven", catalog.inventory(workspace=self.workspace)["root_state"])
+
+    def test_unanchored_prior_issuance_is_latched_before_next_issue(self) -> None:
+        old = self.witnessed.publish_bytes("evidence", "old.json", b"old\n")
+        catalog = ResourceCatalog(self.config)
+        epoch = catalog.fresh_root_epoch()["root_epoch"]
+        workspace_root = self.workspace / ".workbench/resource-issuance-v2"
+        (workspace_root / issuance.WORKSPACE_EPOCH_NAME).unlink()
+        (workspace_root / issuance.WORKSPACE_EPOCH_LOCK).unlink()
+        self.assertEqual("unanchored-selected-epoch", catalog.inspect_workspace_issuance_epoch(
+            workspace=self.workspace,
+        )["status"])
+        new = self.witnessed.publish_bytes("evidence", "new.json", b"new\n")
+        self.assertEqual("selected-epoch", catalog.inspect_workspace_issuance_epoch(
+            workspace=self.workspace,
+        )["status"])
+        self.assertEqual(epoch, catalog.fresh_root_epoch()["root_epoch"])
+        self.assertEqual("post-birth-covered", catalog.post_birth_coverage(
             old.resource_id, workspace=self.workspace, owner_id="sample", target=old.path,
         ))
         self.assertEqual("post-birth-covered", catalog.post_birth_coverage(
             new.resource_id, workspace=self.workspace, owner_id="sample", target=new.path,
         ))
+
+    def test_retained_epoch_refuses_missing_paired_ledger(self) -> None:
+        self.witnessed.publish_bytes("evidence", "old.json", b"old\n")
+        catalog = ResourceCatalog(self.config)
+        epoch = catalog.fresh_root_epoch()["root_epoch"]
+        ledger = self.workspace / ".workbench/resource-issuance-v2" / epoch
+        held = self.home / "held-workspace-ledger"
+        ledger.rename(held)
+        try:
+            self.assertEqual("incomplete-epoch", catalog.inspect_workspace_issuance_epoch(
+                workspace=self.workspace,
+            )["status"])
+            with self.assertRaises(DurableResourceError) as missing:
+                self.witnessed.publish_bytes("evidence", "new.json", b"new\n")
+            self.assertEqual("resource.changed", missing.exception.code)
+            self.assertFalse((ledger / "0000000000000001.json").exists())
+        finally:
+            held.rename(ledger)
+        self.assertEqual("current-paired-prefix", catalog.inspect_post_birth_issue_gap(
+            workspace=self.workspace,
+        )["status"])
+
+    def test_unanchored_partial_directory_is_not_recreated(self) -> None:
+        catalog = ResourceCatalog(self.config)
+        catalog._ensure(fresh_epoch=True)
+        epoch = catalog.fresh_root_epoch()["root_epoch"]
+        witness_root = self.workspace / ".workbench/resource-issuance-v2"
+        (witness_root / epoch).mkdir(parents=True, mode=0o700)
+        with self.assertRaises(DurableResourceError) as incomplete:
+            self.witnessed.publish_bytes("evidence", "new.json", b"new\n")
+        self.assertEqual("resource.changed", incomplete.exception.code)
+        self.assertFalse((witness_root / (epoch + ".lock")).exists())
+        self.assertFalse(self.evidence.exists())
+
+    def test_changed_workspace_epoch_anchor_refuses_inspection_and_issuance(self) -> None:
+        old = self.witnessed.publish_bytes("evidence", "old.json", b"old\n")
+        catalog = ResourceCatalog(self.config)
+        anchor = self.workspace / ".workbench/resource-issuance-v2" / issuance.WORKSPACE_EPOCH_NAME
+        held = self.home / "held-anchor.json"
+        anchor.rename(held)
+        os.link(held, anchor)
+        try:
+            with self.assertRaises(DurableResourceError) as inspection:
+                catalog.inspect_workspace_issuance_epoch(workspace=self.workspace)
+            self.assertEqual("resource.changed", inspection.exception.code)
+            with self.assertRaises(DurableResourceError) as issue:
+                self.witnessed.publish_bytes("evidence", "new.json", b"new\n")
+            self.assertEqual("resource.changed", issue.exception.code)
+            self.assertEqual(b"old\n", old.path.read_bytes())
+        finally:
+            anchor.unlink()
+            held.rename(anchor)
+
+    def test_concurrent_distinct_home_epochs_cannot_both_issue(self) -> None:
+        other_home = self.home / "other-config"
+        other = CoreDurableResources(
+            workspace=self.workspace, configuration_home=other_home,
+            locations={"evidence": self.evidence}, owner_id="sample",
+            post_birth_issuance=True,
+        )
+        self.witnessed.catalog._ensure(fresh_epoch=True)
+        other.catalog._ensure(fresh_epoch=True)
+
+        def issue(provider: CoreDurableResources, name: str) -> str:
+            try:
+                provider.publish_bytes("evidence", name, name.encode())
+            except DurableResourceError as exc:
+                return exc.code
+            return "issued"
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(
+                lambda item: issue(*item),
+                ((self.witnessed, "first.json"), (other, "second.json")),
+            ))
+        self.assertCountEqual(["issued", "resource.changed"], results)
+        self.assertEqual(1, len(list(self.evidence.rglob("*.json"))))
+
+    def test_concurrent_selected_home_issues_remain_serialized(self) -> None:
+        self.witnessed.catalog._ensure(fresh_epoch=True)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            references = list(pool.map(
+                lambda name: self.witnessed.publish_bytes("evidence", name, name.encode()),
+                ("first.json", "second.json"),
+            ))
+        self.assertEqual(2, len(references))
+        self.assertEqual("current-paired-prefix", self.witnessed.catalog.inspect_post_birth_issue_gap(
+            workspace=self.workspace,
+        )["status"])
+        self.assertEqual(2, len(list(self.evidence.rglob("*.json"))))
 
     def test_post_birth_proof_refuses_same_bytes_replacement(self) -> None:
         reference = self.witnessed.publish_bytes("evidence", "first.json", b"first\n")
