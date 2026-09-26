@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, Mock
 
-from textual.widgets import Button, Input, Select
+from textual.widgets import Button, Checkbox, Input, Select
 
 from workbench_tui.app import WorkbenchApp, WorkspaceChoicesScreen, EnvironmentImportScreen
 from workbench_tui.core_client import CoreClient, CoreClientError
@@ -158,6 +158,34 @@ class WorkspaceChoiceClientTests(IsolatedAsyncioTestCase):
             await client.import_environment_share(
                 "/share.json", "shared", "/workspace", expected_plan_id="plan-id",
             )
+
+    async def test_client_passes_managed_acquisition_only_for_reviewed_choice(self) -> None:
+        client = CoreClient(("workbench",))
+        client.json_record = AsyncMock(side_effect=[
+            {"format": "workbench-environment-import-plan-v2", "state": "ready",
+             "plan_id": "with-java", "acquire_managed_java": True,
+             "blockers": [], "unresolved_inputs": ["managed-java-archive"]},
+            {"format": "workbench-environment-import-result-v2", "outcome": "bound",
+             "plan_id": "with-java", "resource": {"path": "/receipt.json"},
+             "unresolved_inputs": [], "managed_java": {"runtime_id": "test", "outcome": "reused"}},
+        ])
+        await client.plan_environment_import(
+            "/share.json", "shared", "/workspace", acquire_managed_java=True,
+        )
+        client.json_record.assert_awaited_with(
+            "settings", "environment", "plan", "/share.json",
+            "--name", "shared", "--workspace", "/workspace",
+            "--acquire-managed-java", "--json", allowed_exit=(0, 1),
+        )
+        await client.import_environment_share(
+            "/share.json", "shared", "/workspace", expected_plan_id="with-java",
+            acquire_managed_java=True,
+        )
+        client.json_record.assert_awaited_with(
+            "settings", "environment", "import", "/share.json",
+            "--name", "shared", "--workspace", "/workspace",
+            "--acquire-managed-java", "--plan-id", "with-java", "--json", timeout=600,
+        )
 
 
 class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
@@ -313,3 +341,49 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
                 expected_plan_id="plan-id", config="/matching.toml", java_home="",
             )
             await self._settle(pilot, lambda: screen.plan is None)
+
+    async def test_import_acquisition_choice_invalidates_plan_and_is_reviewed(self) -> None:
+        core = _core()
+        core.plan_environment_import.side_effect = [
+            {"format": "workbench-environment-import-plan-v1", "plan_id": "plain-plan",
+             "state": "ready", "action": "create", "blockers": [], "unresolved_inputs": []},
+            {"format": "workbench-environment-import-plan-v2", "plan_id": "with-java",
+             "state": "ready", "action": "create", "acquire_managed_java": True,
+             "blockers": [], "unresolved_inputs": ["managed-java-archive"]},
+        ]
+        core.import_environment_share.return_value = {
+            "format": "workbench-environment-import-result-v2", "plan_id": "with-java",
+            "outcome": "bound", "resource": {"path": "/evidence/import.json"},
+            "managed_java": {"runtime_id": "test", "outcome": "reused"},
+            "unresolved_inputs": [],
+        }
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 44)) as pilot:
+            app.push_screen(EnvironmentImportScreen())
+            await self._settle(pilot, lambda: isinstance(app.screen, EnvironmentImportScreen)
+                               and bool(app.screen.query("#import-share")))
+            screen = app.screen
+            screen.query_one("#import-share", Input).value = "/share.json"
+            screen.query_one("#import-name", Input).value = "shared"
+            screen.query_one("#import-workspace", Input).value = "/workspace"
+            screen.query_one("#import-plan", Button).press()
+            await self._settle(pilot, lambda: screen.plan is not None)
+            screen.query_one("#import-acquire-java", Checkbox).value = True
+            await self._settle(pilot, lambda: screen.plan is None)
+            self.assertTrue(screen.query_one("#import-apply", Button).disabled)
+            screen.query_one("#import-plan", Button).press()
+            await self._settle(pilot, lambda: screen.plan is not None
+                               and core.plan_environment_import.await_count == 2)
+            core.plan_environment_import.assert_awaited_with(
+                "/share.json", "shared", "/workspace", config="", java_home="",
+                acquire_managed_java=True,
+            )
+            screen.query_one("#import-apply", Button).press()
+            await self._settle(pilot, lambda: bool(app.screen.query("#review-confirm")))
+            self.assertIn("Acquire managed Java: yes", str(app.screen.query_one("#review-body").render()))
+            app.screen.query_one("#review-confirm", Button).press()
+            await self._settle(pilot, lambda: core.import_environment_share.await_count == 1)
+            core.import_environment_share.assert_awaited_with(
+                "/share.json", "shared", "/workspace", expected_plan_id="with-java",
+                config="", java_home="", acquire_managed_java=True,
+            )

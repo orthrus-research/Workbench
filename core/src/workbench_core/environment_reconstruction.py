@@ -27,6 +27,7 @@ from .configuration import (
 from .environment_resolution import resolve_environment
 from .runtime_java import (
     JavaRuntimeError,
+    ensure_java_runtime,
     host_platform,
     load_java_runtime_policy,
     select_managed_java_policy,
@@ -48,7 +49,9 @@ SHARE_FORMAT = "workbench-environment-share-v1"
 INTENT_FORMAT = "workbench-environment-intent-v1"
 LOCK_FORMAT = "workbench-environment-lock-v1"
 PLAN_FORMAT = "workbench-environment-import-plan-v1"
+PLAN_FORMAT_V2 = "workbench-environment-import-plan-v2"
 RESULT_FORMAT = "workbench-environment-import-result-v1"
+RESULT_FORMAT_V2 = "workbench-environment-import-result-v2"
 MAX_SHARE_BYTES = 256 * 1024
 _NAME = re.compile(r"[a-z][a-z0-9_-]{0,63}\Z")
 _SHA256 = re.compile(r"(?:sha256:)?[0-9a-f]{64}\Z")
@@ -517,12 +520,17 @@ def plan_import(
     workspace: Path | str,
     config_path: Path | str = CONFIGURATION_PATH,
     java_home: Path | str | None = None,
+    acquire_managed_java: bool = False,
     environment: Mapping[str, str] | None = None,
     host: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Check a target suite and local binding without writing any state."""
 
     portable = validate_share(dict(share))
+    if type(acquire_managed_java) is not bool:
+        raise ReconstructionError("managed Java acquisition choice must be Boolean")
+    if acquire_managed_java and portable["intent"]["java"]["mode"] == "local-binding-required":
+        raise ReconstructionError("a user-supplied Java path cannot be acquired as managed Java")
     if type(workspace_name) is not str or _NAME.fullmatch(workspace_name) is None:
         raise ReconstructionError("workspace name must be a lowercase slug")
     suite = Path(suite_root).expanduser().resolve()
@@ -631,8 +639,8 @@ def plan_import(
     )
     action = "reuse" if same else "update" if old is not None else "create"
     plan_body = {
-        "format": PLAN_FORMAT,
-        "schema_version": 1,
+        "format": PLAN_FORMAT_V2 if acquire_managed_java else PLAN_FORMAT,
+        "schema_version": 2 if acquire_managed_java else 1,
         "share_id": portable["share_id"],
         "lock_id": portable["lock"]["lock_id"],
         "workspace_name": workspace_name,
@@ -657,7 +665,54 @@ def plan_import(
         "blockers": blockers,
         "state": "blocked" if blockers else "ready",
     }
+    if acquire_managed_java:
+        plan_body["acquire_managed_java"] = True
     return _seal(plan_body, "workbench-environment-import-plan", "plan_id")
+
+
+def _acquire_locked_managed_java(
+    suite: Path,
+    configuration: configuration_source.WorkbenchConfiguration,
+    *,
+    state_root: Path,
+    feature: int | None,
+    policy_lock: Mapping[str, Any],
+    variant_lock: Mapping[str, str],
+) -> dict[str, str]:
+    """Acquire only the reviewed profile release, then identify its verified receipt."""
+
+    selected_policy = select_managed_java_policy(
+        load_java_runtime_policy(suite, configuration=configuration), feature,
+    )
+    if selected_policy["policy_sha256"] != policy_lock["selected_policy_sha256"]:
+        raise ReconstructionError("managed Java policy changed before acquisition")
+    acquired = ensure_java_runtime(
+        suite, configuration=configuration, state_root=state_root,
+        candidates=(), managed_feature_version=feature,
+    )
+    receipt = acquired.get("receipt")
+    if (
+        acquired.get("format") != "workbench-java-runtime-result-v2"
+        or acquired.get("source") != "managed"
+        or acquired.get("outcome") not in {"provisioned", "reused"}
+        or type(receipt) is not dict
+        or receipt.get("format") != "workbench-java-runtime-receipt-v2"
+        or receipt.get("state") != "ready"
+        or receipt.get("policy") != selected_policy
+        or receipt.get("host") != host_platform()
+        or type(receipt.get("runtime_id")) is not str
+        or type(receipt.get("target")) is not dict
+        or type(receipt["target"].get("receipt_uri")) is not str
+    ):
+        raise ReconstructionError("managed Java acquisition did not return the locked runtime")
+    if _host_variant(receipt["host"]) != variant_lock:
+        raise ReconstructionError("managed Java acquisition returned another host variant")
+    return {
+        "outcome": acquired["outcome"],
+        "runtime_id": receipt["runtime_id"],
+        "receipt_uri": receipt["target"]["receipt_uri"],
+        "policy_sha256": selected_policy["policy_sha256"],
+    }
 
 
 def apply_import(
@@ -669,6 +724,7 @@ def apply_import(
     workspace: Path | str,
     config_path: Path | str = CONFIGURATION_PATH,
     java_home: Path | str | None = None,
+    acquire_managed_java: bool = False,
     environment: Mapping[str, str] | None = None,
     host: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
@@ -678,7 +734,8 @@ def apply_import(
     portable = validate_share(dict(share))
     plan = plan_import(
         suite_root, portable, workspace_name=workspace_name, workspace=workspace,
-        config_path=config_path, java_home=java_home, environment=values,
+        config_path=config_path, java_home=java_home,
+        acquire_managed_java=acquire_managed_java, environment=values,
         host=host,
     )
     if type(expected_plan_id) is not str or expected_plan_id != plan["plan_id"]:
@@ -689,8 +746,11 @@ def apply_import(
     if service.policy_id != plan["environment_resolution_id"]:
         raise ReconstructionError("environment import resolution changed after review")
     prepared = {
-        "format": "workbench-environment-import-attempt-v1",
-        "schema_version": 1,
+        "format": (
+            "workbench-environment-import-attempt-v2"
+            if acquire_managed_java else "workbench-environment-import-attempt-v1"
+        ),
+        "schema_version": 2 if acquire_managed_java else 1,
         "state": "prepared",
         "share": portable,
         "plan_id": plan["plan_id"],
@@ -703,6 +763,8 @@ def apply_import(
             "resource_id": plan["configuration_manifest_resource_id"],
         },
     }
+    if acquire_managed_java:
+        prepared["acquire_managed_java"] = True
     prepared_payload = _canonical(prepared) + b"\n"
     prepared_ref = service.publish_bytes(
         "evidence", "environment-import-attempt.json", prepared_payload,
@@ -710,7 +772,8 @@ def apply_import(
     )
     admitted = plan_import(
         suite_root, portable, workspace_name=workspace_name, workspace=workspace,
-        config_path=config_path, java_home=java_home, environment=values,
+        config_path=config_path, java_home=java_home,
+        acquire_managed_java=acquire_managed_java, environment=values,
         host=host,
     )
     if admitted["plan_id"] != plan["plan_id"] or admitted["state"] != "ready":
@@ -754,6 +817,34 @@ def apply_import(
         suite_root, workspace=Path(plan["workspace"]), environment=values,
     ).record["resolution_id"] != plan["environment_resolution_id"]:
         raise ReconstructionError("environment inputs changed before binding")
+    managed_java = None
+    if acquire_managed_java:
+        resolved = resolve_environment(
+            suite_root, workspace=Path(plan["workspace"]), environment=values,
+        )
+        managed_java = _acquire_locked_managed_java(
+            Path(suite_root), verified_configuration,
+            state_root=resolved.state_root,
+            feature=plan["managed_java_feature"],
+            policy_lock=portable["lock"]["java_policy"],
+            variant_lock=portable["lock"]["host_variant"],
+        )
+        try:
+            current_configuration = load_workbench_configuration(
+                Path(suite_root), plan["profile_config"],
+            )
+            changed = (
+                current_configuration.manifest.sha256 != plan["configuration_manifest_sha256"]
+                or _configuration_blockers(Path(suite_root), current_configuration, portable)
+            )
+        except WorkbenchConfigurationError as exc:
+            raise ReconstructionError("Configuration V1 manifest changed during Java acquisition") from exc
+        if changed:
+            raise ReconstructionError("Configuration V1 manifest or target profiles changed during Java acquisition")
+        if resolve_environment(
+            suite_root, workspace=Path(plan["workspace"]), environment=values,
+        ).record["resolution_id"] != plan["environment_resolution_id"]:
+            raise ReconstructionError("environment inputs changed during Java acquisition")
     registry = bind_workspace_selection(
         workspace_name, plan["workspace"],
         profile_config=plan["profile_config"],
@@ -764,8 +855,8 @@ def apply_import(
     )
     entry = next(row for row in registry["entries"] if row["name"] == workspace_name)
     receipt = {
-        "format": RESULT_FORMAT,
-        "schema_version": 1,
+        "format": RESULT_FORMAT_V2 if managed_java is not None else RESULT_FORMAT,
+        "schema_version": 2 if managed_java is not None else 1,
         "outcome": (
             "reused"
             if plan["action"] == "reuse" and plan["configuration_manifest_action"] != "create"
@@ -782,9 +873,18 @@ def apply_import(
             "sha256": plan["configuration_manifest_sha256"],
             "resource_id": manifest_resource_id,
         },
-        "unresolved_inputs": plan["unresolved_inputs"],
-        "scope": "Local selections only; project bytes and managed dependencies require separate acquisition.",
+        "unresolved_inputs": [
+            item for item in plan["unresolved_inputs"]
+            if managed_java is None or item != "managed-java-archive"
+        ],
+        "scope": (
+            "Project bytes and non-Java managed dependencies require separate acquisition."
+            if managed_java is not None
+            else "Local selections only; project bytes and managed dependencies require separate acquisition."
+        ),
     }
+    if managed_java is not None:
+        receipt["managed_java"] = managed_java
     payload = _canonical(receipt) + b"\n"
     complete_service = _resource_host(Path(suite_root), Path(plan["workspace"]), values)
     references = (prepared_ref.resource_id,)

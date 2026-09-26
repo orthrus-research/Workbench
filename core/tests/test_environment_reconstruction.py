@@ -27,6 +27,10 @@ from workbench_core.environment_reconstruction import (
     plan_import,
 )
 from workbench_core.environment_resolution import resolve_environment
+from workbench_core.runtime_java import (
+    JavaRuntimeError, host_platform, load_java_runtime_policy,
+    select_managed_java_policy,
+)
 from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
 from workbench_core.configuration import load_workbench_configuration
 from workbench_core.user_preferences import (
@@ -91,6 +95,222 @@ class EnvironmentReconstructionTests(TestCase):
             java_home=java_home, managed_java_feature=feature,
             environment=self.source_environment,
         )
+
+    def _managed_result(self, *, outcome: str, registered: int = 0):
+        def acquire(_suite, **options):
+            self.assertEqual((), options["candidates"])
+            self.assertEqual(self.target_root / "state", options["state_root"])
+            self.assertEqual(8, options["managed_feature_version"])
+            self.assertEqual(
+                registered, len(load_workspaces(environment=self.target_environment)["entries"]),
+            )
+            policy = select_managed_java_policy(
+                load_java_runtime_policy(self.target_suite, configuration=options["configuration"]),
+                options["managed_feature_version"],
+            )
+            return {
+                "format": "workbench-java-runtime-result-v2",
+                "source": "managed", "outcome": outcome,
+                "receipt": {
+                    "format": "workbench-java-runtime-receipt-v2",
+                    "state": "ready", "policy": policy,
+                    "host": host_platform(),
+                    "runtime_id": "workbench-java-runtime-v2:test",
+                    "target": {"receipt_uri": "file:///local/state/receipts/java-runtime-v2.json"},
+                },
+            }
+        return acquire
+
+    def test_reviewed_import_acquires_locked_java_before_binding(self) -> None:
+        self._source_choice(feature=8)
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        (self.target_suite / "workbench.toml").unlink()
+        ordinary = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            environment=self.target_environment,
+        )
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            acquire_managed_java=True, environment=self.target_environment,
+        )
+        self.assertEqual("ready", plan["state"])
+        self.assertEqual("workbench-environment-import-plan-v1", ordinary["format"])
+        self.assertNotIn("acquire_managed_java", ordinary)
+        self.assertEqual("workbench-environment-import-plan-v2", plan["format"])
+        self.assertTrue(plan["acquire_managed_java"])
+        self.assertNotEqual(ordinary["plan_id"], plan["plan_id"])
+        with self.assertRaisesRegex(ReconstructionError, "changed after review"):
+            apply_import(
+                self.target_suite, share, expected_plan_id=ordinary["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                acquire_managed_java=True, environment=self.target_environment,
+            )
+        with patch(
+            "workbench_core.environment_reconstruction.ensure_java_runtime",
+            side_effect=self._managed_result(outcome="provisioned"),
+        ) as acquire:
+            result = apply_import(
+                self.target_suite, share, expected_plan_id=plan["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                acquire_managed_java=True, environment=self.target_environment,
+            )
+        self.assertEqual(1, acquire.call_count)
+        self.assertEqual("workbench-environment-import-result-v2", result["format"])
+        self.assertEqual("provisioned", result["managed_java"]["outcome"])
+        self.assertEqual(share["lock"]["java_policy"]["selected_policy_sha256"],
+                         result["managed_java"]["policy_sha256"])
+        self.assertNotIn("managed-java-archive", result["unresolved_inputs"])
+        self.assertIn("workspace-project-bytes", result["unresolved_inputs"])
+        self.assertEqual(8, load_workspaces(environment=self.target_environment)["entries"][0]["managed_java_feature"])
+        retained = json.loads(Path(result["resource"]["path"]).read_text(encoding="utf-8"))
+        self.assertEqual(result["managed_java"], retained["managed_java"])
+        repeat_plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            acquire_managed_java=True, environment=self.target_environment,
+        )
+        self.assertEqual("reuse", repeat_plan["action"])
+        with patch(
+            "workbench_core.environment_reconstruction.ensure_java_runtime",
+            side_effect=self._managed_result(outcome="reused", registered=1),
+        ):
+            repeated = apply_import(
+                self.target_suite, share, expected_plan_id=repeat_plan["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                acquire_managed_java=True, environment=self.target_environment,
+            )
+        self.assertEqual(("reused", "reused"),
+                         (repeated["outcome"], repeated["managed_java"]["outcome"]))
+
+    def test_failed_managed_acquisition_keeps_attempt_and_does_not_bind(self) -> None:
+        self._source_choice(feature=8)
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        (self.target_suite / "workbench.toml").unlink()
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            acquire_managed_java=True, environment=self.target_environment,
+        )
+        with patch(
+            "workbench_core.environment_reconstruction.ensure_java_runtime",
+            side_effect=JavaRuntimeError("archive unavailable"),
+        ):
+            with self.assertRaisesRegex(JavaRuntimeError, "archive unavailable"):
+                apply_import(
+                    self.target_suite, share, expected_plan_id=plan["plan_id"],
+                    workspace_name="shared", workspace=self.target_workspace,
+                    acquire_managed_java=True, environment=self.target_environment,
+                )
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+        attempts = list((self.target_root / "state/evidence/outputs/workbench-core").glob(
+            "*-environment-import-attempt.json"
+        ))
+        self.assertEqual(1, len(attempts))
+        attempt = json.loads(attempts[0].read_text(encoding="utf-8"))
+        self.assertEqual("workbench-environment-import-attempt-v2", attempt["format"])
+        self.assertTrue(attempt["acquire_managed_java"])
+        retry = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            acquire_managed_java=True, environment=self.target_environment,
+        )
+        self.assertNotEqual(plan["plan_id"], retry["plan_id"])
+        self.assertEqual("reuse-generated", retry["configuration_manifest_action"])
+        with patch(
+            "workbench_core.environment_reconstruction.ensure_java_runtime",
+            side_effect=self._managed_result(outcome="reused"),
+        ):
+            recovered = apply_import(
+                self.target_suite, share, expected_plan_id=retry["plan_id"],
+                workspace_name="shared", workspace=self.target_workspace,
+                acquire_managed_java=True, environment=self.target_environment,
+            )
+        self.assertEqual("reused", recovered["managed_java"]["outcome"])
+
+    def test_foreign_managed_java_receipt_cannot_bind_workspace(self) -> None:
+        self._source_choice(feature=8)
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            acquire_managed_java=True, environment=self.target_environment,
+        )
+
+        def foreign(suite, **options):
+            value = self._managed_result(outcome="reused")(suite, **options)
+            value["receipt"]["policy"] = {
+                **value["receipt"]["policy"], "release_name": "jdk8u1-b01",
+            }
+            return value
+
+        with patch(
+            "workbench_core.environment_reconstruction.ensure_java_runtime",
+            side_effect=foreign,
+        ):
+            with self.assertRaisesRegex(ReconstructionError, "locked runtime"):
+                apply_import(
+                    self.target_suite, share, expected_plan_id=plan["plan_id"],
+                    workspace_name="shared", workspace=self.target_workspace,
+                    acquire_managed_java=True, environment=self.target_environment,
+                )
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+
+    def test_profile_drift_during_managed_acquisition_prevents_binding(self) -> None:
+        self._source_choice(feature=8)
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        plan = plan_import(
+            self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+            acquire_managed_java=True, environment=self.target_environment,
+        )
+
+        def drift(suite, **options):
+            result = self._managed_result(outcome="provisioned")(suite, **options)
+            platform = self.target_suite / share["intent"]["selection"]["platform_document"]
+            platform.write_bytes(platform.read_bytes() + b"\n")
+            return result
+
+        with patch(
+            "workbench_core.environment_reconstruction.ensure_java_runtime",
+            side_effect=drift,
+        ):
+            with self.assertRaisesRegex(ReconstructionError, "changed during Java acquisition"):
+                apply_import(
+                    self.target_suite, share, expected_plan_id=plan["plan_id"],
+                    workspace_name="shared", workspace=self.target_workspace,
+                    acquire_managed_java=True, environment=self.target_environment,
+                )
+        self.assertEqual([], load_workspaces(environment=self.target_environment)["entries"])
+
+    def test_supplied_java_path_cannot_be_managed_acquisition(self) -> None:
+        self._source_choice(java_home=str(self.source_root / "unchecked-jdk"))
+        share = build_share(self.source_suite, "pack", environment=self.source_environment)
+        with self.assertRaisesRegex(ReconstructionError, "user-supplied Java path"):
+            plan_import(
+                self.target_suite, share, workspace_name="shared", workspace=self.target_workspace,
+                java_home=self.target_root / "unchecked-jdk", acquire_managed_java=True,
+                environment=self.target_environment,
+            )
+
+    def test_cli_import_acquires_managed_java_with_same_reviewed_flag(self) -> None:
+        self._source_choice(feature=8)
+        path = export_share(
+            self.source_suite, "pack", environment=self.source_environment,
+        )["resource"]["path"]
+        with patch.dict(os.environ, self.target_environment, clear=False), redirect_stdout(StringIO()) as stream:
+            self.assertEqual(0, settings_cli.main([
+                "environment", "plan", path, "--name", "shared",
+                "--workspace", str(self.target_workspace), "--acquire-managed-java", "--json",
+            ], suite_root=self.target_suite))
+        plan = json.loads(stream.getvalue())
+        self.assertTrue(plan["acquire_managed_java"])
+        with patch(
+            "workbench_core.environment_reconstruction.ensure_java_runtime",
+            side_effect=self._managed_result(outcome="provisioned"),
+        ), patch.dict(os.environ, self.target_environment, clear=False), redirect_stdout(StringIO()) as stream:
+            self.assertEqual(0, settings_cli.main([
+                "environment", "import", path, "--name", "shared",
+                "--workspace", str(self.target_workspace), "--acquire-managed-java",
+                "--plan-id", plan["plan_id"], "--json",
+            ], suite_root=self.target_suite))
+        result = json.loads(stream.getvalue())
+        self.assertEqual("provisioned", result["managed_java"]["outcome"])
+        self.assertNotIn("managed-java-archive", result["unresolved_inputs"])
 
     def test_missing_manifest_is_generated_under_core_custody_and_reused(self) -> None:
         self._source_choice(feature=8)

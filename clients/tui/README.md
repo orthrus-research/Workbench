@@ -99,9 +99,11 @@ for the saved workspace. **Import environment** takes that file, a local
 workspace name and an existing project directory. Textual displays Core's
 exact import plan, blockers and unresolved inputs, then requires a review of
 the plan ID before binding the local choice. Core rechecks the profile and Java
-lock when importing. The file does not contain project, fixture, tool or Java
-archives; those inputs still need local acquisition. A user-supplied Java path
-is redacted from the exported file and must be supplied again on import.
+lock when importing. A reviewed checkbox can ask Core to acquire the locked
+managed Java release before binding. The file does not contain project,
+fixture, tool or Java archives; project, fixture and tool bytes still need
+local acquisition. A user-supplied Java path is redacted from the exported
+file and must be supplied again on import without managed acquisition.
 
 ## Prototype surfaces
 

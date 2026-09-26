@@ -56,6 +56,10 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
     reconstruction.add_argument("--workspace", help="local workspace directory for plan or import")
     reconstruction.add_argument("--config", help="matching local Configuration V1 manifest")
     reconstruction.add_argument("--java-home", help="local Java path when the share requires one")
+    reconstruction.add_argument(
+        "--acquire-managed-java", action="store_true",
+        help="acquire the exact managed Java release during import",
+    )
     reconstruction.add_argument("--plan-id", help="exact reviewed import plan identity")
     reconstruction.add_argument("--json", action="store_true")
     migration = actions.add_parser("migrate", help="copy earlier user records into the stable home")
@@ -127,7 +131,7 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
         suite = Path.cwd() if suite_root is None else suite_root
         if selected.operation == "export":
             if any((selected.name, selected.workspace, selected.config,
-                    selected.java_home, selected.plan_id)):
+                    selected.java_home, selected.plan_id, selected.acquire_managed_java)):
                 parser.error("environment export takes only a named source workspace")
             result = export_share(suite, selected.source)
             if selected.json:
@@ -148,6 +152,7 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
             "workspace": selected.workspace,
             "config_path": selected.config or "workbench.toml",
             "java_home": selected.java_home,
+            "acquire_managed_java": selected.acquire_managed_java,
         }
         if selected.operation == "plan":
             result = plan_import(suite, share, **options)
@@ -167,6 +172,9 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
         else:
             print(f"Environment selection: {result['outcome']}")
             print(f"  Receipt: {result['resource']['path']}")
+            if result.get("managed_java") is not None:
+                java = result["managed_java"]
+                print(f"  Managed Java: {java['outcome']} ({java['runtime_id']})")
             for unresolved in result["unresolved_inputs"]:
                 print(f"  Additional input: {unresolved}")
         return 0

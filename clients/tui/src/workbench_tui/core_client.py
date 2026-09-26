@@ -283,7 +283,7 @@ class CoreClient:
     @staticmethod
     def _environment_import_args(
         source: str, name: str, workspace: str, *,
-        config: str = "", java_home: str = "",
+        config: str = "", java_home: str = "", acquire_managed_java: bool = False,
     ) -> tuple[str, ...]:
         if not source.strip() or not name.strip() or not workspace.strip():
             raise CoreClientError("choose a share file, local name and workspace")
@@ -292,14 +292,17 @@ class CoreClient:
             arguments.extend(("--config", config))
         if java_home.strip():
             arguments.extend(("--java-home", java_home))
+        if acquire_managed_java:
+            arguments.append("--acquire-managed-java")
         return tuple(arguments)
 
     async def plan_environment_import(
         self, source: str, name: str, workspace: str, *,
-        config: str = "", java_home: str = "",
+        config: str = "", java_home: str = "", acquire_managed_java: bool = False,
     ) -> Mapping[str, Any]:
         arguments = self._environment_import_args(
             source, name, workspace, config=config, java_home=java_home,
+            acquire_managed_java=acquire_managed_java,
         )
         record = await self.json_record(
             "settings", "environment", "plan", *arguments, "--json",
@@ -307,7 +310,11 @@ class CoreClient:
         )
         if (
             not isinstance(record, dict)
-            or record.get("format") != "workbench-environment-import-plan-v1"
+            or record.get("format") != (
+                "workbench-environment-import-plan-v2"
+                if acquire_managed_java else "workbench-environment-import-plan-v1"
+            )
+            or (acquire_managed_java and record.get("acquire_managed_java") is not True)
             or record.get("state") not in {"ready", "blocked"}
             or not isinstance(record.get("plan_id"), str)
             or not isinstance(record.get("blockers"), list)
@@ -321,19 +328,32 @@ class CoreClient:
     async def import_environment_share(
         self, source: str, name: str, workspace: str, *,
         expected_plan_id: str, config: str = "", java_home: str = "",
+        acquire_managed_java: bool = False,
     ) -> Mapping[str, Any]:
         if not expected_plan_id:
             raise CoreClientError("review an exact environment import plan first")
         arguments = self._environment_import_args(
             source, name, workspace, config=config, java_home=java_home,
+            acquire_managed_java=acquire_managed_java,
         )
         record = await self.json_record(
             "settings", "environment", "import", *arguments,
             "--plan-id", expected_plan_id, "--json",
+            **({"timeout": 600} if acquire_managed_java else {}),
         )
         if (
             not isinstance(record, dict)
-            or record.get("format") != "workbench-environment-import-result-v1"
+            or record.get("format") != (
+                "workbench-environment-import-result-v2"
+                if acquire_managed_java else "workbench-environment-import-result-v1"
+            )
+            or (
+                acquire_managed_java and (
+                    not isinstance(record.get("managed_java"), dict)
+                    or record["managed_java"].get("outcome") not in {"reused", "provisioned"}
+                    or not isinstance(record["managed_java"].get("runtime_id"), str)
+                )
+            )
             or record.get("plan_id") != expected_plan_id
             or record.get("outcome") not in {"bound", "reused"}
             or not isinstance(record.get("resource"), dict)

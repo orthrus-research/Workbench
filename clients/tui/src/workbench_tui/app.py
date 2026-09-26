@@ -21,6 +21,7 @@ from textual.screen import ModalScreen, Screen
 from textual.theme import Theme
 from textual.widgets import (
     Button,
+    Checkbox,
     DataTable,
     Footer,
     Header,
@@ -393,7 +394,7 @@ class EnvironmentImportScreen(Screen[None]):
     def __init__(self) -> None:
         super().__init__()
         self.plan: Mapping[str, Any] | None = None
-        self.plan_options: tuple[str, str, str, str, str] | None = None
+        self.plan_options: tuple[str, str, str, str, str, bool] | None = None
         self.busy = False
 
     @property
@@ -406,7 +407,8 @@ class EnvironmentImportScreen(Screen[None]):
             yield Static("Import environment selection", classes="screen-heading")
             yield Static(
                 "Core checks the exact profile and Java policy against a local Workbench suite. "
-                "This binds choices to an existing workspace; acquire project and dependency bytes separately.",
+                "This binds choices to an existing workspace. Core can also acquire the locked "
+                "managed Java release; acquire project and other dependency bytes separately.",
                 classes="screen-intro",
             )
             yield Static("Share file", classes="field-label")
@@ -419,6 +421,7 @@ class EnvironmentImportScreen(Screen[None]):
             yield Input(placeholder="/path/to/workbench.toml", id="import-config")
             yield Static("Local Java home · only if the share requires one", classes="field-label")
             yield Input(placeholder="/path/to/jdk", id="import-java")
+            yield Checkbox("Acquire managed Java before binding", id="import-acquire-java")
             with Horizontal(classes="button-row"):
                 yield Button("Check exact plan", id="import-plan", variant="primary")
                 yield Button("Bind selection", id="import-apply", disabled=True)
@@ -427,11 +430,12 @@ class EnvironmentImportScreen(Screen[None]):
             yield Static("", id="import-detail")
         yield Footer()
 
-    def _options(self) -> tuple[str, str, str, str, str]:
-        return tuple(
+    def _options(self) -> tuple[str, str, str, str, str, bool]:
+        fields = tuple(
             self.query_one(f"#import-{field}", Input).value.strip()
             for field in ("share", "name", "workspace", "config", "java")
-        )  # type: ignore[return-value]
+        )
+        return (*fields, self.query_one("#import-acquire-java", Checkbox).value)
 
     def _invalidate_plan(self) -> None:
         self.plan = None
@@ -441,6 +445,10 @@ class EnvironmentImportScreen(Screen[None]):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id and event.input.id.startswith("import-"):
+            self._invalidate_plan()
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if event.checkbox.id == "import-acquire-java":
             self._invalidate_plan()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -461,9 +469,10 @@ class EnvironmentImportScreen(Screen[None]):
         self.query_one("#import-plan", Button).disabled = True
         self.query_one("#import-status", Static).update("Core is checking the exact environment selection…")
         try:
-            source, name, workspace, config, java = options
+            source, name, workspace, config, java, acquire = options
             plan = await self.core.plan_environment_import(
                 source, name, workspace, config=config, java_home=java,
+                **({"acquire_managed_java": True} if acquire else {}),
             )
             if self._options() != options:
                 self.query_one("#import-status", Static).update("Inputs changed. Check a new plan.")
@@ -474,6 +483,7 @@ class EnvironmentImportScreen(Screen[None]):
                 f"Plan: {plan['plan_id']}",
                 f"State: {plan['state']}",
                 f"Action: {plan.get('action', '?')}",
+                f"Acquire managed Java: {'yes' if acquire else 'no'}",
             ]
             lines.extend(f"Blocked: {item}" for item in plan["blockers"])
             lines.extend(f"Additional input: {item}" for item in plan["unresolved_inputs"])
@@ -497,13 +507,14 @@ class EnvironmentImportScreen(Screen[None]):
         options = self.plan_options
         if plan is None or options is None or plan.get("state") != "ready" or self.busy:
             return
-        source, name, workspace, config, java = options
+        source, name, workspace, config, java, acquire = options
         body = (
             f"Plan ID\n{plan['plan_id']}\n\n"
             f"Share\n{source}\n\n"
             f"Local binding\n{name}: {workspace}\n"
             f"Configuration: {config or 'suite default'}\n"
             f"Java home: {java or 'shared managed choice'}\n\n"
+            f"Acquire managed Java: {'yes' if acquire else 'no'}\n\n"
             "Core will recheck the exact lock and registry revision before saving the selection."
         )
         approved = await self.app.push_screen_wait(
@@ -513,16 +524,26 @@ class EnvironmentImportScreen(Screen[None]):
             return
         self.busy = True
         self.query_one("#import-apply", Button).disabled = True
-        self.query_one("#import-status", Static).update("Core is binding the reviewed selection…")
+        self.query_one("#import-status", Static).update(
+            "Core is acquiring the locked Java release and binding the selection…"
+            if acquire else "Core is binding the reviewed selection…"
+        )
         try:
             result = await self.core.import_environment_share(
                 source, name, workspace, expected_plan_id=str(plan["plan_id"]),
                 config=config, java_home=java,
+                **({"acquire_managed_java": True} if acquire else {}),
             )
             self._invalidate_plan()
+            java_status = result.get("managed_java")
+            java_line = (
+                f"Managed Java {java_status['outcome']}: {java_status['runtime_id']}\n"
+                if isinstance(java_status, dict) else ""
+            )
             self.query_one("#import-status", Static).update(
                 f"Selection {result['outcome']}. Receipt: {result['resource']['path']}\n"
-                "Acquire remaining inputs before running the environment."
+                + java_line
+                + "Acquire remaining inputs before running the environment."
             )
             self.app.refresh_environment()  # type: ignore[attr-defined]
         except (CoreClientError, TimeoutError) as exc:
