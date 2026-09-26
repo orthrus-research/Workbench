@@ -517,6 +517,7 @@ class CatalogTests(unittest.TestCase):
                 "run",
                 "server_template",
                 "accept_minecraft_eula",
+                "template_custody",
                 "server_java",
                 "runtime_experiment",
                 "memory",
@@ -535,6 +536,10 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(server.field("server_template").kind, "path")
         self.assertEqual(server.field("accept_minecraft_eula").kind, "boolean")
         self.assertTrue(server.field("accept_minecraft_eula").required_group)
+        self.assertEqual(
+            server.field("template_custody").choices,
+            ("core-posix-exact-v1",),
+        )
         self.assertEqual(server.field("server_java").kind, "path")
         server_experiment = server.field("runtime_experiment")
         self.assertTrue(server_experiment.repeat)
@@ -609,6 +614,17 @@ class CatalogTests(unittest.TestCase):
                 "--accept-minecraft-eula",
             ],
         )
+        core_auto_argv, _ = server.build_argv(
+            {
+                "run": "susy-mod-20260820T120000000000Z-abcdef123456",
+                "accept_minecraft_eula": True,
+                "template_custody": "core-posix-exact-v1",
+            },
+            root=ROOT,
+            execute=True,
+        )
+        self.assertIn("--template-custody", core_auto_argv)
+        self.assertIn("core-posix-exact-v1", core_auto_argv)
         with self.assertRaisesRegex(CatalogError, "requires exactly one of"):
             server.build_argv(
                 {"run": "susy-mod-20260820T120000000000Z-abcdef123456"},

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from hashlib import sha1, sha256
 import json
+import multiprocessing
 import os
 from pathlib import Path
 import shutil
@@ -44,6 +45,8 @@ from workbench_shell.susy_server_materialize import (  # noqa: E402
 import workbench_shell.susy_server_materialize as server_materialize  # noqa: E402
 from workbench_api.verified_artifacts import VerifiedArtifact  # noqa: E402
 from workbench_api.state_paths import default_suite_state_root  # noqa: E402
+from workbench_api.managed_trees import managed_trees  # noqa: E402
+from workbench_core.host_services import suite_managed_tree_scope  # noqa: E402
 
 
 RUN_ID = "susy-mod-20260820T120000000000Z-abcdef123456"
@@ -928,7 +931,7 @@ class _MaterializationFixture:
         )
         return _uri_path(plan["target"]["fixture_root_uri"])
 
-    def server_target(self) -> Path:
+    def server_target(self, *, core_exact: bool = False) -> Path:
         plan = plan_project_runtime(
             self.suite,
             self.pack,
@@ -945,7 +948,10 @@ class _MaterializationFixture:
         )
         return (
             self.suite
-            / ".workbench/fixtures/supersymmetry/server-v2"
+            / (
+                ".workbench/fixtures/supersymmetry/server-core-posix-exact-v1"
+                if core_exact else ".workbench/fixtures/supersymmetry/server-v2"
+            )
             / variant["variant_id"].removeprefix("sha256:")[:16]
         )
 
@@ -990,6 +996,14 @@ class _MaterializationFixture:
                 **arguments,
             )
 
+    def materialize_core(self, configuration_home: Path, **overrides):
+        with suite_managed_tree_scope(
+            workspace=self.suite, configuration_home=configuration_home,
+        ):
+            return self.materialize(
+                template_custody="core-posix-exact-v1", **overrides,
+            )
+
 
 class SusyServerMaterializationTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -998,6 +1012,173 @@ class SusyServerMaterializationTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_core_exact_opt_in_publishes_and_reuses_separate_target(self) -> None:
+        home = self.fixture.root / "core-home"
+        default_result = self.fixture.materialize()
+        legacy_target = _uri_path(default_result["receipt"]["target"]["fixture_root_uri"])
+        legacy_before = _snapshot(legacy_target)
+
+        installed = self.fixture.materialize_core(home)
+        self.assertEqual("installed", installed["outcome"])
+        receipt = installed["receipt"]
+        target = self.fixture.server_target(core_exact=True)
+        self.assertEqual(target.as_uri(), receipt["target"]["fixture_root_uri"])
+        self.assertEqual("workbench-susy-server-source-variant-v1", receipt["source_variant"]["format"])
+        self.assertEqual(0o700, stat.S_IMODE(target.stat().st_mode))
+        self.assertEqual(0o600, stat.S_IMODE((target / server_materialize.RECEIPT_RELATIVE_V2).stat().st_mode))
+        with suite_managed_tree_scope(workspace=self.fixture.suite, configuration_home=home):
+            host = managed_trees()
+            cataloged = host.lookup_target(
+                "artifacts", target,
+                domain_id=receipt["source_variant"]["variant_id"],
+            )
+            reference = host.describe(cataloged.tree_id)
+        self.assertEqual(target, reference.path)
+        self.assertEqual("workbench-shell", reference.owner_id)
+        self.assertEqual("posix-exact-v1", reference.inventory_policy)
+        self.assertEqual(receipt["source_variant"]["variant_id"], reference.domain_id)
+
+        reused = self.fixture.materialize_core(home)
+        self.assertEqual("reused", reused["outcome"])
+        self.assertEqual(receipt["materialization_id"], reused["receipt"]["materialization_id"])
+        self.assertEqual(legacy_before, _snapshot(legacy_target))
+
+    def test_core_exact_refuses_uncataloged_existing_target(self) -> None:
+        target = self.fixture.server_target(core_exact=True)
+        _write(target / "foreign.txt", "do not adopt\n")
+        before = _snapshot(target)
+        with self.assertRaisesRegex(SusyServerMaterializationError, "Core.*catalog"):
+            self.fixture.materialize_core(self.fixture.root / "core-home")
+        self.assertEqual(before, _snapshot(target))
+
+    def test_core_exact_requires_correct_bound_host_before_state_directory(self) -> None:
+        parent = self.fixture.server_target(core_exact=True).parent
+        with self.assertRaisesRegex(SusyServerMaterializationError, "custody is unavailable"):
+            self.fixture.materialize(template_custody="core-posix-exact-v1")
+        self.assertFalse(parent.exists())
+
+        with suite_managed_tree_scope(
+            workspace=self.fixture.root, configuration_home=self.fixture.root / "foreign-home",
+        ):
+            with self.assertRaisesRegex(SusyServerMaterializationError, "another workspace"):
+                self.fixture.materialize(template_custody="core-posix-exact-v1")
+        self.assertFalse(parent.exists())
+
+    def test_core_exact_admits_large_posix_tree_without_changing_default(self) -> None:
+        original_run = server_materialize._run_owned_logged
+
+        def generate_runtime(*args, **kwargs):
+            result = original_run(*args, **kwargs)
+            if kwargs.get("label") == "Packwiz server installer":
+                runtime = kwargs["cwd"]
+                generated = runtime / "generated"
+                generated.mkdir()
+                for index in range(4100):
+                    (generated / f"file-{index:04d}.txt").write_bytes(b"x")
+                (runtime / "notes:local.cfg").write_bytes(b"colon is a POSIX name\n")
+            return result
+
+        with patch.object(server_materialize, "_run_owned_logged", side_effect=generate_runtime):
+            default_result = self.fixture.materialize()
+            core_result = self.fixture.materialize_core(self.fixture.root / "core-home")
+        for result in (default_result, core_result):
+            template = _uri_path(result["receipt"]["target"]["template_uri"])
+            self.assertEqual(4100, len(list((template / "generated").iterdir())))
+            self.assertEqual(
+                b"colon is a POSIX name\n", (template / "notes:local.cfg").read_bytes(),
+            )
+
+    def test_core_exact_refuses_hardlinked_payload_without_publication(self) -> None:
+        original_run = server_materialize._run_owned_logged
+        target = self.fixture.server_target(core_exact=True)
+
+        def generate_hardlink(*args, **kwargs):
+            result = original_run(*args, **kwargs)
+            if kwargs.get("label") == "Packwiz server installer":
+                runtime = kwargs["cwd"]
+                os.link(
+                    runtime / "cleanroom-0.6.8-alpha.jar",
+                    runtime / "linked-launcher.bin",
+                )
+            return result
+
+        with patch.object(server_materialize, "_run_owned_logged", side_effect=generate_hardlink):
+            with self.assertRaisesRegex(SusyServerMaterializationError, "independent ordinary files"):
+                self.fixture.materialize_core(self.fixture.root / "core-home")
+        self.assertFalse(target.exists())
+        pending = list(target.parent.glob(".workbench-tree-*.pending"))
+        self.assertTrue(pending)
+        with self.assertRaisesRegex(SusyServerMaterializationError, "failed prior stage"):
+            self.fixture.materialize_core(self.fixture.root / "core-home")
+        self.assertFalse(target.exists())
+        self.assertEqual(pending, list(target.parent.glob(".workbench-tree-*.pending")))
+
+    def test_core_exact_mode_drift_fails_before_domain_reuse(self) -> None:
+        home = self.fixture.root / "core-home"
+        installed = self.fixture.materialize_core(home)
+        receipt = _uri_path(installed["receipt"]["target"]["receipt_uri"])
+        receipt.chmod(0o644)
+        before = _snapshot(self.fixture.server_target(core_exact=True))
+        with self.assertRaisesRegex(SusyServerMaterializationError, "Core.*custody|changed"):
+            self.fixture.materialize_core(home)
+        self.assertEqual(before, _snapshot(self.fixture.server_target(core_exact=True)))
+
+    def test_core_exact_refuses_cataloged_portable_inventory(self) -> None:
+        from workbench_core.managed_trees import _CoreTreeStage
+
+        original_publish = _CoreTreeStage.publish
+
+        def portable_publish(stage, **kwargs):
+            self.assertEqual("posix-exact-v1", kwargs["inventory_policy"])
+            kwargs["inventory_policy"] = "portable-v1"
+            return original_publish(stage, **kwargs)
+
+        home = self.fixture.root / "core-home"
+        with patch.object(_CoreTreeStage, "publish", portable_publish):
+            with self.assertRaisesRegex(SusyServerMaterializationError, "another SUSY server template"):
+                self.fixture.materialize_core(home)
+        target = self.fixture.server_target(core_exact=True)
+        self.assertTrue(target.is_dir())
+        before = _snapshot(target)
+        with self.assertRaisesRegex(SusyServerMaterializationError, "another SUSY server template"):
+            self.fixture.materialize_core(home)
+        self.assertEqual(before, _snapshot(target))
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Core no-replace host requires Linux")
+    def test_core_exact_reconciles_hard_exit_after_rename(self) -> None:
+        import workbench_core.managed_trees as core_trees
+
+        home = self.fixture.root / "core-home"
+        target = self.fixture.server_target(core_exact=True)
+        original_rename = core_trees._rename_no_replace
+
+        def child() -> None:
+            def exit_after_rename(*args, **kwargs):
+                original_rename(*args, **kwargs)
+                os._exit(73)
+
+            with patch.object(core_trees, "_rename_no_replace", side_effect=exit_after_rename):
+                self.fixture.materialize_core(home)
+            os._exit(0)
+
+        process = multiprocessing.get_context("fork").Process(target=child)
+        process.start()
+        process.join(timeout=20)
+        if process.is_alive():
+            process.kill()
+            process.join(timeout=5)
+        self.assertEqual(73, process.exitcode)
+        self.assertTrue(target.is_dir())
+        with suite_managed_tree_scope(workspace=self.fixture.suite, configuration_home=home):
+            cataloged = managed_trees().lookup_target("artifacts", target)
+        self.assertEqual("published-uncommitted", cataloged.status)
+
+        reopened = self.fixture.materialize_core(home)
+        self.assertEqual("reused", reopened["outcome"])
+        with suite_managed_tree_scope(workspace=self.fixture.suite, configuration_home=home):
+            committed = managed_trees().lookup_target("artifacts", target)
+        self.assertEqual("committed", committed.status)
 
     def test_v2_reuse_rejects_resealed_forged_canonical_provenance(self) -> None:
         installed = self.fixture.materialize()

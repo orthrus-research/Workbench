@@ -37,6 +37,7 @@ class ManagedTreeReference:
     references: tuple[str, ...]
     policy_id: str | None
     domain_id: str | None
+    inventory_policy: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +66,9 @@ class ManagedTreeStage(Protocol):
 
 
 class ManagedTrees(Protocol):
+    workspace: Path  # Exact workspace bound by the host.
+    owner_id: str  # Module owner selected by the host.
+
     def stage(
         self, role: str, name: str, *, requested_path: Path | None = None,
     ) -> ContextManager[ManagedTreeStage]: ...

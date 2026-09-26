@@ -221,6 +221,26 @@ or use `workbench capabilities`, for exact arguments.
 | `runtime-diagnose`, `runtime-worldgen-audit` | Read retained launch, log, artifact, and profile-selected world-generation evidence. |
 | `runtime-worldgen-fingerprint`, `runtime-worldgen-compare`, `runtime-worldgen-block-delta` | Compare identity-bound observations of stopped Anvil worlds. |
 
+`workbench dev launch-server --run ID --accept-minecraft-eula` keeps the
+existing `server-v2` template route. Add
+`--template-custody core-posix-exact-v1` to opt into Core staging, exact POSIX
+inventory, no-replace publication, and catalog-based reconciliation. This
+option uses a separate `server-core-posix-exact-v1` fixture directory. An
+existing target there is reusable only when its exact source-variant identity
+is present in Core's catalog and the V2 materialization receipt still verifies.
+The V2 receipt and source-variant meaning are unchanged. The option applies
+only to automatic `launch-server` materialization with EULA acceptance; an
+explicit `--server-template` or the other `dev` actions do not select it.
+Core's exact inventory limits this opt-in route to 100,000 files, 100,000
+directories, 2 GiB per file, and 32 GiB total, and rejects links and special
+files. A limit failure retains an aborted Core stage for inspection and does
+not fall back to the default route. A failed prior stage at the same exact
+target blocks automatic retry until its catalog history is reviewed; it is not
+silently discarded or adopted. Linux/WSL ext4 has focused source-fixture
+coverage. A bounded WSL2 DrvFs fixture refused Core staging because the path
+was not owner-private and published no target. Native installation remains
+unqualified.
+
 The installed Core route `workbench feature plan FAMILY WORKSPACE` retains its
 plan under that workspace's Core-selected `feature` state root. Without an
 explicit `--state-root`, WORKSPACE must be Core's active workspace. Other

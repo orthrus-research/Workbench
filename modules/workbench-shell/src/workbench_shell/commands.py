@@ -86,7 +86,7 @@ def dev_fixture(argv, *, context):
 def dev(argv, *, context):
     from .development_commands import _dev_main
     context.check_cancelled()
-    return _dev_main(list(argv))
+    return _dev_main(list(argv), configuration_home=context.configuration_home)
 
 
 def change(argv, *, context):

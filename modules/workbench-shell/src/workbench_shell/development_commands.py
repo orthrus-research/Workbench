@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 from pathlib import Path
 import sys
@@ -128,6 +129,14 @@ def _dev_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--template-custody",
+        choices=("core-posix-exact-v1",),
+        help=(
+            "opt into Core POSIX exact tree custody for automatic launch-server "
+            "materialization; the default server-v2 route remains available"
+        ),
+    )
+    parser.add_argument(
         "--side",
         choices=("auto", "client", "server", "both"),
         help=(
@@ -177,7 +186,9 @@ def _dev_parser() -> argparse.ArgumentParser:
     )
     return parser
 
-def _dev_main(argv: list[str]) -> int:
+def _dev_main(
+    argv: list[str], *, configuration_home: Path | None = None,
+) -> int:
     from workbench_shell.susy_mod_dev import (
         SusyModDevError,
         execute_susy_mod_build,
@@ -212,6 +223,15 @@ def _dev_main(argv: list[str]) -> int:
 
     parser = _dev_parser()
     args = parser.parse_args(argv)
+    if args.template_custody is not None and (
+        args.action != "launch-server"
+        or args.server_template is not None
+        or not args.accept_minecraft_eula
+    ):
+        parser.error(
+            "--template-custody requires automatic launch-server "
+            "materialization with --accept-minecraft-eula"
+        )
     if args.action == "run":
         side = "auto" if args.side is None else args.side
         fresh = args.run is None
@@ -556,23 +576,36 @@ def _dev_main(argv: list[str]) -> int:
             )
             return 0 if result["outcome"] == "passed" else 1
         if args.action == "launch-server":
-            result = launch_susy_mod_server(
-                ROOT,
-                args.run,
-                server_template=args.server_template,
-                accept_minecraft_eula=args.accept_minecraft_eula,
-                server_java=args.server_java,
-                compatibility_experiments=tuple(args.runtime_experiment or ()),
-                memory_mib=(8192 if args.memory is None else args.memory),
-                timeout_seconds=(
-                    600.0 if args.launch_timeout is None else args.launch_timeout
-                ),
-                shutdown_timeout_seconds=(
-                    180.0
-                    if args.shutdown_timeout is None
-                    else args.shutdown_timeout
-                ),
-            )
+            tree_custody = nullcontext()
+            if args.template_custody is not None:
+                from workbench_core.host_services import suite_managed_tree_scope
+
+                tree_custody = suite_managed_tree_scope(
+                    workspace=ROOT.resolve(strict=True),
+                    configuration_home=configuration_home,
+                )
+            with tree_custody:
+                result = launch_susy_mod_server(
+                    ROOT,
+                    args.run,
+                    server_template=args.server_template,
+                    accept_minecraft_eula=args.accept_minecraft_eula,
+                    **(
+                        {"template_custody": args.template_custody}
+                        if args.template_custody is not None else {}
+                    ),
+                    server_java=args.server_java,
+                    compatibility_experiments=tuple(args.runtime_experiment or ()),
+                    memory_mib=(8192 if args.memory is None else args.memory),
+                    timeout_seconds=(
+                        600.0 if args.launch_timeout is None else args.launch_timeout
+                    ),
+                    shutdown_timeout_seconds=(
+                        180.0
+                        if args.shutdown_timeout is None
+                        else args.shutdown_timeout
+                    ),
+                )
             sys.stdout.write(render_susy_mod_server(result, json_output=args.json))
             return 0 if result["outcome"] == "passed" else 1
         if args.action == "check":

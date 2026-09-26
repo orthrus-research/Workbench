@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 from types import ModuleType
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -23,6 +24,70 @@ from workbench_core import cli as CORE_ROUTER
 
 
 class ProductCommandSurfaceTests(unittest.TestCase):
+    def test_core_exact_server_option_routes_selected_config_home(self) -> None:
+        home = Path("/tmp/selected-core-catalog")
+        observed = []
+
+        def launch_under_host(*args, **kwargs):
+            from workbench_api.managed_trees import managed_trees
+
+            host = managed_trees()
+            observed.append((host.workspace, host.owner_id, host.catalog.configuration_home))
+            return {"outcome": "passed"}
+
+        with (
+            patch(
+                "workbench_shell.susy_mod_server.launch_susy_mod_server",
+                side_effect=launch_under_host,
+            ) as launch,
+            patch(
+                "workbench_shell.susy_mod_server.render_susy_mod_server",
+                return_value="passed\n",
+            ),
+            patch("sys.stdout", io.StringIO()),
+        ):
+            status = ROUTER._dev_main(
+                [
+                    "launch-server", "--run", "retained-run",
+                    "--accept-minecraft-eula",
+                    "--template-custody", "core-posix-exact-v1",
+                ],
+                configuration_home=home,
+        )
+        self.assertEqual(0, status)
+        self.assertEqual(
+            [(ROOT.resolve(), "workbench-shell", home)], observed,
+        )
+        self.assertEqual(
+            "core-posix-exact-v1", launch.call_args.kwargs["template_custody"],
+        )
+
+        from workbench_shell import commands
+
+        context = SimpleNamespace(
+            configuration_home=home,
+            check_cancelled=lambda: None,
+        )
+        with patch.object(ROUTER, "_dev_main", return_value=0) as dispatched:
+            self.assertEqual(0, commands.dev(["launch-server"], context=context))
+        dispatched.assert_called_once_with(
+            ["launch-server"], configuration_home=home,
+        )
+
+    def test_core_exact_server_option_rejects_other_actions_and_template(self) -> None:
+        for arguments in (
+            ["launch-server", "--run", "retained-run", "--server-template", "/tmp/template"],
+            ["check", "--run", "retained-run", "--side", "server", "--accept-minecraft-eula"],
+            ["run", "--pack", "/tmp/pack", "--accept-minecraft-eula"],
+        ):
+            with self.subTest(arguments=arguments), patch("sys.stderr", io.StringIO()) as error:
+                with self.assertRaises(SystemExit) as raised:
+                    ROUTER._dev_main([
+                        *arguments, "--template-custody", "core-posix-exact-v1",
+                    ])
+                self.assertEqual(2, raised.exception.code)
+                self.assertIn("--template-custody requires", error.getvalue())
+
     def _run(self, *arguments: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, str(WORKBENCH), *arguments],

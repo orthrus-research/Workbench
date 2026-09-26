@@ -19,6 +19,7 @@ from urllib.request import url2pathname
 from workbench_project_intelligence.working_tree import WorkingTreeError, copy_tracked_workspace
 
 from copy import deepcopy
+from contextlib import ExitStack
 import ctypes
 import errno
 from hashlib import sha256
@@ -30,6 +31,7 @@ import shutil
 import signal
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 from typing import Any, Mapping
@@ -41,6 +43,7 @@ from workbench_api.verified_artifacts import (
     VerifiedArtifactError,
     acquire_verified_artifact,
 )
+from workbench_api.managed_trees import ManagedTreeError, managed_trees
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
     WorkbenchConfiguration,
@@ -80,6 +83,7 @@ MATERIALIZATION_RECEIPT_FORMAT_V2 = "workbench-susy-server-materialization-recei
 MATERIALIZATION_ID_PREFIX = "workbench-susy-server-materialization:"
 RECEIPT_RELATIVE_V2 = Path("receipts/susy-server-materialization-v2.json")
 SOURCE_VARIANT_FORMAT = "workbench-susy-server-source-variant-v1"
+CORE_EXACT_TEMPLATE_CUSTODY = "core-posix-exact-v1"
 INSTALLER_MAIN_CLASS = "link.infra.packwiz.installer.Main"
 MAX_RECORD_BYTES = 8 * 1024 * 1024
 MAX_LOG_BYTES = 64 * 1024 * 1024
@@ -232,6 +236,7 @@ def _validate_server_packwiz_options(
     *,
     runtime: Path,
     refreshed_pack: Mapping[str, Any],
+    published_runtime: Path | None = None,
 ) -> frozenset[str]:
     if not isinstance(value, dict) or not isinstance(value.get("files"), list):
         raise SusyServerMaterializationError(
@@ -303,7 +308,7 @@ def _validate_server_packwiz_options(
     except PackwizMaterializationError as exc:
         raise SusyServerMaterializationError(str(exc)) from exc
     expected = _server_packwiz_options(
-        published_runtime=runtime,
+        published_runtime=published_runtime or runtime,
         decisions=authoritative_decisions,
         initial=initial,
         final=final,
@@ -998,6 +1003,7 @@ def _expected_server_mods(
 def _validate_reusable(
     fixture_root: Path,
     *,
+    published_root: Path | None = None,
     plan: Mapping[str, Any],
     canonical_payload: Mapping[str, Any],
     canonical_materialization_id: str,
@@ -1011,6 +1017,7 @@ def _validate_reusable(
     canonical_receipt: Mapping[str, Any],
     checkout_identity: Mapping[str, Any],
 ) -> dict[str, Any]:
+    published_root = fixture_root if published_root is None else published_root
     receipts_root = fixture_root / "receipts"
     try:
         receipts_info = receipts_root.lstat()
@@ -1096,18 +1103,29 @@ def _validate_reusable(
         raise SusyServerMaterializationError(
             "existing SUSY server materialization source provenance is invalid"
         )
-    template = _local_uri(target.get("template_uri"), "materialized server template", directory=True)
-    if template != (fixture_root / ".minecraft").resolve():
+    expected_template = published_root / ".minecraft"
+    if target.get("template_uri") != expected_template.as_uri():
         raise SusyServerMaterializationError(
             "existing SUSY server materialization target has drifted"
+        )
+    template = fixture_root / ".minecraft"
+    try:
+        template_info = template.lstat()
+    except OSError as exc:
+        raise SusyServerMaterializationError(
+            "existing SUSY server materialization template is missing"
+        ) from exc
+    if stat.S_ISLNK(template_info.st_mode) or not stat.S_ISDIR(template_info.st_mode):
+        raise SusyServerMaterializationError(
+            "existing SUSY server materialization template is unsafe"
         )
     expected_variant_id = source_variant.get("variant_id")
     if (
         target.get("variant") != "packwiz-source-v2"
         or target.get("variant_id") != expected_variant_id
-        or target.get("variant_root_uri") != fixture_root.as_uri()
-        or target.get("fixture_root_uri") != fixture_root.as_uri()
-        or target.get("receipt_uri") != receipt_path.as_uri()
+        or target.get("variant_root_uri") != published_root.as_uri()
+        or target.get("fixture_root_uri") != published_root.as_uri()
+        or target.get("receipt_uri") != (published_root / RECEIPT_RELATIVE_V2).as_uri()
         or target.get("planned_fixture_root_uri")
         != source_variant.get("planned_fixture_root_uri")
         or set(target)
@@ -1145,6 +1163,7 @@ def _validate_reusable(
         receipt.get("server_packwiz_options"),
         runtime=template,
         refreshed_pack=refreshed,
+        published_runtime=expected_template,
     )
     canonical_payload_record = canonical_receipt.get("payload")
     canonical_payload_uri = (
@@ -1270,7 +1289,7 @@ def _validate_reusable(
             )
         digest, size = sha256_file(path)
         actual_evidence[path.name] = {
-            "uri": path.as_uri(),
+            "uri": (published_root / "evidence" / path.name).as_uri(),
             "sha256": digest,
             "size": size,
         }
@@ -1291,6 +1310,7 @@ def materialize_susy_server(
     install_timeout_seconds: float = 1800.0,
     configuration: WorkbenchConfiguration | None = None,
     config_path: Path | str | None = None,
+    template_custody: str | None = None,
 ) -> dict[str, Any]:
     """Create or reopen the exact server template for one retained SUSY run."""
 
@@ -1298,12 +1318,26 @@ def materialize_susy_server(
         raise SusyServerMaterializationError(
             "automatic server materialization requires --accept-minecraft-eula"
         )
+    if template_custody not in {None, CORE_EXACT_TEMPLATE_CUSTODY}:
+        raise SusyServerMaterializationError("unknown server template custody policy")
     if any(
         not math.isfinite(value) or value <= 0
         for value in (refresh_timeout_seconds, install_timeout_seconds)
     ):
         raise SusyServerMaterializationError("materialization timeouts must be positive")
     suite = Path(suite_root).resolve()
+    tree_host = None
+    if template_custody == CORE_EXACT_TEMPLATE_CUSTODY:
+        try:
+            tree_host = managed_trees()
+        except ManagedTreeError as exc:
+            raise SusyServerMaterializationError(
+                f"Core tree custody is unavailable: {exc}"
+            ) from exc
+        if tree_host.workspace != suite or tree_host.owner_id != "workbench-shell":
+            raise SusyServerMaterializationError(
+                "Core tree custody is bound to another workspace or owner"
+            )
     if configuration is not None and config_path is not None:
         raise SusyServerMaterializationError(
             "configuration and config_path are mutually exclusive"
@@ -1453,7 +1487,11 @@ def materialize_susy_server(
     if not isinstance(target, dict):
         raise SusyServerMaterializationError("server runtime plan lacks a target")
     source_variant = _server_source_variant(plan, canonical_provenance)
-    fixture_family_relative = Path("fixtures/supersymmetry/server-v2")
+    fixture_family_relative = Path(
+        "fixtures/supersymmetry/server-core-posix-exact-v1"
+        if template_custody == CORE_EXACT_TEMPLATE_CUSTODY
+        else "fixtures/supersymmetry/server-v2"
+    )
     fixture_parent = _ensure_state_directory(
         state,
         fixture_family_relative,
@@ -1511,13 +1549,10 @@ def materialize_susy_server(
         )
     checkout_before = _checkout_identity(pack_root)
 
-    if fixture_root.exists() or fixture_root.is_symlink():
-        if not fixture_root.is_dir() or fixture_root.is_symlink():
-            raise SusyServerMaterializationError(
-                "existing SUSY server materialization target is unsafe"
-            )
-        receipt = _validate_reusable(
-            fixture_root,
+    def validate_tree(root: Path, *, published_root: Path | None = None) -> dict[str, Any]:
+        return _validate_reusable(
+            root,
+            published_root=published_root,
             plan=plan,
             canonical_payload=canonical_payload,
             canonical_materialization_id=str(stage["materialization_id"]),
@@ -1531,6 +1566,46 @@ def materialize_susy_server(
             canonical_receipt=canonical_receipt,
             checkout_identity=checkout_before,
         )
+
+    if template_custody == CORE_EXACT_TEMPLATE_CUSTODY:
+        assert tree_host is not None
+        try:
+            cataloged = tree_host.lookup_target("artifacts", fixture_root)
+        except (ManagedTreeError, OSError) as exc:
+            if (not isinstance(exc, ManagedTreeError)
+                    or exc.code != "tree.unavailable"
+                    or fixture_root.exists() or fixture_root.is_symlink()):
+                raise SusyServerMaterializationError(
+                    f"Core cannot verify SUSY server template custody: {exc}"
+                ) from exc
+        else:
+            if (cataloged.domain_id != source_variant["variant_id"]
+                    or cataloged.status == "failed"):
+                raise SusyServerMaterializationError(
+                    "Core server template has an incompatible or failed prior stage; "
+                    "review the retained catalog record before retrying"
+                )
+            try:
+                reference = tree_host.reconcile(cataloged.tree_id)
+                if (reference.path != fixture_root
+                        or reference.workspace != suite
+                        or reference.owner_id != "workbench-shell"
+                        or reference.inventory_policy != "posix-exact-v1"
+                        or reference.domain_id != source_variant["variant_id"]):
+                    raise SusyServerMaterializationError(
+                        "Core cataloged another SUSY server template"
+                    )
+            except (ManagedTreeError, ValueError, OSError) as exc:
+                raise SusyServerMaterializationError(
+                    f"Core cannot reconcile existing SUSY server template: {exc}"
+                ) from exc
+
+    if fixture_root.exists() or fixture_root.is_symlink():
+        if not fixture_root.is_dir() or fixture_root.is_symlink():
+            raise SusyServerMaterializationError(
+                "existing SUSY server materialization target is unsafe"
+            )
+        receipt = validate_tree(fixture_root)
         return {
             "format": MATERIALIZATION_RESULT_FORMAT_V2,
             "schema_version": 2,
@@ -1566,12 +1641,36 @@ def materialize_susy_server(
         raise SusyServerMaterializationError(
             "managed server state directory changed before materialization"
         )
-    staging = Path(tempfile.mkdtemp(prefix=f".{fixture_root.name}.", dir=fixture_parent))
-    source_staging = staging / "source"
-    runtime = staging / ".minecraft"
-    evidence = staging / "evidence"
-    runtime.mkdir()
-    evidence.mkdir()
+    tree_custody = ExitStack()
+    core_stage = None
+    staging: Path | None = None
+    try:
+        if template_custody == CORE_EXACT_TEMPLATE_CUSTODY:
+            assert tree_host is not None
+            core_stage = tree_custody.enter_context(tree_host.stage(
+                "artifacts", fixture_root.name, requested_path=fixture_root,
+            ))
+            staging = core_stage.path
+            staging.mkdir(mode=0o700)
+        else:
+            staging = Path(tempfile.mkdtemp(
+                prefix=f".{fixture_root.name}.", dir=fixture_parent,
+            ))
+        source_staging = staging / "source"
+        runtime = staging / ".minecraft"
+        evidence = staging / "evidence"
+        runtime.mkdir()
+        evidence.mkdir()
+    except BaseException as exc:
+        if core_stage is None and staging is not None and staging.exists():
+            shutil.rmtree(staging)
+        tree_custody.__exit__(*sys.exc_info())
+        if isinstance(exc, (ManagedTreeError, ValueError, OSError)):
+            raise SusyServerMaterializationError(
+                f"Core cannot stage SUSY server template: {exc}"
+            ) from exc
+        raise
+    assert staging is not None
     try:
         try:
             source_snapshot, exclusions = copy_tracked_workspace(pack_root, source_staging)
@@ -1854,25 +1953,38 @@ def materialize_susy_server(
             raise SusyServerMaterializationError(
                 "managed server state directory changed before atomic publish"
             )
-        _rename_no_replace(staging, fixture_root)
-        staging = Path()
+        if core_stage is not None:
+            try:
+                reference = core_stage.publish(
+                    validate=lambda payload_root: validate_tree(
+                        payload_root, published_root=fixture_root,
+                    ),
+                    domain_id=str(source_variant["variant_id"]),
+                    inventory_policy="posix-exact-v1",
+                )
+            except (ManagedTreeError, OSError) as exc:
+                raise SusyServerMaterializationError(
+                    f"Core cannot publish SUSY server template: {exc}"
+                ) from exc
+            if (reference.path != fixture_root
+                    or reference.workspace != suite
+                    or reference.owner_id != "workbench-shell"
+                    or reference.inventory_policy != "posix-exact-v1"
+                    or reference.domain_id != source_variant["variant_id"]):
+                raise SusyServerMaterializationError(
+                    "Core published another SUSY server template"
+                )
+        else:
+            _rename_no_replace(staging, fixture_root)
+            staging = Path()
         try:
-            published = _validate_reusable(
-                fixture_root,
-                plan=plan,
-                canonical_payload=canonical_payload,
-                canonical_materialization_id=str(stage["materialization_id"]),
-                canonical_provenance=canonical_provenance,
-                source_variant=source_variant,
-                profile_sha256=profile_sha256,
-                locks=locks,
-                java_tool=java_tool,
-                packwiz_tool=observed_packwiz,
-                pack=pack,
-                canonical_receipt=canonical_receipt,
-                checkout_identity=checkout_before,
-            )
+            published = validate_tree(fixture_root)
         except Exception as exc:
+            if core_stage is not None:
+                raise SusyServerMaterializationError(
+                    "Core-published SUSY server template failed owner verification; "
+                    "the cataloged target is retained for reconciliation"
+                ) from exc
             rejected = fixture_parent / (
                 f".rejected-{fixture_root.name}-{os.getpid()}-{time.time_ns()}"
             )
@@ -1894,8 +2006,9 @@ def materialize_susy_server(
             "receipt": published,
         }
     finally:
-        if staging != Path() and staging.exists():
+        if core_stage is None and staging != Path() and staging.exists():
             shutil.rmtree(staging)
+        tree_custody.__exit__(*sys.exc_info())
 
 
 def render_susy_server_materialization(

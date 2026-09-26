@@ -869,6 +869,7 @@ def launch_susy_mod_server(
     server_template: Path | str | None = None,
     server_java: Path | str | None = None,
     accept_minecraft_eula: bool = False,
+    template_custody: str | None = None,
     compatibility_experiments: Sequence[str] = (),
     memory_mib: int = 8192,
     timeout_seconds: float = 600.0,
@@ -896,6 +897,14 @@ def launch_susy_mod_server(
         raise SusyModServerError("server launch timeouts must be positive")
     if os.name != "posix":
         raise SusyModServerError("this first dedicated-server slice requires a POSIX host")
+    if template_custody is not None and (
+        template_custody != "core-posix-exact-v1"
+        or server_template is not None
+        or not accept_minecraft_eula
+    ):
+        raise SusyModServerError(
+            "Core template custody requires automatic materialization and EULA acceptance"
+        )
 
     suite = Path(suite_root).resolve()
     (
@@ -926,6 +935,10 @@ def launch_susy_mod_server(
                 run_id,
                 server_java=server_java,
                 accept_minecraft_eula=accept_minecraft_eula,
+                **(
+                    {"template_custody": template_custody}
+                    if template_custody is not None else {}
+                ),
             )
         except SusyServerMaterializationError as exc:
             raise SusyModServerError(str(exc)) from exc

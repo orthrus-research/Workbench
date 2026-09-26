@@ -454,6 +454,8 @@ class TreeCatalog:
             members=tuple(member_rows), derived_status=derived_status,
             references=tuple(intent["references"]),
             policy_id=intent["policy_id"], domain_id=intent["domain_id"],
+            inventory_policy=(EXACT_INVENTORY_POLICY if intent["format"] == EXACT_INTENT_KIND
+                              else "portable-v1"),
         )
 
     def describe(self, tree_id: str, *, workspace: Path | None = None) -> ManagedTreeReference:
