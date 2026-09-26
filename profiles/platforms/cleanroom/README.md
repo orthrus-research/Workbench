@@ -29,6 +29,10 @@ this exact fixture policy and extracted Gradle tree. A verified managed Java 25
 runtime may be bound; a user-supplied path stays lexical and unchecked until
 the Cleanroom fixture preflight inspects that selected path. A general Java 8
 choice remains available but cannot satisfy this fixture's Java 25 policy.
+The Cleanroom owner can now inspect only the elected Java path for a portable
+fixture: it checks the release version and executable, and Core retains and
+reopens the owner's exact preflight answer. This is read-only and does not
+project the retained source or run Gradle.
 
 The generic-mod fixture runner accepts `--core-supervised` for a local build.
 Core holds the existing source projection lease while Gradle runs as a child,

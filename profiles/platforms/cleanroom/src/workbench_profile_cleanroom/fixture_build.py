@@ -138,19 +138,62 @@ def _validate_java_home(path: Path) -> Path:
     if not home.is_dir():
         raise FixtureBuildError("Java home must be an absolute ordinary directory")
     release = _ordinary_file(home / "release", label="Java release record")
+    release_bytes = _read_ordinary_bytes(
+        release,
+        label="Java release record",
+        limit=MAX_TOOL_RECORD_BYTES,
+    )
+    _require_java25_release(release_bytes)
+    _ordinary_file(home / "bin/java", label="Java executable", executable=True)
+    return home.resolve(strict=True)
+
+
+def _require_java25_release(raw: bytes) -> str:
     try:
-        text = _read_ordinary_bytes(
-            release,
-            label="Java release record",
-            limit=MAX_TOOL_RECORD_BYTES,
-        ).decode("utf-8")
+        text = raw.decode("utf-8")
     except UnicodeError as exc:
         raise FixtureBuildError("Java release record is not UTF-8") from exc
     match = re.search(r'^JAVA_VERSION="([^"]+)"$', text, flags=re.MULTILINE)
     if match is None or match.group(1).split(".", 1)[0] != "25":
         raise FixtureBuildError("the frozen Cleanroom fixture requires Java 25")
+    return match.group(1)
+
+
+def inspect_portable_java_home(*, java_home: Path) -> dict[str, Any]:
+    """Read one elected Java 25 path for a later retained-fixture execution.
+
+    Workspace selection does not call this. An owner preflight may reject the
+    user's path without changing their general Workbench Java choice.
+    """
+
+    requested = java_home.expanduser()
+    if not requested.is_absolute():
+        raise FixtureBuildError("portable fixture Java home must be absolute")
+    home = _validate_java_home(requested)
+    release_bytes = _read_ordinary_bytes(
+        home / "release", label="Java release record", limit=MAX_TOOL_RECORD_BYTES,
+    )
+    version = _require_java25_release(release_bytes)
+    executable_bytes = _read_ordinary_bytes(
+        home / "bin/java", label="Java executable", limit=MAX_TOOL_RECORD_BYTES,
+    )
+    # A version switch between the Java executable and release reads cannot
+    # become a successful preflight. Core repeats this owner check on reopen.
+    if _read_ordinary_bytes(
+        home / "release", label="Java release record", limit=MAX_TOOL_RECORD_BYTES,
+    ) != release_bytes:
+        raise FixtureBuildError("Java release record changed during owner preflight")
     _ordinary_file(home / "bin/java", label="Java executable", executable=True)
-    return home.resolve(strict=True)
+    return {
+        "format": "workbench-cleanroom-fixture-java25-preflight-v1",
+        "schema_version": 1, "feature_version": 25,
+        "runtime_version": version,
+        "requested_home": str(requested), "resolved_home": str(home),
+        "release_sha256": "sha256:" + sha256(release_bytes).hexdigest(),
+        "release_size": len(release_bytes),
+        "executable_sha256": "sha256:" + sha256(executable_bytes).hexdigest(),
+        "executable_size": len(executable_bytes),
+    }
 
 
 def _validate_fixture() -> str:

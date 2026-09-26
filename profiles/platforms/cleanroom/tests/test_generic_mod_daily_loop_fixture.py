@@ -266,6 +266,33 @@ class GenericModDailyLoopFixtureTests(unittest.TestCase):
                 _lock_errors(copied, lock),
             )
 
+    def test_portable_java25_preflight_checks_only_elected_path(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workbench-fixture-java25-") as temp:
+            base = Path(temp)
+            home = base / "jdk25"
+            (home / "bin").mkdir(parents=True)
+            release = home / "release"
+            release.write_text('JAVA_VERSION="25.0.4"\n', encoding="utf-8")
+            executable = home / "bin/java"
+            executable.write_bytes(b"#!/bin/sh\nexit 0\n")
+            executable.chmod(0o700)
+            before = _tree_snapshot(home)
+            inspected = HOME.inspect_portable_java_home(java_home=home)
+            self.assertEqual("workbench-cleanroom-fixture-java25-preflight-v1", inspected["format"])
+            self.assertEqual(25, inspected["feature_version"])
+            self.assertEqual("25.0.4", inspected["runtime_version"])
+            self.assertEqual(str(home), inspected["requested_home"])
+            self.assertEqual("sha256:" + _digest(release), inspected["release_sha256"])
+            self.assertEqual("sha256:" + _digest(executable), inspected["executable_sha256"])
+            self.assertEqual(before, _tree_snapshot(home))
+            alias = base / "jdk-alias"
+            alias.symlink_to(home, target_is_directory=True)
+            with self.assertRaisesRegex(RUNNER.FixtureBuildError, "symlink"):
+                HOME.inspect_portable_java_home(java_home=alias)
+            release.write_text('JAVA_VERSION="8.0.472"\n', encoding="utf-8")
+            with self.assertRaisesRegex(RUNNER.FixtureBuildError, "Java 25"):
+                HOME.inspect_portable_java_home(java_home=home)
+
     def test_build_runner_binds_exact_fixture_and_toolchain_and_rejects_drift(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workbench-fixture-runner-") as temp:
             base = Path(temp)

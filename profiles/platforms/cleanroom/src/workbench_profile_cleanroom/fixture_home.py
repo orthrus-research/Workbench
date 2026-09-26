@@ -123,5 +123,11 @@ def inspect_build_inputs(*, gradle_cmd: Path, java_home: Path) -> dict[str, Any]
     return fixture_build.inspect_build_inputs(gradle_cmd=gradle_cmd, java_home=java_home)
 
 
+def inspect_portable_java_home(*, java_home: Path) -> dict[str, Any]:
+    """Preflight one elected Java path for the retained portable fixture."""
+
+    return fixture_build.inspect_portable_java_home(java_home=java_home)
+
+
 def build_input_digest(inputs: dict[str, Any]) -> str:
     return fixture_build.build_input_digest(inputs)
