@@ -35,6 +35,7 @@ from workbench_pack_program_studio import (  # noqa: E402
     load_language_profile,
     load_managed_session_profile,
     load_profile,
+    inspect_retained_overlay_attempt,
     run_managed_language_session,
     validate_managed_session_receipt,
     validate_session_descriptor,
@@ -45,13 +46,18 @@ from workbench_pack_program_studio.managed_model import (  # noqa: E402
     receipt_identity,
 )
 from workbench_pack_program_studio.managed_session import (  # noqa: E402
+    _OverlayAttempt,
+    _create_lock,
     _parse_windows_processes,
+    _prepare_overlays,
     _replace_if_hash,
     _shutdown,
     _windows_helper_environment,
     _windows_path_file_uri,
+    load_prism_launch_binding,
     run_in_core_session_allocation,
 )
+from workbench_pack_program_studio.model import canonical_bytes  # noqa: E402
 from workbench_core.host_services import install_local_host_services  # noqa: E402
 from workbench_core.source_transactions import CoreSourceTransactions  # noqa: E402
 from workbench_core.working_allocations import CoreWorkingAllocations  # noqa: E402
@@ -341,6 +347,216 @@ os._exit(99)
                 "overlay restoration deferred until client absence is proven",
                 result["limitations"],
             )
+
+    def _retained_overlay(self, directory: str):
+        root = Path(directory)
+        environment = self._environment(directory)
+        custody = self._custody(root)
+        allocation = custody.allocate("groovy-language-session", "retained-attempt")
+        binding = load_prism_launch_binding(
+            environment["launch_receipt"], runtime_root=environment["runtime"],
+            managed_profile=self.managed_profile,
+        )
+        records = _prepare_overlays(
+            binding, managed_profile=self.managed_profile,
+            session_dir=allocation.path, port=32561,
+        )
+        session_id = f"workbench-groovy-language-session:{allocation.label}"
+        _create_lock(
+            environment["instance"] / ".workbench-groovy-language-service.lock",
+            canonical_bytes({
+                "format": "workbench-groovy-language-session-lock-v1",
+                "session_id": session_id,
+            }) + b"\n",
+        )
+        return environment, custody, allocation, binding, records, session_id
+
+    def _inspect_retained(self, environment, custody, allocation):
+        with source_transactions_scope(CoreSourceTransactions(owner_id="pack-program-studio")):
+            return inspect_retained_overlay_attempt(
+                custody=custody, allocation_id=allocation.allocation_id,
+                launch_receipt=environment["launch_receipt"],
+                runtime_root=environment["runtime"],
+                managed_profile=self.managed_profile,
+            )
+
+    def test_retained_overlay_inspection_is_read_only_and_process_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment, custody, allocation, binding, records, session_id = self._retained_overlay(directory)
+            with source_transactions_scope(CoreSourceTransactions(owner_id="pack-program-studio")):
+                attempt = _OverlayAttempt(
+                    binding.instance_root, allocation.path, session_id, records,
+                    instance_id=binding.instance_id,
+                    launch_receipt_sha256=binding.receipt_sha256,
+                )
+                attempt.apply()
+            before = (attempt.path.read_bytes(), *(record.path.read_bytes() for record in records))
+            result = self._inspect_retained(environment, custody, allocation)
+            self.assertEqual("unknown", result["process_state"])
+            self.assertEqual("blocked", result["restoration_state"])
+            self.assertEqual("applied", result["attempt_state"])
+            self.assertEqual(["after", "after"], [row["target_state"] for row in result["overlays"]])
+            self.assertEqual(["applied", "applied"], [row["owned_fields"] for row in result["overlays"]])
+            self.assertEqual(before, (attempt.path.read_bytes(), *(record.path.read_bytes() for record in records)))
+            self.assertEqual("incomplete", custody.describe(allocation.allocation_id).status)
+
+            instance_config = environment["instance"] / "instance.cfg"
+            instance_config.write_bytes(instance_config.read_bytes() + b"lastLaunchTime=fixture\n")
+            forge_config = environment["runtime"] / "config/groovyscript.cfg"
+            forge_config.write_bytes(forge_config.read_bytes().replace(
+                b"I:languageServerPort=32561", b"I:languageServerPort=32562",
+            ))
+            result = self._inspect_retained(environment, custody, allocation)
+            self.assertEqual(["other", "other"], [row["target_state"] for row in result["overlays"]])
+            self.assertEqual(["mergeable", "conflict"], [row["owned_fields"] for row in result["overlays"]])
+            self.assertEqual("blocked", result["restoration_state"])
+
+    def test_retained_overlay_inspection_refuses_changed_bindings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment, custody, allocation, binding, records, session_id = self._retained_overlay(directory)
+            with source_transactions_scope(CoreSourceTransactions(owner_id="pack-program-studio")):
+                attempt = _OverlayAttempt(
+                    binding.instance_root, allocation.path, session_id, records,
+                    instance_id=binding.instance_id,
+                    launch_receipt_sha256=binding.receipt_sha256,
+                )
+                attempt.apply()
+            lock = environment["instance"] / ".workbench-groovy-language-service.lock"
+            exact_lock = lock.read_bytes()
+            lock.write_bytes(b"different owner\n")
+            with self.assertRaisesRegex(PackProgramError, "lock"):
+                self._inspect_retained(environment, custody, allocation)
+            lock.write_bytes(exact_lock)
+            attempt_value = json.loads(attempt.path.read_bytes())
+            attempt_value["instance_id"] = "other-instance"
+            attempt.path.write_bytes(canonical_bytes(attempt_value) + b"\n")
+            with self.assertRaisesRegex(PackProgramError, "identity"):
+                self._inspect_retained(environment, custody, allocation)
+            attempt.path.write_bytes(attempt.raw)
+            records[0].backup_path.write_bytes(b"changed backup\n")
+            with self.assertRaisesRegex(PackProgramError, "backup"):
+                self._inspect_retained(environment, custody, allocation)
+
+    def test_retained_overlay_inspection_refuses_changed_instance_or_redirect(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment, custody, allocation, binding, records, session_id = self._retained_overlay(directory)
+            with source_transactions_scope(CoreSourceTransactions(owner_id="pack-program-studio")):
+                attempt = _OverlayAttempt(
+                    binding.instance_root, allocation.path, session_id, records,
+                    instance_id=binding.instance_id,
+                    launch_receipt_sha256=binding.receipt_sha256,
+                )
+                attempt.apply()
+            instance = environment["instance"]
+            target = instance / "instance.cfg"
+            outside = Path(directory) / "outside.cfg"
+            outside.write_bytes(b"unrelated\n")
+            target.unlink()
+            target.symlink_to(outside)
+            with self.assertRaisesRegex(PackProgramError, "symlink"):
+                self._inspect_retained(environment, custody, allocation)
+            self.assertEqual(b"unrelated\n", outside.read_bytes())
+            target.unlink()
+            target.write_bytes(records[0].applied)
+            moved = instance.with_name("moved-instance")
+            instance.rename(moved)
+            shutil.copytree(moved, instance)
+            with self.assertRaisesRegex(PackProgramError, "identity"):
+                self._inspect_retained(environment, custody, allocation)
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX hard-exit source stages")
+    def test_retained_overlay_inspection_classifies_hard_exit_without_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment, custody, allocation, binding, _records, session_id = self._retained_overlay(directory)
+            child = r'''
+import os
+from pathlib import Path
+import sys
+sys.path[:0] = [sys.argv[1] + "/api/src", sys.argv[1] + "/core/src",
+                sys.argv[1] + "/modules/pack-program-studio/src",
+                sys.argv[1] + "/modules/project-intelligence/src"]
+from workbench_core.host_services import install_local_host_services
+from workbench_pack_program_studio.managed_session import (
+    OverlayRecord, _OverlayAttempt, _patch_instance_config, _patch_forge_int,
+)
+install_local_host_services()
+instance, session = Path(sys.argv[2]), Path(sys.argv[3])
+first = session / "overlay-originals/instance.cfg"
+second = session / "overlay-originals/groovyscript.cfg"
+original_first, original_second = first.read_bytes(), second.read_bytes()
+records = [
+    OverlayRecord("launcher-jvm", instance / "instance.cfg", original_first,
+                  _patch_instance_config(original_first, jvm_key="JvmArgs", override_key="OverrideJavaArgs",
+                                         start_argument="-Dgroovyscript.run_ls=true"), first),
+    OverlayRecord("language-server-port", instance / ".minecraft/config/groovyscript.cfg",
+                  original_second, _patch_forge_int(original_second, key="languageServerPort", value=32561), second),
+]
+attempt = _OverlayAttempt(instance, session, sys.argv[4], records,
+                          instance_id=sys.argv[5], launch_receipt_sha256=sys.argv[6])
+commit = attempt.transaction.commit
+def exit_after_first(stage):
+    commit(stage)
+    os._exit(17)
+attempt.transaction.commit = exit_after_first
+attempt.apply()
+os._exit(99)
+'''
+            process = subprocess.run(
+                [sys.executable, "-c", child, str(ROOT), str(binding.instance_root),
+                 str(allocation.path), session_id, binding.instance_id, binding.receipt_sha256],
+                capture_output=True, timeout=20, check=False,
+                env={**os.environ, "WORKBENCH_CONFIG_HOME": str(Path(directory) / "config")},
+            )
+            self.assertEqual(17, process.returncode, process.stderr.decode(errors="replace"))
+            journal = allocation.path / "overlay-attempt-v1.json"
+            attempt = json.loads(journal.read_bytes())
+            staged_second = binding.instance_root / attempt["overlays"][1]["staged_relative"]
+            self.assertTrue(staged_second.is_file())
+            before = (journal.read_bytes(), staged_second.read_bytes())
+            inspected = self._inspect_retained(environment, custody, allocation)
+            self.assertEqual("applying", inspected["attempt_state"])
+            self.assertEqual(["after", "before"], [row["target_state"] for row in inspected["overlays"]])
+            self.assertEqual("unknown", inspected["process_state"])
+            self.assertEqual("blocked", inspected["restoration_state"])
+            self.assertEqual(before, (journal.read_bytes(), staged_second.read_bytes()))
+
+    def test_retained_overlay_inspection_checks_sealed_failure_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment, custody, allocation, binding, records, session_id = self._retained_overlay(directory)
+            with source_transactions_scope(CoreSourceTransactions(owner_id="pack-program-studio")):
+                attempt = _OverlayAttempt(
+                    binding.instance_root, allocation.path, session_id, records,
+                    instance_id=binding.instance_id,
+                    launch_receipt_sha256=binding.receipt_sha256,
+                )
+                attempt.apply()
+            with custody.execution(allocation):
+                custody.finish(
+                    allocation, outcome="failed",
+                    evidence=(attempt.path, records[0].backup_path, records[1].backup_path),
+                    failure="interrupted before launch",
+                )
+            self.assertEqual("failed", custody.verify(allocation.allocation_id).status)
+            self.assertEqual("blocked", self._inspect_retained(
+                environment, custody, allocation,
+            )["restoration_state"])
+            attempt.path.write_bytes(attempt.path.read_bytes() + b" ")
+            with self.assertRaisesRegex(ValueError, "evidence changed"):
+                self._inspect_retained(environment, custody, allocation)
+
+    def test_retained_overlay_inspection_refuses_active_core_session(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment, custody, allocation, binding, records, session_id = self._retained_overlay(directory)
+            with source_transactions_scope(CoreSourceTransactions(owner_id="pack-program-studio")):
+                attempt = _OverlayAttempt(
+                    binding.instance_root, allocation.path, session_id, records,
+                    instance_id=binding.instance_id,
+                    launch_receipt_sha256=binding.receipt_sha256,
+                )
+                attempt.apply()
+            with custody.execution(allocation):
+                with self.assertRaisesRegex(ValueError, "already executing"):
+                    self._inspect_retained(environment, custody, allocation)
 
     def _environment(self, directory: str) -> dict[str, Path]:
         root = Path(directory)

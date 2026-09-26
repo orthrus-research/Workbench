@@ -74,6 +74,15 @@ preserves the backup and refuses to overwrite it. A `complete` receipt requires
 both overlays to be `restored-exact` or `restored-merged` with no owned-field
 conflict.
 
+For an interrupted or failed Core session, the Python
+`inspect_retained_overlay_attempt` API reads the exact retained instance lock,
+launch receipt, overlay attempt, and original backups under Core allocation
+custody. It classifies each Core source stage and whether owned fields remain
+applied, original, mergeable, or conflicting. Inspection changes no projection
+file or retained evidence. Its process state is always `unknown` and its
+restoration state is `blocked`; stage classification alone cannot release the
+lock or authorize restoration after an interrupted launch.
+
 ## Readiness, handoff, and the single-client boundary
 
 A listening socket is insufficient. Workbench connects as a bounded LSP client,

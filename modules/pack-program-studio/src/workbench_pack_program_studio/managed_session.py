@@ -1312,6 +1312,213 @@ def _restore_overlay(record: OverlayRecord) -> None:
         record.restore_state = "restored-merged"
 
 
+def inspect_retained_overlay_attempt(
+    *, custody: WorkingAllocations, allocation_id: str,
+    launch_receipt: Path, runtime_root: Path,
+    managed_profile: LoadedManagedSessionProfile,
+) -> dict[str, Any]:
+    """Classify an interrupted overlay without changing its retained evidence.
+
+    A stage classification is not process absence. Even an exact `before`
+    state cannot authorize lock release or restoration on this V1 path.
+    """
+
+    description = custody.describe(allocation_id)
+    allocation = description.reference
+    if (allocation.family != "groovy-language-session"
+            or allocation.owner_id != "pack-program-studio"
+            or description.status not in {"incomplete", "failed"}):
+        raise PackProgramError("retained overlay requires an incomplete or failed Core session")
+    binding = load_prism_launch_binding(
+        launch_receipt, runtime_root=runtime_root, managed_profile=managed_profile,
+    )
+    if description.status == "failed":
+        # A failed session's selected evidence is immutable. Do not inspect a
+        # rewritten attempt or backup as though it belonged to that failure.
+        selected = {row["relative_path"] for row in description.evidence}
+        if not {
+            _OVERLAY_ATTEMPT_NAME,
+            "overlay-originals/instance.cfg",
+            "overlay-originals/groovyscript.cfg",
+        }.issubset(selected):
+            raise PackProgramError("failed session did not seal its overlay attempt and backups")
+        custody.verify(allocation_id)
+        return _inspect_retained_overlay_attempt(allocation, binding, managed_profile)
+    with custody.execution(allocation):
+        return _inspect_retained_overlay_attempt(allocation, binding, managed_profile)
+
+
+def _inspect_retained_overlay_attempt(
+    allocation: WorkingAllocationReference, binding: PrismLaunchBinding,
+    managed_profile: LoadedManagedSessionProfile,
+) -> dict[str, Any]:
+    session_id = f"workbench-groovy-language-session:{allocation.label}"
+    instance = binding.instance_root
+    root_state = instance.lstat()
+    lock_path = instance / _LOCK_NAME
+    lock_payload = canonical_bytes({
+        "format": "workbench-groovy-language-session-lock-v1", "session_id": session_id,
+    }) + b"\n"
+    if safe_regular_bytes(lock_path, maximum=4096) != lock_payload:
+        raise PackProgramError("retained overlay instance lock does not match the Core session")
+    attempt_path = allocation.path / _OVERLAY_ATTEMPT_NAME
+    raw = read_private_bytes(attempt_path, byte_limit=_MAX_CONTROL_BYTES)
+    try:
+        value = json.loads(raw)
+    except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise PackProgramError("retained overlay attempt is malformed JSON") from exc
+    if not isinstance(value, dict) or raw != canonical_bytes(value) + b"\n":
+        raise PackProgramError("retained overlay attempt is not canonical")
+    expected_keys = {
+        "format", "schema_version", "session_id", "instance_root", "instance_id",
+        "instance_identity", "launch_receipt_sha256", "transaction_token",
+        "state", "attempted_ordinals", "overlays", "restoration",
+    }
+    identity = value.get("instance_identity")
+    token = value.get("transaction_token")
+    if (set(value) != expected_keys
+            or value["format"] != "workbench-groovy-overlay-attempt-v1"
+            or type(value["schema_version"]) is not int or value["schema_version"] != 1
+            or value["session_id"] != session_id
+            or value["instance_root"] != str(instance)
+            or value["instance_id"] != binding.instance_id
+            or not isinstance(identity, dict)
+            or set(identity) != {"device", "inode"}
+            or type(identity["device"]) is not int or type(identity["inode"]) is not int
+            or (identity["device"], identity["inode"]) != (root_state.st_dev, root_state.st_ino)
+            or value["launch_receipt_sha256"] != binding.receipt_sha256
+            or type(token) is not str or re.fullmatch(r"[0-9a-f]{32}", token) is None
+            or type(value["state"]) is not str
+            or value["state"] not in {"staging", "applying", "applied", "blocked", "restored"}):
+        raise PackProgramError("retained overlay attempt identity changed")
+    attempted = value["attempted_ordinals"]
+    rows = value["overlays"]
+    if (not isinstance(attempted, list) or any(type(item) is not int for item in attempted)
+            or attempted != sorted(set(attempted)) or any(item not in {0, 1} for item in attempted)
+            or not isinstance(rows, list) or len(rows) != 2
+            or value["state"] == "staging" and bool(attempted)
+            or value["state"] == "applying" and not attempted):
+        raise PackProgramError("retained overlay attempt order is invalid")
+    restoration = value["restoration"]
+    if value["state"] in {"staging", "applying", "applied"}:
+        if restoration is not None:
+            raise PackProgramError("retained overlay restoration is premature")
+    elif (not isinstance(restoration, list) or len(restoration) != 2
+          or any(not isinstance(row, dict) or set(row) != {"role", "state", "sha256"}
+                 or type(row["role"]) is not str
+                 or row["role"] not in {"launcher-jvm", "language-server-port"}
+                 or type(row["state"]) is not str
+                 or row["state"] not in {"not-applied", "restored-exact", "restored-merged", "conflict"}
+                 or row["sha256"] is not None and (
+                     type(row["sha256"]) is not str
+                     or re.fullmatch(r"[0-9a-f]{64}", row["sha256"]) is None
+                 ) for row in restoration)
+          or [row["role"] for row in restoration] != ["launcher-jvm", "language-server-port"]):
+        raise PackProgramError("retained overlay restoration record is invalid")
+
+    launcher = managed_profile.value["launcher"]
+    policy = managed_profile.value["overlay"]
+    expected = (
+        ("launcher-jvm", PurePosixPath(launcher["instance_config"]), "instance.cfg"),
+        ("language-server-port", PurePosixPath(".minecraft") /
+         PurePosixPath(policy["runtime_config"]), "groovyscript.cfg"),
+    )
+    transaction = open_source_transaction(
+        instance, binding=session_id, staging_token=token,
+    )
+    inspected: list[dict[str, Any]] = []
+    for ordinal, (role, relative, backup_name) in enumerate(expected):
+        row = rows[ordinal]
+        if (not isinstance(row, dict)
+                or set(row) != {"role", "path", "original_base64", "applied_base64", "staged_relative"}
+                or row["role"] != role or row["path"] != relative.as_posix()):
+            raise PackProgramError("retained overlay target differs from the managed profile")
+        try:
+            original = base64.b64decode(row["original_base64"], validate=True)
+            applied = base64.b64decode(row["applied_base64"], validate=True)
+        except (TypeError, ValueError) as exc:
+            raise PackProgramError("retained overlay image is malformed") from exc
+        if (len(original) > _MAX_OVERLAY_BYTES or len(applied) > _MAX_OVERLAY_BYTES
+                or base64.b64encode(original).decode("ascii") != row["original_base64"]
+                or base64.b64encode(applied).decode("ascii") != row["applied_base64"]):
+            raise PackProgramError("retained overlay image is invalid")
+        backup = read_private_bytes(
+            allocation.path / "overlay-originals" / backup_name,
+            byte_limit=_MAX_OVERLAY_BYTES,
+        )
+        if backup != original:
+            raise PackProgramError("retained overlay original differs from its Core backup")
+        if role == "launcher-jvm":
+            expected_applied = _patch_instance_config(
+                original, jvm_key=launcher["jvm_arguments_key"],
+                override_key=launcher["override_jvm_arguments_key"],
+                start_argument=policy["start_jvm_argument"],
+            )
+        else:
+            port = _forge_int_value(_decode_overlay(applied, "applied GroovyScript config"),
+                                    policy["port_property_key"])
+            if not 1 <= port <= 65535:
+                raise PackProgramError("retained GroovyScript port is invalid")
+            expected_applied = _patch_forge_int(
+                original, key=policy["port_property_key"], value=port,
+            )
+        if applied != expected_applied:
+            raise PackProgramError("retained overlay applied bytes differ from the owner transform")
+        target = _safe_projection_file(instance, relative, "retained overlay target")
+        staged = row["staged_relative"]
+        if original == applied:
+            if staged is not None or ordinal in attempted:
+                raise PackProgramError("unchanged overlay has a source stage")
+            current = safe_regular_bytes(target, maximum=_MAX_OVERLAY_BYTES)
+            target_state = "before" if current == original else "other"
+        elif staged is None:
+            if ordinal in attempted or value["state"] != "staging":
+                raise PackProgramError("attempted overlay has no Core source stage")
+            current = safe_regular_bytes(target, maximum=_MAX_OVERLAY_BYTES)
+            target_state = "before" if current == original else "other"
+        else:
+            stage = transaction.attach(
+                relative.as_posix(),
+                before=SourceImage("file", original, executable=None),
+                after=SourceImage("file", applied, executable=None),
+                staged_relative=staged,
+                attempted=ordinal in attempted,
+            )
+            target_state = transaction.classify(stage)
+            current = safe_regular_bytes(target, maximum=_MAX_OVERLAY_BYTES)
+        observed_state = "before" if current == original else "after" if current == applied else "other"
+        if target_state != observed_state and not (original == applied and target_state == "before"):
+            raise PackProgramError("retained overlay target changed during inspection")
+        record = OverlayRecord(role, target, original, applied, allocation.path / "overlay-originals" / backup_name)
+        if current == original:
+            owned_fields = "original"
+        elif current == applied:
+            owned_fields = "applied"
+        else:
+            try:
+                merged = _merge_overlay_restoration(record, current)
+            except PackProgramError:
+                merged = None
+            owned_fields = "mergeable" if merged is not None else "conflict"
+        inspected.append({
+            "role": role, "path": relative.as_posix(),
+            "target_state": target_state, "owned_fields": owned_fields,
+            "stage_recorded": staged is not None, "attempted": ordinal in attempted,
+        })
+    if ((instance.lstat().st_dev, instance.lstat().st_ino) !=
+            (root_state.st_dev, root_state.st_ino)
+            or safe_regular_bytes(lock_path, maximum=4096) != lock_payload
+            or read_private_bytes(attempt_path, byte_limit=_MAX_CONTROL_BYTES) != raw):
+        raise PackProgramError("retained overlay changed during inspection")
+    return {
+        "format": "workbench-groovy-overlay-inspection-v1", "schema_version": 1,
+        "allocation_id": allocation.allocation_id,
+        "session_id": session_id, "attempt_sha256": _sha(raw),
+        "attempt_state": value["state"], "process_state": "unknown",
+        "restoration_state": "blocked", "overlays": inspected,
+    }
+
+
 def _merge_overlay_restoration(record: OverlayRecord, current: bytes) -> bytes | None:
     """Restore only owned fields when the launcher changed unrelated bytes."""
 
@@ -2254,6 +2461,7 @@ def _utc() -> str:
 
 __all__ = [
     "PrismLaunchBinding",
+    "inspect_retained_overlay_attempt",
     "load_prism_launch_binding",
     "run_in_core_session_allocation",
     "run_managed_language_session",

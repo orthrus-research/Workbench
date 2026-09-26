@@ -13,7 +13,7 @@ from .managed_profile import (
     LoadedManagedSessionProfile,
     load_managed_session_profile,
 )
-from .managed_session import run_managed_language_session
+from .managed_session import inspect_retained_overlay_attempt, run_managed_language_session
 from .model import PackProgramError, validate_report
 from .profile import LoadedProfile, load_profile
 from .declarations import (
@@ -40,6 +40,7 @@ __all__ = [
     "build_source_declarations",
     "compare_programs",
     "declarations_from_program",
+    "inspect_retained_overlay_attempt",
     "load_language_profile",
     "load_live_session_descriptor",
     "load_managed_session_profile",
