@@ -142,7 +142,11 @@ The same API has a separate `feature` role. A changed workspace identity,
 redirected selected path, or stale policy ID is refused. An explicit
 `WORKBENCH_STATE_ROOT` remains an invocation override. Owner commands still
 accept their documented direct path overrides; clients can resolve the Core
-selection before invoking them. If a workspace is replaced and its saved root
+selection before invoking them. Project qualification can apply with
+`--expected-state-root-policy-id ID`; Core rechecks that ID and the destination
+under its selection lock through the owner write. An explicit `--state-root`
+without a policy ID retains the existing one-command override behavior. If a
+workspace is replaced and its saved root
 is bound to the old identity, `settings show --json` exposes the selections
 record ID; `state-root clear-stale WORKSPACE ROLE --expected-record-id ID`
 removes only that stale role after review.

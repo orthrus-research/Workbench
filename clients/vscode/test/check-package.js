@@ -260,7 +260,7 @@ assert.match(
 );
 assert.match(qualificationActionSource, /const statePolicy = await selectedProductSpinePolicy/);
 assert.match(qualificationActionSource, /const stateRoot = statePolicy\.stateRoot/);
-assert.match(qualificationActionSource, /expectedPolicyId: statePolicy\.policyId/);
+assert.match(qualificationActionSource, /expectedStateRootPolicyId: statePolicy\.policyId/);
 assert.doesNotMatch(
   qualificationActionSource,
   /workspaceHome\.reset\(\);[\s\S]*await openWorkspaceHome\(workspaceHome\)/,

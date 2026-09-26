@@ -8,7 +8,10 @@ import sys
 import tempfile
 import unittest
 
-from workbench_api.state_paths import default_feature_state_root, default_runtime_state_root
+from workbench_api.state_paths import (
+    default_feature_state_root, default_product_spine_state_root,
+    default_runtime_state_root,
+)
 
 
 class StatePathTests(unittest.TestCase):
@@ -20,6 +23,12 @@ class StatePathTests(unittest.TestCase):
             feature = home / ".local/state/workbench/developer-features"
             self.assertEqual(feature, default_feature_state_root(environment=environment))
             self.assertEqual(feature.parent / "runtime", default_runtime_state_root(environment=environment))
+            self.assertEqual(feature.parent / "product-spine", default_product_spine_state_root(environment=environment))
+            explicit = {**environment, "WORKBENCH_STATE_ROOT": str(home / "retained")}
+            self.assertEqual(
+                home / "retained/product-spine",
+                default_product_spine_state_root(environment=explicit),
+            )
 
 
 if __name__ == "__main__":

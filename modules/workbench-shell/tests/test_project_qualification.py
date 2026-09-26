@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 import json
 import os
@@ -39,6 +40,10 @@ from workbench_shell.project_qualification import (  # noqa: E402
     qualification_status,
 )
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core import cli as core_cli  # noqa: E402
+from workbench_core.state_root_selection import (  # noqa: E402
+    effective_state_root, select_state_root,
+)
 from workbench_api.record_stores import record_store_scope  # noqa: E402
 from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
 from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
@@ -93,6 +98,90 @@ class ProjectQualificationTests(unittest.TestCase):
 
     def setUp(self) -> None:
         install_local_host_services()
+
+    def test_core_policy_selection_change_blocks_reviewed_apply_at_owner_boundary(self) -> None:
+        with _temporary_directory() as temporary:
+            root = Path(temporary)
+            project = create_supersymmetry_project(root)
+            config = root / "user-config"
+            first_root = root / "first-state"
+            second_root = root / "second-state"
+            environment = dict(os.environ)
+            environment.update({
+                "HOME": str(root), "USERPROFILE": str(root),
+                "WORKBENCH_CONFIG_HOME": str(config),
+            })
+            environment.pop("WORKBENCH_STATE_ROOT", None)
+            initial = effective_state_root(
+                project, "product-spine", suite_root=REPOSITORY_ROOT,
+                environment=environment,
+            )
+            first = select_state_root(
+                project, "product-spine", str(first_root),
+                suite_root=REPOSITORY_ROOT,
+                expected_policy_id=initial["policy_id"], environment=environment,
+            )
+
+            def invoke(*arguments: str) -> subprocess.CompletedProcess[str]:
+                stdout = StringIO()
+                stderr = StringIO()
+                argv = [
+                    "project", "qualify", str(project), "--profile", "supersymmetry",
+                    *arguments, "--json",
+                ]
+                # The real Core dispatcher is exercised here. Route only its
+                # fixed account-wide package lease into this private fixture.
+                with patch.dict(os.environ, environment, clear=True), patch(
+                    "workbench_core.package_guard.account_home", return_value=root,
+                ), redirect_stdout(stdout), redirect_stderr(stderr):
+                    code = core_cli._main(argv)
+                return subprocess.CompletedProcess(argv, code, stdout.getvalue(), stderr.getvalue())
+
+            reviewed = invoke("--state-root", str(first_root), "--plan")
+            self.assertEqual(0, reviewed.returncode, reviewed.stderr)
+            first_plan = json.loads(reviewed.stdout)
+            self.assertTrue(first_plan["can_apply"])
+            second = select_state_root(
+                project, "product-spine", str(second_root),
+                suite_root=REPOSITORY_ROOT,
+                expected_policy_id=first["policy_id"], environment=environment,
+            )
+            stale = invoke(
+                "--state-root", str(first_root), "--apply", first_plan["plan_id"],
+                "--expected-state-root-policy-id", first["policy_id"],
+            )
+            self.assertEqual(2, stale.returncode)
+            self.assertIn("state-root policy changed after review", stale.stderr)
+            self.assertFalse(first_root.exists())
+
+            wrong_destination = invoke(
+                "--state-root", str(first_root), "--apply", first_plan["plan_id"],
+                "--expected-state-root-policy-id", second["policy_id"],
+            )
+            self.assertEqual(2, wrong_destination.returncode)
+            self.assertIn("owner state root differs from the reviewed Core policy", wrong_destination.stderr)
+            self.assertFalse(first_root.exists())
+
+            current = invoke("--state-root", str(second_root), "--plan")
+            self.assertEqual(0, current.returncode, current.stderr)
+            second_plan = json.loads(current.stdout)
+            applied = invoke(
+                "--state-root", str(second_root), "--apply", second_plan["plan_id"],
+                "--expected-state-root-policy-id", second["policy_id"],
+            )
+            self.assertEqual(0, applied.returncode, applied.stderr)
+            self.assertEqual("qualified", json.loads(applied.stdout)["outcome"])
+            self.assertTrue(second_root.exists())
+
+            explicit_root = root / "one-command-state"
+            explicit_plan = invoke("--state-root", str(explicit_root), "--plan")
+            self.assertEqual(0, explicit_plan.returncode, explicit_plan.stderr)
+            explicit_apply = invoke(
+                "--state-root", str(explicit_root), "--apply",
+                json.loads(explicit_plan.stdout)["plan_id"],
+            )
+            self.assertEqual(0, explicit_apply.returncode, explicit_apply.stderr)
+            self.assertTrue(explicit_root.exists())
 
     def test_binding_catalogs_explicit_target_when_dispatch_selected_suite(self) -> None:
         with _temporary_directory() as temporary:

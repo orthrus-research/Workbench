@@ -91,13 +91,16 @@ def default_suite_state_root(suite_root: Path | str) -> Path:
 
 def default_product_spine_state_root(
     suite_root: Path | str | None = None,
+    *,
+    environment: Mapping[str, str] | None = None,
 ) -> Path:
     """Return the shared Work Session/Home state root used by public adapters."""
 
-    explicit = os.environ.get("WORKBENCH_STATE_ROOT")
+    values = os.environ if environment is None else environment
+    explicit = values.get("WORKBENCH_STATE_ROOT")
     if explicit:
         return Path(explicit).expanduser().resolve() / "product-spine"
-    return default_feature_state_root(suite_root).parent / "product-spine"
+    return default_feature_state_root(suite_root, environment=values).parent / "product-spine"
 
 
 __all__ = [

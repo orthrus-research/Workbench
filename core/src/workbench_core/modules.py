@@ -5,7 +5,9 @@ from __future__ import annotations
 from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from importlib import import_module, metadata
-from typing import Iterable, Sequence
+import os
+from pathlib import Path
+from typing import Iterable, Mapping, Sequence
 
 from workbench_api import Capability, ExecutionContext, Module, ModuleError
 from workbench_api.record_stores import record_store_scope
@@ -88,7 +90,11 @@ def discover(*, entries: Iterable[metadata.EntryPoint] | None = None, disabled: 
     )
 
 
-def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Sequence[InstalledModule]) -> int:
+def dispatch(
+    arguments: Sequence[str], context: ExecutionContext, modules: Sequence[InstalledModule],
+    *, policy_environment: Mapping[str, str] | None = None,
+    suite_root: Path | None = None,
+) -> int:
     matches: list[tuple[InstalledModule, Capability]] = []
     for row in modules:
         if row.state == "available" and row.module:
@@ -119,6 +125,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         working_stores = nullcontext()
         fixture_stores = nullcontext()
         source_stores = nullcontext()
+        policy_stores = nullcontext()
         registration_stores = registration_attempts_scope(None)
         if owner.id == "atlas":
             from workbench_api.derived_indexes import derived_indexes_scope
@@ -140,6 +147,8 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
             from workbench_api.fixture_selections import fixture_selections_scope
             from .source_transactions import CoreSourceTransactions
             from workbench_api.source_transactions import source_transactions_scope
+            from .state_root_selection import CoreStateRootPolicies
+            from workbench_api.state_root_policies import state_root_policies_scope
             from .derived_indexes import CoreDerivedIndexes
             durable_resources = CoreDurableResources(
                 workspace=context.workspace,
@@ -191,6 +200,11 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
                 owner_id=owner.id,
                 check_cancelled=context.check_cancelled,
             ))
+            policy_stores = state_root_policies_scope(CoreStateRootPolicies(
+                suite_root=context.workspace if suite_root is None else suite_root,
+                configuration_home=context.configuration_home,
+                environment=os.environ if policy_environment is None else policy_environment,
+            ))
             if owner.id == "workbench-shell":
                 from .registration_attempts import CoreRegistrationAttempts
                 registration_stores = registration_attempts_scope(CoreRegistrationAttempts(
@@ -218,7 +232,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         try:
             from workbench_api.archive_exchange import archive_exchange_scope
             from .archive_port import CoreArchiveExchange
-            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, source_stores, registration_stores, derived_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
+            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, source_stores, policy_stores, registration_stores, derived_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
                 handler = getattr(import_module(package), name)
                 result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:

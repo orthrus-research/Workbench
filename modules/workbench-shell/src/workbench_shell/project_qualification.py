@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from hashlib import sha256
 import json
 import os
@@ -32,6 +32,7 @@ from workbench_api.host_filesystem import (
     secure_private_path,
 )
 from workbench_api.record_stores import open_target_record_store
+from workbench_api.state_root_policies import state_root_policies
 from workbench_project_intelligence import ProjectInspectionError
 from workbench_project_intelligence.git_observation import (
     GitObservationError,
@@ -1202,6 +1203,25 @@ def _qualification_lock(path: Path):
         ) from exc
 
 
+@contextmanager
+def _qualification_mutation_scope(
+    binding_path: Path, *, workspace: Path, state_root: Path,
+    expected_state_root_policy_id: str | None,
+):
+    guard = (
+        nullcontext() if expected_state_root_policy_id is None else
+        state_root_policies().hold(
+            workspace, "product-spine", state_root, expected_state_root_policy_id,
+        )
+    )
+    with guard:
+        _ensure_private_state(
+            binding_path, workspace=workspace, state_root=state_root,
+        )
+        with _qualification_lock(binding_path):
+            yield
+
+
 def apply_qualification_plan(
     suite_root: Path | str,
     workspace: Path | str,
@@ -1209,6 +1229,7 @@ def apply_qualification_plan(
     profile_selector: str,
     state_root: Path | str,
     expected_plan_id: str,
+    expected_state_root_policy_id: str | None = None,
 ) -> dict[str, Any]:
     """Reinspect exact evidence and apply only the current reviewed plan."""
 
@@ -1231,14 +1252,12 @@ def apply_qualification_plan(
     target = Path(str(current_status["workspace"]["root"]))
     effective_state_root = _state_base(state_root)
     _assert_state_outside_workspace(target, effective_state_root)
-    _ensure_private_state(
-        binding_path,
-        workspace=target,
-        state_root=effective_state_root,
-    )
     intended_record: dict[str, Any] | None = None
     try:
-        with _qualification_lock(binding_path):
+        with _qualification_mutation_scope(
+            binding_path, workspace=target, state_root=effective_state_root,
+            expected_state_root_policy_id=expected_state_root_policy_id,
+        ):
             locked_status = qualification_status(
                 suite_root,
                 workspace,
@@ -1351,6 +1370,7 @@ def _parser() -> argparse.ArgumentParser:
     operation.add_argument("--plan", action="store_true")
     operation.add_argument("--apply", metavar="PLAN_ID")
     parser.add_argument("--state-root", type=Path)
+    parser.add_argument("--expected-state-root-policy-id")
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -1525,6 +1545,10 @@ def main(
     reviewed_plan: Mapping[str, Any] | None = None
     apply_started = False
     try:
+        if args.expected_state_root_policy_id is not None and args.apply is None:
+            raise ProjectQualificationError(
+                "--expected-state-root-policy-id requires --apply"
+            )
         effective_state_root = _state_base(selected_state_root)
         status = qualification_status(
             root,
@@ -1587,6 +1611,7 @@ def main(
             profile_selector=args.profile,
             state_root=effective_state_root,
             expected_plan_id=expected_plan_id,
+            expected_state_root_policy_id=args.expected_state_root_policy_id,
         )
         stdout.write(
             json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"

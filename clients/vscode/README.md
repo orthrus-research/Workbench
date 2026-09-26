@@ -163,7 +163,9 @@ selected retained root through Core for this workspace. The earlier
 `workbench.productSpine.stateRoot` setting is shown as the migration suggestion;
 it no longer chooses the active root. Other Workbench clients can read the same
 Core choice with `workbench settings state-root resolve WORKSPACE product-spine
---json`. A configured Core executable remains a machine-local bootstrap choice
+--json`. Project qualification sends the reviewed Core policy ID to its owner
+command, which checks the current selection and destination before writing.
+A configured Core executable remains a machine-local bootstrap choice
 so the extension can find Core before reading its policy. The developer-feature
 state-root setting has not yet moved to this Core selection route. When Core
 runs in WSL, explicit Windows paths must be UNC paths for the same configured

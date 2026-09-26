@@ -138,6 +138,7 @@ function result(selectedPlan, overrides = {}) {
 test("builds exact plan/apply argv without an approval bypass and maps core-side paths", () => {
   const native = resolveCoreLaunch("/opt/workbench/bin/workbench", { platform: "linux" });
   const selected = plan();
+  const policyId = `workbench-state-root-policy:sha256:${"a".repeat(64)}`;
   assert.deepEqual(qualificationArguments("/work/Supersymmetry", "plan", native), [
     "project", "qualify", "/work/Supersymmetry",
     "--profile", "supersymmetry", "--plan", "--json",
@@ -148,6 +149,22 @@ test("builds exact plan/apply argv without an approval bypass and maps core-side
     "project", "qualify", "/work/Supersymmetry",
     "--profile", "supersymmetry", "--apply", selected.plan_id, "--json",
   ]);
+  assert.deepEqual(qualificationArguments(
+    "/work/Supersymmetry", { apply: selected.plan_id }, native,
+    { stateRoot: "/retained", expectedStateRootPolicyId: policyId },
+  ), [
+    "project", "qualify", "/work/Supersymmetry", "--profile", "supersymmetry",
+    "--state-root", "/retained", "--expected-state-root-policy-id", policyId,
+    "--apply", selected.plan_id, "--json",
+  ]);
+  assert.throws(() => qualificationArguments(
+    "/work/Supersymmetry", "plan", native,
+    { expectedStateRootPolicyId: policyId },
+  ), /apply-only guard/);
+  assert.throws(() => qualificationArguments(
+    "/work/Supersymmetry", { apply: selected.plan_id }, native,
+    { expectedStateRootPolicyId: "stale" },
+  ), /policy ID is invalid/);
   assert.doesNotMatch(qualificationArguments(
     "/work/Supersymmetry", "plan", native,
   ).join(" "), /--yes|approve/i);

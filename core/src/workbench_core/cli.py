@@ -189,7 +189,10 @@ def _dispatch_available(
             location_sources={role: value["source"] for role, value in resolved.record["locations"].items()},
             selection=resolved.operation_selection(),
         )
-    return dispatch(arguments, context, modules)
+    return dispatch(
+        arguments, context, modules,
+        policy_environment=resolution_environment, suite_root=root,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

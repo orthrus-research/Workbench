@@ -756,9 +756,6 @@ async function qualifyProject(workspaceHome) {
       );
       return plan;
     }
-    await invokeStateRootPolicy(executable, workspace.uri.fsPath, "product-spine", {
-      cwd: workspace.uri.fsPath, expectedPolicyId: statePolicy.policyId,
-    });
     const result = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Window,
@@ -768,6 +765,7 @@ async function qualifyProject(workspaceHome) {
       () => applyProjectQualification(executable, workspace.uri.fsPath, plan, {
         cwd: workspace.uri.fsPath,
         stateRoot,
+        expectedStateRootPolicyId: statePolicy.policyId,
       }),
     );
     void vscode.window.showInformationMessage(

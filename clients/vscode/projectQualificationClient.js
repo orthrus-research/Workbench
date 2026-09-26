@@ -16,6 +16,7 @@ const QUALIFICATION_TIMEOUT_MS = 2 * 60 * 1000;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const GIT_OBJECT = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 const PLAN_ID = /^workbench-project-qualification-plan:sha256:[0-9a-f]{64}$/;
+const STATE_ROOT_POLICY_ID = /^workbench-state-root-policy:sha256:[0-9a-f]{64}$/;
 const INSPECTION_ID = /^workbench-project-inspection:sha256:[0-9a-f]{64}$/;
 const BINDING_ID = /^workbench-project-qualification-binding:sha256:[0-9a-f]{64}$/;
 const STATE_REVISION = /^workbench-project-qualification-state:sha256:[0-9a-f]{64}$/;
@@ -283,6 +284,15 @@ function qualificationArguments(workspace, phase, launch, options = {}) {
         launch,
         "project qualification state root",
       ),
+    );
+  }
+  if (options.expectedStateRootPolicyId !== undefined) {
+    if (phase === "plan") {
+      throw new Error("state-root policy identity is an apply-only guard");
+    }
+    arguments_.push(
+      "--expected-state-root-policy-id",
+      text(options.expectedStateRootPolicyId, "state-root policy ID", 256, STATE_ROOT_POLICY_ID),
     );
   }
   if (phase === "plan") {

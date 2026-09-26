@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from workbench_api.state_paths import default_feature_state_root
+from workbench_api.state_root_policies import StateRootPolicyError
 
 from .environment_resolution import resolve_environment
 from .setup_cli import _state_root, setup_record_lock
@@ -28,6 +30,7 @@ FORMAT = "workbench-state-root-selections-v1"
 POLICY_FORMAT = "workbench-state-root-policy-v1"
 ROLES = frozenset({"product-spine", "feature"})
 _WORKSPACE_ID = re.compile(r"workbench-workspace-v1:[0-9a-f]{32}\Z")
+_POLICY_ID = re.compile(r"workbench-state-root-policy:sha256:[0-9a-f]{64}\Z")
 
 
 def _identity(prefix: str, body: Mapping[str, Any]) -> str:
@@ -240,8 +243,50 @@ def clear_stale_state_root(
         )
 
 
+class CoreStateRootPolicies:
+    """Hold the selection writer's lock through an owner publication."""
+
+    def __init__(
+        self, *, suite_root: Path, configuration_home: Path,
+        environment: Mapping[str, str],
+    ) -> None:
+        self.suite_root = suite_root
+        self.configuration_home = configuration_home
+        self.environment = dict(environment)
+
+    @contextmanager
+    def hold(
+        self, workspace: Path, role: str, state_root: Path, expected_policy_id: str,
+    ) -> Iterator[None]:
+        """Refuse drift and serialize a mutation against Core selection writes."""
+
+        if type(expected_policy_id) is not str or _POLICY_ID.fullmatch(expected_policy_id) is None:
+            raise StateRootPolicyError("expected state-root policy identity is invalid")
+        if role not in ROLES:
+            raise StateRootPolicyError(f"unsupported state-root role: {role}")
+        if not isinstance(workspace, Path) or not workspace.is_absolute():
+            raise StateRootPolicyError("state-root policy workspace must be absolute")
+        if not isinstance(state_root, Path) or not state_root.is_absolute():
+            raise StateRootPolicyError("state-root policy destination must be absolute")
+        if default_user_config_home(environment=self.environment) != self.configuration_home:
+            raise StateRootPolicyError("state-root policy configuration home changed")
+        path = default_state_root_selections_path(environment=self.environment)
+        _prepare_home(path)
+        with setup_record_lock(path):
+            current = _effective(
+                workspace, role, suite_root=self.suite_root,
+                environment=self.environment,
+                record=load_state_root_selections(environment=self.environment),
+            )
+            if current["policy_id"] != expected_policy_id:
+                raise StateRootPolicyError("state-root policy changed after review")
+            if Path(current["state_root"]) != _state_root(state_root):
+                raise StateRootPolicyError("owner state root differs from the reviewed Core policy")
+            yield
+
+
 __all__ = [
-    "POLICY_FORMAT", "ROLES", "clear_stale_state_root",
+    "POLICY_FORMAT", "ROLES", "CoreStateRootPolicies", "clear_stale_state_root",
     "default_state_root_selections_path", "effective_state_root",
     "load_state_root_selections", "select_state_root",
 ]
