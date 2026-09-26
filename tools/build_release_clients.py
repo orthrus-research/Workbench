@@ -109,6 +109,8 @@ EXPECTED_VSCODE_COMMAND_IDS = frozenset(
         "workbench.commandCenter.open",
         "workbench.core.checkInstallation",
         "workbench.core.configureExecutable",
+        "workbench.core.configureFeatureStateRoot",
+        "workbench.core.configureProductSpineStateRoot",
         "workbench.core.openInstallationGuide",
         "workbench.feature.browseExamples",
         "workbench.feature.browseRetainedRecords",
@@ -154,6 +156,7 @@ VSCODE_STAGE_FILES = (
     "coreLaunch.js",
     "coreClient.js",
     "coreStatusClient.js",
+    "stateRootPolicyClient.js",
     "recipeReviewClient.js",
     "prRecipeReviewClient.js",
     "prRecipeReviewTree.js",
@@ -331,11 +334,24 @@ def build_vscode(
 ) -> dict[str, str]:
     sys.path.insert(0, str(ROOT / "validation"))
     try:
-        from provision_ide_toolchains import provision_node, provision_npm
+        from provision_ide_toolchains import (
+            hold_provisioned_toolchains, provision_node, provision_npm,
+        )
     except ImportError as error:
         raise ClientBuildError("could not load the Node toolchain provisioner") from error
     node_home = provision_node()
     npm_home = provision_npm()
+    with hold_provisioned_toolchains({"node": node_home, "npm": npm_home}):
+        return _build_vscode_with_locked_tools(
+            raw_output, node_home, npm_home,
+            skip_extension_host=skip_extension_host,
+        )
+
+
+def _build_vscode_with_locked_tools(
+    raw_output: Path, node_home: Path, npm_home: Path, *,
+    skip_extension_host: bool,
+) -> dict[str, str]:
     node = node_home / "bin/node"
     npm_cli = npm_home / "bin/npm-cli.js"
     if not node.is_file() or not npm_cli.is_file():
@@ -408,6 +424,21 @@ def build_intellij(
     raw_output: Path,
 ) -> dict[str, str]:
     java_home, java_platform_home, gradle_home = _provision_intellij()
+    from provision_ide_toolchains import hold_provisioned_toolchains
+
+    with hold_provisioned_toolchains({
+        "java": java_home, "java_platform": java_platform_home,
+        "gradle": gradle_home,
+    }):
+        return _build_intellij_with_locked_tools(
+            raw_output, java_home, java_platform_home, gradle_home,
+        )
+
+
+def _build_intellij_with_locked_tools(
+    raw_output: Path, java_home: Path, java_platform_home: Path,
+    gradle_home: Path,
+) -> dict[str, str]:
     lock = json.loads((ROOT / "validation/ide-toolchains-v1.json").read_text(encoding="utf-8"))
     environment = os.environ.copy()
     environment.update(

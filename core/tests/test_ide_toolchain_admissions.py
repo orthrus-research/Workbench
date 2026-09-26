@@ -133,6 +133,41 @@ class IdeToolchainAdmissionTests(unittest.TestCase):
         self.assertEqual(raw, path.read_bytes())
         self.assertTrue(displaced.is_dir())
 
+    def test_held_admission_fences_another_client_and_rechecks_after_use(self) -> None:
+        self.admit()
+        arguments = dict(
+            archive_sha256=self.digest, archive_size=self.archive.stat().st_size,
+            expected_root="locked-tool", archive_format="zip",
+        )
+        with self.host.hold(self.archive, self.target, **arguments) as selected:
+            self.assertEqual(self.target, selected)
+            with self.assertRaisesRegex(IdeToolchainAdmissionError, "held by another writer"):
+                with CoreIdeToolchainAdmissions(self.root).hold(
+                    self.archive, self.target, **arguments,
+                ):
+                    self.fail("a second hold crossed the Core admission fence")
+        with self.assertRaisesRegex(IdeToolchainAdmissionError, "differs from archive"):
+            with self.host.hold(self.archive, self.target, **arguments):
+                (self.target / "bin").write_bytes(b"changed")
+        self.assertTrue(self.record().exists())
+
+    def test_held_admission_refuses_a_missing_record_without_recreating_it(self) -> None:
+        self.admit()
+        record = self.record()
+        held = self.home / "held-admission.json"
+        record.rename(held)
+        try:
+            with self.assertRaises(IdeToolchainAdmissionError):
+                with self.host.hold(
+                    self.archive, self.target, archive_sha256=self.digest,
+                    archive_size=self.archive.stat().st_size,
+                    expected_root="locked-tool", archive_format="zip",
+                ):
+                    self.fail("a missing admission was reused")
+            self.assertFalse(record.exists())
+        finally:
+            held.rename(record)
+
     def test_interrupted_record_publication_retains_tree_for_exact_retry(self) -> None:
         with patch(
             "workbench_core.ide_toolchain_admissions.publish_immutable_bytes",

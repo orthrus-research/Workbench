@@ -137,6 +137,20 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         self.assertEqual("ide-toolchain", rows[0]["role"])
         self.assertTrue((Path(rows[0]["path"]) / ".workbench-temporary-retained.json").is_file())
 
+    def test_client_hold_reopens_exact_locked_tree_and_rejects_wrong_selection(self) -> None:
+        with patch.object(provision, "download", return_value=self.archive), patch.object(
+            provision, "load_lock", return_value={"gradle": self.entry},
+        ):
+            target = provision.provision_entry(self.entry, suffix="-bin.zip")
+            with provision.hold_provisioned_toolchains({"gradle": target}):
+                self.assertEqual(b"exact installed bytes", (target / "bin").read_bytes())
+            with self.assertRaisesRegex(OSError, "client sentinel"):
+                with provision.hold_provisioned_toolchains({"gradle": target}):
+                    raise OSError("client sentinel")
+            with self.assertRaisesRegex(provision.ProvisionFailure, "differs from the locked selection"):
+                with provision.hold_provisioned_toolchains({"gradle": self.root / "other"}):
+                    self.fail("an unrelated target crossed the IDE toolchain hold")
+
     def test_plus_named_tar_with_relative_link_uses_core_extract_and_admission(self) -> None:
         archive = self.root / "plus.tar.gz"
         name = "jdk-25.0.4+7"

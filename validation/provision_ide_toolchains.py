@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager, ExitStack
 import hashlib
 import argparse
 import json
@@ -17,6 +18,7 @@ from typing import Any
 from core_run_custody import (
     admit_ide_toolchain_directory, allocate_ide_toolchain_stage,
     extract_ide_toolchain_archive, promote_ide_toolchain_directory,
+    hold_ide_toolchain_directory,
     reject_existing_ide_toolchain_stage, review_ide_toolchain_stages_on_reuse,
 )
 
@@ -29,6 +31,12 @@ DOWNLOAD_ROOT = ROOT / ".workbench/downloads/ide-validation-v1"
 
 class ProvisionFailure(RuntimeError):
     pass
+
+
+_SUFFIXES = {
+    "java": ".tar.gz", "java_platform": ".tar.gz",
+    "gradle": "-bin.zip", "node": ".tar.xz", "npm": ".tgz",
+}
 
 
 def load_lock() -> dict[str, Any]:
@@ -237,6 +245,41 @@ def provision_npm() -> Path:
         suffix=".tgz",
         extracted_root="package",
     )
+
+
+@contextmanager
+def hold_provisioned_toolchains(selected: dict[str, Path]):
+    """Hold exact Core admissions while Workbench clients use locked tools."""
+
+    if not selected or not set(selected).issubset(_SUFFIXES):
+        raise ProvisionFailure("IDE toolchain hold selection is unsupported")
+    lock = load_lock()
+    client_error = False
+    try:
+        with ExitStack() as held:
+            for key in sorted(selected):
+                entry = lock[key]
+                destination = TOOLCHAIN_ROOT / entry["archive_root"]
+                if selected[key] != destination:
+                    raise ProvisionFailure("IDE toolchain hold target differs from the locked selection")
+                suffix = _SUFFIXES[key]
+                archive = download(entry, suffix)
+                held.enter_context(hold_ide_toolchain_directory(
+                    archive.absolute(), destination.absolute(),
+                    archive_sha256=entry["archive_sha256"],
+                    archive_size=entry["archive_size"],
+                    extracted_root="package" if key == "npm" else entry["archive_root"],
+                    archive_format="zip" if suffix.endswith(".zip") else "tar",
+                ))
+            try:
+                yield
+            except BaseException:
+                client_error = True
+                raise
+    except OSError as exc:
+        if client_error:
+            raise
+        raise ProvisionFailure(f"IDE toolchain hold needs review: {exc}") from exc
 
 
 def main(argv=None) -> int:

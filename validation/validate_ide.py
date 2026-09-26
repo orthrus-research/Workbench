@@ -15,7 +15,10 @@ import sys
 import tempfile
 import threading
 
-from provision_ide_toolchains import LOCK_PATH, ProvisionFailure, provision, provision_node, provision_npm
+from provision_ide_toolchains import (
+    LOCK_PATH, ProvisionFailure, hold_provisioned_toolchains,
+    provision, provision_node, provision_npm,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -347,7 +350,11 @@ def main(argv=None) -> int:
                                       gradle_home=gradle_home, full=args.full, non_adversarial=args.non_adversarial,
                                       environment=intellij_environment),
                 }
-                run_clients(diagnostics, checks, jobs=args.jobs)
+                with hold_provisioned_toolchains({
+                    "java": java_home, "java_platform": java_platform_home,
+                    "gradle": gradle_home, "node": node_home, "npm": npm_home,
+                }):
+                    run_clients(diagnostics, checks, jobs=args.jobs)
             if source_identity(ROOT) != source:
                 raise IdeValidationFailure("validation source changed during IDE checks")
     finally:

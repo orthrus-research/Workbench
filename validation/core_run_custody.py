@@ -7,6 +7,7 @@ here; the validation scheduler still owns suite admission and result meaning.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 import os
 import re
@@ -329,6 +330,29 @@ def admit_ide_toolchain_directory(
         )
     except IdeToolchainAdmissionError as exc:
         raise OSError(f"Core IDE toolchain admission needs review: {exc}") from exc
+
+
+@contextmanager
+def hold_ide_toolchain_directory(
+    archive: Path, target: Path, *, archive_sha256: str,
+    archive_size: int, extracted_root: str, archive_format: str,
+):
+    """Keep an existing Core admission locked during IDE client execution."""
+
+    _source_core()
+    from workbench_core.ide_toolchain_admissions import (
+        CoreIdeToolchainAdmissions, IdeToolchainAdmissionError,
+    )
+
+    try:
+        with CoreIdeToolchainAdmissions(target.parent).hold(
+            archive, target, archive_sha256=archive_sha256,
+            archive_size=archive_size, expected_root=extracted_root,
+            archive_format=archive_format,
+        ) as selected:
+            yield selected
+    except IdeToolchainAdmissionError as exc:
+        raise OSError(f"Core IDE toolchain hold needs review: {exc}") from exc
 
 
 def publish_ci_plan(

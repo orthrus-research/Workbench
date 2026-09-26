@@ -8,13 +8,14 @@ its cleanup, and historical trees can be admitted after exact readback.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import re
 import stat
-from typing import Any
+from typing import Any, Iterator
 
 from workbench_api.host_filesystem import DurableRecordError
 
@@ -276,6 +277,95 @@ class CoreIdeToolchainAdmissions:
             if isinstance(exc, IdeToolchainAdmissionError):
                 raise
             raise IdeToolchainAdmissionError(f"Core IDE toolchain admission needs review: {exc}") from exc
+
+    @contextmanager
+    def hold(
+        self, archive: Path, destination: Path, *, archive_sha256: str,
+        archive_size: int, expected_root: str, archive_format: str,
+    ) -> Iterator[Path]:
+        """Keep an existing exact admission fenced during a client command.
+
+        Workbench writers must take this admission lock before changing its
+        target. The physical readback at both ends also detects many changes
+        from writers that do not cooperate with the advisory lease.
+        """
+
+        if (
+            not isinstance(destination, Path) or not destination.is_absolute()
+            or ".." in destination.parts or destination.parent != self.toolchain_root
+            or not isinstance(archive, Path) or not archive.is_absolute()
+            or ".." in archive.parts or type(archive_sha256) is not str
+            or _DIGEST.fullmatch(archive_sha256) is None
+            or type(archive_size) is not int or archive_size <= 0
+            or not isinstance(expected_root, str)
+            or expected_root in {"", ".", ".."}
+            or "/" in expected_root or "\\" in expected_root
+            or archive_format not in {"zip", "tar"}
+        ):
+            raise IdeToolchainAdmissionError("IDE toolchain hold policy is invalid")
+        client_error = False
+        try:
+            store = CoreRecordStores(
+                workspace=self.workspace, configuration_home=self.configuration_home,
+                owner_id="validation",
+            ).open("validation-ide-toolchain-admissions-v1", self.workspace)
+            path = _record_path(store.root, destination)
+            with private_record_lock(path.with_suffix(".lock")):
+                retained = _read_record(path)
+                required = {
+                    "id", "format", "store_id", "workspace", "target",
+                    "target_device", "target_inode", "archive_sha256",
+                    "archive_size", "expected_root", "archive_format",
+                    "regular_files", "members_sha256", "stage_lease_id", "retention",
+                }
+                if set(retained) != required or any((
+                    retained["store_id"] != store.store_id,
+                    retained["workspace"] != str(self.workspace),
+                    retained["target"] != str(destination),
+                    retained["archive_sha256"] != archive_sha256,
+                    retained["archive_size"] != archive_size,
+                    retained["expected_root"] != expected_root,
+                    retained["archive_format"] != archive_format,
+                    retained["retention"] != "protected-until-reviewed-policy",
+                )):
+                    raise IdeToolchainAdmissionError("IDE toolchain hold differs from its admission")
+
+                def readback() -> None:
+                    stages = [
+                        row for row in self._source_stages(destination, archive_sha256)
+                        if row["status"] != "disposed"
+                    ]
+                    source = retained["stage_lease_id"]
+                    if (source is None and stages) or (source is not None and (
+                        len(stages) != 1 or stages[0]["lease_id"] != source
+                        or stages[0]["status"] != "retained-unproven"
+                    )):
+                        raise IdeToolchainAdmissionError("IDE toolchain source stage changed during hold")
+                    observed = inspect_ide_toolchain_tree(
+                        archive, destination, archive_sha256=archive_sha256,
+                        archive_size=archive_size, expected_root=expected_root,
+                        archive_format=archive_format,
+                    )
+                    if (
+                        retained["target_device"] != observed.device
+                        or retained["target_inode"] != observed.inode
+                        or retained["regular_files"] != observed.files
+                        or retained["members_sha256"] != observed.members_sha256
+                        or _read_record(path) != retained
+                    ):
+                        raise IdeToolchainAdmissionError("IDE toolchain changed during held readback")
+
+                readback()
+                try:
+                    yield destination
+                except BaseException:
+                    client_error = True
+                    raise
+                readback()
+        except (DurableRecordError, OSError, ValueError) as exc:
+            if client_error or isinstance(exc, IdeToolchainAdmissionError):
+                raise
+            raise IdeToolchainAdmissionError(f"Core IDE toolchain hold needs review: {exc}") from exc
 
 
 __all__ = ["CoreIdeToolchainAdmissions", "IdeToolchainAdmissionError"]
