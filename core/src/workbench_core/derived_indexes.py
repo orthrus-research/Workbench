@@ -319,6 +319,14 @@ class CoreDerivedIndexes:
         if (record.get("root") != str(root) or record.get("parent_identity") != parent_id
                 or record.get("root_identity") != root_id):
             raise DerivedIndexError("changed", "Atlas derived-index root identity changed")
+        if self.workspace is not None:
+            # Dispatch supplies the selected workspace independently of the
+            # graph path, which may live in an external evidence store. Bind
+            # this attempt namespace before exposing a new SQLite stage.
+            ResourceCatalog(self.configuration_home).register_record_store(
+                family="atlas-derived-index-v1", owner_id=self.owner_id,
+                workspace=self.workspace, root=holder,
+            )
         lock = holder / "owner.lock"
         flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
         descriptor = os.open(lock, flags, 0o600)

@@ -27,6 +27,7 @@ from workbench_atlas_categorical_graph import (
 from workbench_core import derived_indexes as core_module
 from workbench_core.derived_indexes import CoreDerivedIndexes
 from workbench_core.managed_trees import CoreManagedTrees
+from workbench_core.storage.registered import ResourceCatalog
 
 
 def _graph(root: Path, *, observation: bool = False) -> dict:
@@ -58,6 +59,25 @@ class DerivedIndexCustodyTests(unittest.TestCase):
         self.base = Path(temporary.name).resolve()
         self.config = self.base / "config"
         self.host = CoreDerivedIndexes(configuration_home=self.config)
+
+    def test_dispatch_registers_external_index_attempts_against_selected_workspace(self) -> None:
+        workspace = self.base / "selected-workspace"
+        workspace.mkdir()
+        graph = self.base / "external-evidence" / "graph"
+        graph.parent.mkdir()
+        manifest = _graph(graph)
+        host = CoreDerivedIndexes(configuration_home=self.config, workspace=workspace)
+        with host.stage(graph, graph_set_id=manifest["graph_set_id"]) as stage:
+            self.assertTrue(stage.path.parent.is_dir())
+            rows = ResourceCatalog(self.config).inventory(workspace=workspace)["record_stores"]
+            self.assertEqual(1, len(rows))
+            self.assertEqual("atlas-derived-index-v1", rows[0]["family"])
+            self.assertEqual("atlas", rows[0]["owner_id"])
+            self.assertEqual(str(graph.parent / f".{graph.name}.derived-index-core"), rows[0]["path"])
+            self.assertEqual([], ResourceCatalog(self.config).inventory(
+                workspace=self.base / "unselected",
+            )["record_stores"])
+        self.assertEqual("available", rows[0]["status"])
 
     def test_missing_and_corrupt_prior_index_rebuild_preserves_manifest_mode(self) -> None:
         root = self.base / "graph"
