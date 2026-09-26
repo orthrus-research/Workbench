@@ -23,6 +23,10 @@ DIRECT_CORE_COMPATIBILITY = {
     "modules/atlas/src/workbench_atlas/layout.py": {
         ("workbench_core.environment_resolution", "resolve_environment"),
     },
+    "modules/blueprints/src/workbench_blueprints/cli.py": {
+        # The supported direct CLI composes Core after validating its target.
+        ("workbench_core.host_services", "direct_module_custody_scope"),
+    },
     "modules/runtime-explorer/src/workbench_runtime_explorer/graph_query.py": {
         ("workbench_core.service.runtime", "ServiceRuntimeV3"),
     },

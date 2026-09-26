@@ -7,7 +7,9 @@ from __future__ import annotations
 import copy
 from io import StringIO
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
 from typing import Any
 import unittest
@@ -141,6 +143,86 @@ class InterfaceTest(unittest.TestCase):
         self.assertEqual("BPI100_USAGE", context.exception.code)
         self.assertIn("--registry-root", context.exception.message)
         self.assertIn("--ledger", context.exception.message)
+
+    def test_direct_cli_binds_target_core_custody_and_resumes(self) -> None:
+        intake = self._write_json("direct-intake.json", self._intake("instructions"))
+        configuration_home = self.fixture.root / "direct-configuration"
+        environment = dict(os.environ)
+        environment["WORKBENCH_CONFIG_HOME"] = str(configuration_home)
+        environment["PYTHONPATH"] = os.pathsep.join(filter(None, (
+            str(WORKBENCH_ROOT / "api/src"),
+            str(WORKBENCH_ROOT / "core/src"),
+            str(SOURCE_ROOT.parent),
+            str(WORKBENCH_ROOT / "modules/project-intelligence/src"),
+            environment.get("PYTHONPATH", ""),
+        )))
+
+        def command(*arguments: str) -> dict[str, Any]:
+            completed = subprocess.run(
+                [sys.executable, "-m", "workbench_blueprints.cli",
+                 "--workspace", str(self.workspace), *arguments],
+                cwd=self.fixture.root, env=environment,
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(completed.stderr, "")
+            return json.loads(completed.stdout)
+
+        initialized = command(
+            "init",
+            "--target-repository", str(self.fixture.repository),
+            "--repository-id", "pack",
+            "--intake", str(intake),
+            "--registry-root", str(self.fixture.registry),
+            "--asset-root", str(REPO_ROOT),
+            "--ledger", str(self.fixture.ledger),
+        )
+        self.assertEqual(initialized["state"], "initialized")
+        history = command("history")
+        self.assertEqual(history["state"], "initialized")
+        stores = [
+            json.loads(path.read_text(encoding="utf-8"))
+            for path in (configuration_home / "resources-v1/stores").glob("*.json")
+        ]
+        self.assertTrue(stores)
+        self.assertTrue(all(row["workspace"] == str(self.fixture.repository) for row in stores))
+        self.assertIn(str(self.workspace), {row["root"] for row in stores})
+
+    def test_direct_cli_rejects_workspace_outside_target_before_core_registration(self) -> None:
+        intake = self._write_json("outside-intake.json", self._intake("instructions"))
+        configuration_home = self.fixture.root / "outside-configuration"
+        environment = dict(os.environ)
+        environment["WORKBENCH_CONFIG_HOME"] = str(configuration_home)
+        environment["PYTHONPATH"] = os.pathsep.join((
+            str(WORKBENCH_ROOT / "api/src"),
+            str(WORKBENCH_ROOT / "core/src"),
+            str(SOURCE_ROOT.parent),
+            str(WORKBENCH_ROOT / "modules/project-intelligence/src"),
+        ))
+        completed = subprocess.run(
+            [sys.executable, "-m", "workbench_blueprints.cli",
+             "--workspace", str(self.fixture.root / "other/.workbench/blueprints/session"),
+             "init", "--target-repository", str(self.fixture.repository),
+             "--repository-id", "pack", "--intake", str(intake),
+             "--registry-root", str(self.fixture.registry),
+             "--asset-root", str(REPO_ROOT),
+             "--ledger", str(self.fixture.ledger)],
+            cwd=self.fixture.root, env=environment,
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(completed.returncode, 4)
+        self.assertEqual(json.loads(completed.stderr)["diagnostics"][0]["code"], "BPI106_WORKSPACE")
+        self.assertFalse(configuration_home.exists())
+
+    def test_cli_keeps_an_existing_core_store_scope(self) -> None:
+        self._core("instructions")
+        with patch(
+            "workbench_core.host_services.direct_module_custody_scope",
+            side_effect=AssertionError("dispatch custody was shadowed"),
+        ):
+            code, result, stderr = self._cli(["history"])
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(result["state"], "initialized")
 
     def test_core_completes_resumable_direct_lifecycle(self) -> None:
         core = self._core()

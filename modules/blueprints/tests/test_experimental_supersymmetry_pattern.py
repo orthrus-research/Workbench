@@ -188,7 +188,9 @@ class ExperimentalSupersymmetryPatternTest(unittest.TestCase):
                 asset_root=WORKBENCH_ROOT,
                 ledger_path=LEDGER_PATH,
                 target_repository=repository,
-                sealed_store=planner.SealedStore(root / "sealed"),
+                sealed_store=planner.SealedStore(
+                    repository / ".workbench/blueprints/experimental-test/sealed"
+                ),
             )
             intake = {
                 "sequence": 0,

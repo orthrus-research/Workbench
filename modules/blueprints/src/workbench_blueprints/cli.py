@@ -7,12 +7,14 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+from contextlib import nullcontext
 from pathlib import Path
 import sys
 from typing import Any, NoReturn, TextIO
 
 from workbench_blueprints import interface, lifecycle, planner, simulation, standards
 from workbench_blueprints.layout import WORKBENCH_ROOT
+from workbench_api.record_stores import record_store_host_bound
 
 
 REPO_ROOT = WORKBENCH_ROOT
@@ -258,6 +260,19 @@ def _execute(
     )
 
 
+def _direct_target(arguments: argparse.Namespace) -> Path:
+    """Validate a direct session before selecting its Core workspace."""
+
+    blueprints = interface.BlueprintsCore(arguments.workspace)
+    if arguments.command == "init":
+        target = arguments.target_repository.resolve()
+        blueprints._require_protected_workspace(target)
+    else:
+        session = blueprints.store.load()
+        _configuration, target = blueprints._paths(session)
+    return target
+
+
 def main(
     argv: list[str] | None = None,
     *,
@@ -280,7 +295,16 @@ def main(
         arguments = _parser().parse_args(argv)
         command = arguments.command
         workspace = arguments.workspace
-        result = _execute(arguments, adapters)
+        if record_store_host_bound():
+            custody = nullcontext()
+        else:
+            target = _direct_target(arguments)
+            from workbench_core.host_services import direct_module_custody_scope
+            custody = direct_module_custody_scope(
+                workspace=target, owner_id="blueprints",
+            )
+        with custody:
+            result = _execute(arguments, adapters)
     except Exception as exc:
         diagnostic = _domain_diagnostic(exc)
         run = None

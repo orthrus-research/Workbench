@@ -59,7 +59,7 @@ class PlannerTest(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.repository = self.root / "target"
         self.registry = self.root / "standards"
-        self.sealed_root = self.root / "sealed"
+        self.sealed_root = self.repository / ".workbench/blueprints/planner-test/sealed"
         self.repository.mkdir()
         self.registry.mkdir()
         for name in (

@@ -47,4 +47,13 @@ def open_record_store(family: str, base: Path) -> RecordStoreReference | None:
     return None if provider is None else provider.open(family, base)
 
 
-__all__ = ["RecordStoreReference", "RecordStores", "record_store_scope", "open_record_store"]
+def record_store_host_bound() -> bool:
+    """Tell a direct entry point whether dispatch already selected custody."""
+
+    return _bound.get() is not None
+
+
+__all__ = [
+    "RecordStoreReference", "RecordStores", "record_store_scope",
+    "open_record_store", "record_store_host_bound",
+]

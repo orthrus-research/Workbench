@@ -60,9 +60,9 @@ class SimulationTest(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.repository = self.root / "target"
         self.registry = self.root / "standards"
-        self.sealed_root = self.root / "sealed"
-        self.cache_root = self.root / "dependencies"
-        self.evidence_root = self.root / "evidence"
+        self.sealed_root = self.repository / ".workbench/blueprints/simulation-test/sealed"
+        self.cache_root = self.repository / ".workbench/blueprints/simulation-test/dependencies"
+        self.evidence_root = self.repository / ".workbench/blueprints/simulation-test/simulation-evidence"
         self.workspace_root = self.root / "workspaces"
         self.repository.mkdir()
         self.registry.mkdir()
@@ -611,7 +611,9 @@ class SimulationEvidenceCustodyTests(unittest.TestCase):
             workspace = root / "workspace"
             workspace.mkdir()
             evidence = self._evidence(gates=257)
-            store = simulation.SimulationEvidenceStore(root / "simulation-evidence")
+            store = simulation.SimulationEvidenceStore(
+                workspace / ".workbench/blueprints/evidence-test/simulation-evidence"
+            )
             with sealed_store_scope(workspace, root / "config"):
                 locator = store.put(evidence)
                 self.assertEqual(evidence, store.read(locator))
@@ -632,18 +634,20 @@ class SimulationEvidenceCustodyTests(unittest.TestCase):
     def test_historical_v1_locator_reopens_without_and_with_core(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
             evidence = self._evidence()
             content = standards.canonical_json(evidence).encode("utf-8")
             digest = hashlib.sha256(content).hexdigest()
             locator = "local-simulation-evidence:sha256:" + digest
-            store = simulation.SimulationEvidenceStore(root / "historical/simulation-evidence")
+            store = simulation.SimulationEvidenceStore(
+                workspace / ".workbench/blueprints/historical/simulation-evidence"
+            )
             historical = store.root / "objects" / digest[:2] / f"{digest}.json"
             historical.parent.mkdir(mode=0o700, parents=True)
             historical.write_bytes(content)
             historical.chmod(0o600)
             self.assertEqual(evidence, store.read(locator))
-            workspace = root / "workspace"
-            workspace.mkdir()
             with sealed_store_scope(workspace, root / "config"):
                 self.assertEqual(evidence, store.read(locator))
                 self.assertEqual(locator, store.put(evidence))
@@ -661,7 +665,9 @@ class SimulationEvidenceCustodyTests(unittest.TestCase):
             workspace = root / "workspace"
             workspace.mkdir()
             evidence = self._evidence()
-            store = simulation.SimulationEvidenceStore(root / "simulation-evidence")
+            store = simulation.SimulationEvidenceStore(
+                workspace / ".workbench/blueprints/evidence-test/simulation-evidence"
+            )
             raced = []
             def collide(path, data, **options):
                 path.write_bytes(b"racing different evidence")

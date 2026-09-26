@@ -26,6 +26,12 @@ class CoreRecordStores:
         if not isinstance(base, Path):
             raise DurableResourceError("resource.policy", "record store owner or base is unsupported")
         selected = Path(os.path.abspath(base.expanduser()))
+        if self.owner_id == "blueprints" and family.startswith("blueprints-"):
+            protected = self.workspace / ".workbench/blueprints"
+            if selected == protected or not selected.is_relative_to(protected):
+                raise DurableResourceError(
+                    "resource.policy", "Blueprints store is outside the selected target workspace",
+                )
         if self.owner_id == "workbench-shell" and family == "work-session-v2":
             root = selected / ".workbench/sessions/work-session-v2"
         elif self.owner_id == "workbench-shell" and family == "feature-change-session-context-v1":

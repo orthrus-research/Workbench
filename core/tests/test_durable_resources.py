@@ -108,7 +108,7 @@ class DurableResourceTests(unittest.TestCase):
             workspace=self.workspace, configuration_home=self.config,
             owner_id="blueprints",
         )
-        root = self.home / "blueprints-session/sealed"
+        root = self.workspace / ".workbench/blueprints/blueprints-session/sealed"
         with self.assertRaises(DurableResourceError):
             provider.open("work-session-v2", root)
         self.assertFalse(root.exists())
@@ -127,7 +127,7 @@ class DurableResourceTests(unittest.TestCase):
             workspace=self.workspace, configuration_home=self.config,
             owner_id="blueprints",
         )
-        root = self.home / "blueprints-session/dependencies"
+        root = self.workspace / ".workbench/blueprints/blueprints-session/dependencies"
         opened = provider.open("blueprints-dependency-cache-v1", root)
         self.assertEqual(root, opened.root)
         self.assertEqual(opened, provider.open("blueprints-dependency-cache-v1", root))
@@ -143,7 +143,7 @@ class DurableResourceTests(unittest.TestCase):
             workspace=self.workspace, configuration_home=self.config,
             owner_id="blueprints",
         )
-        root = self.home / "blueprints-session/simulation-evidence"
+        root = self.workspace / ".workbench/blueprints/blueprints-session/simulation-evidence"
         opened = provider.open("blueprints-simulation-evidence-v1", root)
         self.assertEqual(root, opened.root)
         self.assertEqual(opened, provider.open("blueprints-simulation-evidence-v1", root))
@@ -209,6 +209,30 @@ class DurableResourceTests(unittest.TestCase):
         with self.assertRaises(DurableResourceError):
             CoreRecordStores(workspace=self.workspace, configuration_home=self.config,
                              owner_id="workbench-shell").open("blueprints-history-transaction-v1", root)
+
+    def test_blueprints_store_rejects_other_target_before_catalog_registration(self) -> None:
+        other = self.home / "other-workspace"
+        other.mkdir()
+        provider = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="blueprints",
+        )
+        families = {
+            "blueprints-session-pointer-v1": "session",
+            "blueprints-sealed-v1": "session/sealed",
+            "blueprints-dependency-cache-v1": "session/dependencies",
+            "blueprints-simulation-evidence-v1": "session/simulation-evidence",
+            "blueprints-artifact-v1": "session/session-cas",
+            "blueprints-history-transaction-v1": "session/history",
+        }
+        for family, suffix in families.items():
+            with self.subTest(family=family):
+                foreign = other / ".workbench/blueprints" / suffix
+                with self.assertRaises(DurableResourceError) as caught:
+                    provider.open(family, foreign)
+                self.assertEqual(caught.exception.code, "resource.policy")
+                self.assertFalse(foreign.exists())
+        self.assertFalse((self.config / "resources-v1").exists())
 
     def test_dispatch_binds_core_and_inventory_sees_external_root(self) -> None:
         captured = []
