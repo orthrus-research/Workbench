@@ -263,6 +263,86 @@ class CoreClient:
             raise CoreClientError("Core did not return a managed Java receipt")
         return result
 
+    async def export_environment_share(self, name: str) -> Mapping[str, Any]:
+        if not name:
+            raise CoreClientError("choose a saved workspace to share")
+        record = await self.json_record(
+            "settings", "environment", "export", name, "--json"
+        )
+        if (
+            not isinstance(record, dict)
+            or record.get("format") != "workbench-environment-share-export-v1"
+            or not isinstance(record.get("share"), dict)
+            or not isinstance(record["share"].get("share_id"), str)
+            or not isinstance(record.get("resource"), dict)
+            or not isinstance(record["resource"].get("path"), str)
+        ):
+            raise CoreClientError("Core did not return an environment share")
+        return record
+
+    @staticmethod
+    def _environment_import_args(
+        source: str, name: str, workspace: str, *,
+        config: str = "", java_home: str = "",
+    ) -> tuple[str, ...]:
+        if not source.strip() or not name.strip() or not workspace.strip():
+            raise CoreClientError("choose a share file, local name and workspace")
+        arguments = [source, "--name", name, "--workspace", workspace]
+        if config.strip():
+            arguments.extend(("--config", config))
+        if java_home.strip():
+            arguments.extend(("--java-home", java_home))
+        return tuple(arguments)
+
+    async def plan_environment_import(
+        self, source: str, name: str, workspace: str, *,
+        config: str = "", java_home: str = "",
+    ) -> Mapping[str, Any]:
+        arguments = self._environment_import_args(
+            source, name, workspace, config=config, java_home=java_home,
+        )
+        record = await self.json_record(
+            "settings", "environment", "plan", *arguments, "--json",
+            allowed_exit=(0, 1),
+        )
+        if (
+            not isinstance(record, dict)
+            or record.get("format") != "workbench-environment-import-plan-v1"
+            or record.get("state") not in {"ready", "blocked"}
+            or not isinstance(record.get("plan_id"), str)
+            or not isinstance(record.get("blockers"), list)
+            or not all(isinstance(item, str) for item in record["blockers"])
+            or not isinstance(record.get("unresolved_inputs"), list)
+            or not all(isinstance(item, str) for item in record["unresolved_inputs"])
+        ):
+            raise CoreClientError("Core did not return a compatible environment import plan")
+        return record
+
+    async def import_environment_share(
+        self, source: str, name: str, workspace: str, *,
+        expected_plan_id: str, config: str = "", java_home: str = "",
+    ) -> Mapping[str, Any]:
+        if not expected_plan_id:
+            raise CoreClientError("review an exact environment import plan first")
+        arguments = self._environment_import_args(
+            source, name, workspace, config=config, java_home=java_home,
+        )
+        record = await self.json_record(
+            "settings", "environment", "import", *arguments,
+            "--plan-id", expected_plan_id, "--json",
+        )
+        if (
+            not isinstance(record, dict)
+            or record.get("format") != "workbench-environment-import-result-v1"
+            or record.get("plan_id") != expected_plan_id
+            or record.get("outcome") not in {"bound", "reused"}
+            or not isinstance(record.get("resource"), dict)
+            or not isinstance(record["resource"].get("path"), str)
+            or not isinstance(record.get("unresolved_inputs"), list)
+        ):
+            raise CoreClientError("Core did not return an exact environment import result")
+        return record
+
     async def setup_check(self, options: Sequence[str] = ()) -> Mapping[str, Any]:
         record = await self.json_record(
             "setup", "--check", "--json", *options, allowed_exit=(0, 1)

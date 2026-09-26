@@ -219,6 +219,9 @@ class WorkspaceChoicesScreen(Screen[None]):
                              disabled=not bool(self.entries))
                 yield Button("Acquire saved Java", id="choice-acquire",
                              disabled=not bool(self.entries))
+                yield Button("Export environment", id="choice-export",
+                             disabled=not bool(self.entries))
+                yield Button("Import environment", id="choice-import")
                 yield Button("Back", id="choice-back")
             yield Static("", id="choice-status")
         yield Footer()
@@ -263,6 +266,10 @@ class WorkspaceChoicesScreen(Screen[None]):
             self.save_choices()
         elif event.button.id == "choice-acquire":
             self.acquire_java()
+        elif event.button.id == "choice-export":
+            self.export_environment()
+        elif event.button.id == "choice-import":
+            self.app.push_screen(EnvironmentImportScreen())
 
     @work(exclusive=True, group="workspace-java")
     async def find_java(self) -> None:
@@ -358,6 +365,170 @@ class WorkspaceChoicesScreen(Screen[None]):
             self.query_one("#choice-acquire", Button).disabled = (
                 self.query_one("#choice-java-mode", Select).value == "path"
             )
+
+    @work(exclusive=True, group="workspace-export")
+    async def export_environment(self) -> None:
+        if not self.selected_name or self.busy:
+            return
+        self.busy = True
+        self.query_one("#choice-export", Button).disabled = True
+        self.query_one("#choice-status", Static).update("Asking Core to export the saved environment selection…")
+        try:
+            result = await self.core.export_environment_share(self.selected_name)
+            self.query_one("#choice-status", Static).update(
+                f"Share: {result['resource']['path']}\n"
+                f"Identity: {result['share']['share_id']}\n"
+                "Project, fixture and tool bytes must be supplied separately."
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            self.query_one("#choice-status", Static).update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#choice-export", Button).disabled = False
+
+
+class EnvironmentImportScreen(Screen[None]):
+    """Present Core's read-only import plan before binding local choices."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.plan: Mapping[str, Any] | None = None
+        self.plan_options: tuple[str, str, str, str, str] | None = None
+        self.busy = False
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        yield Header(icon="W")
+        with VerticalScroll():
+            yield Static("Import environment selection", classes="screen-heading")
+            yield Static(
+                "Core checks the exact profile and Java policy against a local Workbench suite. "
+                "This binds choices to an existing workspace; acquire project and dependency bytes separately.",
+                classes="screen-intro",
+            )
+            yield Static("Share file", classes="field-label")
+            yield Input(placeholder="/path/to/environment-share.json", id="import-share")
+            yield Static("Local workspace name", classes="field-label")
+            yield Input(placeholder="my-workspace", id="import-name")
+            yield Static("Existing workspace directory", classes="field-label")
+            yield Input(placeholder="/path/to/project", id="import-workspace")
+            yield Static("Matching Workbench configuration · optional", classes="field-label")
+            yield Input(placeholder="/path/to/workbench.toml", id="import-config")
+            yield Static("Local Java home · only if the share requires one", classes="field-label")
+            yield Input(placeholder="/path/to/jdk", id="import-java")
+            with Horizontal(classes="button-row"):
+                yield Button("Check exact plan", id="import-plan", variant="primary")
+                yield Button("Bind selection", id="import-apply", disabled=True)
+                yield Button("Back", id="import-back")
+            yield Static("", id="import-status")
+            yield Static("", id="import-detail")
+        yield Footer()
+
+    def _options(self) -> tuple[str, str, str, str, str]:
+        return tuple(
+            self.query_one(f"#import-{field}", Input).value.strip()
+            for field in ("share", "name", "workspace", "config", "java")
+        )  # type: ignore[return-value]
+
+    def _invalidate_plan(self) -> None:
+        self.plan = None
+        self.plan_options = None
+        self.query_one("#import-apply", Button).disabled = True
+        self.query_one("#import-detail", Static).update("")
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id and event.input.id.startswith("import-"):
+            self._invalidate_plan()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "import-back" and not self.busy:
+            self.app.pop_screen()
+        elif event.button.id == "import-plan":
+            self.check_plan()
+        elif event.button.id == "import-apply":
+            self.confirm_import()
+
+    @work(exclusive=True, group="environment-import-plan")
+    async def check_plan(self) -> None:
+        if self.busy:
+            return
+        options = self._options()
+        self._invalidate_plan()
+        self.busy = True
+        self.query_one("#import-plan", Button).disabled = True
+        self.query_one("#import-status", Static).update("Core is checking the exact environment selection…")
+        try:
+            source, name, workspace, config, java = options
+            plan = await self.core.plan_environment_import(
+                source, name, workspace, config=config, java_home=java,
+            )
+            if self._options() != options:
+                self.query_one("#import-status", Static).update("Inputs changed. Check a new plan.")
+                return
+            self.plan = plan
+            self.plan_options = options
+            lines = [
+                f"Plan: {plan['plan_id']}",
+                f"State: {plan['state']}",
+                f"Action: {plan.get('action', '?')}",
+            ]
+            lines.extend(f"Blocked: {item}" for item in plan["blockers"])
+            lines.extend(f"Additional input: {item}" for item in plan["unresolved_inputs"])
+            self.query_one("#import-detail", Static).update("\n".join(lines))
+            self.query_one("#import-status", Static).update(
+                "Core blocked this selection." if plan["state"] == "blocked"
+                else "Plan ready. Review the exact binding before importing."
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            self.query_one("#import-status", Static).update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#import-plan", Button).disabled = False
+            self.query_one("#import-apply", Button).disabled = (
+                self.plan is None or self.plan.get("state") != "ready"
+            )
+
+    @work(exclusive=True, group="environment-import-apply")
+    async def confirm_import(self) -> None:
+        plan = self.plan
+        options = self.plan_options
+        if plan is None or options is None or plan.get("state") != "ready" or self.busy:
+            return
+        source, name, workspace, config, java = options
+        body = (
+            f"Plan ID\n{plan['plan_id']}\n\n"
+            f"Share\n{source}\n\n"
+            f"Local binding\n{name}: {workspace}\n"
+            f"Configuration: {config or 'suite default'}\n"
+            f"Java home: {java or 'shared managed choice'}\n\n"
+            "Core will recheck the exact lock and registry revision before saving the selection."
+        )
+        approved = await self.app.push_screen_wait(
+            ReviewModal("Bind environment selection?", body, confirm_label="Bind exact plan")
+        )
+        if not approved or self.plan is not plan or self._options() != options:
+            return
+        self.busy = True
+        self.query_one("#import-apply", Button).disabled = True
+        self.query_one("#import-status", Static).update("Core is binding the reviewed selection…")
+        try:
+            result = await self.core.import_environment_share(
+                source, name, workspace, expected_plan_id=str(plan["plan_id"]),
+                config=config, java_home=java,
+            )
+            self._invalidate_plan()
+            self.query_one("#import-status", Static).update(
+                f"Selection {result['outcome']}. Receipt: {result['resource']['path']}\n"
+                "Acquire remaining inputs before running the environment."
+            )
+            self.app.refresh_environment()  # type: ignore[attr-defined]
+        except (CoreClientError, TimeoutError) as exc:
+            self.query_one("#import-status", Static).update(str(exc))
+        finally:
+            self.busy = False
 
 
 class ModulesScreen(Screen[None]):

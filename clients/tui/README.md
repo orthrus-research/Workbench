@@ -94,6 +94,15 @@ probe. Core saves each workspace's choice in the stable `workspaces.json`
 record. A supplied path remains unverified until a consuming operation uses
 it; selecting Java 8 does not establish Cleanroom compatibility.
 
+**Export environment** asks Core to publish a small, path-free selection file
+for the saved workspace. **Import environment** takes that file, a local
+workspace name and an existing project directory. Textual displays Core's
+exact import plan, blockers and unresolved inputs, then requires a review of
+the plan ID before binding the local choice. Core rechecks the profile and Java
+lock when importing. The file does not contain project, fixture, tool or Java
+archives; those inputs still need local acquisition. A user-supplied Java path
+is redacted from the exported file and must be supplied again on import.
+
 ## Prototype surfaces
 
 - **Home:** Core version, setup readiness, workspace, installed module/profile
@@ -105,7 +114,8 @@ it; selecting Java 8 does not establish Cleanroom compatibility.
   Java discovery is read-only. A blank repair field retains the saved value;
   the resulting selection is visible in the plan and confirmation dialog.
 - **Workspace choices:** Select a named workspace, save a profile and Java
-  choice in Core's versioned user registry, and acquire managed Java on demand.
+  choice in Core's versioned user registry, acquire managed Java on demand,
+  and export or import a Core-reviewed environment selection.
 - **Modules:** Tabs, tables, and a detail panel compare installed module and
   profile records. Highlighting a row reveals its capabilities or resources;
   missing or unavailable components retain their reported reason.

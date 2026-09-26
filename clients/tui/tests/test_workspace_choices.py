@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock
 
 from textual.widgets import Button, Input, Select
 
-from workbench_tui.app import WorkbenchApp, WorkspaceChoicesScreen
+from workbench_tui.app import WorkbenchApp, WorkspaceChoicesScreen, EnvironmentImportScreen
 from workbench_tui.core_client import CoreClient, CoreClientError
 
 
@@ -53,6 +53,22 @@ def _core() -> Mock:
         "receipt": {"policy": {"feature_version": 8},
                     "target": {"java_home_uri": "file:///state/jdks/temurin-8"}},
     })
+    core.export_environment_share = AsyncMock(return_value={
+        "format": "workbench-environment-share-export-v1",
+        "share": {"share_id": "share-id"},
+        "resource": {"path": "/exports/share.json"},
+    })
+    core.plan_environment_import = AsyncMock(return_value={
+        "format": "workbench-environment-import-plan-v1",
+        "plan_id": "plan-id", "state": "ready", "action": "create",
+        "blockers": [], "unresolved_inputs": ["managed-java-archive"],
+    })
+    core.import_environment_share = AsyncMock(return_value={
+        "format": "workbench-environment-import-result-v1",
+        "plan_id": "plan-id", "outcome": "bound",
+        "resource": {"path": "/evidence/import.json"},
+        "unresolved_inputs": ["managed-java-archive"],
+    })
     return core
 
 
@@ -97,6 +113,51 @@ class WorkspaceChoiceClientTests(IsolatedAsyncioTestCase):
             "settings", "workspace", "acquire", "beta", "--expected-record-id", "after",
             "--json", timeout=600,
         )
+
+    async def test_client_exports_and_imports_with_exact_core_plan(self) -> None:
+        client = CoreClient(("workbench",))
+        client.json_record = AsyncMock(side_effect=[
+            {"format": "workbench-environment-share-export-v1",
+             "share": {"share_id": "share-id"}, "resource": {"path": "/share.json"}},
+            {"format": "workbench-environment-import-plan-v1", "state": "ready",
+             "plan_id": "plan-id", "blockers": [], "unresolved_inputs": []},
+            {"format": "workbench-environment-import-result-v1", "outcome": "bound",
+             "plan_id": "plan-id", "resource": {"path": "/receipt.json"},
+             "unresolved_inputs": []},
+        ])
+        await client.export_environment_share("beta")
+        client.json_record.assert_any_await(
+            "settings", "environment", "export", "beta", "--json"
+        )
+        await client.plan_environment_import(
+            "/share.json", "shared", "/workspace", config="/wb.toml",
+        )
+        client.json_record.assert_any_await(
+            "settings", "environment", "plan", "/share.json",
+            "--name", "shared", "--workspace", "/workspace",
+            "--config", "/wb.toml", "--json", allowed_exit=(0, 1),
+        )
+        await client.import_environment_share(
+            "/share.json", "shared", "/workspace", expected_plan_id="plan-id",
+            config="/wb.toml",
+        )
+        client.json_record.assert_awaited_with(
+            "settings", "environment", "import", "/share.json",
+            "--name", "shared", "--workspace", "/workspace",
+            "--config", "/wb.toml", "--plan-id", "plan-id", "--json",
+        )
+
+    async def test_client_rejects_unexpected_import_plan_identity(self) -> None:
+        client = CoreClient(("workbench",))
+        client.json_record = AsyncMock(return_value={
+            "format": "workbench-environment-import-result-v1", "outcome": "bound",
+            "plan_id": "another-plan", "resource": {"path": "/receipt.json"},
+            "unresolved_inputs": [],
+        })
+        with self.assertRaisesRegex(CoreClientError, "exact environment import result"):
+            await client.import_environment_share(
+                "/share.json", "shared", "/workspace", expected_plan_id="plan-id",
+            )
 
 
 class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
@@ -201,3 +262,54 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
             await self._settle(pilot, lambda: core.save_workspace_choice.await_count == 1)
             await self._settle(pilot, lambda: "changed after review" in str(screen.query_one("#choice-status").render()))
             self.assertEqual("before", screen.record["record_id"])
+
+    async def test_export_uses_saved_workspace_choice(self) -> None:
+        core = _core()
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            app.push_screen(WorkspaceChoicesScreen(_record()))
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen)
+                               and bool(app.screen.query("#choice-export")))
+            screen = app.screen
+            screen.query_one("#choice-workspace", Select).value = "beta"
+            await self._settle(pilot, lambda: screen.selected_name == "beta")
+            screen.query_one("#choice-export", Button).press()
+            await self._settle(pilot, lambda: core.export_environment_share.await_count == 1)
+            core.export_environment_share.assert_awaited_with("beta")
+            await self._settle(pilot, lambda: "/exports/share.json" in str(
+                screen.query_one("#choice-status").render()
+            ))
+
+    async def test_import_requires_current_ready_plan_and_review(self) -> None:
+        core = _core()
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 44)) as pilot:
+            app.push_screen(EnvironmentImportScreen())
+            await self._settle(pilot, lambda: isinstance(app.screen, EnvironmentImportScreen)
+                               and bool(app.screen.query("#import-share")))
+            screen = app.screen
+            screen.query_one("#import-share", Input).value = "/share.json"
+            screen.query_one("#import-name", Input).value = "shared"
+            screen.query_one("#import-workspace", Input).value = "/workspace"
+            screen.query_one("#import-plan", Button).press()
+            await self._settle(pilot, lambda: screen.plan is not None)
+            core.plan_environment_import.assert_awaited_with(
+                "/share.json", "shared", "/workspace", config="", java_home="",
+            )
+            self.assertFalse(screen.query_one("#import-apply", Button).disabled)
+            screen.query_one("#import-config", Input).value = "/matching.toml"
+            await self._settle(pilot, lambda: screen.plan is None)
+            self.assertTrue(screen.query_one("#import-apply", Button).disabled)
+            screen.query_one("#import-plan", Button).press()
+            await self._settle(pilot, lambda: core.plan_environment_import.await_count == 2
+                               and screen.plan is not None)
+            screen.query_one("#import-apply", Button).press()
+            await self._settle(pilot, lambda: bool(app.screen.query("#review-confirm")))
+            self.assertEqual(0, core.import_environment_share.await_count)
+            app.screen.query_one("#review-confirm", Button).press()
+            await self._settle(pilot, lambda: core.import_environment_share.await_count == 1)
+            core.import_environment_share.assert_awaited_with(
+                "/share.json", "shared", "/workspace",
+                expected_plan_id="plan-id", config="/matching.toml", java_home="",
+            )
+            await self._settle(pilot, lambda: screen.plan is None)
