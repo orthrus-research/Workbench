@@ -55,6 +55,7 @@ class RetainedSnapshotPortTests(unittest.TestCase):
             self.assertEqual(self.manifest, reader.manifest)
             self.assertEqual(self.request, reader.request)
             self.assertEqual(self.custody, reader.custody)
+            self.assertEqual(lifecycle.reference_id(self.custody), reader.custody_reference)
             self.assertEqual('native-failed', reader.manifest['native_outcome'])
             self.assertEqual(self.fixture.value, reader.read_record('report', 'value'))
         with self.assertRaisesRegex(ValueError, 'lease is closed'):

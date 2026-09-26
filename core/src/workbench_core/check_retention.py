@@ -206,6 +206,8 @@ def status(root, *, now=None):
             gaps.append({'root': name, 'reason': str(exc)})
     records, errors = life.registrations(root)
     gaps.extend(errors)
+    _, consumer_errors = life.tree_consumers(root, records)
+    gaps.extend(consumer_errors)
     inventory = _inventory(root)
     bypath = {row['path']: row for row in inventory['items']}
     checks, latest, contexts = [], {}, {}

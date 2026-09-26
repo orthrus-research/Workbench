@@ -18,6 +18,9 @@ from .host_filesystem import file_lease, fsync_directory
 
 FORMAT = 'workbench-check-custody-v1'
 MANIFEST = '.workbench-check-custody-v1.json'
+TREE_CONSUMER = 'workbench-check-tree-consumer-v1'
+_CHECK_REFERENCE = re.compile(r'workbench-check-v1:([0-9a-f]{64})\Z')
+_TREE_REFERENCE = re.compile(r'workbench-tree-v1:([0-9a-f]{32})\Z')
 _HELD = ContextVar('check_store_leases', default={})
 
 
@@ -43,6 +46,111 @@ def _identity(identity):
     if not isinstance(identity, str) or not re.fullmatch(r'[a-z][a-z0-9-]*-[0-9a-f]{32}', identity):
         raise ValueError('select an exact retained check attempt')
     return identity
+
+
+def reference_id(record):
+    """Name one sealed registered check, including its root and snapshot binding."""
+    match = re.fullmatch(r'check-custody:sha256:([0-9a-f]{64})', str(record.get('id', '')))
+    if match is None:
+        raise ValueError('select exact sealed check custody for a dependent resource')
+    return 'workbench-check-v1:' + match.group(1)
+
+
+def resolve_tree_reference(root, reference):
+    """Admit a live source for a managed tree under the check-store lease."""
+    root = _root(root)
+    if not isinstance(reference, str) or _CHECK_REFERENCE.fullmatch(reference) is None:
+        raise ValueError('select an exact Core check reference')
+    with lease(root):
+        records, errors = registrations(root)
+        if errors:
+            raise ValueError('check reference accounting is incomplete')
+        matched = [row for row in records.values() if reference_id(row) == reference]
+        if len(matched) != 1:
+            raise ValueError('referenced check is not registered in this workspace')
+        record = matched[0]
+        path, state = locate(root, record)
+        if state != 'retained' or path != root / '.workbench/check-attempts' / record['attempt_id']:
+            raise ValueError('referenced check is not live retained evidence')
+        verify_payload(path, record, full=True)
+        return record
+
+
+def _consumer_directory(root):
+    return root / '.workbench/runtime-manager/check-tree-consumers'
+
+
+def register_tree_consumer(root, reference, tree_id, catalog_root):
+    """Anchor a pending Core tree edge before its intent can become durable.
+
+    A crash after this record but before the tree intent conservatively retains
+    the source. Later tree retirement must explicitly reconcile this anchor.
+    """
+    root = _root(root)
+    if not isinstance(tree_id, str) or _TREE_REFERENCE.fullmatch(tree_id) is None:
+        raise ValueError('select an exact Core managed tree')
+    catalog_root = Path(catalog_root)
+    if not catalog_root.is_absolute():
+        raise ValueError('managed tree catalog root must be absolute')
+    with lease(root):
+        record = resolve_tree_reference(root, reference)
+        directory = _consumer_directory(root) / reference.split(':', 1)[1]
+        _manager()._assert_no_symlink_ancestors(directory, root)
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        _manager()._assert_no_symlink_ancestors(directory, root)
+        files.ordinary(directory.parent, directory=True)
+        files.ordinary(directory, directory=True)
+        fsync_directory(directory.parent.parent)
+        fsync_directory(directory.parent)
+        body = {'format': TREE_CONSUMER, 'root': str(root),
+                'custody_id': record['id'], 'reference_id': reference,
+                'tree_id': tree_id, 'catalog_root': str(catalog_root)}
+        selected = files.seal('check-tree-consumer', body)
+        target = directory / (tree_id.split(':', 1)[1] + '.json')
+        if target.exists() or target.is_symlink():
+            if _sealed(target, 'check-tree-consumer') != selected:
+                raise ValueError('existing managed tree dependency differs')
+        else:
+            files.write_json(target, selected)
+        return selected
+
+
+def tree_consumers(root, records):
+    """Read source-side anchors; uncertainty protects every registered check."""
+    root = _root(root)
+    directory = _consumer_directory(root)
+    consumers, errors = {}, []
+    if not directory.exists() and not directory.is_symlink():
+        return consumers, errors
+    by_reference = {reference_id(row): row for row in records.values()}
+    try:
+        files.ordinary(directory, directory=True)
+        for group in sorted(directory.iterdir()):
+            try:
+                if not re.fullmatch(r'[0-9a-f]{64}', group.name):
+                    raise ValueError('unknown check consumer group')
+                files.ordinary(group, directory=True)
+                for path in sorted(group.iterdir()):
+                    if path.suffix != '.json' or _TREE_REFERENCE.fullmatch('workbench-tree-v1:' + path.stem) is None:
+                        raise ValueError('unknown check consumer record')
+                    row = _sealed(path, 'check-tree-consumer')
+                    reference = 'workbench-check-v1:' + group.name
+                    source = by_reference.get(reference)
+                    if (set(row) != {'id', 'format', 'root', 'custody_id', 'reference_id',
+                                     'tree_id', 'catalog_root'}
+                            or row['format'] != TREE_CONSUMER or row['root'] != str(root)
+                            or row['reference_id'] != reference or source is None
+                            or row['custody_id'] != source['id']
+                            or row['tree_id'] != 'workbench-tree-v1:' + path.stem
+                            or not isinstance(row['catalog_root'], str)
+                            or not Path(row['catalog_root']).is_absolute()):
+                        raise ValueError('check consumer binding differs from registered source')
+                    consumers.setdefault(source['attempt_id'], []).append(row)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                errors.append({'path': str(group), 'reason': str(exc)})
+    except (OSError, ValueError) as exc:
+        errors.append({'path': str(directory), 'reason': str(exc)})
+    return consumers, errors
 
 
 def _sealed(path, kind):
@@ -362,7 +470,8 @@ def verify_payload(path, record, *, full=False):
         _snapshots()._verify_archive(path / 'snapshot/result.json.gz', publication['manifest']['source_result'], lambda: False)
 
 
-def inventory_policy(root, path, policy, records, errors, *, active, trash, unsafe=False):
+def inventory_policy(root, path, policy, records, errors, *, active, trash, unsafe=False,
+                     consumers=None, consumer_errors=None):
     """Add check ownership to Core's existing inventory; no deletion engine here."""
     from . import check_retention
     check_retention.owned_unit(root, path, policy['deletion'], trash=trash)
@@ -375,7 +484,9 @@ def inventory_policy(root, path, policy, records, errors, *, active, trash, unsa
         if record is not None:
             identity = record['attempt_id']
             unsafe = True  # A changed/ambiguous trash transaction retains dependencies, never collection authority.
-    if errors:
+    if consumers is None or consumer_errors is None:
+        consumers, consumer_errors = tree_consumers(root, records)
+    if errors or consumer_errors:
         policy['deletion'].update(state='protected', recoverability='none', reason_codes=['check-reference-accounting-incomplete'])
     if record is None:
         return None
@@ -390,9 +501,12 @@ def inventory_policy(root, path, policy, records, errors, *, active, trash, unsa
         policy['last_use'] = {'state': 'observed', 'at': record['registered_at'], 'basis': 'manager-ledger',
                              'evidence_paths': [str((path / MANIFEST).relative_to(root))]}
         policy['reproducibility'] = {'state': 'retained-only', 'reason': 'Inspectable saved evidence; exact native reproduction is not established.', 'evidence_paths': []}
-        if reasons or errors:
+        if reasons or errors or consumer_errors:
             policy['deletion'].update(state='protected', recoverability='none',
                 reason_codes=['pinned-check-history' if reasons else 'check-reference-accounting-incomplete'])
+        if consumers.get(identity):
+            policy['deletion'].update(state='protected', recoverability='none',
+                reason_codes=sorted(set([*policy['deletion']['reason_codes'], 'referenced-managed-tree'])))
         if unsafe:
             policy['deletion'].update(state='protected', recoverability='none', reason_codes=['unsafe-check-filesystem'])
         if active or policy['deletion']['state'] == 'active':

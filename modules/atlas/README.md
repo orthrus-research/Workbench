@@ -117,6 +117,13 @@ import leaves its unpublished stage under Core custody for inspection; the
 selected output path remains absent. Import runs through the installed Workbench
 command so that Core binds the publication service.
 
+New graph publications retain an exact Core check-custody dependency on their
+original registered snapshot. Core protects that source from check-history
+cleanup while the graph dependency is recorded, including an interrupted graph
+publication. Historical graphs keep their original provenance fields; they do
+not acquire a dependency retroactively. Core currently retains a dependency
+anchor until an explicit managed-tree retirement workflow can release it.
+
 ```bash
 workbench atlas observations import-snapshot /path/to/check-attempt \
   --pack-profile supersymmetry --output /path/to/new-observation-graph --json

@@ -38,6 +38,7 @@ class RetainedSnapshotReader(Protocol):
     request: Mapping[str, Any]
     manifest: Mapping[str, Any]
     custody: Mapping[str, Any]
+    custody_reference: str  # Exact registered Core check, for managed dependents.
     scope_supported: bool
     unsupported_sections: set[str]
 

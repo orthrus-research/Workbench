@@ -2193,6 +2193,7 @@ def inventory_storage(root: Path, *, now: datetime | str | None = None) -> dict[
     trash_records = _trash_records(storage) if storage.exists() else {}
     process_cmdlines, process_paths = _live_process_state()
     check_records, check_errors = check_lifecycle.registrations(workspace)
+    check_consumers, check_consumer_errors = check_lifecycle.tree_consumers(workspace, check_records)
     check_active = check_lifecycle.busy(workspace)
     items: list[dict[str, Any]] = []
     internals: dict[str, dict[str, Any]] = {}
@@ -2244,7 +2245,9 @@ def inventory_storage(root: Path, *, now: datetime | str | None = None) -> dict[
             bool(scan["components"]),
         )
         check_record = check_lifecycle.inventory_policy(workspace, path, policy, check_records, check_errors,
-            active=check_active or policy["deletion"]["state"] == "active", trash=trash_record, unsafe=bool(scan["problems"]) or bool(scan["components"]))
+            active=check_active or policy["deletion"]["state"] == "active", trash=trash_record,
+            unsafe=bool(scan["problems"]) or bool(scan["components"]),
+            consumers=check_consumers, consumer_errors=check_consumer_errors)
         if check_record is not None:
             metadata = {"format": "workbench-check-storage-references-v1", "references": check_record["references"]}
             metadata_path = path / check_lifecycle.MANIFEST

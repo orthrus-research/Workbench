@@ -8,6 +8,7 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from pathlib import Path
+import re
 
 from workbench_api.managed_trees import managed_trees
 
@@ -55,6 +56,16 @@ def project_retained_observations(reader, output, *, side="single",
     check = check_cancelled or (lambda: None)
     check()
     manifest = _check_reader(reader, side)
+    custody = getattr(reader, "custody", None)
+    reference = getattr(reader, "custody_reference", None)
+    custody_id = custody.get("id") if isinstance(custody, dict) else None
+    context = custody.get("context") if isinstance(custody, dict) else None
+    if (not isinstance(custody, dict) or custody.get("snapshot_id") != manifest["id"]
+            or not isinstance(context, dict) or context.get("owner") != "axiom"
+            or not isinstance(custody_id, str)
+            or re.fullmatch(r"check-custody:sha256:[0-9a-f]{64}", custody_id) is None
+            or reference != "workbench-check-v1:" + custody_id.rsplit(":", 1)[1]):
+        raise ObservationProjectionError("retained observation has no exact Core custody reference")
     code = _code_binding()
     output = Path(output)
     if output.is_symlink():
@@ -104,6 +115,7 @@ def project_retained_observations(reader, output, *, side="single",
         published = stage.publish(
             validate=lambda path: validate_bundle_directory(path, check_cancelled=check),
             domain_id=graph["graph_set_id"],
+            references=(reference,),
             derived_members=("query-index.sqlite3",),
         )
         return {"format": PROJECTION_FORMAT, "schema_version": 1, "state": "complete",

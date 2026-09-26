@@ -16,7 +16,7 @@ from uuid import uuid4
 
 from workbench_api.managed_trees import ManagedTreeError, ManagedTreeReference
 
-from . import check_storage
+from . import check_lifecycle, check_storage
 from .durable_files import _directory as pinned_directory, read_verified
 from .host_filesystem import fsync_directory, secure_private_path
 from .output_routing import _WINDOWS_RESERVED
@@ -31,6 +31,7 @@ _OWNER = re.compile(r"[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*\Z")
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _FILE_ID = re.compile(r"workbench-resource-v1:[0-9a-f]{32}\Z")
 _TREE_ID = re.compile(r"workbench-tree-v1:[0-9a-f]{32}\Z")
+_CHECK_ID = re.compile(r"workbench-check-v1:[0-9a-f]{64}\Z")
 
 
 def _now() -> str:
@@ -165,6 +166,9 @@ class _CoreTreeStage:
             if inventory_members(self.path, derived_members=derived_members,
                                  cancelled=self.host._cancelled) != after:
                 raise ManagedTreeError("tree.changed", "managed tree changed while flushing members")
+            # Source-side anchors precede the tree intent. An abrupt exit in
+            # between may overretain a check, but cannot orphan published proof.
+            self.host._record_check_consumers(references, self.tree_id)
             selected = check_storage.ordinary(self.path, directory=True)
             info = selected.stat()
             nonce = self.tree_id.rsplit(":", 1)[-1]
@@ -271,7 +275,8 @@ class CoreManagedTrees:
     @contextmanager
     def _references(self, references: tuple[str, ...]) -> Iterator[None]:
         if (not isinstance(references, tuple) or len(references) > 128
-                or any(not isinstance(value, str) or not (_FILE_ID.fullmatch(value) or _TREE_ID.fullmatch(value))
+                or any(not isinstance(value, str) or not (_FILE_ID.fullmatch(value) or _TREE_ID.fullmatch(value)
+                                                       or _CHECK_ID.fullmatch(value))
                        for value in references)
                 or len(set(references)) != len(references)):
             raise ManagedTreeError("tree.references", "managed tree references must be unique Core resources")
@@ -287,14 +292,30 @@ class CoreManagedTrees:
                         self.catalog._target(intent), expected_size=int(intent["bytes"]),
                         expected_sha256=str(intent["sha256"]),
                     )
-                else:
+                elif _TREE_ID.fullmatch(reference):
                     stack.enter_context(self.catalog.trees.lease(reference))
                     intent = self.catalog.trees.intent(reference)
                     self.catalog.trees.commit(reference, intent)
                     if intent["workspace"] != str(self.workspace):
                         raise ManagedTreeError("tree.references", "referenced tree belongs to another workspace")
                     self.catalog.trees._verify(intent)
+                else:
+                    stack.enter_context(check_lifecycle.lease(self.workspace))
+                    try:
+                        check_lifecycle.resolve_tree_reference(self.workspace, reference)
+                    except (ValueError, OSError, RuntimeError) as exc:
+                        raise ManagedTreeError("tree.references", str(exc)) from exc
             yield
+
+    def _record_check_consumers(self, references: tuple[str, ...], tree_id: str) -> None:
+        for reference in references:
+            if _CHECK_ID.fullmatch(reference):
+                try:
+                    check_lifecycle.register_tree_consumer(
+                        self.workspace, reference, tree_id, self.catalog.root,
+                    )
+                except (ValueError, OSError, RuntimeError) as exc:
+                    raise ManagedTreeError("tree.references", str(exc)) from exc
 
     @contextmanager
     def stage(self, role: str, name: str, *, requested_path: Path | None = None) -> Iterator[_CoreTreeStage]:

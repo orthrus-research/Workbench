@@ -1,4 +1,5 @@
 from copy import deepcopy
+from contextlib import contextmanager
 from io import StringIO
 import json
 from pathlib import Path
@@ -36,6 +37,9 @@ def reader_fixture():
         "sections": [{"id": "report", "schema": "axiom-retained-report-v1", "state": "observed"}]}
     reader = SimpleNamespace(manifest=manifest, request={"baseline": None, "inputs": {"context": {
         "id": "supersymmetry:fixture", "initializationStage": "recipes", "side": "server"}}},
+        custody={"id": "check-custody:sha256:" + "a" * 64,
+                 "snapshot_id": manifest["id"], "context": {"owner": "axiom"}},
+        custody_reference="workbench-check-v1:" + "a" * 64,
         scope_supported=True, unsupported_sections=[], read_record=lambda section, key: report)
     return reader, report
 
@@ -49,6 +53,14 @@ class InitializationProjectionTests(unittest.TestCase):
             locations={"evidence": root / "evidence"}, owner_id="atlas",
         )
         self.enterContext(managed_trees_scope(self._trees))
+        # Domain fixtures are synthetic; Core check reference admission is
+        # covered with registered check custody in the Core dependency tests.
+        @contextmanager
+        def synthetic_reference(_host, references):
+            self.assertEqual(("workbench-check-v1:" + "a" * 64,), references)
+            yield
+        self.enterContext(patch.object(CoreManagedTrees, "_references", synthetic_reference))
+        self.enterContext(patch.object(CoreManagedTrees, "_record_check_consumers", lambda *args: None))
 
     def test_cli_accepts_parent_segments_and_symlinked_parent_receipts(self):
         reader, _ = reader_fixture()
@@ -111,6 +123,7 @@ class InitializationProjectionTests(unittest.TestCase):
             receipt = project_retained_observations(reader, output, profile_id="supersymmetry")
             self.assertEqual(receipt["state"], "complete")
             self.assertEqual(receipt["tree_id"], self._trees.catalog.inventory()["trees"][0]["tree_id"])
+            self.assertEqual((reader.custody_reference,), self._trees.describe(receipt["tree_id"]).references)
             self.assertEqual(receipt["native_outcome"], "native-failed")
             self.assertEqual(receipt["capture_coverage"], "incomplete")
             self.assertTrue(any(row["family"] == "furnace" and row["node_count"] > 0
@@ -150,6 +163,20 @@ class InitializationProjectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ObservationProjectionError, "paired side"):
                 project_retained_observations(reader, Path(tmp)/"graph", side="candidate", profile_id="supersymmetry")
+
+    def test_custody_reference_must_bind_the_selected_snapshot(self):
+        for change in (
+            lambda reader: setattr(reader, "custody_reference", "workbench-check-v1:" + "b" * 64),
+            lambda reader: reader.custody.update(snapshot_id="snapshot:other"),
+            lambda reader: reader.custody.update(id="unsealed"),
+        ):
+            reader, _ = reader_fixture()
+            change(reader)
+            with self.subTest(reader=reader), tempfile.TemporaryDirectory() as tmp:
+                output = Path(tmp) / "graph"
+                with self.assertRaisesRegex(ObservationProjectionError, "Core custody reference"):
+                    project_retained_observations(reader, output, profile_id="supersymmetry")
+                self.assertFalse(output.exists())
 
     def test_original_evidence_is_exact_and_rejects_wrong_snapshot(self):
         reader, report = reader_fixture()

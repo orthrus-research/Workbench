@@ -105,6 +105,7 @@ class _Reader:
     def __init__(self, opened, request, custody):
         self._opened = opened
         self.request, self.custody = request, custody
+        self.custody_reference = lifecycle.reference_id(custody)
         self.manifest = opened.manifest
         self.publication = opened.publication
         self.scope_supported = opened.scope_supported
