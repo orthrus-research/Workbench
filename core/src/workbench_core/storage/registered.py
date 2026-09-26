@@ -180,6 +180,15 @@ class ResourceCatalog:
             raise DurableResourceError("resource.changed", "fresh root epoch changed")
         return record if record["format"] == ROOT_V2_FORMAT else None
 
+    def inspect_post_birth_issue_gap(self, *, workspace: Path) -> dict[str, object]:
+        """Read the exact V2 mirror state; this does not repair or cover output."""
+        if not isinstance(workspace, Path) or not workspace.is_absolute():
+            raise DurableResourceError("resource.policy", "select an absolute issuance workspace")
+        root_record = self.fresh_root_epoch()
+        if root_record is None:
+            raise DurableResourceError("resource.unsupported", "issuance inspection requires a fresh V2 root")
+        return issuance.inspect_gap(self, root_record, workspace)
+
     def post_birth_coverage(
         self, resource_id: str, *, workspace: Path, owner_id: str, target: Path,
     ) -> str:

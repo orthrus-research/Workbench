@@ -184,6 +184,62 @@ def _match_reservations(catalog, rows: list[dict]) -> None:
             raise DurableResourceError("resource.changed", "resource issuance differs from its reservation")
 
 
+def _reservation_absent(catalog, row: Mapping[str, object]) -> bool:
+    nonce = str(row["resource_id"]).split(":", 1)[1]
+    try:
+        catalog._path("reservations", nonce).lstat()
+    except FileNotFoundError:
+        return True
+    except OSError as exc:
+        raise DurableResourceError("resource.unavailable", "resource issuance reservation cannot be inspected") from exc
+    return False
+
+
+def inspect_gap(catalog, root_record: Mapping[str, object], workspace: Path) -> dict[str, object]:
+    """Report visible V2 issue gaps; the lease fences issues, not reservations."""
+    config_dir, workspace_dir, lock = _paths(catalog, root_record, workspace)
+    if not any(path.exists() or path.is_symlink() for path in (config_dir, workspace_dir, lock)):
+        raise DurableResourceError("resource.unavailable", "no retained resource issuance witness exists")
+    with _read_lock(lock):
+        if not all(path.exists() or path.is_symlink() for path in (config_dir, workspace_dir)):
+            raise DurableResourceError("resource.changed", "resource issuance lost a ledger directory")
+        _workspace_parents(workspace, workspace_dir)
+        config_rows = _rows(config_dir, root_record, workspace)
+        workspace_rows = _rows(workspace_dir, root_record, workspace)
+        if not config_rows and not workspace_rows:
+            raise DurableResourceError("resource.unavailable", "empty resource issuance ledgers cannot prove history")
+        if len({row["resource_id"] for row in workspace_rows}) != len(workspace_rows):
+            raise DurableResourceError("resource.changed", "resource issuance identity was reused")
+        if config_rows == workspace_rows:
+            if workspace_rows and _reservation_absent(catalog, workspace_rows[-1]):
+                _match_reservations(catalog, workspace_rows[:-1])
+                trailing = workspace_rows[-1]
+                status = "current-paired-unreserved-tail"
+            else:
+                _match_reservations(catalog, workspace_rows)
+                trailing = None
+                status = "current-paired-prefix"
+        elif (len(workspace_rows) == len(config_rows) + 1
+              and workspace_rows[:-1] == config_rows):
+            _match_reservations(catalog, config_rows)
+            trailing = workspace_rows[-1]
+            if not _reservation_absent(catalog, trailing):
+                raise DurableResourceError(
+                    "resource.changed", "one-sided resource issuance has a reservation",
+                )
+            status = "current-workspace-only-unreserved-tail"
+        else:
+            raise DurableResourceError("resource.changed", "resource issuance ledgers differ")
+        if catalog.fresh_root_epoch() != root_record:
+            raise DurableResourceError("resource.changed", "resource issuance root epoch changed")
+        return {
+            "status": status, "paired_rows": len(config_rows),
+            "issue_id": trailing["id"] if trailing is not None else None,
+            "resource_id": trailing["resource_id"] if trailing is not None else None,
+            "historical_completeness": "unproven",
+        }
+
+
 def issue(catalog, root_record: Mapping[str, object], reservation: Mapping[str, object]) -> dict:
     """Publish both ordered rows before writing the reservation or target."""
     workspace = Path(str(reservation["workspace"]))
