@@ -11,7 +11,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 import native_distribution as distribution
-from native_build_custody import build_managed_assembly
+from build_tree_custody import publish_build_tree
 from verify_wheelhouse import WheelhouseError
 
 
@@ -118,9 +118,12 @@ class NativeReuseTests(unittest.TestCase):
             base = Path(temporary)
             source, output = base / "source", base / "native-output"
             self.assembly(source)
-            result, reference = build_managed_assembly(
+            result, reference = publish_build_tree(
                 output,
                 lambda staged: self.derive(source, staged),
+                lambda path, expected: self.assertEqual(expected, distribution.verify(path)),
+                lambda path, _result: "workbench-native-wheelhouse-v1:sha256:" + distribution._digest(path / "wheelhouse.json"),
+                owner_id="native-build",
                 configuration_home=base / "core-home",
             )
             self.assertEqual(result, distribution.verify(output))
@@ -146,8 +149,10 @@ class NativeReuseTests(unittest.TestCase):
                 raise RuntimeError("build interrupted")
 
             with self.assertRaisesRegex(RuntimeError, "interrupted"):
-                build_managed_assembly(
-                    output, fail, configuration_home=base / "core-home",
+                publish_build_tree(
+                    output, fail, lambda _path, _result: None,
+                    lambda _path, _result: "unreachable", owner_id="native-build",
+                    configuration_home=base / "core-home",
                 )
             self.assertFalse(output.exists())
             self.assertEqual(

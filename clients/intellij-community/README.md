@@ -173,10 +173,11 @@ tests and plugin verifier, and emits the descriptor-named public-v1 ZIP:
 python3 tools/build_release_clients.py \
   --component workbench-intellij-community \
   --lane public-v1 \
-  --output-dir .workbench/build/public-components
+  --output-dir .workbench/build/intellij-candidate
 ```
 
-Run the repository builder from the repository root. Build output, downloaded
+Run the repository builder from the repository root with a new output directory
+for each build. Build output, downloaded
 IDE distributions, and Gradle state remain under ignored `.workbench/` storage
 or ignored client build directories.
 

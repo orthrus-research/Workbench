@@ -181,10 +181,11 @@ public-v1 artifact:
 python3 tools/build_release_clients.py \
   --component workbench-vscode \
   --lane public-v1 \
-  --output-dir .workbench/build/public-components
+  --output-dir .workbench/build/vscode-candidate
 ```
 
-Run that command from the repository root. Build output and downloaded tools
+Run that command from the repository root with a new output directory for each
+build. Build output and downloaded tools
 remain under ignored `.workbench/` storage or ignored client dependency
 directories.
 

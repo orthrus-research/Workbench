@@ -33,6 +33,7 @@ if str(TOOLS_SOURCE) not in sys.path:
 from release_track import artifact_filename as release_artifact_filename  # noqa: E402
 from release_track import component as release_component  # noqa: E402
 from release_track import load_release_descriptor  # noqa: E402
+from build_tree_custody import publish_build_tree  # noqa: E402
 
 VSCODE_ROOT = ROOT / "clients/vscode"
 INTELLIJ_ROOT = ROOT / "clients/intellij-community"
@@ -1063,6 +1064,52 @@ def _artifact_row(path: Path, verified: Mapping[str, Any], tools: Mapping[str, s
     }
 
 
+def _verify_client_output(path: Path, result: Mapping[str, Any], selected: set[str]) -> None:
+    """Read back exact builder bytes and domain evidence before Core publication."""
+
+    manifest_name = "workbench-developer-clients-manifest-v1.json"
+    selected_names = {
+        "workbench-vscode": VSCODE_ARTIFACT_NAME,
+        "workbench-intellij-community": INTELLIJ_ARTIFACT_NAME,
+    }
+    expected_names = {selected_names[name] for name in selected}
+    if path.is_symlink() or not path.is_dir():
+        raise ClientBuildError("client output is not a direct directory")
+    if {member.name for member in path.iterdir()} != expected_names | {manifest_name}:
+        raise ClientBuildError("client output contains missing or extra files")
+    manifest_path = path / manifest_name
+    expected_manifest = json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+    if (manifest_path.is_symlink() or not manifest_path.is_file()
+            or manifest_path.read_bytes() != expected_manifest
+            or result.get("client_artifact_manifest_id") != manifest_id(result)):
+        raise ClientBuildError("client artifact manifest changed")
+    rows = result.get("artifacts")
+    if not isinstance(rows, list) or len(rows) != len(expected_names):
+        raise ClientBuildError("client artifact manifest selection changed")
+    by_name = {row.get("path"): row for row in rows if isinstance(row, dict)}
+    if set(by_name) != expected_names or len(by_name) != len(rows):
+        raise ClientBuildError("client artifact manifest paths changed")
+    verifiers = {
+        VSCODE_ARTIFACT_NAME: verify_vscode,
+        INTELLIJ_ARTIFACT_NAME: verify_intellij,
+    }
+    for name in sorted(expected_names):
+        artifact = path / name
+        row = by_name[name]
+        if (artifact.is_symlink() or not artifact.is_file()
+                or not 0 < artifact.stat().st_size <= MAX_ARCHIVE_BYTES):
+            raise ClientBuildError(f"client archive is missing or indirect: {name}")
+        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        verified = verifiers[name](artifact)
+        if (set(row) != set(verified) | {"path", "size", "sha256", "artifact_identity", "build_tools"}
+                or any(row.get(key) != value for key, value in verified.items())
+                or row["size"] != artifact.stat().st_size
+                or row["sha256"] != digest
+                or row["artifact_identity"] != "artifact:sha256:" + digest
+                or not isinstance(row["build_tools"], dict)):
+            raise ClientBuildError(f"client archive manifest changed: {name}")
+
+
 def build(
     output_dir: Path,
     *,
@@ -1158,6 +1205,37 @@ def build(
     return result
 
 
+def build_managed(
+    output_dir: Path,
+    *,
+    component: str | None = None,
+    lane: str = PUBLIC_LANE,
+    skip_build: bool = False,
+    skip_vscode_extension_host: bool = False,
+    configuration_home: Path | None = None,
+):
+    """Publish a fresh verified client bundle through source-checkout Core."""
+
+    selected = ({"workbench-vscode", "workbench-intellij-community"}
+                if component is None else {component})
+    if lane != PUBLIC_LANE:
+        raise ClientBuildError(f"unsupported developer-client build lane: {lane}")
+    supported = {"workbench-vscode", "workbench-intellij-community"}
+    if not selected <= supported:
+        raise ClientBuildError(
+            "unsupported developer-client component: " + ", ".join(sorted(selected))
+        )
+    return publish_build_tree(
+        output_dir,
+        lambda staged: build(staged, component=component, lane=lane,
+                             skip_build=skip_build, skip_vscode_extension_host=skip_vscode_extension_host),
+        lambda path, result: _verify_client_output(path, result, selected),
+        lambda _path, result: str(result["client_artifact_manifest_id"]),
+        owner_id="developer-client-build",
+        configuration_home=configuration_home,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1180,13 +1258,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        result = build(
+        result, custody = build_managed(
             args.output_dir.resolve(),
             component=args.component,
             lane=args.lane,
             skip_build=args.skip_build,
             skip_vscode_extension_host=args.skip_vscode_extension_host,
         )
+        result = {**result, "artifact_tree_id": custody.tree_id, "artifact_path": str(custody.path)}
     except (
         ClientBuildError,
         ElementTree.ParseError,

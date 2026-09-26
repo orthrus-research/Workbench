@@ -29,6 +29,10 @@ wheelhouse, and catalogs the published directory. Its CLI result reports the
 Core `artifact_tree_id` and `artifact_path`; `wheelhouse.json` keeps the
 standalone installer format. A build that fails after staging begins retains
 its partial bytes without publishing a complete wheelhouse at the requested path.
+The client builder also requires a fresh output directory. Source-checkout Core
+publishes its verified ZIPs and exact client manifest as one cataloged tree;
+the CLI returns that tree ID and path. Existing client bundles remain readable
+at their original paths.
 
 The component candidate workflow accepts an annotated namespaced tag such as
 `workbench-atlas/v0.1.0-rc.1`. It builds the selected package and its dependency
