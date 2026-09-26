@@ -28,6 +28,9 @@ class HostFilesystem(Protocol):
         self, path: Path, data: bytes, *, byte_limit: int,
         expected_sha256: str | None = None, require_absent: bool = False,
     ) -> None: ...
+    def remove_private_bytes(
+        self, path: Path, *, expected_sha256: str, byte_limit: int,
+    ) -> None: ...
     def private_record_lock(self, path: Path, *, wait: bool = False) -> ContextManager[None]: ...
     def append_private_line(
         self, path: Path, line: bytes, *, expected_size: int, byte_limit: int,
@@ -117,6 +120,17 @@ def replace_private_bytes(
         raise HostFilesystemError("selected filesystem host does not provide revisioned record replacement")
     operation(path, data, byte_limit=byte_limit,
               expected_sha256=expected_sha256, require_absent=require_absent)
+
+
+def remove_private_bytes(
+    path: Path, *, expected_sha256: str, byte_limit: int,
+) -> None:
+    """Remove one owner-private record only while its reviewed bytes still match."""
+
+    operation = getattr(_filesystem(), "remove_private_bytes", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide private record removal")
+    operation(path, expected_sha256=expected_sha256, byte_limit=byte_limit)
 
 
 def private_record_lock(path: Path, *, wait: bool = False) -> ContextManager[None]:

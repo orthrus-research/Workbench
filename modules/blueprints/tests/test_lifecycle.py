@@ -94,6 +94,46 @@ class ArtifactStoreTest(unittest.TestCase):
             store.acquire_transaction({"format": "susy-blueprints-active-transaction-v1"})
         self.assertFalse(root.exists())
 
+    def test_history_cleanup_preserves_changed_marker_and_lock(self) -> None:
+        root = self.workspace / ".workbench/blueprints/history"
+        store = lifecycle.HistoryStore(root)
+        journal = {"format": "susy-blueprints-active-transaction-v1", "schema_version": 1}
+        with sealed_store_scope(self.workspace, self.config):
+            lock = store.acquire_transaction(journal)
+            marker = store.write_journal(journal)
+            marker.write_bytes(b"changed during application")
+            with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA117_TRANSACTION_LOCK"):
+                store.release_transaction(journal, lock, marker)
+        self.assertEqual(b"changed during application", marker.read_bytes())
+        self.assertTrue(lock.exists())
+
+    def test_history_cleanup_preserves_journal_when_lock_changes(self) -> None:
+        root = self.workspace / ".workbench/blueprints/history"
+        store = lifecycle.HistoryStore(root)
+        journal = {"format": "susy-blueprints-active-transaction-v1", "schema_version": 1}
+        with sealed_store_scope(self.workspace, self.config):
+            lock = store.acquire_transaction(journal)
+            marker = store.write_journal(journal)
+            lock.write_bytes(b"changed during application")
+            with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA117_TRANSACTION_LOCK"):
+                store.release_transaction(journal, lock, marker)
+        self.assertEqual(b"changed during application", lock.read_bytes())
+        self.assertTrue(marker.exists())
+
+    def test_artifact_removal_requires_core_and_exact_digest(self) -> None:
+        content = b"bulky history bytes"
+        digest = hashlib.sha256(content).hexdigest()
+        with sealed_store_scope(self.workspace, self.config):
+            self.store.put_bytes(content)
+        with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA108_STORE_ROOT"):
+            self.store.delete_digest(digest)
+        self.assertEqual(content, self.store._path(digest).read_bytes())
+        with sealed_store_scope(self.workspace, self.config):
+            self.store._path(digest).write_bytes(b"changed history bytes")
+            with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA112_ARTIFACT_DIGEST"):
+                self.store.delete_digest(digest)
+        self.assertEqual(b"changed history bytes", self.store._path(digest).read_bytes())
+
 
 class LifecycleTest(unittest.TestCase):
 

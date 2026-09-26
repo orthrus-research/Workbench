@@ -19,7 +19,8 @@ from jsonschema import Draft202012Validator
 from workbench_api.durable_resources import DurableResourceError
 from workbench_api.host_filesystem import (
     DurableRecordError, HostFilesystemError, publish_immutable_bytes,
-    read_private_bytes, replace_private_bytes, secure_private_path,
+    read_private_bytes, remove_private_bytes, replace_private_bytes,
+    secure_private_path,
 )
 from workbench_api.record_stores import open_record_store
 from workbench_blueprints import planner, simulation, standards
@@ -343,8 +344,27 @@ class ArtifactStore:
         path = self._path(digest)
         if path.is_symlink():
             _fail("BPA108_STORE_ROOT", str(path), "artifact path is symlinked")
-        path.unlink(missing_ok=True)
-        _fsync_directory(path.parent, "BPA109_STORE_COLLISION")
+        try:
+            managed = open_record_store("blueprints-artifact-v1", self.root)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPA108_STORE_ROOT", str(self.root), str(exc))
+        if managed is None or managed.root != self.root:
+            _fail("BPA108_STORE_ROOT", str(self.root), "artifact removal requires its Core store")
+        if not path.exists():
+            return
+        if any(item.is_symlink() for item in (self.root, self.root / "objects", path.parent)):
+            _fail("BPA108_STORE_ROOT", str(path.parent), "store path contains a symlink")
+        try:
+            size = path.lstat().st_size
+            observed = read_private_bytes(path, byte_limit=size)
+            if _digest_bytes(observed) != digest:
+                _fail("BPA112_ARTIFACT_DIGEST", str(path), "artifact digest drift")
+            remove_private_bytes(
+                path, expected_sha256="sha256:" + digest,
+                byte_limit=size,
+            )
+        except (DurableRecordError, HostFilesystemError, OSError) as exc:
+            _fail("BPA108_STORE_ROOT", str(path), str(exc))
 
 
 class HistoryStore:
@@ -481,6 +501,35 @@ class HistoryStore:
         except (DurableRecordError, HostFilesystemError, OSError) as exc:
             _fail("BPA117_TRANSACTION_LOCK", str(path), str(exc))
         return path
+
+    def release_transaction(
+        self, journal: dict[str, Any], lock_path: Path,
+        journal_path: Path | None,
+    ) -> None:
+        """Release only the matching V1 markers after a settled transaction."""
+
+        self._transaction_store()
+        expected = standards.canonical_json(journal).encode("utf-8")
+        digest = "sha256:" + _digest_bytes(expected)
+        if lock_path != self.root / "active-transaction.lock" or (
+            journal_path is not None
+            and journal_path != self.root / "active-transaction.json"
+        ):
+            _fail("BPA117_TRANSACTION_LOCK", str(self.root), "transaction marker path changed")
+        try:
+            if read_private_bytes(lock_path, byte_limit=len(expected)) != expected:
+                _fail("BPA117_TRANSACTION_LOCK", str(lock_path), "transaction lock changed before cleanup")
+            if journal_path is not None:
+                remove_private_bytes(
+                    journal_path, expected_sha256=digest,
+                    byte_limit=len(expected),
+                )
+            remove_private_bytes(
+                lock_path, expected_sha256=digest,
+                byte_limit=len(expected),
+            )
+        except (DurableRecordError, HostFilesystemError, OSError) as exc:
+            _fail("BPA117_TRANSACTION_LOCK", str(self.root), str(exc))
 
 
 def _validate_release_bundle(bundle: dict[str, Any]) -> None:
@@ -1710,11 +1759,8 @@ class LifecycleEngine:
                 atomic = False
         finally:
             if rollback != "failed":
-                if journal_path is not None:
-                    journal_path.unlink(missing_ok=True)
-                lock_path.unlink(missing_ok=True)
-                _fsync_directory(
-                    self.history_store.root, "BPA117_TRANSACTION_LOCK"
+                self.history_store.release_transaction(
+                    journal, lock_path, journal_path,
                 )
 
         if mutation_error is None:

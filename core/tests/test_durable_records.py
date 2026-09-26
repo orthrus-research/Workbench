@@ -16,7 +16,7 @@ from unittest.mock import patch
 from workbench_api.host_filesystem import (
     DurableRecordError, append_private_line, inspect_private_journal,
     private_record_lock, publish_immutable_bytes, read_bounded_bytes,
-    read_private_bytes, replace_private_bytes,
+    read_private_bytes, remove_private_bytes, replace_private_bytes,
 )
 from workbench_core.host_services import install_local_host_services
 from workbench_core import durable_records
@@ -77,6 +77,40 @@ class DurableRecordTests(unittest.TestCase):
         with self.assertRaises(DurableRecordError) as redirected:
             read_bounded_bytes(link, byte_limit=1024)
         self.assertEqual("unsafe", redirected.exception.code)
+
+    def test_private_removal_requires_exact_reviewed_bytes(self) -> None:
+        content = b'{"active":true}\n'
+        replace_private_bytes(self.path, content, byte_limit=1024, require_absent=True)
+        reviewed = "sha256:" + sha256(content).hexdigest()
+        with self.assertRaises(DurableRecordError) as stale:
+            remove_private_bytes(
+                self.path, expected_sha256="sha256:" + "0" * 64,
+                byte_limit=1024,
+            )
+        self.assertEqual("stale", stale.exception.code)
+        self.assertEqual(content, self.path.read_bytes())
+        with self.assertRaises(DurableRecordError) as bounded:
+            remove_private_bytes(self.path, expected_sha256=reviewed, byte_limit=3)
+        self.assertEqual("unsafe", bounded.exception.code)
+        self.assertEqual(content, self.path.read_bytes())
+        remove_private_bytes(self.path, expected_sha256=reviewed, byte_limit=1024)
+        self.assertFalse(self.path.exists())
+        with self.assertRaises(DurableRecordError) as absent:
+            remove_private_bytes(self.path, expected_sha256=reviewed, byte_limit=1024)
+        self.assertEqual("unavailable", absent.exception.code)
+
+    def test_private_removal_preserves_symlink_target(self) -> None:
+        other = self.root / "other.json"
+        replace_private_bytes(other, b"other\n", byte_limit=1024, require_absent=True)
+        self.path.symlink_to(other)
+        with self.assertRaises(DurableRecordError) as unsafe:
+            remove_private_bytes(
+                self.path, expected_sha256="sha256:" + sha256(b"other\n").hexdigest(),
+                byte_limit=1024,
+            )
+        self.assertEqual("unsafe", unsafe.exception.code)
+        self.assertTrue(self.path.is_symlink())
+        self.assertEqual(b"other\n", other.read_bytes())
 
     def test_unprivate_mount_refuses_publication_without_output(self) -> None:
         original = durable_records.private_path

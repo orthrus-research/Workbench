@@ -374,6 +374,13 @@ def replace_private_bytes(
             expected_sha256=expected_sha256, require_absent=require_absent)
 
 
+def remove_private_bytes(
+    path: Path, *, expected_sha256: str, byte_limit: int,
+) -> None:
+    from .durable_records import remove_private_bytes as remove
+    remove(path, expected_sha256=expected_sha256, byte_limit=byte_limit)
+
+
 def private_record_lock(path: Path, *, wait: bool = False):
     from .durable_records import private_record_lock as lock
     return lock(path, wait=wait)

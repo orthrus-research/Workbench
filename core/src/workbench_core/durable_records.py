@@ -270,6 +270,37 @@ def replace_private_bytes(
         fsync_directory(path.parent)
 
 
+def remove_private_bytes(
+    path: Path, *, expected_sha256: str, byte_limit: int,
+) -> None:
+    """Remove a private record after Core confirms its exact reviewed digest.
+
+    The caller owns the record's meaning and deletion policy. Core owns the
+    physical comparison, redirect checks, cooperating-writer lease and sync.
+    """
+
+    _parent(path)
+    if (
+        type(expected_sha256) is not str
+        or _DIGEST.fullmatch(expected_sha256) is None
+        or type(byte_limit) is not int
+        or byte_limit < 0
+    ):
+        raise DurableRecordError("bounds", "private record removal precondition is invalid")
+    with _record_lock(path):
+        before = _ordinary(path, byte_limit=byte_limit)
+        observed = read_private_bytes(path, byte_limit=byte_limit)
+        if "sha256:" + sha256(observed).hexdigest() != expected_sha256:
+            raise DurableRecordError("stale", "private record changed after review")
+        if _identity(before) != _identity(_ordinary(path, byte_limit=byte_limit)):
+            raise DurableRecordError("changed", "private record changed before removal")
+        try:
+            path.unlink()
+            fsync_directory(path.parent)
+        except OSError as exc:
+            raise DurableRecordError("write", f"cannot remove private record: {exc}") from exc
+
+
 def append_private_line(
     path: Path, line: bytes, *, expected_size: int, byte_limit: int,
     journal_byte_limit: int | None = None,
@@ -386,6 +417,6 @@ def inspect_private_journal(path: Path, *, byte_limit: int) -> dict:
 
 __all__ = [
     "read_private_bytes", "read_bounded_bytes", "publish_immutable_bytes",
-    "replace_private_bytes", "private_record_lock", "append_private_line",
+    "replace_private_bytes", "remove_private_bytes", "private_record_lock", "append_private_line",
     "inspect_private_journal",
 ]
