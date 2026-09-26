@@ -76,6 +76,37 @@ def _relative(path: Path, root: Path) -> str:
         return str(path)
 
 
+def _has_git_worktree_root(candidate: Path) -> bool:
+    marker = candidate / ".git"
+    if marker.is_symlink() or not marker.exists():
+        return False
+    try:
+        git = configured_git_executable()
+    except GitObservationError:
+        return False
+    if not git:
+        return False
+    result = _run(
+        [
+            git,
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.untrackedCache=false",
+            "-C",
+            str(candidate),
+            "rev-parse",
+            "--show-toplevel",
+        ]
+    )
+    if result is None or result.returncode:
+        return False
+    try:
+        return Path(result.stdout.strip()).resolve(strict=True) == candidate
+    except (OSError, RuntimeError):
+        return False
+
+
 def discover_workspace_root(path: Path) -> Path:
     """Resolve the nearest Gradle workspace, falling back to a repository root."""
 
@@ -100,7 +131,7 @@ def discover_workspace_root(path: Path) -> Path:
             (candidate / marker).is_file() for marker in _BUILD_MARKERS[2:]
         ):
             nearest_build = candidate
-        if repository is None and (candidate / ".git").exists():
+        if repository is None and _has_git_worktree_root(candidate):
             repository = candidate
         if nearest_build is not None and repository == candidate:
             break

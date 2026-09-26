@@ -138,6 +138,18 @@ def _assert_schema(test: unittest.TestCase, report: dict[str, object]) -> None:
 
 
 class WorkspaceDoctorTests(unittest.TestCase):
+    def test_stray_git_marker_does_not_select_an_ancestor_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            requested = base / "nested/workspace"
+            requested.mkdir(parents=True)
+            marker = base / ".git"
+            marker.mkdir()
+            self.assertEqual(requested, discover_workspace_root(requested))
+            marker.rmdir()
+            marker.write_text("not a Git worktree\n", encoding="utf-8")
+            self.assertEqual(requested, discover_workspace_root(requested))
+
     def test_discovers_nearest_cleanroom_gradle_root_and_project_surfaces(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository, project, requested = _cleanroom_fixture(Path(temporary))
