@@ -9,6 +9,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -37,10 +38,13 @@ from workbench_core.host_services import install_local_host_services  # noqa: E4
 from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
 from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
 from workbench_core.source_transactions import _SourceTransaction  # noqa: E402
+from workbench_core.registration_attempts import _Attempt  # noqa: E402
+from workbench_core import registration_attempts as registration_attempt_core  # noqa: E402
 from workbench_api.record_stores import record_store_scope  # noqa: E402
 from workbench_shell.registration_wizard import (  # noqa: E402
     RegistrationWizardError,
     apply_active_registration,
+    inspect_active_registration_attempt,
     plan_active_registration,
     registration_capabilities,
 )
@@ -194,7 +198,311 @@ def _uri_path(value: str) -> Path:
 
 class RegistrationWizardTest(unittest.TestCase):
     def setUp(self) -> None:
+        configuration = tempfile.TemporaryDirectory()
+        self.addCleanup(configuration.cleanup)
+        self.configuration_home = Path(configuration.name) / "config"
+        environment = patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(self.configuration_home)})
+        environment.start()
+        self.addCleanup(environment.stop)
         install_local_host_services()
+
+    def _interrupted_material_apply(
+        self, root: Path, *, ordinal: int, after_replace: bool,
+    ) -> tuple[Path, Path, Path, dict, dict]:
+        project = _project(root)
+        instance, payload = _instance(root)
+        state = root / "state"
+        initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+        answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+        plan = plan_active_registration(
+            SUITE_ROOT, project, pattern_key="material-backed-fluid",
+            answers=answers, state_root=state,
+        )
+        pid = os.fork()
+        if pid == 0:
+            original_commit = _SourceTransaction.commit
+            calls = 0
+
+            def exit_at_replacement(transaction, stage):
+                nonlocal calls
+                current = calls
+                calls += 1
+                if current == ordinal and not after_replace:
+                    os._exit(86)
+                original_commit(transaction, stage)
+                if current == ordinal and after_replace:
+                    os._exit(86)
+
+            try:
+                with patch.object(_SourceTransaction, "commit", exit_at_replacement):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+            except BaseException:
+                os._exit(87)
+            os._exit(88)
+        _, status = os.waitpid(pid, 0)
+        self.assertEqual(86, os.waitstatus_to_exitcode(status))
+        return project, payload, state, plan, answers
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_classifies_hard_exit_around_each_source_replacement(self) -> None:
+        for ordinal in range(3):
+            for after_replace in (False, True):
+                with self.subTest(ordinal=ordinal, after_replace=after_replace):
+                    with tempfile.TemporaryDirectory() as temporary:
+                        project, _payload, state, plan, _answers = self._interrupted_material_apply(
+                            Path(temporary), ordinal=ordinal, after_replace=after_replace,
+                        )
+                        result = inspect_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                        self.assertEqual("prepared", result["receipt_state"])
+                        self.assertEqual("consistent", result["journal_status"])
+                        for index, operation in enumerate(result["operations"]):
+                            self.assertEqual(
+                                "after" if index < ordinal + int(after_replace) else "before",
+                                operation["source_state"],
+                            )
+                            self.assertEqual(index <= ordinal, operation["attempted"])
+                        self.assertTrue((state / "registrations" / (
+                            ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                        ) / "backups").is_dir())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_marks_external_edit_for_review_and_retains_backups(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project, payload, state, plan, _answers = self._interrupted_material_apply(
+                Path(temporary), ordinal=0, after_replace=True,
+            )
+            relative = plan["operations"][0]["path"]
+            (payload / relative).write_bytes(b"later user edit\n")
+            result = inspect_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            )
+            self.assertEqual("review-required", result["journal_status"])
+            self.assertEqual("other", result["operations"][0]["source_state"])
+            retained = state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            )
+            self.assertTrue((retained / "backups" / relative).is_file())
+            self.assertEqual(b"later user edit\n", (payload / relative).read_bytes())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_rejects_changed_backup_or_stage_journal(self) -> None:
+        for changed in ("backup", "stage"):
+            with self.subTest(changed=changed):
+                with tempfile.TemporaryDirectory() as temporary:
+                    project, _payload, state, plan, _answers = self._interrupted_material_apply(
+                        Path(temporary), ordinal=0, after_replace=True,
+                    )
+                    retained = state / "registrations" / (
+                        ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                    )
+                    path = (
+                        retained / "backups" / plan["operations"][0]["path"]
+                        if changed == "backup" else retained / "stages/000.json"
+                    )
+                    path.write_bytes(b"changed retained evidence\n")
+                    with self.assertRaisesRegex(RegistrationWizardError, "review"):
+                        inspect_active_registration_attempt(
+                            SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                        )
+                    self.assertTrue((retained / "attempt.json").is_file())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_keeps_applied_receipt_stage_for_review_before_promotion(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, _payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            pid = os.fork()
+            if pid == 0:
+                with patch.object(_Attempt, "promote", lambda _attempt: os._exit(86)):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+                os._exit(87)
+            _, status = os.waitpid(pid, 0)
+            self.assertEqual(86, os.waitstatus_to_exitcode(status))
+            inspected = inspect_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            )
+            self.assertEqual("applied", inspected["receipt_state"])
+            self.assertEqual("review-required", inspected["journal_status"])
+            self.assertEqual(
+                ["after"] * len(plan["operations"]),
+                [row["source_state"] for row in inspected["operations"]],
+            )
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_flags_orphan_stage_before_journal_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            pid = os.fork()
+            if pid == 0:
+                with patch.object(_Attempt, "record_stage", lambda _attempt, _ordinal, _relative: os._exit(86)):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+                os._exit(87)
+            _, status = os.waitpid(pid, 0)
+            self.assertEqual(86, os.waitstatus_to_exitcode(status))
+            inspected = inspect_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+            )
+            self.assertEqual("review-required", inspected["journal_status"])
+            self.assertEqual(
+                ["before"] * len(plan["operations"]),
+                [row["source_state"] for row in inspected["operations"]],
+            )
+            retained = state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            )
+            token = json.loads((retained / "attempt.json").read_bytes())["staging_token"]
+            first = payload / plan["operations"][0]["path"]
+            self.assertEqual(1, len(list(first.parent.glob(
+                f".{first.name}.workbench-{token}-*.tmp",
+            ))))
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_restart_rejects_source_parent_redirect_and_state_root_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project, payload, state, plan, _answers = self._interrupted_material_apply(
+                Path(temporary), ordinal=0, after_replace=True,
+            )
+            parent = (payload / plan["operations"][0]["path"]).parent
+            displaced = parent.with_name(parent.name + "-original")
+            parent.rename(displaced)
+            parent.symlink_to(displaced, target_is_directory=True)
+            with self.assertRaisesRegex(RegistrationWizardError, "review"):
+                inspect_active_registration_attempt(
+                    SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                )
+            parent.unlink()
+            displaced.rename(parent)
+            displaced_state = state.with_name("state-original")
+            state.rename(displaced_state)
+            state.mkdir()
+            shutil.copytree(displaced_state / "active-instances", state / "active-instances")
+            with self.assertRaises((RegistrationWizardError, OSError)):
+                inspect_active_registration_attempt(
+                    SUITE_ROOT, project, plan_id=plan["plan_id"], state_root=state,
+                )
+            self.assertTrue((displaced_state / "registrations" / (
+                ".apply-" + plan["plan_id"].removeprefix("sha256:")
+            ) / "attempt.json").is_file())
+
+    def test_applied_receipt_failure_rolls_back_and_discards_exact_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            originals = {
+                row["path"]: (payload / row["path"]).read_bytes()
+                for row in plan["operations"]
+            }
+            with patch.object(_Attempt, "publish_applied", side_effect=OSError("receipt unavailable")):
+                with self.assertRaisesRegex(RegistrationWizardError, "rolled back"):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+            self.assertEqual([], list((state / "registrations").iterdir()))
+            for relative, raw in originals.items():
+                self.assertEqual(raw, (payload / relative).read_bytes())
+
+    def test_uncertain_promotion_keeps_prepared_receipt_and_restored_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            originals = {
+                row["path"]: (payload / row["path"]).read_bytes()
+                for row in plan["operations"]
+            }
+            original_rename = registration_attempt_core._rename_noreplace
+
+            def rename_then_fail(source, destination):
+                original_rename(source, destination)
+                raise OSError("injected post-rename failure")
+
+            with patch.object(registration_attempt_core, "_rename_noreplace", rename_then_fail):
+                with self.assertRaisesRegex(RegistrationWizardError, "retained attempt requires review"):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+            retained = state / "registrations" / plan["plan_id"].removeprefix("sha256:")
+            self.assertEqual("prepared", json.loads((retained / "receipt.json").read_bytes())["state"])
+            for relative, raw in originals.items():
+                self.assertEqual(raw, (payload / relative).read_bytes())
+
+    def test_replace_then_error_uses_attempt_journal_for_rollback(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = _project(root)
+            instance, payload = _instance(root)
+            state = root / "state"
+            initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+            answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+            plan = plan_active_registration(
+                SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                answers=answers, state_root=state,
+            )
+            originals = {
+                row["path"]: (payload / row["path"]).read_bytes()
+                for row in plan["operations"]
+            }
+
+            def replace_then_fail(transaction, stage):
+                entry = transaction._entry(stage)
+                target = transaction._target(entry["relative"], create_parents=False)
+                os.replace(entry["staged"], target)
+                raise OSError("injected error after replacement")
+
+            with patch.object(_SourceTransaction, "commit", replace_then_fail):
+                with self.assertRaisesRegex(RegistrationWizardError, "rolled back"):
+                    apply_active_registration(
+                        SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                        answers=answers, state_root=state,
+                    )
+            self.assertEqual([], list((state / "registrations").iterdir()))
+            for relative, raw in originals.items():
+                self.assertEqual(raw, (payload / relative).read_bytes())
 
     def test_later_commit_failure_restores_only_unchanged_wizard_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -436,6 +744,17 @@ class RegistrationWizardTest(unittest.TestCase):
                 state_root=state,
             )
             self.assertIn("fluid('sulfuric_water')", script.read_text("utf-8"))
+            inspected = inspect_active_registration_attempt(
+                SUITE_ROOT, project, plan_id=recipe_result["plan"]["plan_id"],
+                state_root=state,
+            )
+            self.assertEqual("applied", inspected["receipt_state"])
+            self.assertEqual("consistent", inspected["journal_status"])
+            self.assertEqual(["after"], [row["source_state"] for row in inspected["operations"]])
+            catalog_rows = ResourceCatalog(self.configuration_home).inventory(
+                workspace=project,
+            )["record_stores"]
+            self.assertIn(str(state / "registrations"), [row["path"] for row in catalog_rows])
             receipt_path = _uri_path(
                 recipe_result["receipt"]["target"]["receipt_uri"]
             )

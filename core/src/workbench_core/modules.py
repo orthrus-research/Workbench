@@ -9,6 +9,7 @@ from typing import Iterable, Sequence
 
 from workbench_api import Capability, ExecutionContext, Module, ModuleError
 from workbench_api.record_stores import record_store_scope
+from workbench_api.registration_attempts import registration_attempts_scope
 from .dependencies import dependency_errors
 
 RESERVED_COMMANDS = frozenset({"setup", "settings", "repair", "environment", "modules", "profiles", "version", "storage", "runtime", "world"})
@@ -118,6 +119,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         working_stores = nullcontext()
         fixture_stores = nullcontext()
         source_stores = nullcontext()
+        registration_stores = registration_attempts_scope(None)
         if owner.id == "atlas":
             from workbench_api.derived_indexes import derived_indexes_scope
             derived_stores = derived_indexes_scope(None)
@@ -189,6 +191,12 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
                 owner_id=owner.id,
                 check_cancelled=context.check_cancelled,
             ))
+            if owner.id == "workbench-shell":
+                from .registration_attempts import CoreRegistrationAttempts
+                registration_stores = registration_attempts_scope(CoreRegistrationAttempts(
+                    configuration_home=context.configuration_home,
+                    owner_id=owner.id,
+                ))
             if owner.id == "atlas":
                 derived_stores = derived_indexes_scope(CoreDerivedIndexes(
                     configuration_home=context.configuration_home,
@@ -210,7 +218,7 @@ def dispatch(arguments: Sequence[str], context: ExecutionContext, modules: Seque
         try:
             from workbench_api.archive_exchange import archive_exchange_scope
             from .archive_port import CoreArchiveExchange
-            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, source_stores, derived_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
+            with record_stores, attempt_stores, check_stores, tree_stores, working_stores, fixture_stores, source_stores, registration_stores, derived_stores, archive_exchange_scope(CoreArchiveExchange(check_cancelled=context.check_cancelled)):
                 handler = getattr(import_module(package), name)
                 result = handler(list(arguments[len(capability.command):]), context=operation_context)
         except SystemExit as exc:

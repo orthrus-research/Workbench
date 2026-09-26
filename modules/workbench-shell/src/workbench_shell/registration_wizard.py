@@ -6,19 +6,21 @@ from collections.abc import Mapping
 import difflib
 from hashlib import sha256
 import json
-import os
 from pathlib import Path, PurePosixPath
-import shutil
 import stat
 import sys
-import tempfile
 from typing import Any, NoReturn
 
 from .active_instance import load_active_instance
+from workbench_api import ModuleError
+from workbench_api.durable_resources import DurableResourceError
 from workbench_api.source_transactions import (
     SourceImage,
     SourceTransactionError,
     open_source_transaction,
+)
+from workbench_api.registration_attempts import (
+    RegistrationImage, registration_attempts,
 )
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
@@ -67,10 +69,9 @@ def _state_root(suite: Path, value: Path | str | None) -> Path:
     root = (
         default_suite_state_root(suite)
         if value is None
-        else Path(value).expanduser().resolve()
+        else Path(value).expanduser().absolute()
     )
-    root.mkdir(parents=True, exist_ok=True)
-    if not root.is_dir() or root.is_symlink():
+    if root.exists() and (not root.is_dir() or root.is_symlink()):
         _fail("Workbench state root must be a regular directory")
     return root
 
@@ -369,17 +370,6 @@ def plan_active_registration(
     return _plan(rendered, payload, context)
 
 
-def _write_json(path: Path, value: dict[str, Any]) -> None:
-    try:
-        with path.open("w", encoding="utf-8") as output:
-            json.dump(value, output, ensure_ascii=False, indent=2, sort_keys=True)
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-    except OSError as exc:
-        _fail(f"cannot retain registration receipt: {exc}")
-
-
 def apply_active_registration(
     suite_root: Path | str,
     workspace_root: Path | str,
@@ -414,119 +404,172 @@ def apply_active_registration(
             "before applying it"
         )
     state = _state_root(suite, state_root)
-    transactions = state / "registrations"
-    transactions.mkdir(parents=True, exist_ok=True)
-    if transactions.is_symlink():
-        _fail("registration transaction root cannot be a symbolic link")
-    digest = plan["plan_id"].removeprefix("sha256:")
-    transaction = transactions / digest
-    if transaction.exists() or transaction.is_symlink():
-        _fail("this exact registration transaction already has retained state")
-    temporary = Path(tempfile.mkdtemp(prefix=".apply-", dir=transactions))
-    backups = temporary / "backups"
-    backups.mkdir()
-    source_transaction = None
-    retain_incomplete = False
+    workspace = Path(workspace_root).expanduser().resolve()
+    retained_images: list[RegistrationImage] = []
+    source_images: list[tuple[str, SourceImage, SourceImage]] = []
+    receipt_outputs: list[dict[str, Any]] = []
+    for operation in operations:
+        relative = _safe_relative(operation["path"], "registration operation path")
+        target = payload.joinpath(*relative.parts)
+        if target.is_symlink() or not target.is_file():
+            _fail(f"registration target changed before apply: {relative}")
+        before = target.read_bytes()
+        if sha256(before).hexdigest() != operation["before_sha256"]:
+            _fail(f"registration target changed before apply: {relative}")
+        mode = stat.S_IMODE(target.stat().st_mode)
+        retained_images.append(RegistrationImage(relative.as_posix(), before, operation["content"], mode))
+        source_images.append((
+            relative.as_posix(), SourceImage("file", before, mode=mode),
+            SourceImage("file", operation["content"], mode=mode),
+        ))
+        receipt_outputs.append({
+            "operation": "update", "path": relative.as_posix(),
+            "before_sha256": operation["before_sha256"],
+            "content_sha256": operation["content_sha256"],
+            "size": len(operation["content"]),
+            "backup_path": (PurePosixPath("backups") / relative).as_posix(),
+        })
     try:
-        receipt_outputs: list[dict[str, Any]] = []
-        images: list[tuple[str, SourceImage, SourceImage]] = []
-        for operation in operations:
-            relative = _safe_relative(operation["path"], "registration operation path")
-            target = payload.joinpath(*relative.parts)
-            if target.is_symlink() or not target.is_file():
-                _fail(f"registration target changed before apply: {relative}")
-            before = target.read_bytes()
-            if sha256(before).hexdigest() != operation["before_sha256"]:
-                _fail(f"registration target changed before apply: {relative}")
-            backup = backups.joinpath(*relative.parts)
-            backup.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(target, backup)
-            mode = stat.S_IMODE(target.stat().st_mode)
-            images.append((
-                relative.as_posix(),
-                SourceImage("file", before, mode=mode),
-                SourceImage("file", operation["content"], mode=mode),
-            ))
-            receipt_outputs.append({
-                "operation": "update",
-                "path": relative.as_posix(),
-                "before_sha256": operation["before_sha256"],
-                "content_sha256": operation["content_sha256"],
-                "size": len(operation["content"]),
-                "backup_path": (PurePosixPath("backups") / relative).as_posix(),
-            })
-        receipt = {
-            "format": "workbench-registration-receipt-v1",
-            "schema_version": 1,
-            "transaction_id": plan["plan_id"],
-            "state": "prepared",
-            "operation_class": "local-mutation",
-            "plan": {key: value for key, value in plan.items() if key != "operations"},
-            "outputs": receipt_outputs,
-            "target": {
-                "instance_root_uri": context["selection"]["instance"]["root_uri"],
-                "payload_root_uri": payload.as_uri(),
-                "receipt_uri": (transaction / "receipt.json").as_uri(),
-            },
-        }
-        source_transaction = open_source_transaction(
-            payload, binding=f"registration:{plan['plan_id']}",
-        )
-        stages = [
-            source_transaction.prepare(relative, before=before, after=after)
-            for relative, before, after in images
-        ]
-        _write_json(temporary / "receipt.json", receipt)
-
-        for stage in stages:
-            source_transaction.commit(stage)
-
-        receipt["state"] = "applied"
-        _write_json(temporary / "receipt.json", receipt)
-        os.replace(temporary, transaction)
-        return {
-            "format": "workbench-registration-result-v1",
-            "schema_version": 1,
-            "outcome": "applied",
-            "plan": plan,
-            "receipt": receipt,
-        }
-    except Exception as exc:
-        rollback_error: Exception | None = None
-        if source_transaction is not None:
+        with registration_attempts().open(
+            state_root=state, workspace=workspace, payload=payload,
+            plan_id=plan["plan_id"], selection_id=context["selection"]["selection_id"],
+        ) as retained:
+            receipt = {
+                "format": "workbench-registration-receipt-v1", "schema_version": 1,
+                "transaction_id": plan["plan_id"], "state": "prepared",
+                "operation_class": "local-mutation",
+                "plan": {key: value for key, value in plan.items() if key != "operations"},
+                "outputs": receipt_outputs,
+                "target": {
+                    "instance_root_uri": context["selection"]["instance"]["root_uri"],
+                    "payload_root_uri": payload.as_uri(),
+                    "receipt_uri": (retained.transaction_path / "receipt.json").as_uri(),
+                },
+            }
+            prepared_bytes = _canonical_bytes(receipt) + b"\n"
+            source_transaction = None
+            prepared = False
+            stages = []
+            attempted_count = 0
             try:
-                source_transaction.rollback_all()
-            except Exception as rollback_exc:
-                rollback_error = rollback_exc
-        if rollback_error is not None:
-            # Preserve the original images for an explicit recovery decision.
-            # Core refused to overwrite a source changed after our commit.
-            retain_incomplete = True
-            if not transaction.exists() and not transaction.is_symlink():
-                try:
-                    os.replace(temporary, transaction)
-                except OSError:
-                    pass
-            raise RegistrationWizardError(
-                f"registration failed and rollback also failed: {rollback_error}"
-            ) from exc
-        if isinstance(exc, RegistrationWizardError):
-            raise
-        _fail(f"registration transaction failed and was rolled back: {exc}")
-    finally:
-        if source_transaction is not None:
-            try:
+                retained.prepare(tuple(retained_images), prepared_bytes)
+                prepared = True
+                source_transaction = open_source_transaction(
+                    payload, binding=f"registration:{plan['plan_id']}",
+                    staging_token=retained.staging_token,
+                )
+                for ordinal, (relative, before, after) in enumerate(source_images):
+                    stage = source_transaction.prepare(relative, before=before, after=after)
+                    retained.record_stage(ordinal, stage.staged_relative)
+                    stages.append(stage)
+                for ordinal, stage in enumerate(stages):
+                    retained.mark_attempted(ordinal)
+                    attempted_count = ordinal + 1
+                    source_transaction.commit(stage)
+                if any(source_transaction.classify(stage) != "after" for stage in stages):
+                    _fail("registration output changed before receipt publication")
                 source_transaction.cleanup()
-            except SourceTransactionError:
-                retain_incomplete = True
-                raise
-        if temporary.exists() and not retain_incomplete:
-            shutil.rmtree(temporary)
+                receipt["state"] = "applied"
+                retained.publish_applied(_canonical_bytes(receipt) + b"\n")
+                retained.promote()
+                return {
+                    "format": "workbench-registration-result-v1", "schema_version": 1,
+                    "outcome": "applied", "plan": plan, "receipt": receipt,
+                }
+            except Exception as exc:
+                rollback_error: Exception | None = None
+                if source_transaction is not None:
+                    for ordinal in reversed(range(attempted_count)):
+                        try:
+                            relative, before, after = source_images[ordinal]
+                            stage = source_transaction.attach(
+                                relative, before=before, after=after,
+                                staged_relative=stages[ordinal].staged_relative,
+                                attempted=True,
+                            )
+                            observed = source_transaction.classify(stage)
+                            if observed == "after":
+                                source_transaction.rollback(stage)
+                            elif observed != "before":
+                                raise SourceTransactionError(
+                                    "stale", "registration source changed after replacement attempt",
+                                )
+                        except Exception as rollback_exc:
+                            rollback_error = rollback_error or rollback_exc
+                    for stage in stages:
+                        try:
+                            if source_transaction.classify(stage) != "before":
+                                raise SourceTransactionError(
+                                    "stale", "registration source is not at its preimage after rollback",
+                                )
+                        except Exception as rollback_exc:
+                            rollback_error = rollback_error or rollback_exc
+                    try:
+                        source_transaction.cleanup()
+                    except Exception as cleanup_exc:
+                        rollback_error = rollback_error or cleanup_exc
+                if prepared:
+                    try:
+                        retained.restore_prepared(prepared_bytes)
+                    except Exception as restore_exc:
+                        rollback_error = rollback_error or restore_exc
+                if rollback_error is not None:
+                    try:
+                        if not retained.promoted:
+                            retained.promote()
+                    except Exception as retention_exc:
+                        rollback_error.add_note(
+                            f"Registration attempt remains at {retained.path}: {retention_exc}"
+                        )
+                    raise RegistrationWizardError(
+                        f"registration failed and rollback also failed: {rollback_error}"
+                    ) from exc
+                if retained.promoted:
+                    _fail(
+                        "registration failed after receipt promotion; source edits were rolled "
+                        f"back and the retained attempt requires review: {retained.transaction_path}"
+                    )
+                retained.discard()
+                if isinstance(exc, RegistrationWizardError):
+                    raise
+                _fail(f"registration transaction failed and was rolled back: {exc}")
+    except (OSError, DurableResourceError, ModuleError) as exc:
+        _fail(f"registration Core custody rejected the attempt: {exc}")
+
+
+def inspect_active_registration_attempt(
+    suite_root: Path | str,
+    workspace_root: Path | str,
+    *,
+    plan_id: str,
+    state_root: Path | str | None = None,
+    configuration: WorkbenchConfiguration | None = None,
+    config_path: Path | str | None = None,
+) -> dict[str, Any]:
+    """Inspect a retained attempt against the still-selected instance."""
+
+    suite = Path(suite_root).resolve()
+    active_configuration = _active_configuration(suite, configuration, config_path)
+    selection = load_active_instance(
+        suite, workspace_root, state_root=state_root,
+        configuration=active_configuration,
+    )
+    try:
+        with registration_attempts().open(
+            state_root=_state_root(suite, state_root),
+            workspace=Path(workspace_root).expanduser().resolve(),
+            payload=selection["payload_path"], plan_id=plan_id,
+            selection_id=selection["selection_id"],
+        ) as attempt:
+            return attempt.inspect()
+    except (OSError, DurableResourceError, ModuleError) as exc:
+        _fail(f"registration attempt requires review: {exc}")
 
 
 __all__ = [
     "RegistrationWizardError",
     "apply_active_registration",
+    "inspect_active_registration_attempt",
     "plan_active_registration",
     "registration_capabilities",
 ]
