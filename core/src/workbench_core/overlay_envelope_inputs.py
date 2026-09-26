@@ -19,16 +19,19 @@ import sys
 from typing import Callable, Iterable, Iterator, Mapping
 from uuid import uuid4
 
+from workbench_api.managed_trees import ManagedTreeError, ManagedTreeReference
+
 from .durable_files import _directory as pinned_directory
 from .durable_records import publish_immutable_bytes, read_private_bytes
 from .host_filesystem import private_path, secure_private_path
-from .managed_trees import _CoreTreeStage
+from .managed_trees import CoreManagedTrees, _CoreTreeStage
 from .output_routing import _private_directory
 from .storage.exact_tree_inventory import (
-    MAX_DIRECTORIES, MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES,
-    inventory_exact_members,
+    EXACT_INVENTORY_POLICY, MAX_DIRECTORIES, MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES,
+    exact_content_sha256, inventory_exact_members,
 )
 from .storage.registered import ResourceCatalog
+from .storage.tree_catalog import EXACT_INTENT_KIND, TreeCatalog
 from .transport_trees import _mount_id
 
 
@@ -42,6 +45,8 @@ _PLAN_CHUNK_BYTES = 1024 * 1024
 _SIBLING_COUNT = 2
 _SIBLING_RESERVE_BYTES = _SIBLING_COUNT * MAX_FILE_BYTES
 _SIBLING_NAMES = ("gtceu-worldgen-inventory-v1.json", "overlay-materialization-v1.json")
+_PUBLICATION_ATTEMPT_FORMAT = "workbench-overlay-envelope-publication-attempted-v1"
+_PUBLICATION_COMPLETE_FORMAT = "workbench-overlay-envelope-publication-complete-v1"
 _NONCE = re.compile(r"[0-9a-f]{32}\Z")
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _PART = re.compile(r"[^/\\\0\r\n:]+\Z")
@@ -385,6 +390,7 @@ class CoreOverlayEnvelopeInputs:
                 "input.json", "copy-attempted.json", "copy-complete.json",
                 "effects", "effect-seal.json", "operations", "operations-complete.json",
                 "siblings-attempted.json", "siblings-complete.json",
+                "publication-attempted.json", "publication-complete.json",
             }
             if any(path.name not in expected_entries for path in root.iterdir()):
                 raise OverlayEnvelopeInputError("overlay.changed", "overlay attempt has an unknown entry")
@@ -469,6 +475,9 @@ class CoreOverlayEnvelopeInputs:
                 raise OverlayEnvelopeInputError("overlay.changed", "overlay copy attempt lacks sealed effects")
             if (root / "input.json").exists() and not (root / "manifest.json").exists():
                 raise OverlayEnvelopeInputError("overlay.changed", "overlay inputs lack their manifest")
+            selected_path, publication_status, _publication = self._publication_state(
+                root, reservation, tree_catalog,
+            )
             copy_path = root / "copy-complete.json"
             if (root / "input.json").exists():
                 input_raw = read_private_bytes(root / "input.json", byte_limit=_MANIFEST_BYTES)
@@ -525,8 +534,8 @@ class CoreOverlayEnvelopeInputs:
                                 or any(copy_record[key] != value for key, value in basic.items())):
                             raise OverlayEnvelopeInputError("overlay.changed", "overlay copy identity changed")
                         for path, device, inode in (
-                            (Path(stage_text), copy_record["payload_device"], copy_record["payload_inode"]),
-                            (Path(stage_text) / reservation["content_root"],
+                            (selected_path, copy_record["payload_device"], copy_record["payload_inode"]),
+                            (selected_path / reservation["content_root"],
                              copy_record["content_device"], copy_record["content_inode"]),
                         ):
                             try:
@@ -568,9 +577,9 @@ class CoreOverlayEnvelopeInputs:
             if (root / "operations").exists() or (root / "operations-complete.json").exists():
                 self._inventory_operations(root, reservation["attempt_id"], effect_rows,
                                            effect_seal_path.exists(), copy_path.exists(),
-                                           Path(stage_text))
+                                           selected_path)
             if (root / "siblings-attempted.json").exists() or (root / "siblings-complete.json").exists():
-                self._inventory_siblings(root, reservation["attempt_id"], Path(stage_text))
+                self._inventory_siblings(root, reservation["attempt_id"], selected_path)
             status = ("copy-complete" if (root / "copy-complete.json").is_file()
                       else "copy-incomplete" if (root / "copy-attempted.json").is_file()
                       else "effects-incomplete" if (root / "effects").exists() and not effect_seal_path.exists()
@@ -585,6 +594,8 @@ class CoreOverlayEnvelopeInputs:
                 status = "siblings-complete"
             elif (root / "siblings-attempted.json").exists():
                 status = "siblings-incomplete"
+            if publication_status is not None:
+                status = publication_status
             rows.append({"attempt_id": reservation["attempt_id"], "status": status,
                          "path": str(root), "stage_path": reservation["stage_path"],
                          "tree_id": reservation["tree_id"],
@@ -692,6 +703,178 @@ class CoreOverlayEnvelopeInputs:
         }
         if _read_record(complete_path, byte_limit=_MANIFEST_BYTES) != expected:
             raise OverlayEnvelopeInputError("overlay.changed", "overlay sibling completion changed")
+
+    @staticmethod
+    def _publication_state(
+        root: Path, reservation: Mapping[str, object], tree_catalog: TreeCatalog,
+    ) -> tuple[Path, str | None, dict[str, object] | None]:
+        """Resolve one attempt to its private stage or an exact Core published target."""
+        attempted_path = root / "publication-attempted.json"
+        complete_path = root / "publication-complete.json"
+        stage = Path(str(reservation["stage_path"]))
+        target = Path(str(reservation["target"]))
+        if not attempted_path.exists():
+            if complete_path.exists():
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay publication completion lacks an attempt")
+            return stage, None, None
+        attempted_raw = read_private_bytes(attempted_path, byte_limit=_MANIFEST_BYTES)
+        attempted = _read_record(attempted_path, byte_limit=_MANIFEST_BYTES)
+        siblings_path = root / "siblings-complete.json"
+        copy_path = root / "copy-complete.json"
+        if not siblings_path.exists() or not copy_path.exists():
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay publication lacks completed inputs")
+        siblings = _read_record(siblings_path, byte_limit=_MANIFEST_BYTES)
+        copy = _read_record(copy_path, byte_limit=_MANIFEST_BYTES)
+        summary = attempted.get("stage_inventory")
+        if (set(attempted) != {"format", "attempt_id", "tree_id", "target", "stage_path",
+                               "siblings_sha256", "stage_inventory", "content_sha256",
+                               "payload_device", "payload_inode"}
+                or attempted["format"] != _PUBLICATION_ATTEMPT_FORMAT
+                or attempted["attempt_id"] != reservation["attempt_id"]
+                or attempted["tree_id"] != reservation["tree_id"]
+                or attempted["target"] != reservation["target"]
+                or attempted["stage_path"] != reservation["stage_path"]
+                or attempted["siblings_sha256"] != sha256(
+                    read_private_bytes(siblings_path, byte_limit=_MANIFEST_BYTES)
+                ).hexdigest()
+                or not _valid_inventory_summary(summary)
+                or summary != siblings.get("stage_inventory")
+                or type(attempted["content_sha256"]) is not str
+                or _DIGEST.fullmatch(attempted["content_sha256"]) is None
+                or attempted["payload_device"] != copy.get("payload_device")
+                or attempted["payload_inode"] != copy.get("payload_inode")):
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay publication attempt changed")
+        try:
+            intent = tree_catalog.intent(str(reservation["tree_id"]))
+        except ManagedTreeError as exc:
+            if exc.code != "tree.unavailable":
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay Core tree intent changed") from exc
+            intent = None
+        if intent is not None and (
+            intent["format"] != EXACT_INTENT_KIND
+            or intent["inventory_policy"] != EXACT_INVENTORY_POLICY
+            or intent["domain_id"] != reservation["attempt_id"]
+            or intent["content_sha256"] != attempted["content_sha256"]
+            or intent["root_mode"] != summary["root_mode"]
+            or intent["file_count"] != summary["file_count"]
+            or intent["directory_count"] != summary["directory_count"]
+            or (intent["device"], intent["inode"]) != (
+                attempted["payload_device"], attempted["payload_inode"]
+            )
+        ):
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay Core tree intent differs from attempt")
+        stage_present = stage.exists() or stage.is_symlink()
+        target_present = target.exists() or target.is_symlink()
+        aborted = tree_catalog._path(
+            "aborts", str(reservation["tree_id"]).rsplit(":", 1)[-1],
+        ).is_file()
+
+        def check_copied_content(selected: Path) -> None:
+            try:
+                info = (selected / str(reservation["content_root"])).lstat()
+            except FileNotFoundError as exc:
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay copied content is missing") from exc
+            if (not stat.S_ISDIR(info.st_mode)
+                    or (info.st_dev, info.st_ino) != (
+                        copy.get("content_device"), copy.get("content_inode")
+                    )):
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay copied content identity changed")
+
+        if stage_present:
+            if complete_path.exists():
+                raise OverlayEnvelopeInputError("overlay.changed", "completed overlay publication still has a stage")
+            if intent is not None:
+                try:
+                    selected = stage.lstat()
+                    if (not stat.S_ISDIR(selected.st_mode)
+                            or (selected.st_dev, selected.st_ino) != (intent["device"], intent["inode"])):
+                        raise OverlayEnvelopeInputError("overlay.changed", "prepared overlay stage identity changed")
+                    tree_catalog._verify_exact(intent, stage)
+                except ManagedTreeError as exc:
+                    raise OverlayEnvelopeInputError("overlay.changed", "prepared overlay stage changed") from exc
+            check_copied_content(stage)
+            return stage, ("publication-collision" if target_present else
+                           "publication-failed" if aborted else
+                           "publication-prepared" if intent is not None else
+                           "publication-incomplete"), attempted
+        if not target_present or intent is None:
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay publication has no provable stage or target")
+        try:
+            tree_catalog._verify(intent)
+        except ManagedTreeError as exc:
+            raise OverlayEnvelopeInputError("overlay.changed", "published overlay target changed") from exc
+        check_copied_content(target)
+        try:
+            tree_catalog.commit(str(reservation["tree_id"]), intent)
+        except ManagedTreeError as exc:
+            if exc.code != "tree.unavailable":
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay Core tree commit changed") from exc
+            committed = False
+        else:
+            committed = True
+        if complete_path.exists():
+            expected = {
+                "format": _PUBLICATION_COMPLETE_FORMAT,
+                "attempt_id": reservation["attempt_id"],
+                "tree_id": reservation["tree_id"],
+                "publication_sha256": sha256(attempted_raw).hexdigest(),
+                "intent_id": intent["id"],
+                "content_sha256": attempted["content_sha256"],
+            }
+            if not committed or _read_record(complete_path, byte_limit=_MANIFEST_BYTES) != expected:
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay publication completion changed")
+            return target, "published", attempted
+        return target, ("published-unreconciled" if committed else "published-uncommitted"), attempted
+
+    @staticmethod
+    def _seal_publication_completion(
+        root: Path, reservation: Mapping[str, object], reference: ManagedTreeReference,
+        tree_catalog: TreeCatalog,
+    ) -> None:
+        selected, status, attempted = CoreOverlayEnvelopeInputs._publication_state(
+            root, reservation, tree_catalog,
+        )
+        if (status not in {"published-uncommitted", "published-unreconciled"}
+                or selected != reference.path or reference.tree_id != reservation["tree_id"]
+                or reference.domain_id != reservation["attempt_id"]
+                or reference.content_sha256 != "sha256:" + attempted["content_sha256"]):
+            raise OverlayEnvelopeInputError("overlay.changed", "Core publication differs from overlay attempt")
+        CoreOverlayEnvelopeInputs._inventory_siblings(root, str(reservation["attempt_id"]), selected)
+        intent = tree_catalog.intent(str(reservation["tree_id"]))
+        tree_catalog.commit(str(reservation["tree_id"]), intent)
+        attempted_raw = read_private_bytes(root / "publication-attempted.json", byte_limit=_MANIFEST_BYTES)
+        publish_immutable_bytes(root / "publication-complete.json", _canonical({
+            "format": _PUBLICATION_COMPLETE_FORMAT,
+            "attempt_id": reservation["attempt_id"],
+            "tree_id": reservation["tree_id"],
+            "publication_sha256": sha256(attempted_raw).hexdigest(),
+            "intent_id": intent["id"],
+            "content_sha256": attempted["content_sha256"],
+        }) + b"\n", byte_limit=_MANIFEST_BYTES)
+
+    def reconcile_publication(
+        self, *, attempt_id: str, trees: CoreManagedTrees,
+    ) -> ManagedTreeReference:
+        """Explicitly finish an exact Core intent after an interrupted publish."""
+        if (not isinstance(trees, CoreManagedTrees)
+                or trees.workspace != self.workspace
+                or trees.catalog.configuration_home != self.configuration_home
+                or trees.owner_id != self.owner_id):
+            raise OverlayEnvelopeInputError("overlay.policy", "overlay recovery needs the exact Core tree owner")
+        rows = [row for row in self.inventory() if row.get("attempt_id") == attempt_id]
+        if len(rows) != 1 or rows[0]["status"] not in {
+            "publication-prepared", "published-uncommitted", "published-unreconciled",
+        }:
+            raise OverlayEnvelopeInputError("overlay.state", "overlay publication is not ready for reconciliation")
+        row = rows[0]
+        root = Path(str(row["path"]))
+        reservation = _read_record(root / "reservation.json")
+        reference = trees.reconcile(str(row["tree_id"]))
+        self._seal_publication_completion(root, reservation, reference, self._tree_catalog())
+        return reference
+
+    def _tree_catalog(self) -> TreeCatalog:
+        return ResourceCatalog(self.configuration_home).trees
 
 
 class CoreOverlayEnvelopeInputAttempt:
@@ -1344,6 +1527,77 @@ class CoreOverlayEnvelopeInputAttempt:
             "stage_inventory": _inventory_summary(rows, root_mode),
         }) + b"\n", byte_limit=_MANIFEST_BYTES)
         return tuple(self.stage.path / name for name in _SIBLING_NAMES)
+
+    def publish_envelope(
+        self, *, validate_output: Callable[[Path, Iterable[bytes]], object],
+    ) -> ManagedTreeReference:
+        """Publish the validated whole envelope through Core's exact V3 tree."""
+        if not callable(validate_output):
+            raise OverlayEnvelopeInputError("overlay.plan", "overlay publication needs an output validator")
+        if (self.root / "publication-attempted.json").exists() or (self.root / "publication-complete.json").exists():
+            raise OverlayEnvelopeInputError("overlay.state", "overlay publication was already attempted")
+        if self.stage.renamed or self.stage.committed or self.stage.target.exists() or self.stage.target.is_symlink():
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay publication target is not fresh")
+        self._verified_inputs()
+        content_fd = self._copied_stage()
+        os.close(content_fd)
+        _seal, effects = self._read_effect_seal()
+        self.host._inventory_operations(
+            self.root, self.attempt_id, effects, True, True, self.stage.path,
+            cancelled=self.stage.host._cancelled,
+        )
+
+        def validate_stage(path: Path) -> None:
+            if path != self.stage.path:
+                raise OverlayEnvelopeInputError("overlay.changed", "overlay publication selected another stage")
+            pinned_content = self._copied_stage()
+            os.close(pinned_content)
+            self.host._inventory_siblings(self.root, self.attempt_id, path)
+            selected = validate_output(path / str(self.reservation["content_root"]), self._plan_chunks())
+            if (type(selected) is not tuple or len(selected) != _SIBLING_COUNT
+                    or any(type(data) is not bytes for data in selected)):
+                raise OverlayEnvelopeInputError("overlay.plan", "overlay output validator returned invalid bytes")
+            retained = _read_record(self.root / "siblings-attempted.json", byte_limit=_MANIFEST_BYTES)
+            for index, expected in enumerate(selected):
+                metadata = retained["siblings"][index]
+                if (len(expected) != metadata["size_bytes"]
+                        or sha256(expected).hexdigest() != metadata["sha256"]):
+                    raise OverlayEnvelopeInputError("overlay.changed", "overlay sibling differs from reviewed output")
+            self.stage.host.check_cancelled()
+
+        validate_stage(self.stage.path)
+        rows, root_mode, _files, _directories = inventory_exact_members(
+            self.stage.path, cancelled=self.stage.host._cancelled,
+        )
+        summary = _inventory_summary(rows, root_mode)
+        sibling_completion = _read_record(self.root / "siblings-complete.json", byte_limit=_MANIFEST_BYTES)
+        if summary != sibling_completion["stage_inventory"]:
+            raise OverlayEnvelopeInputError("overlay.changed", "overlay envelope changed before publication")
+        copy = _read_record(self.root / "copy-complete.json", byte_limit=_MANIFEST_BYTES)
+        attempted = {
+            "format": _PUBLICATION_ATTEMPT_FORMAT,
+            "attempt_id": self.attempt_id,
+            "tree_id": self.stage.tree_id,
+            "target": str(self.stage.target), "stage_path": str(self.stage.path),
+            "siblings_sha256": sha256(read_private_bytes(
+                self.root / "siblings-complete.json", byte_limit=_MANIFEST_BYTES,
+            )).hexdigest(),
+            "stage_inventory": summary,
+            "content_sha256": exact_content_sha256(rows),
+            "payload_device": copy["payload_device"],
+            "payload_inode": copy["payload_inode"],
+        }
+        self.stage.host.check_cancelled()
+        publish_immutable_bytes(self.root / "publication-attempted.json",
+                                _canonical(attempted) + b"\n", byte_limit=_MANIFEST_BYTES)
+        reference = self.stage.publish(
+            validate=validate_stage, domain_id=self.attempt_id,
+            inventory_policy=EXACT_INVENTORY_POLICY,
+        )
+        self.host._seal_publication_completion(
+            self.root, self.reservation, reference, self.stage.host.catalog.trees,
+        )
+        return reference
 
     @staticmethod
     def _write_sibling(payload_fd: int, name: str, data: bytes) -> None:

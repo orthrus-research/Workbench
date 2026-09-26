@@ -4,6 +4,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import sys
@@ -88,6 +89,23 @@ class OverlayEnvelopeInputTests(unittest.TestCase):
                         "expected_sha256": None, "data": b"{}\n"},)
         attempt.seal_effects(effects, validate_plan=lambda _chunks: effects)
         return attempt, manifest
+
+    def _ready_envelope(self, stage):
+        effect = ({"op": "add", "relative_path": "worldgen/vein/new.json",
+                   "expected_sha256": None, "data": b"{}\n"},)
+        attempt, manifest = self._attempt(stage, effect)
+        attempt.copy_source(verify_source=lambda _selected, _chunks: manifest)
+        attempt.apply_effects(effect)
+        siblings = (b'{"inventory":"reviewed"}\n', b'{"materialization":"reviewed"}\n')
+
+        def validate_output(_content, _chunks):
+            return siblings
+
+        attempt.write_siblings(
+            inventory_bytes=siblings[0], materialization_bytes=siblings[1],
+            validate_output=validate_output,
+        )
+        return attempt, validate_output
 
     def test_core_copies_complete_rows_and_retains_pre_copy_attempt(self) -> None:
         with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
@@ -358,6 +376,147 @@ class OverlayEnvelopeInputTests(unittest.TestCase):
                             validate_output=lambda _content, _chunks: (b"inventory\n", b"receipt\n"),
                         )
                     self.assertFalse(target.exists())
+
+    def test_exact_core_tree_publishes_one_verified_envelope(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, validate_output = self._ready_envelope(stage)
+            reference = attempt.publish_envelope(validate_output=validate_output)
+            self.assertEqual(stage.tree_id, reference.tree_id)
+            self.assertEqual(attempt.attempt_id, reference.domain_id)
+            self.assertEqual(self.target, reference.path)
+            self.assertTrue(self.target.is_dir())
+            self.assertFalse(stage.path.exists())
+            self.assertEqual("published", self.host.inventory()[0]["status"])
+        reopened = CoreOverlayEnvelopeInputs(
+            workspace=self.workspace, configuration_home=self.configuration_home,
+            owner_id="crucible",
+        )
+        self.assertEqual("published", reopened.inventory()[0]["status"])
+        self.assertEqual("published", ResourceCatalog(self.configuration_home).inventory(
+            workspace=self.workspace)["overlay_envelopes"][0]["status"])
+        with self.assertRaisesRegex(OverlayEnvelopeInputError, "already attempted"):
+            attempt.publish_envelope(validate_output=validate_output)
+
+    def test_changed_published_sibling_blocks_reconciliation_and_inventory(self) -> None:
+        with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+            attempt, validate_output = self._ready_envelope(stage)
+            attempt.publish_envelope(validate_output=validate_output)
+        (self.target / "overlay-materialization-v1.json").write_bytes(b"changed\n")
+        with self.assertRaisesRegex(OverlayEnvelopeInputError, "published overlay target changed"):
+            self.host.inventory()
+        with self.assertRaises(OverlayEnvelopeInputError):
+            self.host.reconcile_publication(attempt_id=attempt.attempt_id, trees=self.trees)
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_publication_crash_windows_reconcile_only_exact_core_intents(self) -> None:
+        for phase, expected_status in (
+            ("before-intent", "publication-incomplete"),
+            ("before-rename", "publication-prepared"),
+            ("after-rename-before-commit", "published-uncommitted"),
+            ("after-rename", "published-unreconciled"),
+        ):
+            with self.subTest(phase=phase):
+                target = self.target.parent / phase / "config"
+                child = os.fork()
+                if child == 0:
+                    try:
+                        with self.trees.stage("artifacts", "config", requested_path=target) as stage:
+                            attempt, validate_output = self._ready_envelope(stage)
+                            if phase == "before-intent":
+                                with patch.object(stage, "publish", side_effect=lambda **_kwargs: os._exit(73)):
+                                    attempt.publish_envelope(validate_output=validate_output)
+                            elif phase == "before-rename":
+                                with patch("workbench_core.managed_trees._rename_no_replace",
+                                           side_effect=lambda *_args, **_kwargs: os._exit(73)):
+                                    attempt.publish_envelope(validate_output=validate_output)
+                            elif phase == "after-rename-before-commit":
+                                from workbench_core import managed_trees as managed_tree_module
+                                original_rename = managed_tree_module._rename_no_replace
+
+                                def exit_after_rename(*args, **kwargs):
+                                    original_rename(*args, **kwargs)
+                                    os._exit(73)
+
+                                with patch("workbench_core.managed_trees._rename_no_replace",
+                                           side_effect=exit_after_rename):
+                                    attempt.publish_envelope(validate_output=validate_output)
+                            else:
+                                original = stage.publish
+
+                                def exit_after_publish(**kwargs):
+                                    original(**kwargs)
+                                    os._exit(73)
+
+                                with patch.object(stage, "publish", side_effect=exit_after_publish):
+                                    attempt.publish_envelope(validate_output=validate_output)
+                    except BaseException:
+                        os._exit(74)
+                    os._exit(75)
+                _pid, status = os.waitpid(child, 0)
+                self.assertEqual(73, os.waitstatus_to_exitcode(status))
+                row = next(row for row in self.host.inventory() if row["target"] == str(target))
+                self.assertEqual(expected_status, row["status"])
+                if phase == "before-intent":
+                    with self.assertRaisesRegex(OverlayEnvelopeInputError, "not ready"):
+                        self.host.reconcile_publication(attempt_id=row["attempt_id"], trees=self.trees)
+                    self.assertFalse(target.exists())
+                    self.assertTrue(Path(row["stage_path"]).exists())
+                else:
+                    reference = self.host.reconcile_publication(
+                        attempt_id=row["attempt_id"], trees=self.trees,
+                    )
+                    self.assertEqual(target, reference.path)
+                    self.assertEqual("published", next(
+                        item for item in self.host.inventory() if item["attempt_id"] == row["attempt_id"]
+                    )["status"])
+
+    def test_occupied_target_at_no_replace_rename_remains_a_publication_conflict(self) -> None:
+        count = 0
+        with self.assertRaises(ManagedTreeError):
+            with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+                attempt, _validate_output = self._ready_envelope(stage)
+
+                def collide_during_publish(_content, _chunks):
+                    nonlocal count
+                    count += 1
+                    if count == 2:
+                        self.target.mkdir()
+                    return b'{"inventory":"reviewed"}\n', b'{"materialization":"reviewed"}\n'
+
+                attempt.publish_envelope(validate_output=collide_during_publish)
+        row = self.host.inventory()[0]
+        self.assertEqual("publication-collision", row["status"])
+        self.assertTrue(Path(row["stage_path"]).exists())
+        self.assertTrue(self.target.exists())
+        with self.assertRaisesRegex(OverlayEnvelopeInputError, "not ready"):
+            self.host.reconcile_publication(attempt_id=row["attempt_id"], trees=self.trees)
+
+    @unittest.skipUnless(hasattr(os, "fork"), "hard-exit fixture requires fork")
+    def test_prepared_stage_with_same_bytes_but_new_inode_cannot_reconcile(self) -> None:
+        child = os.fork()
+        if child == 0:
+            try:
+                with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
+                    attempt, validate_output = self._ready_envelope(stage)
+                    with patch("workbench_core.managed_trees._rename_no_replace",
+                               side_effect=lambda *_args, **_kwargs: os._exit(73)):
+                        attempt.publish_envelope(validate_output=validate_output)
+            except BaseException:
+                os._exit(74)
+            os._exit(75)
+        _pid, status = os.waitpid(child, 0)
+        self.assertEqual(73, os.waitstatus_to_exitcode(status))
+        row = self.host.inventory()[0]
+        self.assertEqual("publication-prepared", row["status"])
+        original = Path(row["stage_path"])
+        retained = original.with_name("retained-payload")
+        original.rename(retained)
+        shutil.copytree(retained, original)
+        with self.assertRaisesRegex(OverlayEnvelopeInputError, "stage identity changed"):
+            self.host.inventory()
+        with self.assertRaises(OverlayEnvelopeInputError):
+            self.host.reconcile_publication(attempt_id=row["attempt_id"], trees=self.trees)
+        self.assertFalse(self.target.exists())
 
     def test_changed_effect_record_is_reported_as_changed_attempt(self) -> None:
         with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:

@@ -366,7 +366,7 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
             )
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "V2 Core copy uses Linux pinned handles")
-    def test_v2_inventory_streams_into_core_attempt_before_copy(self) -> None:
+    def test_v2_inventory_streams_into_core_published_overlay(self) -> None:
         try:
             from workbench_core.managed_trees import CoreManagedTrees
             from workbench_core.overlay_envelope_inputs import CoreOverlayEnvelopeInputs
@@ -441,7 +441,14 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
             self.assertIsNone(json.loads(inventory_bytes)["observation"])
             self.assertEqual("siblings-complete", host.inventory()[0]["status"])
             self.assertFalse(target.exists())
-        self.assertEqual("siblings-complete", host.inventory()[0]["status"])
+            reference = attempt.publish_envelope(validate_output=reviewed_siblings)
+            self.assertEqual(target, reference.path)
+            self.assertEqual(attempt.attempt_id, reference.domain_id)
+            self.assertEqual("published", host.inventory()[0]["status"])
+        self.assertEqual(inventory_bytes, (target / "gtceu-worldgen-inventory-v1.json").read_bytes())
+        self.assertEqual(materialization_bytes, (target / "overlay-materialization-v1.json").read_bytes())
+        self.assertEqual(b"selected sidecar\n", (target / "gregtech/worldgen/vein/overworld/notes.txt").read_bytes())
+        self.assertEqual("published", host.inventory()[0]["status"])
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
     def test_v2_copy_inventory_refuses_external_symlink(self) -> None:
