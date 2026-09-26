@@ -288,6 +288,28 @@ def verify_ide_toolchain_directory(
         raise OSError(f"Core IDE toolchain read needs review: {exc}") from exc
 
 
+def admit_ide_toolchain_directory(
+    archive: Path, target: Path, *, archive_sha256: str,
+    archive_size: int, extracted_root: str, archive_format: str,
+    stage_lease_id: str | None = None,
+) -> dict:
+    """Record Core's exact archive/tree readback at the historical target."""
+
+    _source_core()
+    from workbench_core.ide_toolchain_admissions import (
+        CoreIdeToolchainAdmissions, IdeToolchainAdmissionError,
+    )
+
+    try:
+        return CoreIdeToolchainAdmissions(target.parent).admit(
+            archive, target, archive_sha256=archive_sha256,
+            archive_size=archive_size, expected_root=extracted_root,
+            archive_format=archive_format, stage_lease_id=stage_lease_id,
+        )
+    except IdeToolchainAdmissionError as exc:
+        raise OSError(f"Core IDE toolchain admission needs review: {exc}") from exc
+
+
 def publish_ci_plan(
     root: Path, output: Path, payload: bytes, *,
     configuration_home: Path | None = None,
@@ -349,5 +371,5 @@ __all__ = [
     "reject_existing_ide_toolchain_stage",
     "review_ide_toolchain_stages_on_reuse",
     "promote_ide_toolchain_directory",
-    "verify_ide_toolchain_directory",
+    "verify_ide_toolchain_directory", "admit_ide_toolchain_directory",
 ]

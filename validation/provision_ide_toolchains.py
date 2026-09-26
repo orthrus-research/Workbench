@@ -17,9 +17,9 @@ from typing import Any
 import zipfile
 
 from core_run_custody import (
-    allocate_ide_toolchain_stage, promote_ide_toolchain_directory,
+    admit_ide_toolchain_directory, allocate_ide_toolchain_stage,
+    promote_ide_toolchain_directory,
     reject_existing_ide_toolchain_stage, review_ide_toolchain_stages_on_reuse,
-    verify_ide_toolchain_directory,
 )
 
 
@@ -156,7 +156,7 @@ def provision_entry(
                         raise ProvisionFailure(str(exc)) from exc
                     archive = download(entry, suffix)
                     try:
-                        verify_ide_toolchain_directory(
+                        admit_ide_toolchain_directory(
                             archive.absolute(), destination.absolute(),
                             archive_sha256=entry["archive_sha256"],
                             archive_size=entry["archive_size"],
@@ -204,11 +204,12 @@ def provision_entry(
                     (entry["archive_sha256"] + "\n").encode("ascii"),
                     stage_host=stage_host, stage_reference=stage,
                 )
-                verify_ide_toolchain_directory(
+                admit_ide_toolchain_directory(
                     archive.absolute(), destination.absolute(),
                     archive_sha256=entry["archive_sha256"],
                     archive_size=entry["archive_size"],
                     extracted_root=expected_root, archive_format=archive_format,
+                    stage_lease_id=stage.lease_id,
                 )
             except BaseException as exc:
                 try:

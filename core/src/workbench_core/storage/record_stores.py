@@ -112,6 +112,10 @@ class CoreRecordStores:
         elif self.owner_id == "validation" and family == "validation-invocations-v1" and selected == self.workspace:
             # Keep validation's per-invocation V1 result URI inside the checkout.
             root = selected / ".workbench/validation/invocations"
+        elif self.owner_id == "validation" and family == "validation-ide-toolchain-admissions-v1" and selected == self.workspace:
+            # The historical extracted targets stay in ide-validation-v1;
+            # Core retains their independent admission rows beside stage custody.
+            root = selected / ".ide-toolchain-core/admissions-v1"
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

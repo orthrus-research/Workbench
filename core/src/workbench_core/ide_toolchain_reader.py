@@ -1,15 +1,16 @@
-"""Read-only, exact archive-to-tree verification for legacy IDE toolchains.
+"""Read-only, exact archive-to-tree verification for IDE toolchains.
 
 The historical extraction paths are retained. This reader pins directories and
 ordinary files while it compares their contents, modes, and relative links with
-the exact locked archive. Its result is an observation at read time, not a
-durable tree admission or a grant to remove or repair the destination.
+the exact locked archive. Its result is an observation at read time; a separate
+Core record binds that observation to a retained target identity.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import posixpath
@@ -32,6 +33,14 @@ _MAX_TOTAL = 2 * 1024 * 1024 * 1024
 
 class IdeToolchainReadError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class IdeToolchainReadback:
+    device: int
+    inode: int
+    files: int
+    members_sha256: str
 
 
 @dataclass(frozen=True)
@@ -261,11 +270,11 @@ def _verify_tree(directory_fd: int, parts: tuple[str, ...], expected: dict[tuple
     return files
 
 
-def verify_ide_toolchain_tree(
+def inspect_ide_toolchain_tree(
     archive: Path, destination: Path, *, archive_sha256: str,
     archive_size: int, expected_root: str, archive_format: str,
-) -> int:
-    """Return compared regular-file count, or refuse without changing either path."""
+) -> IdeToolchainReadback:
+    """Return a pinned comparison of one exact archive and extracted tree."""
 
     if (
         os.name != "posix" or not hasattr(os, "O_NOFOLLOW")
@@ -306,6 +315,14 @@ def verify_ide_toolchain_tree(
             os.lseek(archive_fd, 0, os.SEEK_SET)
             with os.fdopen(os.dup(archive_fd), "rb") as source:
                 expected = _archive_inventory(source, expected_root=expected_root, archive_format=archive_format)
+            members = [
+                {"path": list(parts), "kind": item.kind, "mode": item.mode,
+                 "size": item.size, "sha256": item.digest, "link": item.link}
+                for parts, item in sorted(expected.items())
+            ]
+            members_sha256 = sha256(json.dumps(
+                members, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+            ).encode("ascii")).hexdigest()
             if not _unchanged(archive_info, os.fstat(archive_fd)):
                 raise IdeToolchainReadError("locked archive changed during read")
         finally:
@@ -319,7 +336,10 @@ def verify_ide_toolchain_tree(
                 raise IdeToolchainReadError("toolchain destination changed during read")
         finally:
             os.close(destination_fd)
-        return compared
+        return IdeToolchainReadback(
+            device=destination_info.st_dev, inode=destination_info.st_ino,
+            files=compared, members_sha256=members_sha256,
+        )
     except (OSError, tarfile.TarError, zipfile.BadZipFile, RuntimeError) as exc:
         raise IdeToolchainReadError(f"locked toolchain read needs review: {exc}") from exc
     finally:
@@ -329,4 +349,20 @@ def verify_ide_toolchain_tree(
             os.close(archive_parent)
 
 
-__all__ = ["IdeToolchainReadError", "verify_ide_toolchain_tree"]
+def verify_ide_toolchain_tree(
+    archive: Path, destination: Path, *, archive_sha256: str,
+    archive_size: int, expected_root: str, archive_format: str,
+) -> int:
+    """Return compared regular-file count, or refuse without changing either path."""
+
+    return inspect_ide_toolchain_tree(
+        archive, destination, archive_sha256=archive_sha256,
+        archive_size=archive_size, expected_root=expected_root,
+        archive_format=archive_format,
+    ).files
+
+
+__all__ = [
+    "IdeToolchainReadError", "IdeToolchainReadback", "inspect_ide_toolchain_tree",
+    "verify_ide_toolchain_tree",
+]

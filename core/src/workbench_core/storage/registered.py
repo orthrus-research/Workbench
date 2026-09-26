@@ -752,6 +752,9 @@ class ResourceCatalog:
         return "committed"
 
     def inventory(self, *, workspace: Path | None = None) -> dict:
+        from ..ide_toolchain_admissions import (
+            CoreIdeToolchainAdmissions, IdeToolchainAdmissionError,
+        )
         from ..reusable_projections import CoreReusableProjections, ReusableProjectionError
         from ..temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
         from ..transport_trees import CoreTransportTrees, TransportTreeError
@@ -1004,6 +1007,56 @@ class ResourceCatalog:
             # also mean the declaration was lost. Presence proves no ordering.
             projection["parent_store_registration"] = "present" if parent else "absent"
             projection["parent_store_id"] = parent["store_id"] if parent else None
+        ide_toolchain_admissions: list[dict[str, object]] = []
+        ide_stores = [
+            store for store in all_record_stores
+            if store["family"] == "validation-ide-toolchain-admissions-v1"
+        ]
+        if len(ide_stores) > 1:
+            raise DurableResourceError("resource.changed", "IDE admission store binding is ambiguous")
+        if ide_stores or (
+            self.configuration_home.name == ".ide-toolchain-core"
+            and (
+                (self.configuration_home / "admissions-v1").exists()
+                or (self.configuration_home / "admissions-v1").is_symlink()
+            )
+        ):
+            try:
+                toolchains = CoreIdeToolchainAdmissions(
+                    self.configuration_home.parent / "ide-validation-v1",
+                )
+                if ide_stores:
+                    store = ide_stores[0]
+                    if (
+                        store["owner_id"] != "validation"
+                        or store["workspace"] != str(toolchains.workspace)
+                        or store["path"] != str(self.configuration_home / "admissions-v1")
+                    ):
+                        raise IdeToolchainAdmissionError("IDE admission store binding changed")
+                    if store["status"] != "available":
+                        ide_toolchain_admissions.append({
+                            "path": store["path"], "status": "store-unavailable",
+                            "retention": "protected-until-reviewed-policy",
+                        })
+                rows = toolchains.inventory_catalog()
+                for row in rows:
+                    if row["status"] == "catalog-only" and (
+                        not ide_stores or row["store_id"] != ide_stores[0]["store_id"]
+                    ):
+                        raise IdeToolchainAdmissionError("IDE admission parent store differs")
+                    row["parent_store_registration"] = "present" if ide_stores else "absent"
+                    if workspace is None or workspace == toolchains.workspace:
+                        ide_toolchain_admissions.append(row)
+                if not ide_stores and (workspace is None or workspace == toolchains.workspace):
+                    ide_toolchain_admissions.append({
+                        "path": str(self.configuration_home / "admissions-v1"),
+                        "status": "unregistered-store",
+                        "retention": "protected-until-reviewed-policy",
+                    })
+            except IdeToolchainAdmissionError as exc:
+                raise DurableResourceError(
+                    "resource.changed", "IDE admission catalog is unavailable or changed",
+                ) from exc
         return {
             "format": CATALOG_FORMAT, "schema_version": 1,
             "root_state": root_state,
@@ -1016,6 +1069,7 @@ class ResourceCatalog:
             "temporary_leases": temporary_leases,
             "transport_trees": transport_trees,
             "reusable_projections": reusable_projections,
+            "ide_toolchain_admissions": ide_toolchain_admissions,
             "overlay_envelopes": overlay_envelopes,
         }
 
