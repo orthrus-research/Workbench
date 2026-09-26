@@ -12,7 +12,11 @@ from workbench_api.record_stores import RecordStoreReference, SessionOwnerAlloca
 from workbench_api.state_paths import default_product_spine_state_root
 from workbench_api.durable_resources import DurableResourceError
 
-from ..host_filesystem import private_path, secure_private_path
+from ..host_filesystem import (
+    count_interrupted_create_once_stages, private_path,
+    publish_create_once_bytes, read_private_single_link_bytes,
+    secure_private_path,
+)
 from ..output_routing import _private_directory
 from ..setup_cli import _state_root
 from .registered import ResourceCatalog
@@ -189,6 +193,67 @@ class CoreRecordStores:
         store_id = self.catalog.register_record_store(
             family=family, owner_id=self.owner_id, workspace=self.workspace, root=parent,
         )
+        return RecordStoreReference(
+            store_id=store_id, family=family, owner_id=self.owner_id,
+            workspace=self.workspace, root=parent,
+            retention="protected-until-reviewed-policy",
+        )
+
+    def publish_review_artifact(
+        self, family: str, target: Path, data: bytes, *, byte_limit: int,
+    ) -> RecordStoreReference:
+        """Publish one owner-encoded plan at an exact, protected selected path."""
+
+        if self.owner_id != "workbench-shell" or family != "cleanroom-construction-plan-v2":
+            raise DurableResourceError("resource.policy", "review artifact family is unsupported")
+        if (
+            not isinstance(target, Path) or not target.is_absolute()
+            or target.name in {"", ".", ".."} or ".." in target.parts
+            or type(data) is not bytes or type(byte_limit) is not int
+            or not 0 < len(data) <= byte_limit <= 16 * 1024 * 1024
+        ):
+            raise DurableResourceError("resource.policy", "review artifact requires exact bounded bytes and path")
+        target = Path(os.path.abspath(target))
+        if target.is_relative_to(self.catalog.configuration_home):
+            raise DurableResourceError("resource.policy", "review artifact overlaps Core configuration storage")
+        parent = target.parent
+        try:
+            _state_root(parent)
+            existing = parent
+            while not existing.exists():
+                existing = existing.parent
+            if not private_path(existing, directory=True):
+                raise DurableResourceError(
+                    "resource.unsafe", "review artifact parent must be owner-private",
+                )
+            _private_directory(parent)
+            if not private_path(parent, directory=True):
+                raise DurableResourceError(
+                    "resource.unsafe", "review artifact parent lost private custody",
+                )
+            before = parent.lstat()
+            if count_interrupted_create_once_stages(target):
+                raise DurableResourceError(
+                    "resource.incomplete", "interrupted review artifact publication requires review",
+                )
+        except DurableResourceError:
+            raise
+        except (OSError, ValueError) as exc:
+            raise DurableResourceError("resource.unsafe", "review artifact parent is unavailable or redirected") from exc
+        store_id = self.catalog.register_record_store(
+            family=family, owner_id=self.owner_id, workspace=self.workspace, root=parent,
+        )
+        _state_root(parent)
+        after_registration = parent.lstat()
+        if (before.st_dev, before.st_ino) != (after_registration.st_dev, after_registration.st_ino):
+            raise DurableResourceError("resource.changed", "review artifact parent changed during registration")
+        publish_create_once_bytes(target, data, byte_limit=byte_limit)
+        if read_private_single_link_bytes(target, byte_limit=byte_limit) != data:
+            raise DurableResourceError("resource.changed", "review artifact changed after publication")
+        _state_root(parent)
+        after_publication = parent.lstat()
+        if (before.st_dev, before.st_ino) != (after_publication.st_dev, after_publication.st_ino):
+            raise DurableResourceError("resource.changed", "review artifact parent changed during publication")
         return RecordStoreReference(
             store_id=store_id, family=family, owner_id=self.owner_id,
             workspace=self.workspace, root=parent,

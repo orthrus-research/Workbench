@@ -698,7 +698,7 @@ def _public_commands(root: Path) -> list[CommandSpec]:
                 _f("target", "Absent, empty, or clean unborn Git destination.", positional=True, kind="path", required=True),
                 _f("output_mode", "Preview instructions or authorize later direct apply.", flags=("--output-mode",), kind="choice", choices=("instructions", "direct-apply"), default="instructions"),
                 _f("sequence", "Owner request sequence.", flags=("--sequence",), kind="integer", default=0),
-                _f("output", "Fresh reviewed plan output.", flags=("--output",), kind="path"),
+                _f("output", "Fresh reviewed plan in an owner-private directory.", flags=("--output",), kind="path"),
                 _f("json", "Emit the exact owner result.", flags=("--json",), kind="boolean"),
             ), "docs/product/CLEANROOM-PLATFORM.md", availability="experimental",
             limitations=("Preview observes the target and source lock but does not create either.",),

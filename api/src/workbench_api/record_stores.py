@@ -63,6 +63,10 @@ class RecordStores(Protocol):
         self, family: str, base: Path, session_id: str, *, create: bool,
     ) -> ContextManager[SessionOwnerAllocation]: ...
 
+    def publish_review_artifact(
+        self, family: str, target: Path, data: bytes, *, byte_limit: int,
+    ) -> RecordStoreReference: ...
+
 
 _bound: ContextVar[RecordStores | None] = ContextVar("workbench_record_stores", default=None)
 
@@ -117,9 +121,30 @@ def session_owner_scope(
     return provider.session_owner(family, base, session_id, create=create)
 
 
+def publish_review_artifact(
+    family: str, target: Path, data: bytes, *, byte_limit: int,
+) -> RecordStoreReference:
+    """Ask Core to publish one fresh owner-encoded review artifact.
+
+    The owner chooses the exact bytes and requested file. Core admits its
+    physical parent, registers the protected store, and performs publication.
+    """
+
+    from .durable_resources import DurableResourceError
+
+    provider = _bound.get()
+    operation = getattr(provider, "publish_review_artifact", None)
+    if not callable(operation):
+        raise DurableResourceError(
+            "resource.host", "review artifact publication requires Workbench Core",
+        )
+    return operation(family, target, data, byte_limit=byte_limit)
+
+
 __all__ = [
     "RecordStoreReference", "RecordStores", "record_store_scope",
     "open_record_store", "open_target_record_store", "record_store_host_bound",
     "SessionOwnerAllocation", "SessionOwnerAllocationError", "SessionOwnerReference",
     "session_owner_scope",
+    "publish_review_artifact",
 ]

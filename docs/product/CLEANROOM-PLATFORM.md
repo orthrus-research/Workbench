@@ -58,6 +58,15 @@ The selected profile determines the supported Java and build-provider
 combination. Workbench does not freeze a present upstream template, provider,
 or Java version into permanent product policy.
 
+## Reviewed new-project plans
+
+`workbench new cleanroom-mod preview <target> --output <plan.json>` saves the
+profile's exact construction plan for later review. The output must be a fresh
+file in an owner-private directory, or a new subdirectory beneath one. Core
+creates and protects that directory, publishes the plan, and retains its
+storage identity. A shared or redirected parent is refused without changing
+its permissions. The preview leaves the construction target untouched.
+
 ## Compatibility claims
 
 Cleanroom's broad Forge compatibility is a starting hypothesis, not a

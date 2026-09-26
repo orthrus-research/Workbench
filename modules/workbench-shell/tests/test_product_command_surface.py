@@ -122,6 +122,22 @@ class ProductCommandSurfaceTests(unittest.TestCase):
             ))
             self.assertFalse(target.exists())
 
+    def test_new_cleanroom_mod_preview_saves_plan_through_core_custody(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            private = Path(temporary)
+            target = private / "new-project"
+            plan_path = private / "plans" / "construction.json"
+            result = self._run(
+                "new", "cleanroom-mod", "preview", str(target),
+                "--output", str(plan_path), "--json",
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+            value = json.loads(result.stdout)
+            self.assertEqual(value["plan"], json.loads(plan_path.read_text(encoding="utf-8")))
+            self.assertEqual(plan_path.stat().st_mode & 0o077, 0)
+            self.assertEqual(plan_path.parent.stat().st_mode & 0o077, 0)
+            self.assertFalse(target.exists())
+
     def test_change_runtime_config_routes_to_supersymmetry_owner(self) -> None:
         change_id = "workbench-feature-change:sha256:" + "1" * 64
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:

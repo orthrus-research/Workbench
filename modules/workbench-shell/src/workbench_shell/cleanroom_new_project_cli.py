@@ -13,6 +13,7 @@ import sys
 from typing import Any, Mapping, Sequence, TextIO
 
 from workbench_api.state_paths import default_product_spine_state_root
+from workbench_api.record_stores import publish_review_artifact
 
 
 PROFILE_PACKAGE = Path(
@@ -170,7 +171,7 @@ def _read_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def _write_fresh(path: Path, value: Mapping[str, Any]) -> None:
+def _publish_plan(path: Path, value: Mapping[str, Any]) -> None:
     raw = (
         json.dumps(
             dict(value),
@@ -184,23 +185,14 @@ def _write_fresh(path: Path, value: Mapping[str, Any]) -> None:
     if len(raw) > MAX_RECORD_BYTES:
         raise CleanroomNewProjectCliV2Error("construction plan exceeds its bound")
     destination = Path(os.path.abspath(path.expanduser()))
-    destination.parent.mkdir(parents=True, exist_ok=True)
     try:
-        descriptor = os.open(
-            destination,
-            os.O_WRONLY
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_NOFOLLOW", 0),
-            0o600,
+        publish_review_artifact(
+            "cleanroom-construction-plan-v2", destination, raw,
+            byte_limit=MAX_RECORD_BYTES,
         )
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(raw)
-            stream.flush()
-            os.fsync(stream.fileno())
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         raise CleanroomNewProjectCliV2Error(
-            "construction plan output must be a fresh file"
+            f"construction plan output requires Core custody: {exc}"
         ) from exc
 
 
@@ -286,7 +278,7 @@ def new_project_main(
                     raise CleanroomNewProjectCliV2Error(
                         "construction preview returned no plan"
                     )
-                _write_fresh(args.output, plan)
+                _publish_plan(args.output, plan)
         else:
             plan = _read_json(args.plan, "Cleanroom construction plan")
             state_root = _state(suite, plan, args.state_root)
