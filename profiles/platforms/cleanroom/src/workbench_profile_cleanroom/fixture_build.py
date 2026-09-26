@@ -573,7 +573,8 @@ def _supervised_build(
     project = Path(command[command.index("-p") + 1])
     result = reusable_fixture_builds().run(
         state_root=_managed_state_root(state_root),
-        source_digest=inputs["fixture_digest"], project=project,
+        source_digest=inputs["fixture_digest"], source_root=FIXTURE,
+        project=project,
         source_files=declared,
         generated_parts=tuple(GENERATED_PARTS),
         generated_suffixes=tuple(GENERATED_SUFFIXES),
@@ -626,7 +627,7 @@ def main(argv: list[str] | None = None) -> int:
             java_home=args.java_home,
             expected_input_digest=args.expected_input_digest,
             state_root=args.state_root,
-            materialize=not args.check_only,
+            materialize=not args.check_only and not args.core_supervised,
         )
         if args.check_only:
             inputs = inspect_build_inputs(

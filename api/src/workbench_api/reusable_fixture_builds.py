@@ -33,7 +33,8 @@ class ReusableFixtureBuilds(Protocol):
     def prepare(self, *, state_root: Path) -> None: ...
 
     def run(
-        self, *, state_root: Path, source_digest: str, project: Path,
+        self, *, state_root: Path, source_digest: str, source_root: Path,
+        project: Path,
         source_files: tuple[dict[str, object], ...],
         generated_parts: tuple[str, ...], generated_suffixes: tuple[str, ...],
         generated_roots: tuple[Path, ...],

@@ -2,7 +2,8 @@
 
 The source manifest is owner supplied. Core records the directory identity and
 checks its exact source bytes at every open; generated build state may change.
-This port does not publish a projection or launch a build process.
+Core also publishes new source-only projections; generated build state remains
+mutable under the same fixed path after publication.
 """
 
 from __future__ import annotations
@@ -20,8 +21,9 @@ from workbench_api.reusable_projections import ReusableProjectionError, Reusable
 
 from . import check_storage
 from .durable_records import private_record_lock, publish_immutable_bytes, read_bounded_bytes
-from .host_filesystem import private_path
+from .host_filesystem import fsync_directory, private_path, secure_private_path
 from .output_routing import _private_directory
+from .source_checkouts import _rename_noreplace
 from .storage.registered import ResourceCatalog
 
 
@@ -44,7 +46,7 @@ def _ordinary_directory(path: Path) -> os.stat_result:
         info = path.lstat()
     except OSError as exc:
         raise ReusableProjectionError("projection.unavailable", f"projection directory is unavailable: {path}") from exc
-    if not stat.S_ISDIR(info.st_mode):
+    if not stat.S_ISDIR(info.st_mode) or getattr(path, "is_junction", lambda: False)():
         _fail("unsafe", f"projection contains a redirect or non-directory: {path}")
     return info
 
@@ -231,6 +233,7 @@ class CoreReusableProjections:
         _private_directory(self.root)
         _private_directory(self.root / "records")
         _private_directory(self.root / "leases")
+        _private_directory(self.root / "publication-leases")
 
     def _record_path(self, projection_id: str) -> Path:
         match = _ID.fullmatch(projection_id) if isinstance(projection_id, str) else None
@@ -268,6 +271,143 @@ class CoreReusableProjections:
         if projection_id != "workbench-reusable-projection-v1:" + sha256(check_storage.canonical(binding)).hexdigest():
             _fail("changed", "projection record identity changed")
         return row
+
+    def ensure(
+        self, family: str, path: Path, *, source_root: Path,
+        source_digest: str, project_relative: Path,
+        source_files: tuple[dict[str, object], ...],
+        generated_parts: tuple[str, ...], generated_suffixes: tuple[str, ...],
+        validate: Callable[[Path], object], generated_roots: tuple[Path, ...] = (),
+    ) -> ReusableProjectionReference:
+        """Publish exact source into a private fixed path, or adopt a valid winner.
+
+        A deterministic stage survives interruption. A later caller resumes it
+        only after a complete Core scan and owner validation. An incomplete
+        stage remains under a registered retained root for explicit recovery.
+        """
+
+        if (not isinstance(family, str) or _NAME.fullmatch(family) is None
+                or not isinstance(source_digest, str)
+                or not isinstance(path, Path) or not path.is_absolute() or ".." in path.parts
+                or path.name != source_digest.removeprefix("sha256:")
+                or path.parent.name != family or path.parent.parent.name != "source-projections"
+                or _SHA.fullmatch(source_digest) is None):
+            _fail("path", "new projection path does not match its source identity")
+        relative = _relative(project_relative)
+        rows = _source_rows(source_files)
+        generated = _generated(generated_parts)
+        suffixes = _suffixes(generated_suffixes)
+        roots = _generated_roots(generated_roots)
+        if any((path / relative).is_relative_to(path / root)
+               or (path / root).is_relative_to(path / relative) for root in roots):
+            _fail("source", "generated root overlaps declared project")
+        if any(set(Path(str(row["path"])).parts).intersection(generated) for row in rows):
+            _fail("source", "declared source overlaps generated build state")
+        if any(Path(str(row["path"])).suffix in suffixes for row in rows):
+            _fail("source", "declared source overlaps generated build suffix")
+        if (not isinstance(source_root, Path) or not source_root.is_absolute()
+                or ".." in source_root.parts):
+            _fail("source", "projection source root must be absolute")
+        for ancestor in (source_root, *source_root.parents):
+            _ordinary_directory(ancestor)
+        self._ensure()
+        _private_directory(path.parent)
+        try:
+            secure_private_path(path.parent, directory=True)
+            self.catalog.register_record_store(
+                family=f"{family}.source-projections", owner_id=self.owner_id,
+                workspace=self.workspace, root=path.parent,
+            )
+        except (OSError, ValueError) as exc:
+            raise ReusableProjectionError(
+                "projection.unsafe", "projection namespace cannot retain private Core custody",
+            ) from exc
+        stage = path.with_name(f".{path.name}.stage")
+        lease = self.root / "publication-leases" / f"{path.name}.lock"
+        with private_record_lock(lease, wait=True):
+            if not path.exists() and not path.is_symlink():
+                if stage.exists() or stage.is_symlink():
+                    try:
+                        stage_info, parent_info = _scan(
+                            stage, stage / relative, rows, [], [], validate, [],
+                        )
+                    except Exception as exc:
+                        raise ReusableProjectionError(
+                            "projection.recovery", f"interrupted projection stage requires review: {stage}",
+                        ) from exc
+                else:
+                    stage.mkdir(mode=0o700)
+                    secure_private_path(stage, directory=True)
+                    project = stage / relative
+                    project.mkdir(parents=True, mode=0o700)
+                    for row in rows:
+                        member = Path(str(row["path"]))
+                        source = source_root / member
+                        for ancestor in (source, *source.parents):
+                            if ancestor == source_root.parent:
+                                break
+                            if ancestor != source:
+                                _ordinary_directory(ancestor)
+                        try:
+                            raw = read_bounded_bytes(source, byte_limit=int(row["size"]))
+                        except (OSError, ValueError) as exc:
+                            raise ReusableProjectionError(
+                                "projection.changed", f"declared source changed: {member}",
+                            ) from exc
+                        if len(raw) != row["size"] or "sha256:" + sha256(raw).hexdigest() != row["sha256"]:
+                            _fail("changed", f"declared source changed: {member}")
+                        target = project / member
+                        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                        descriptor = os.open(
+                            target, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                            | getattr(os, "O_CLOEXEC", 0)
+                            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
+                            0o600,
+                        )
+                        with os.fdopen(descriptor, "wb") as stream:
+                            stream.write(raw)
+                            stream.flush()
+                            os.fsync(stream.fileno())
+                    stage_info, parent_info = _scan(
+                        stage, project, rows, [], [], validate, [],
+                    )
+                    for directory, _, _ in os.walk(stage, topdown=False):
+                        fsync_directory(Path(directory))
+                    fsync_directory(path.parent)
+                if not private_path(path.parent, directory=True):
+                    _fail("unsafe", "projection parent lost private custody before publication")
+                verified_stage, verified_parent = _scan(
+                    stage, stage / relative, rows, [], [], validate, [],
+                )
+                if (
+                    (stage_info.st_dev, stage_info.st_ino) != (
+                        verified_stage.st_dev, verified_stage.st_ino,
+                    )
+                    or (parent_info.st_dev, parent_info.st_ino) != (
+                        verified_parent.st_dev, verified_parent.st_ino,
+                    )
+                ):
+                    _fail("changed", "projection stage changed before publication")
+                try:
+                    _rename_noreplace(stage, path)
+                except OSError as exc:
+                    if not path.exists() and not path.is_symlink():
+                        raise ReusableProjectionError(
+                            "projection.publish", "projection cannot be published without replacement",
+                        ) from exc
+                else:
+                    published = _ordinary_directory(path)
+                    if (published.st_dev, published.st_ino) != (
+                        stage_info.st_dev, stage_info.st_ino,
+                    ):
+                        _fail("changed", "published projection changed identity")
+                    fsync_directory(path.parent)
+        return self.adopt(
+            family, path, source_digest=source_digest,
+            project_relative=project_relative, source_files=source_files,
+            generated_parts=generated_parts, generated_suffixes=generated_suffixes,
+            validate=validate, generated_roots=generated_roots,
+        )
 
     def adopt(
         self, family: str, path: Path, *, source_digest: str,

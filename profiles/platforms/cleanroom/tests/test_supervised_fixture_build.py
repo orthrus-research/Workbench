@@ -103,6 +103,17 @@ class SupervisedFixtureBuildTests(unittest.TestCase):
         )
         self.assertEqual("generated build state", generated.read_text(encoding="utf-8"))
         self.assertEqual(b"retained cache", sentinel.read_bytes())
+        registered = [
+            json.loads(path.read_text(encoding="utf-8"))
+            for path in (self.config / "resources-v1/stores").glob("*.json")
+        ]
+        self.assertEqual(
+            {
+                str(self.state / "source-projections/cleanroom"),
+                str(cache), str(home), str(self.state / "fixture-build-attempts"),
+            },
+            {row["root"] for row in registered},
+        )
         if os.name == "posix":
             self.assertEqual(0o700, home.stat().st_mode & 0o777)
         second = self._run()

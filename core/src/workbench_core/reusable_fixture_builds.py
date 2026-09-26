@@ -74,7 +74,8 @@ class CoreReusableFixtureBuilds:
         _private_directory_at(state_root)
 
     def run(
-        self, *, state_root: Path, source_digest: str, project: Path,
+        self, *, state_root: Path, source_digest: str, source_root: Path,
+        project: Path,
         source_files: tuple[dict[str, object], ...],
         generated_parts: tuple[str, ...], generated_suffixes: tuple[str, ...],
         generated_roots: tuple[Path, ...],
@@ -109,10 +110,11 @@ class CoreReusableFixtureBuilds:
         if verify_inputs() != input_digest:
             _fail("changed", "fixture toolchain or owner code changed before launch")
 
-        # The historical publisher has already created or verified the exact
-        # path. Core adopts it without rewriting any source or generated cache.
-        reference = self.projections.adopt(
+        # Core publishes new source bytes under the historical digest path,
+        # and adopts existing valid trees without rewriting generated state.
+        reference = self.projections.ensure(
             "cleanroom", projection_root, source_digest=source_digest,
+            source_root=source_root,
             project_relative=_PROJECT_RELATIVE, source_files=source_files,
             generated_parts=generated_parts, generated_suffixes=generated_suffixes,
             validate=verify_source, generated_roots=generated_roots,
@@ -121,6 +123,15 @@ class CoreReusableFixtureBuilds:
         for directory in (project_cache, gradle_home):
             _reuse_private_cache(directory)
         _private_directory_at(capture_root)
+        for family, directory in (
+            ("cleanroom.fixture-project-cache", project_cache),
+            ("cleanroom.fixture-gradle-home", gradle_home),
+            ("cleanroom.fixture-build-attempts", capture_root),
+        ):
+            self.projections.catalog.register_record_store(
+                family=family, owner_id=self.projections.owner_id,
+                workspace=self.projections.workspace, root=directory,
+            )
         binding = "workbench-cleanroom-fixture-build-v1:sha256:" + sha256(
             check_storage.canonical({
                 "projection_id": reference.projection_id, "input_digest": input_digest,
