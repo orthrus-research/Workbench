@@ -12,7 +12,6 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
-import tempfile
 from typing import Any, Callable, NoReturn
 
 from jsonschema import Draft202012Validator
@@ -20,7 +19,7 @@ from jsonschema import Draft202012Validator
 from workbench_api.durable_resources import DurableResourceError
 from workbench_api.host_filesystem import (
     DurableRecordError, HostFilesystemError, publish_immutable_bytes,
-    read_private_bytes, secure_private_path,
+    read_private_bytes, replace_private_bytes, secure_private_path,
 )
 from workbench_api.record_stores import open_record_store
 from workbench_blueprints import planner, simulation, standards
@@ -450,43 +449,37 @@ class HistoryStore:
         locator = self.artifacts.put_json(successor)
         return locator.rsplit(":", 1)[1], locator
 
-    def acquire_transaction(self) -> tuple[int, Path]:
-        self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        lock_path = self.root / "active-transaction.lock"
+    def _transaction_store(self) -> None:
         try:
-            descriptor = os.open(
-                lock_path,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL
-                | getattr(os, "O_NOFOLLOW", 0),
-                0o600,
+            managed = open_record_store("blueprints-history-transaction-v1", self.root)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPA117_TRANSACTION_LOCK", str(self.root), str(exc))
+        if managed is None or managed.root != self.root:
+            _fail("BPA117_TRANSACTION_LOCK", str(self.root), "transaction requires its Core store")
+
+    def acquire_transaction(self, journal: dict[str, Any]) -> Path:
+        self._transaction_store()
+        lock_path = self.root / "active-transaction.lock"
+        content = standards.canonical_json(journal).encode("utf-8")
+        try:
+            replace_private_bytes(
+                lock_path, content, byte_limit=len(content), require_absent=True,
             )
-        except OSError as exc:
+        except (DurableRecordError, HostFilesystemError, OSError) as exc:
             _fail("BPA117_TRANSACTION_LOCK", str(lock_path), str(exc))
-        _fsync_directory(self.root, "BPA117_TRANSACTION_LOCK")
-        return descriptor, lock_path
+        return lock_path
 
     def write_journal(self, journal: dict[str, Any]) -> Path:
+        self._transaction_store()
         path = self.root / "active-transaction.json"
         content = standards.canonical_json(journal).encode("utf-8")
-        temporary: str | None = None
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="wb",
-                dir=self.root,
-                prefix=".transaction.",
-                delete=False,
-            ) as handle:
-                temporary = handle.name
-                os.fchmod(handle.fileno(), 0o600)
-                handle.write(content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, path)
-            _fsync_directory(self.root, "BPA117_TRANSACTION_LOCK")
-            temporary = None
-        finally:
-            if temporary is not None:
-                Path(temporary).unlink(missing_ok=True)
+            lock = self.root / "active-transaction.lock"
+            if read_private_bytes(lock, byte_limit=len(content)) != content:
+                _fail("BPA117_TRANSACTION_LOCK", str(lock), "transaction lock changed before journal publication")
+            replace_private_bytes(path, content, byte_limit=len(content), require_absent=True)
+        except (DurableRecordError, HostFilesystemError, OSError) as exc:
+            _fail("BPA117_TRANSACTION_LOCK", str(path), str(exc))
         return path
 
 
@@ -1588,7 +1581,15 @@ class LifecycleEngine:
                 "/bundle/operations",
                 "released operation lies outside plan authority",
             )
-        lock_descriptor, lock_path = self.history_store.acquire_transaction()
+        journal = {
+            "schema_version": 1,
+            "format": "susy-blueprints-active-transaction-v1",
+            "release_id": run["release"]["release_id"],
+            "expected_target_state_id": expected,
+            "bundle_sha256": result["bundle_locator"].rsplit(":", 1)[1],
+            "operations_sha256": bundle["operations_sha256"],
+        }
+        lock_path = self.history_store.acquire_transaction(journal)
         journal_path: Path | None = None
         created_dirs: list[Path] = []
         staged: dict[int, Path] = {}
@@ -1598,19 +1599,6 @@ class LifecycleEngine:
         atomic = True
         post: dict[str, Any] | None = None
         try:
-            journal = {
-                "schema_version": 1,
-                "format": "susy-blueprints-active-transaction-v1",
-                "release_id": run["release"]["release_id"],
-                "expected_target_state_id": expected,
-                "bundle_sha256": result["bundle_locator"].rsplit(":", 1)[1],
-                "operations_sha256": bundle["operations_sha256"],
-            }
-            os.write(
-                lock_descriptor,
-                standards.canonical_json(journal).encode("utf-8"),
-            )
-            os.fsync(lock_descriptor)
             journal_path = self.history_store.write_journal(journal)
             for row in bundle["operations"]:
                 path, made = _safe_target(
@@ -1721,7 +1709,6 @@ class LifecycleEngine:
                 rollback = "failed"
                 atomic = False
         finally:
-            os.close(lock_descriptor)
             if rollback != "failed":
                 if journal_path is not None:
                     journal_path.unlink(missing_ok=True)

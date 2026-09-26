@@ -49,6 +49,10 @@ class CoreRecordStores:
         elif self.owner_id == "blueprints" and family == "blueprints-session-pointer-v1":
             # The session's current.json stays beside its historical CAS root.
             root = selected
+        elif self.owner_id == "blueprints" and family == "blueprints-history-transaction-v1":
+            # Keep V1's recovery markers beside the history CAS. Their exact
+            # selected root remains registered even after a failed rollback.
+            root = selected
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

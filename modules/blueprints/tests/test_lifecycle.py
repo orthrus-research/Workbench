@@ -87,6 +87,13 @@ class ArtifactStoreTest(unittest.TestCase):
             with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA114_ARTIFACT_CANONICAL"):
                 self.store.read_json(locator)
 
+    def test_history_transaction_cannot_publish_without_core(self) -> None:
+        root = self.workspace / ".workbench/blueprints/history"
+        store = lifecycle.HistoryStore(root)
+        with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA117_TRANSACTION_LOCK"):
+            store.acquire_transaction({"format": "susy-blueprints-active-transaction-v1"})
+        self.assertFalse(root.exists())
+
 
 class LifecycleTest(unittest.TestCase):
 
@@ -571,6 +578,40 @@ class LifecycleTest(unittest.TestCase):
             (self.history_store.root / "active-transaction.lock").exists()
         )
 
+    def test_existing_recovery_lock_refuses_new_application(self) -> None:
+        engine, released = self._release("direct-apply")
+        before = planner.capture_target_state(self.fixture.repository, "pack")
+        lock = self.history_store.root / "active-transaction.lock"
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        lock.write_bytes(b"prior interrupted transaction")
+        lock.chmod(0o600)
+        with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA117_TRANSACTION_LOCK"):
+            engine.apply(released)
+        self.assertEqual(b"prior interrupted transaction", lock.read_bytes())
+        self.assertEqual(before, planner.capture_target_state(self.fixture.repository, "pack"))
+
+    def test_existing_recovery_journal_is_not_overwritten(self) -> None:
+        engine, released = self._release("direct-apply")
+        before = planner.capture_target_state(self.fixture.repository, "pack")
+        journal = self.history_store.root / "active-transaction.json"
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        journal.write_bytes(b"prior interrupted transaction")
+        journal.chmod(0o600)
+        rejected = engine.apply(released)
+        self.assertEqual("application-rejected", rejected["run"]["state"])
+        self.assertEqual("succeeded", rejected["application"]["rollback"])
+        self.assertEqual(b"prior interrupted transaction", journal.read_bytes())
+        self.assertFalse((self.history_store.root / "active-transaction.lock").exists())
+        self.assertEqual(before, planner.capture_target_state(self.fixture.repository, "pack"))
+
+    def test_journal_publication_requires_matching_core_lock(self) -> None:
+        journal = {"format": "susy-blueprints-active-transaction-v1", "schema_version": 1}
+        lock = self.history_store.acquire_transaction(journal)
+        lock.write_bytes(b"changed lock")
+        with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA117_TRANSACTION_LOCK"):
+            self.history_store.write_journal(journal)
+        self.assertFalse((self.history_store.root / "active-transaction.json").exists())
+
     def test_update_and_delete_apply_from_one_bound_transaction(self) -> None:
         engine, released = self._release("direct-apply")
         baseline = {
@@ -652,6 +693,10 @@ class LifecycleTest(unittest.TestCase):
         )
         self.assertTrue(
             (self.history_store.root / "active-transaction.lock").exists()
+        )
+        self.assertEqual(
+            (self.history_store.root / "active-transaction.json").read_bytes(),
+            (self.history_store.root / "active-transaction.lock").read_bytes(),
         )
 
     def test_verification_drift_and_side_effects_fail_closed(self) -> None:

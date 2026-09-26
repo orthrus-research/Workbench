@@ -175,6 +175,22 @@ class DurableResourceTests(unittest.TestCase):
             CoreRecordStores(workspace=self.workspace, configuration_home=self.config,
                              owner_id="workbench-shell").open("blueprints-session-pointer-v1", root)
 
+    def test_blueprints_history_transaction_registers_exact_recovery_root(self) -> None:
+        root = self.workspace / ".workbench/blueprints/history"
+        provider = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="blueprints",
+        )
+        opened = provider.open("blueprints-history-transaction-v1", root)
+        self.assertEqual(root, opened.root)
+        self.assertEqual(opened, provider.open("blueprints-history-transaction-v1", root))
+        rows = ResourceCatalog(self.config).inventory(workspace=self.workspace)["record_stores"]
+        self.assertEqual([(opened.store_id, str(root), "blueprints-history-transaction-v1")],
+                         [(row["store_id"], row["path"], row["family"]) for row in rows])
+        with self.assertRaises(DurableResourceError):
+            CoreRecordStores(workspace=self.workspace, configuration_home=self.config,
+                             owner_id="workbench-shell").open("blueprints-history-transaction-v1", root)
+
     def test_dispatch_binds_core_and_inventory_sees_external_root(self) -> None:
         captured = []
 
