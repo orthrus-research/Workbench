@@ -254,6 +254,107 @@ class WorkingAllocationTests(unittest.TestCase):
         self.assertEqual([first.allocation_id],
                          [row["allocation_id"] for row in catalog.inventory(workspace=self.workspace)["working_allocations"]])
 
+    def test_path_lease_without_reservation_remains_a_valid_crash_child(self) -> None:
+        allocation = self.host.allocate("worldgen-iteration", "trial")
+        catalog = WorkingAllocationCatalog(self.config)
+        # Allocation acquires a path lease before it publishes its reservation.
+        orphan = catalog.root / "path-leases" / ("f" * 64 + ".lock")
+        orphan.touch(mode=0o600)
+        rows = ResourceCatalog(self.config).inventory(workspace=self.workspace)["working_allocations"]
+        self.assertEqual([allocation.allocation_id], [row["allocation_id"] for row in rows])
+
+    def test_allocation_child_names_and_orphans_are_checked_before_workspace_filter(self) -> None:
+        first = self.host.allocate("worldgen-iteration", "first")
+        catalog = WorkingAllocationCatalog(self.config)
+        root = catalog.root
+        cases = (
+            (root / "unregistered", True),
+            (root / "path-leases" / "unknown.lock", False),
+            (root / "leases" / ("0" * 32 + ".lock"), False),
+            (root / "cancellations" / ("0" * 32 + ".json"), False),
+        )
+        for path, directory in cases:
+            with self.subTest(path=path):
+                if directory:
+                    path.mkdir(mode=0o700)
+                else:
+                    path.touch(mode=0o600)
+                try:
+                    with self.assertRaises(WorkingAllocationError):
+                        ResourceCatalog(self.config).inventory(workspace=self.workspace)
+                finally:
+                    path.rmdir() if directory else path.unlink()
+        self.assertEqual(first.allocation_id, catalog.inventory_rows(workspace=self.workspace)[0]["allocation_id"])
+
+    def test_foreign_allocation_lease_and_cancellation_are_checked_globally(self) -> None:
+        first = self.host.allocate("worldgen-iteration", "first")
+        other_workspace = self.home / "other-workspace"
+        other_workspace.mkdir()
+        other_host = CoreWorkingAllocations(
+            workspace=other_workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="crucible",
+        )
+        second = other_host.allocate("worldgen-iteration", "second")
+        catalog = WorkingAllocationCatalog(self.config)
+        self.assertEqual([first.allocation_id], [row["allocation_id"] for row in
+                         ResourceCatalog(self.config).inventory(workspace=self.workspace)["working_allocations"]])
+        nonce = second.allocation_id.rsplit(":", 1)[1]
+        lease = catalog.root / "leases" / f"{nonce}.lock"
+        lease.write_bytes(b"unexpected lease payload")
+        try:
+            with self.assertRaisesRegex(WorkingAllocationError, "lease lost private custody"):
+                ResourceCatalog(self.config).inventory(workspace=self.workspace)
+        finally:
+            lease.unlink()
+        other_host.request_cancel(second, "reviewed-request")
+        cancellation = catalog.root / "cancellations" / f"{nonce}.json"
+        cancellation.write_bytes(b"corrupt\n")
+        with self.assertRaises(WorkingAllocationError):
+            ResourceCatalog(self.config).inventory(workspace=self.workspace)
+
+    def test_missing_foreign_path_does_not_hide_changed_activation(self) -> None:
+        self.host.allocate("worldgen-iteration", "first")
+        other_workspace = self.home / "other-workspace"
+        other_workspace.mkdir()
+        other_host = CoreWorkingAllocations(
+            workspace=other_workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="crucible",
+        )
+        second = other_host.allocate("worldgen-iteration", "second")
+        (second.path / ".workbench-allocation.json").unlink()
+        second.path.rmdir()
+        nonce = second.allocation_id.rsplit(":", 1)[1]
+        activation = WorkingAllocationCatalog(self.config).root / "activations" / f"{nonce}.json"
+        activation.write_bytes(b"corrupt\n")
+        with self.assertRaises(WorkingAllocationError):
+            ResourceCatalog(self.config).inventory(workspace=self.workspace)
+
+    def test_linked_or_nonprivate_path_lease_fails_inventory_closed(self) -> None:
+        if os.name == "nt":
+            self.skipTest("POSIX link and mode custody")
+        self.host.allocate("worldgen-iteration", "trial")
+        catalog = WorkingAllocationCatalog(self.config)
+        outside = self.home / "outside.lock"
+        outside.write_bytes(b"")
+        outside.chmod(0o600)
+        linked = catalog.root / "path-leases" / ("e" * 64 + ".lock")
+        os.link(outside, linked)
+        try:
+            with self.assertRaises(WorkingAllocationError):
+                catalog.inventory_rows(workspace=self.workspace)
+        finally:
+            linked.unlink()
+        linked.symlink_to(outside)
+        try:
+            with self.assertRaises(WorkingAllocationError):
+                catalog.inventory_rows(workspace=self.workspace)
+        finally:
+            linked.unlink()
+        linked.touch(mode=0o600)
+        linked.chmod(0o644)
+        with self.assertRaises(WorkingAllocationError):
+            catalog.inventory_rows(workspace=self.workspace)
+
     def test_cleanup_protects_whole_allocation_for_every_lifecycle_state(self) -> None:
         states = []
         for label in ("incomplete", "failed", "complete"):

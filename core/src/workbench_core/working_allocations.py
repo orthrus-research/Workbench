@@ -26,7 +26,7 @@ from workbench_api.working_allocations import (
 )
 
 from . import check_storage
-from .durable_records import private_record_lock, publish_immutable_bytes
+from .durable_records import private_record_lock, publish_immutable_bytes, read_private_single_link_bytes
 from .host_filesystem import fsync_directory, private_path, secure_private_path
 from .output_routing import _WINDOWS_RESERVED, _private_directory
 from .setup_cli import _workspace
@@ -47,6 +47,12 @@ _RECORD_LIMIT = 4 * 1024 * 1024
 _MAX_EVIDENCE = 256
 _MAX_REFERENCES = 256
 _MAX_EVIDENCE_BYTES = 2 * 1024**3
+_CATALOG_CHILDREN = frozenset({
+    "reservations", "activations", "terminals", "cancellations", "leases", "path-leases",
+})
+_RECORD_NAME = re.compile(r"([0-9a-f]{32})\.json\Z")
+_LEASE_NAME = re.compile(r"([0-9a-f]{32})(?:\.transition)?\.lock\Z")
+_PATH_LEASE_NAME = re.compile(r"[0-9a-f]{64}\.lock\Z")
 _active_allocations: ContextVar[frozenset[str]] = ContextVar(
     "workbench_active_working_allocations", default=frozenset(),
 )
@@ -185,6 +191,21 @@ class WorkingAllocationCatalog:
             raise WorkingAllocationError("working.changed", "working-allocation terminal record changed")
         return row
 
+    def cancellation(self, allocation_id: str) -> dict | None:
+        nonce = _nonce(allocation_id)
+        path = self._path("cancellations", nonce)
+        if not path.exists() and not path.is_symlink():
+            return None
+        row = self._read("cancellations", nonce, CANCELLATION_KIND)
+        if (set(row) != {"id", "format", "allocation_id", "reservation_id", "binding"}
+                or row["format"] != CANCELLATION_KIND
+                or row["allocation_id"] != allocation_id
+                or row["reservation_id"] != self.reservation(allocation_id)["id"]
+                or not isinstance(row["binding"], str)
+                or not row["binding"] or len(row["binding"]) > 256):
+            raise WorkingAllocationError("working.changed", "working-allocation cancellation changed")
+        return row
+
     def reference(self, allocation_id: str) -> WorkingAllocationReference:
         row = self.reservation(allocation_id)
         return WorkingAllocationReference(
@@ -241,21 +262,79 @@ class WorkingAllocationCatalog:
             failure=terminal["failure"] if terminal is not None else None,
         )
 
+    @staticmethod
+    def _inventory_directory(path: Path) -> Path:
+        try:
+            directory = check_storage.ordinary(path, directory=True)
+        except (OSError, ValueError) as exc:
+            raise WorkingAllocationError("working.changed", "working-allocation catalog directory is not ordinary") from exc
+        if not private_path(directory, directory=True):
+            raise WorkingAllocationError("working.changed", "working-allocation catalog directory lost private custody")
+        return directory
+
+    @staticmethod
+    def _inventory_file(path: Path, *, label: str, empty: bool = False) -> None:
+        try:
+            if empty:
+                read_private_single_link_bytes(path, byte_limit=0)
+            else:
+                check_storage.ordinary(path)
+        except (OSError, ValueError) as exc:
+            raise WorkingAllocationError("working.changed", f"working-allocation {label} lost private custody") from exc
+        if not private_path(path, directory=False):
+            raise WorkingAllocationError("working.changed", f"working-allocation {label} lost private custody")
+
+    def _inventory_children(self) -> list[Path]:
+        """Check all present-day catalog children before a workspace is selected."""
+        root = self._inventory_directory(self.root)
+        if {path.name for path in root.iterdir()} != _CATALOG_CHILDREN:
+            raise WorkingAllocationError("working.changed", "working-allocation catalog has an unknown or missing child")
+        children: dict[str, list[Path]] = {}
+        for name in sorted(_CATALOG_CHILDREN):
+            directory = self._inventory_directory(self._directory(name))
+            children[name] = sorted(directory.iterdir())
+
+        reservations: set[str] = set()
+        for path in children["reservations"]:
+            match = _RECORD_NAME.fullmatch(path.name)
+            if match is None:
+                raise WorkingAllocationError("working.changed", "working-allocation catalog has an invalid reservation")
+            self._inventory_file(path, label="reservation")
+            reservations.add(match.group(1))
+        for name in ("activations", "terminals", "cancellations"):
+            for path in children[name]:
+                match = _RECORD_NAME.fullmatch(path.name)
+                if match is None or match.group(1) not in reservations:
+                    raise WorkingAllocationError("working.changed", "working-allocation catalog has an orphan record")
+                self._inventory_file(path, label=name)
+        for path in children["leases"]:
+            match = _LEASE_NAME.fullmatch(path.name)
+            if match is None or match.group(1) not in reservations:
+                raise WorkingAllocationError("working.changed", "working-allocation catalog has an orphan lease")
+            self._inventory_file(path, label="lease", empty=True)
+        for path in children["path-leases"]:
+            if _PATH_LEASE_NAME.fullmatch(path.name) is None:
+                raise WorkingAllocationError("working.changed", "working-allocation catalog has an invalid path lease")
+            # Allocation acquires this lease before publishing a reservation.
+            self._inventory_file(path, label="path lease", empty=True)
+
+        for path in children["activations"]:
+            self.activation(f"workbench-working-allocation-v1:{path.stem}")
+        for path in children["terminals"]:
+            if self.terminal(f"workbench-working-allocation-v1:{path.stem}") is None:
+                raise WorkingAllocationError("working.changed", "working-allocation terminal disappeared")
+        for path in children["cancellations"]:
+            if self.cancellation(f"workbench-working-allocation-v1:{path.stem}") is None:
+                raise WorkingAllocationError("working.changed", "working-allocation cancellation disappeared")
+        return children["reservations"]
+
     def inventory_rows(self, *, workspace: Path | None = None) -> list[dict[str, object]]:
         """Expose every registered root so Core cleanup can protect it wholesale."""
         if not self.root.exists() and not self.root.is_symlink():
             return []
-        check_storage.ordinary(self.root, directory=True)
-        directory = check_storage.ordinary(self._directory("reservations"), directory=True)
-        for name in ("activations", "terminals", "cancellations"):
-            for path in check_storage.ordinary(self._directory(name), directory=True).iterdir():
-                if (re.fullmatch(r"[0-9a-f]{32}\.json", path.name) is None
-                        or not self._path("reservations", path.stem).is_file()):
-                    raise WorkingAllocationError("working.changed", "working-allocation catalog has an orphan record")
+        reservations = self._inventory_children()
         rows = []
-        for path in sorted(directory.iterdir()):
-            if not path.is_file() or re.fullmatch(r"[0-9a-f]{32}\.json", path.name) is None:
-                raise WorkingAllocationError("working.changed", "working-allocation catalog has an invalid reservation")
+        for path in reservations:
             description = self.describe(f"workbench-working-allocation-v1:{path.stem}")
             ref = description.reference
             if workspace is not None and ref.workspace != workspace:
@@ -493,18 +572,7 @@ class CoreWorkingAllocations:
 
     def cancellation_requested(self, allocation: WorkingAllocationReference) -> bool:
         selected = self._checked(allocation)
-        nonce = _nonce(selected.allocation_id)
-        marker = self.catalog._path("cancellations", nonce)
-        if not marker.exists() and not marker.is_symlink():
-            return False
-        row = self.catalog._read("cancellations", nonce, CANCELLATION_KIND)
-        if (set(row) != {"id", "format", "allocation_id", "reservation_id", "binding"}
-                or row["format"] != CANCELLATION_KIND
-                or row["allocation_id"] != selected.allocation_id
-                or row["reservation_id"] != self.catalog.reservation(selected.allocation_id)["id"]
-                or not isinstance(row["binding"], str) or not row["binding"]):
-            raise WorkingAllocationError("working.changed", "working-allocation cancellation changed")
-        return True
+        return self.catalog.cancellation(selected.allocation_id) is not None
 
     def check_cancelled(self, allocation: WorkingAllocationReference) -> None:
         selected = self._checked(allocation)
