@@ -60,13 +60,15 @@ def _identity(info: os.stat_result) -> tuple[int, int]:
 
 def _run_git(
     executable: str, arguments: Sequence[str], *, environment: Mapping[str, str],
-    timeout_seconds: float,
+    timeout_seconds: float, full_output_limit: int | None = None,
 ) -> tuple[int, str, str]:
     values = dict(environment)
     values["GIT_TERMINAL_PROMPT"] = "0"
     values["GIT_CONFIG_NOSYSTEM"] = "1"
     values.setdefault("GIT_CONFIG_GLOBAL", os.devnull)
     values.setdefault("LC_ALL", "C")
+    values["GIT_NO_REPLACE_OBJECTS"] = "1"
+    values["GIT_OPTIONAL_LOCKS"] = "0"
     try:
         with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
             completed = subprocess.run(
@@ -75,9 +77,12 @@ def _run_git(
             )
             stdout.seek(0)
             stderr.seek(0)
+            output = stdout.read((full_output_limit + 1) if full_output_limit is not None else 4096)
+            if full_output_limit is not None and len(output) > full_output_limit:
+                _fail("bounds", "Git verification output exceeds its bound")
             return (
                 completed.returncode,
-                stdout.read(4096).decode("utf-8", "replace"),
+                output.decode("utf-8", "replace"),
                 stderr.read(4096).decode("utf-8", "replace"),
             )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -259,6 +264,65 @@ class _CoreSourceCheckout:
 
 class CoreSourceCheckouts:
     """Clone into one owned stage and expose it only for semantic validation."""
+
+    def verify_exact(
+        self, root: Path, *, git_executable: str, expected_commit: str,
+        expected_tree: str, environment: Mapping[str, str],
+    ) -> tuple[str, str]:
+        """Reopen one clean local checkout without trusting its branch or index."""
+
+        if (not isinstance(root, Path) or not root.is_absolute()
+                or not _OBJECT.fullmatch(expected_commit)
+                or not _OBJECT.fullmatch(expected_tree)
+                or len(expected_commit) != len(expected_tree)):
+            _fail("input", "exact checkout verification input is invalid")
+        _no_redirects(root)
+        root_identity = _identity(_directory(root))
+        parent_identity = _identity(_directory(root.parent))
+        _directory(root / ".git")
+        count = 0
+        def walk_error(exc: OSError) -> None:
+            raise SourceCheckoutError("unavailable", "checkout cannot be completely inspected") from exc
+
+        for parent, names, files in os.walk(root, followlinks=False, onerror=walk_error):
+            for name in names + files:
+                count += 1
+                if count > 200_000:
+                    _fail("bounds", "checkout has too many members to verify")
+                member = Path(parent) / name
+                try:
+                    info = member.lstat()
+                except OSError as exc:
+                    raise SourceCheckoutError("changed", "checkout member disappeared during verification") from exc
+                if (stat.S_ISLNK(info.st_mode) or getattr(member, "is_junction", lambda: False)()
+                        or not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode))):
+                    _fail("unsafe", "checkout contains a redirect or special member")
+        for expression, expected in (("HEAD^{commit}", expected_commit), ("HEAD^{tree}", expected_tree)):
+            status, output, _ = _run_git(
+                git_executable, ("-C", str(root), "rev-parse", "--verify", expression),
+                environment=environment, timeout_seconds=30.0,
+            )
+            if status or output.strip() != expected:
+                _fail("identity", "checkout differs from the reviewed commit or tree")
+        status, output, _ = _run_git(
+            git_executable,
+            ("-C", str(root), "status", "--porcelain=v1", "--untracked-files=all",
+             "--ignored=matching", "--ignore-submodules=none"),
+            environment=environment, timeout_seconds=60.0,
+        )
+        if status or output.strip():
+            _fail("changed", "checkout worktree differs from the reviewed tree")
+        status, output, _ = _run_git(
+            git_executable, ("-C", str(root), "ls-files", "-v"),
+            environment=environment, timeout_seconds=60.0,
+            full_output_limit=32 * 1024 * 1024,
+        )
+        if status or any(not line.startswith("H ") for line in output.splitlines()):
+            _fail("changed", "checkout index hides changes to the reviewed tree")
+        if (_identity(_directory(root)) != root_identity
+                or _identity(_directory(root.parent)) != parent_identity):
+            _fail("changed", "checkout directory changed during verification")
+        return expected_commit, expected_tree
 
     def open(
         self, destination: Path, *, git_executable: str, remote_url: str,

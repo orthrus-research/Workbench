@@ -1200,7 +1200,22 @@ def apply_import(
     }
 
 
+def plan_project_import(*args, **kwargs) -> dict[str, Any]:
+    """Review the separate V2-share exact project-byte acquisition."""
+
+    from .environment_project_import import plan_project_import as operation
+    return operation(*args, **kwargs)
+
+
+def apply_project_import(*args, **kwargs) -> dict[str, Any]:
+    """Acquire or reuse only the reviewed Core-managed project input."""
+
+    from .environment_project_import import apply_project_import as operation
+    return operation(*args, **kwargs)
+
+
 __all__ = [
     "ReconstructionError", "apply_import", "assess_reconstruction_feasibility",
     "build_share", "export_share", "load_share", "plan_import", "validate_share",
+    "plan_project_import", "apply_project_import",
 ]
