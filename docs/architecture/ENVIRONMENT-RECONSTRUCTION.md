@@ -302,6 +302,15 @@ unresolved. It does not orchestrate
 acquisition of all five inputs after one approval; that needs a separate step
 journal and recovery contract.
 
+`plan_environment_package_composition` is a read-only next review. It reopens
+that five-input result and a separate installed-package admission against the
+same V3 share, candidate, workspace, closure plan and retained optional-wheel
+resource. It binds both current Core result identities and removes only
+`optional-module-packages` from the review's remaining-input list. The
+historical results retain their original markers. Profile fixture execution,
+managed tool runtime materialization and a supported clean-root rebuild remain
+unresolved, so this plan is not an environment reconstruction result.
+
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
 names the exact import plan, local blockers and missing acquisition inputs. The

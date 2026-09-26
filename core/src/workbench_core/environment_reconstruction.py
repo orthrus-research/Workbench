@@ -1417,6 +1417,13 @@ def reopen_package_admission(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def plan_environment_package_composition(*args, **kwargs) -> dict[str, Any]:
+    """Review retained V3 inputs together with admitted installed packages."""
+
+    from .environment_package_composition import plan_environment_package_composition as operation
+    return operation(*args, **kwargs)
+
+
 def plan_fixture_import(*args, **kwargs) -> dict[str, Any]:
     """Review the admitted profile fixture for separate Core custody."""
 
@@ -1451,5 +1458,6 @@ __all__ = [
     "plan_package_install_preflight",
     "apply_package_install", "reconcile_package_install", "reopen_package_install",
     "admit_package_install", "reopen_package_admission",
+    "plan_environment_package_composition",
     "plan_fixture_import", "apply_fixture_import", "reopen_fixture_import",
 ]
