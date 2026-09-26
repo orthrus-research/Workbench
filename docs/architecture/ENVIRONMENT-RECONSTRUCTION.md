@@ -247,7 +247,8 @@ service to reserve and activate the stable destination. The allocation's own
 catalog and marker establish custody of the mutable directory. Core then adds
 an immutable attempt binding and creates the virtual environment at its final
 path. Pip bootstraps from the retained, hash-locked wheelhouse with no index,
-and `pip check` runs inside that environment. Both child commands use Core's
+bytecode generation or installation compilation, and `pip check` runs inside
+that environment. Both child commands use Core's
 process supervisor with process-group closure, timeouts and bounded private
 stdout/stderr captures. Core verifies the retained input again after execution,
 then records selected completion evidence and a result. A failed or interrupted
@@ -263,6 +264,25 @@ explicit recovery decision. `reopen_package_install` verifies the retained
 result and selected current files. This slice records isolated pip completion,
 not installed module/profile or fixture-owner admission; every unresolved
 input marker, including `optional-module-packages`, remains.
+
+`admit_package_install` is a separate Core result after pip completion. It
+reopens the retained wheelhouse, the prepared install result and the Core
+working allocation, then inventories the isolated site and launcher trees
+through exact POSIX no-follow reads. Both process captures must bind the exact
+install and check command identities; earlier captures without that binding
+remain readable but cannot gain package admission. Every installed source wheel member except
+pip-regenerated `RECORD` must match its retained bytes. Each distribution's
+installed `RECORD` must name exactly its wheel files, pip installer metadata
+and declared launchers, with valid hashes and sizes. Extra files, links,
+missing distributions and changed
+bytes refuse admission. Pip's generated interpreter-minor launcher is reserved
+in preflight. The result records exact installed-tree digests and resolves only
+`optional-module-packages` in its new `remaining_unresolved_inputs` list;
+historical V3 share, install and composition receipts are unchanged.
+`reopen_package_admission` repeats the checks against current bytes. Native
+Linux/WSL private-filesystem support remains required, and profile fixture
+execution, managed tool materialization and clean-root reconstruction retain
+their separate evidence gates.
 
 `plan_environment_input_composition` is a V2 linked review of five separately
 completed Core results: workspace selection, exact project checkout, managed

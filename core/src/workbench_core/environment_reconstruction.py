@@ -1403,6 +1403,20 @@ def reopen_package_install(*args, **kwargs) -> dict[str, Any]:
     return operation(*args, **kwargs)
 
 
+def admit_package_install(*args, **kwargs) -> dict[str, Any]:
+    """Admit current installed distribution bytes against retained pip and wheels."""
+
+    from .environment_package_admission import admit_package_install as operation
+    return operation(*args, **kwargs)
+
+
+def reopen_package_admission(*args, **kwargs) -> dict[str, Any]:
+    """Recheck an exact Core-installed package admission result."""
+
+    from .environment_package_admission import reopen_package_admission as operation
+    return operation(*args, **kwargs)
+
+
 def plan_fixture_import(*args, **kwargs) -> dict[str, Any]:
     """Review the admitted profile fixture for separate Core custody."""
 
@@ -1436,5 +1450,6 @@ __all__ = [
     "plan_package_import", "apply_package_import", "reopen_package_import",
     "plan_package_install_preflight",
     "apply_package_install", "reconcile_package_install", "reopen_package_install",
+    "admit_package_install", "reopen_package_admission",
     "plan_fixture_import", "apply_fixture_import", "reopen_fixture_import",
 ]

@@ -140,6 +140,20 @@ class AggregateWheelTargetTests(TestCase):
         self.assertEqual([{"name": "first", "owner": "first", "group": "console_scripts"}], observed["launchers"])
         self.assertTrue(observed["target_inventory_sha256"].startswith("sha256:"))
 
+    def test_pip_minor_alias_is_reserved_even_when_not_declared(self) -> None:
+        pip = _wheel(self.root / "wheels/pip.whl", "pip", scripts=("pip", "pip3"))
+        alias = f"pip{sys.version_info.major}.{sys.version_info.minor}"
+        observed = self._scan(pip)
+        self.assertIn(
+            {"name": alias, "owner": "pip", "group": "pip-versioned-alias"},
+            observed["launchers"],
+        )
+        mapped = preflight._wheel_targets(
+            self.root, [pip], self.destination, self.paths, include_file_map=True,
+        )["file_map"]
+        self.assertEqual("pip", mapped[f"bin/{alias}"]["owner"])
+        self.assertIsNone(mapped[f"bin/{alias}"]["wheel_member"])
+
     def test_duplicate_file_and_file_directory_collision_refuse(self) -> None:
         first = _wheel(self.root / "wheels/first.whl", "first", members={"shared.py": "1", "occupied": "1"})
         second = _wheel(self.root / "wheels/second.whl", "second", members={"shared.py": "2"})

@@ -126,8 +126,10 @@ def _scheme(destination: Path) -> dict[str, Path]:
 
 
 def _wheel_targets(wheelhouse: Path, rows: list[dict[str, Any]],
-                   destination: Path, paths: Mapping[str, Path]) -> dict[str, Any]:
+                   destination: Path, paths: Mapping[str, Path], *,
+                   include_file_map: bool = False) -> dict[str, Any]:
     files: dict[str, str] = {}
+    file_map: dict[str, dict[str, str | None]] = {}
     directories: set[str] = set()
     launchers: list[dict[str, str]] = []
     member_count = 0
@@ -145,7 +147,7 @@ def _wheel_targets(wheelhouse: Path, rows: list[dict[str, Any]],
             directories.add(key)
             path = path.parent
 
-    def add_file(path: Path, owner: str) -> None:
+    def add_file(path: Path, owner: str, member: str | None) -> None:
         key = relative_target(path)
         if key in files or key in directories:
             raise ReconstructionError(f"wheel installation target collides: {key}")
@@ -154,6 +156,8 @@ def _wheel_targets(wheelhouse: Path, rows: list[dict[str, Any]],
             add_directory(parent)
             parent = parent.parent
         files[key] = owner
+        if include_file_map:
+            file_map[key] = {"owner": owner, "wheel_member": member}
         if len(files) > _MAX_TARGETS:
             raise ReconstructionError("wheelhouse exceeds the aggregate target bound")
 
@@ -201,7 +205,7 @@ def _wheel_targets(wheelhouse: Path, rows: list[dict[str, Any]],
                     if member.is_dir():
                         add_directory(target)
                     else:
-                        add_file(target, row["name"])
+                        add_file(target, row["name"], raw)
                 entry_name = metadata_root + "/entry_points.txt"
                 if entry_name in names:
                     if archive.getinfo(entry_name).file_size > 65536:
@@ -223,8 +227,24 @@ def _wheel_targets(wheelhouse: Path, rows: list[dict[str, Any]],
                                     or (name == "workbench" and row["name"] != "workbench-core")
                                     or (name == "workbench-tui" and row["name"] != "workbench-tui")):
                                 raise ReconstructionError("wheel declares a reserved or unsafe launcher")
-                            add_file(paths["scripts"] / name, row["name"])
+                            add_file(paths["scripts"] / name, row["name"], None)
                             launchers.append({"name": name, "owner": row["name"], "group": group})
+                            if len(launchers) > _MAX_LAUNCHERS:
+                                raise ReconstructionError("wheelhouse exceeds the launcher review bound")
+                    # pip's installer creates its interpreter-minor alias when
+                    # the wheel declares pip3, even though that alias is not
+                    # a separate entry point in the source wheel.
+                    if (row["name"] == "pip" and parser.has_section("console_scripts")
+                            and parser.has_option("console_scripts", "pip3")):
+                        alias = f"pip{sys.version_info.major}.{sys.version_info.minor}"
+                        alias_path = paths["scripts"] / alias
+                        alias_key = relative_target(alias_path)
+                        if alias_key in files and files[alias_key] != row["name"]:
+                            raise ReconstructionError("pip versioned launcher collides with another wheel")
+                        if alias_key not in files:
+                            add_file(alias_path, row["name"], None)
+                            launchers.append({"name": alias, "owner": row["name"],
+                                              "group": "pip-versioned-alias"})
                             if len(launchers) > _MAX_LAUNCHERS:
                                 raise ReconstructionError("wheelhouse exceeds the launcher review bound")
         except (OSError, ValueError, UnicodeError, configparser.Error, zipfile.BadZipFile, KeyError) as exc:
@@ -234,12 +254,16 @@ def _wheel_targets(wheelhouse: Path, rows: list[dict[str, Any]],
     if set(files) & directories:
         raise ReconstructionError("wheel files and directories collide")
     inventory = [{"target": key, "owner": files[key]} for key in sorted(files)]
-    return {
+    result = {
         "wheel_count": len(rows), "member_count": member_count,
         "file_target_count": len(files), "directory_target_count": len(directories),
         "launchers": sorted(launchers, key=lambda row: (row["name"], row["owner"], row["group"])),
         "target_inventory_sha256": "sha256:" + sha256(_canonical(inventory)).hexdigest(),
     }
+    if include_file_map:
+        result["file_map"] = file_map
+        result["directory_map"] = sorted(directories)
+    return result
 
 
 def plan_package_install_preflight(

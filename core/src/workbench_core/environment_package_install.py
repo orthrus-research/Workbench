@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from hashlib import sha256
+import re
 import stat
 from threading import Event
 from typing import Any, Mapping
@@ -45,6 +47,7 @@ _RECORD_LIMIT = 256 * 1024
 _OUTPUT_LIMIT = 8 * 1024 * 1024
 _DESTINATION_BLOCKER = "stable isolated install destination already exists; review recovery before reuse"
 _SCOPE = "Isolated pip completed; installed module/profile admission and optional package closure remain unresolved."
+_COMMAND_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
 def _preflight(
@@ -240,7 +243,28 @@ def _capture(plan: Mapping[str, Any], attempt_resource_id: str,
     if result.exit_code != 0:
         raise ReconstructionError(f"isolated package {stage} exited with code {result.exit_code}")
     return {"capture_id": result.capture_id, "binding": binding,
-            "exit_code": result.exit_code}
+            "exit_code": result.exit_code,
+            "argv_sha256": "sha256:" + sha256(_canonical(command)).hexdigest()}
+
+
+def _commands(plan: Mapping[str, Any], closure_plan: Mapping[str, Any],
+              wheelhouse: Path) -> dict[str, list[str]]:
+    pip_rows = [row for row in closure_plan["wheels"] if row["name"] == "pip"]
+    if len(pip_rows) != 1:
+        raise ReconstructionError("retained closure has no singular pip bootstrap")
+    python = str(_python_path(plan))
+    bootstrap = wheelhouse / "wheels" / pip_rows[0]["filename"]
+    return {
+        "install": [
+            python, "-I", "-B", "-c",
+            "import runpy,sys; sys.path.insert(0,sys.argv.pop(1)); runpy.run_module('pip',run_name='__main__')",
+            str(bootstrap), "--isolated", "install", "--no-index",
+            "--only-binary=:all:", "--require-hashes", "--no-cache-dir", "--no-compile",
+            "--find-links", str(wheelhouse / "wheels"),
+            "-r", str(wheelhouse / "requirements.lock"),
+        ],
+        "check": [python, "-I", "-B", "-m", "pip", "--isolated", "check"],
+    }
 
 
 def _install(plan: Mapping[str, Any], closure_plan: Mapping[str, Any],
@@ -248,22 +272,12 @@ def _install(plan: Mapping[str, Any], closure_plan: Mapping[str, Any],
     destination = Path(plan["destination"])
     venv.EnvBuilder(with_pip=False, clear=False, symlinks=False).create(destination)
     python = _verify_python(plan)
-    pip_rows = [row for row in closure_plan["wheels"] if row["name"] == "pip"]
-    if len(pip_rows) != 1:
-        raise ReconstructionError("retained closure has no singular pip bootstrap")
-    bootstrap = wheelhouse / "wheels" / pip_rows[0]["filename"]
-    command = [
-        python["path"], "-I", "-c",
-        "import runpy,sys; sys.path.insert(0,sys.argv.pop(1)); runpy.run_module('pip',run_name='__main__')",
-        str(bootstrap), "--isolated", "install", "--no-index",
-        "--only-binary=:all:", "--require-hashes", "--no-cache-dir",
-        "--find-links", str(wheelhouse / "wheels"),
-        "-r", str(wheelhouse / "requirements.lock"),
-    ]
-    installed = _capture(plan, attempt_resource_id, "install", command, timeout=1200)
+    commands = _commands(plan, closure_plan, wheelhouse)
+    if commands["install"][0] != python["path"]:
+        raise ReconstructionError("isolated install command targets another interpreter")
+    installed = _capture(plan, attempt_resource_id, "install", commands["install"], timeout=1200)
     checked = _capture(
-        plan, attempt_resource_id, "check",
-        [python["path"], "-I", "-m", "pip", "--isolated", "check"],
+        plan, attempt_resource_id, "check", commands["check"],
         timeout=120,
     )
     return _verify_python(plan), {"install": installed, "check": checked}
@@ -278,9 +292,16 @@ def _capture_evidence(plan: Mapping[str, Any], attempt_resource_id: str,
         item = captures[stage]
         binding = f"{attempt_resource_id}:{stage}"
         directory = Path(plan["destination"]) / f"workbench-package-{stage}-capture"
-        if (type(item) is not dict or set(item) != {"capture_id", "binding", "exit_code"}
+        if (type(item) is not dict or set(item) not in (
+                    {"capture_id", "binding", "exit_code"},
+                    {"capture_id", "binding", "exit_code", "argv_sha256"},
+                )
                 or item["binding"] != binding or item["exit_code"] != 0
-                or type(item["capture_id"]) is not str):
+                or type(item["capture_id"]) is not str
+                or ("argv_sha256" in item and (
+                    type(item["argv_sha256"]) is not str
+                    or _COMMAND_DIGEST.fullmatch(item["argv_sha256"]) is None
+                ))):
             raise ReconstructionError("isolated install capture has another owner or outcome")
         try:
             record = process_capture.load(
