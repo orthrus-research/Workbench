@@ -198,6 +198,24 @@ class CrucibleServiceV3Tests(unittest.TestCase):
             with self.assertRaises(ServiceV3Error):
                 reopened.store.context_bytes(self.context.id, self.binding.id)
 
+    def test_core_record_writer_keeps_service_custody_and_repairs_old_directory_mode(self) -> None:
+        with self._runtime(recover=False) as runtime:
+            store = runtime.store
+            record = store.jobs / "legacy-events" / "events" / "record.json"
+            record.parent.mkdir(parents=True)
+            os.chmod(record.parent, 0o755)
+            store._write_immutable(record, b"exact")
+            self.assertEqual(0, record.parent.stat().st_mode & 0o077)
+            store._write_immutable(record, b"exact")
+            with self.assertRaises(ServiceV3Error) as collision:
+                store._write_immutable(record, b"different")
+            self.assertEqual("service.immutable-collision", collision.exception.code)
+            outside = self.temporary.with_name(self.temporary.name + "-unowned.json")
+            with self.assertRaises(ServiceV3Error) as refused:
+                store._write_immutable(outside, b"unowned")
+            self.assertEqual("service.invalid-root", refused.exception.code)
+            self.assertFalse(outside.exists())
+
     @staticmethod
     def _wait_terminal(runtime, job_id, timeout=10):
         deadline = time.monotonic() + timeout

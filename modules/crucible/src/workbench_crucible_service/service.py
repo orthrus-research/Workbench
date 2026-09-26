@@ -18,7 +18,6 @@ import os
 from pathlib import Path
 import re
 import secrets
-import tempfile
 import threading
 import time
 from types import MappingProxyType
@@ -41,7 +40,12 @@ from workbench_crucible_jobs import (
 
 from workbench_api.service import (DurableJobHandle, JobSubscriptionPage, ServiceCancelled, ServiceExecutionContext, ServiceHandlerRegistration, ServicePhysicalLeasePorts, ServiceV3Error, _require, _validate_handler_value)
 
-from workbench_api.host_filesystem import fsync_directory, secure_private_path
+from workbench_api.host_filesystem import (
+    DurableRecordError,
+    publish_immutable_bytes,
+    replace_private_bytes,
+    secure_private_path,
+)
 from workbench_api.canonical import CANONICALIZER_ID, canonical_json_bytes, content_id, parse_canonical_json
 
 
@@ -1064,53 +1068,55 @@ class DurableJobStore:
         if self._fault_injector is not None:
             self._fault_injector(checkpoint)
 
-    @staticmethod
-    def _write_immutable(path: Path, raw: bytes) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists():
-            _require(
-                path.read_bytes() == raw,
-                "service.immutable-collision",
-                f"immutable service object differs at {path}",
-            )
-            return
-        descriptor, name = tempfile.mkstemp(
-            prefix=f".{path.name}.", dir=path.parent
+    def _record_parent(self, path: Path) -> None:
+        # The service owns its record layout, while Core owns the physical
+        # publication. Keep even old event directories private before handing
+        # them to Core's bounded record writer.
+        _require(
+            isinstance(path, Path)
+            and path.is_absolute()
+            and path.is_relative_to(self.root)
+            and path != self.root
+            and ".." not in path.parts,
+            "service.invalid-root",
+            "service record path is outside its admitted store",
         )
-        temporary = Path(name)
+        current = self.root
         try:
-            with os.fdopen(descriptor, "wb") as stream:
-                stream.write(raw)
-                stream.flush()
-                os.fsync(stream.fileno())
-            try:
-                os.link(temporary, path)
-            except FileExistsError:
+            for part in path.parent.relative_to(self.root).parts:
+                current = current / part
                 _require(
-                    path.read_bytes() == raw,
-                    "service.immutable-collision",
-                    f"immutable service object raced at {path}",
+                    not current.is_symlink() and not getattr(current, "is_junction", lambda: False)(),
+                    "service.invalid-root",
+                    "service record directory is redirected",
                 )
-            fsync_directory(path.parent)
-        finally:
-            temporary.unlink(missing_ok=True)
+                current.mkdir(mode=0o700, exist_ok=True)
+            secure_private_path(path.parent, directory=True)
+        except OSError as exc:
+            raise ServiceV3Error(
+                "service.invalid-root", "service record directory is not safely private"
+            ) from exc
 
-    @staticmethod
-    def _replace(path: Path, raw: bytes) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, name = tempfile.mkstemp(
-            prefix=f".{path.name}.", dir=path.parent
-        )
-        temporary = Path(name)
+    def _write_immutable(self, path: Path, raw: bytes) -> None:
+        self._record_parent(path)
         try:
-            with os.fdopen(descriptor, "wb") as stream:
-                stream.write(raw)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, path)
-            fsync_directory(path.parent)
-        finally:
-            temporary.unlink(missing_ok=True)
+            publish_immutable_bytes(path, raw, byte_limit=len(raw), idempotent=True)
+        except DurableRecordError as exc:
+            code = "service.immutable-collision" if exc.code == "collision" else "service.record-custody-failed"
+            raise ServiceV3Error(code, f"cannot publish immutable service record: {exc}") from exc
+
+    def _replace(self, path: Path, raw: bytes) -> None:
+        self._record_parent(path)
+        try:
+            try:
+                old_size = path.lstat().st_size
+            except FileNotFoundError:
+                old_size = 0
+            replace_private_bytes(path, raw, byte_limit=max(len(raw), old_size))
+        except DurableRecordError as exc:
+            raise ServiceV3Error(
+                "service.record-custody-failed", f"cannot replace service record: {exc}"
+            ) from exc
 
     @contextmanager
     def _file_lock(self, key: str):
