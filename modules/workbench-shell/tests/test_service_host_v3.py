@@ -31,6 +31,7 @@ from workbench_crucible_jobs.synthetic import (  # noqa: E402
     build_synthetic_job_publication,
 )
 from workbench_core.service.runtime import LocalServiceAuthenticator, ServiceRuntimeV3
+from workbench_core.service.record_backend import CoreServiceRecordBackend
 from workbench_api.service import ServiceHandlerRegistration
 from workbench_core.host_adapter import (  # noqa: E402
     inspect_local_host_adapter_v3,
@@ -206,7 +207,7 @@ class ServiceHostV3Tests(unittest.TestCase):
             ),
             result_validator=schema_validator(job_method["result_schema_id"]),
         )
-        self.runtime = ServiceRuntimeV3((self.temporary / 'service').resolve(), registrations=(self.query_registration, self.runtime_registration, self.job_get_registration), physical_leases=posix_service_physical_lease_ports(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda _context, _binding: True))
+        self.runtime = ServiceRuntimeV3((self.temporary / 'service').resolve(), registrations=(self.query_registration, self.runtime_registration, self.job_get_registration), physical_leases=posix_service_physical_lease_ports(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda _context, _binding: True))
         self.runtime.store.register_context(
             self.publication.context_ref.canonical_bytes,
             self.publication.input_binding.canonical_bytes,

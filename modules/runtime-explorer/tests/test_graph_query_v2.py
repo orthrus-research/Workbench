@@ -38,6 +38,7 @@ from workbench_crucible_context import (  # noqa: E402
 )
 from workbench_api.service import ServiceHandlerRegistration
 from workbench_core.service.runtime import ServiceRuntimeV3
+from workbench_core.service.record_backend import CoreServiceRecordBackend
 from workbench_api.canonical import CANONICALIZER_ID, canonical_json_bytes, content_id, parse_canonical_json
 from workbench_crucible_observatory import (  # noqa: E402
     BundleBuilder,
@@ -393,7 +394,7 @@ def _new_runtime(
 ) -> ServiceRuntimeV3:
     binding = build_world_studio_presenter_binding(handler or synthetic.handler)
     selected = registration or binding.registration
-    runtime = ServiceRuntimeV3((root / 'service').resolve(), registrations=(selected,), physical_leases=posix_service_physical_lease_ports(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda context, binding: context.id == synthetic.context.id and binding.id == synthetic.binding.id))
+    runtime = ServiceRuntimeV3((root / 'service').resolve(), registrations=(selected,), physical_leases=posix_service_physical_lease_ports(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda context, binding: context.id == synthetic.context.id and binding.id == synthetic.binding.id))
     runtime.world_studio_binding = binding
     runtime.store.register_context(
         synthetic.context.canonical_bytes,
@@ -1255,7 +1256,7 @@ class NativeGraphQueryV2Tests(unittest.TestCase):
                 ),
             )
             trusted_binding = build_world_studio_presenter_binding(handler)
-            runtime = ServiceRuntimeV3((root / 'service').resolve(), registrations=(trusted_binding.registration,), physical_leases=posix_service_physical_lease_ports(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda context, binding: context.id == context_ref['id'] and binding.id == input_binding['id']))
+            runtime = ServiceRuntimeV3((root / 'service').resolve(), registrations=(trusted_binding.registration,), physical_leases=posix_service_physical_lease_ports(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda context, binding: context.id == context_ref['id'] and binding.id == input_binding['id']))
             runtime.world_studio_binding = trusted_binding
             runtime.store.register_context(
                 canonical_json_bytes(context_ref),

@@ -282,6 +282,7 @@ def installed_world_presenter(root):
     from workbench_core.service.host import local_service_physical_lease_ports
     from workbench_core.service.runtime import ServiceRuntimeV3
     from workbench_crucible_service import DurableJobStore
+    from workbench_core.service.record_backend import CoreServiceRecordBackend
     from workbench_crucible_worldgen.view import WorldStudioProvingViewHandler
     from workbench_runtime_explorer.graph_query import EmbeddedGraphQueryPresenterV2
     import workbench_shell
@@ -298,6 +299,7 @@ def installed_world_presenter(root):
     with ServiceRuntimeV3(root / "world-service", registrations=(binding.registration,),
         physical_leases=local_service_physical_lease_ports(),
         store_factory=lambda path, leases: DurableJobStore(path, physical_leases=leases,
+            record_backend=CoreServiceRecordBackend(path, physical_leases=leases),
             context_publication_validator=lambda _context, _binding: False)) as runtime:
         presenter = EmbeddedGraphQueryPresenterV2(runtime, binding)
         manifest = presenter.manifest
@@ -379,6 +381,7 @@ def durable_service(root):
     from workbench_core.service.runtime import ServiceRuntimeV3
     from workbench_crucible_jobs.synthetic import build_synthetic_job_publication
     from workbench_crucible_service import DurableJobStore
+    from workbench_core.service.record_backend import CoreServiceRecordBackend
 
     publication = build_synthetic_job_publication()
     started = threading.Event()
@@ -402,7 +405,7 @@ def durable_service(root):
 
     def runtime():
         host = ServiceRuntimeV3(service_root, registrations=(registration,), physical_leases=local_service_physical_lease_ports(),
-            store_factory=lambda path, leases: DurableJobStore(path, physical_leases=leases, context_publication_validator=lambda _context, _binding: True))
+            store_factory=lambda path, leases: DurableJobStore(path, physical_leases=leases, record_backend=CoreServiceRecordBackend(path, physical_leases=leases), context_publication_validator=lambda _context, _binding: True))
         try:
             host.store.register_context(publication.context_ref.canonical_bytes, publication.input_binding.canonical_bytes)
         except BaseException:

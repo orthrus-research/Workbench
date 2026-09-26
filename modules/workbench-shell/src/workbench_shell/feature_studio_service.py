@@ -18,6 +18,7 @@ from referencing import Registry, Resource
 
 from workbench_crucible_service import ContextListHandler, JobCancellationHandler, JobEventPageHandler, JobSubscriptionHandler, ServiceCapabilitiesHandler, validate_context_list_result, validate_empty_service_arguments, validate_job_cancellation_arguments, validate_job_event_page_arguments, validate_job_event_page_result, validate_job_handle_result, validate_job_subscription_arguments, validate_job_subscription_result, validate_service_capabilities_result
 from workbench_core.service.runtime import LocalServiceAuthenticator, ServiceRuntimeV3
+from workbench_core.service.record_backend import CoreServiceRecordBackend
 from workbench_api.service import ServiceCancelled, ServiceExecutionContext, ServiceHandlerRegistration
 from workbench_api.canonical import canonical_json_bytes, content_id, parse_canonical_json
 
@@ -1276,7 +1277,7 @@ def compose_feature_studio_service_v3(
         ),
     )
 
-    runtime = ServiceRuntimeV3(store, registrations=tuple(registrations), physical_leases=local_service_physical_lease_ports(), maximum_workers=maximum_workers, maximum_pending_jobs=maximum_pending_jobs, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=_context_publication_validator))
+    runtime = ServiceRuntimeV3(store, registrations=tuple(registrations), physical_leases=local_service_physical_lease_ports(), maximum_workers=maximum_workers, maximum_pending_jobs=maximum_pending_jobs, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=_context_publication_validator))
     authenticator = LocalServiceAuthenticator(credentials)
     try:
         host = ServiceHostV3(

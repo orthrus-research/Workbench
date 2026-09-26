@@ -26,6 +26,7 @@ from workbench_crucible_jobs.synthetic import (  # noqa: E402
 )
 from workbench_crucible_service import ContextListHandler, JobCancellationHandler, JobEventPageHandler, JobSubscriptionHandler, ServiceCapabilitiesHandler, load_job_cancellation_plan, seal_job_cancellation_plan, validate_job_cancellation_arguments, validate_job_handle_result, validate_job_event_page_arguments, validate_job_event_page_result, validate_job_subscription_arguments, validate_job_subscription_result, validate_context_list_result, validate_empty_service_arguments, validate_service_capabilities_result
 from workbench_core.service.runtime import LocalServiceAuthenticator, ServiceRuntimeV3
+from workbench_core.service.record_backend import CoreServiceRecordBackend
 from workbench_api.service import ServiceHandlerRegistration, ServicePhysicalLeasePorts, ServiceV3Error
 
 
@@ -148,7 +149,7 @@ class CrucibleServiceV3Tests(unittest.TestCase):
         shutil.rmtree(self.temporary, ignore_errors=True)
 
     def _runtime(self, *, recover=True, maximum_pending_jobs=64):
-        runtime = ServiceRuntimeV3(self.temporary.resolve(), registrations=(self.registration,), physical_leases=_physical_leases(), maximum_pending_jobs=maximum_pending_jobs, recover=recover, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda _context, _binding: True))
+        runtime = ServiceRuntimeV3(self.temporary.resolve(), registrations=(self.registration,), physical_leases=_physical_leases(), maximum_pending_jobs=maximum_pending_jobs, recover=recover, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda _context, _binding: True))
         runtime.store.register_context(
             self.context.canonical_bytes,
             self.binding.canonical_bytes,
@@ -356,7 +357,7 @@ class CrucibleServiceV3Tests(unittest.TestCase):
             maximum_concurrency=1,
             handler=handler,
         )
-        runtime = ServiceRuntimeV3(self.temporary.resolve(), registrations=(registration,), physical_leases=_physical_leases(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda _context, _binding: True))
+        runtime = ServiceRuntimeV3(self.temporary.resolve(), registrations=(registration,), physical_leases=_physical_leases(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda _context, _binding: True))
         runtime.store.register_context(
             self.context.canonical_bytes,
             self.binding.canonical_bytes,
@@ -470,7 +471,7 @@ class CrucibleServiceV3Tests(unittest.TestCase):
             context_binding="none",
             input_binding="none",
         )
-        runtime = ServiceRuntimeV3(self.temporary.resolve(), registrations=(capabilities_registration, context_list_registration), physical_leases=_physical_leases(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda _context, _binding: True))
+        runtime = ServiceRuntimeV3(self.temporary.resolve(), registrations=(capabilities_registration, context_list_registration), physical_leases=_physical_leases(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda _context, _binding: True))
         runtime.store.register_context(
             self.context.canonical_bytes,
             self.binding.canonical_bytes,
@@ -576,7 +577,7 @@ class CrucibleServiceV3Tests(unittest.TestCase):
             request_validator=validate_job_event_page_arguments,
             result_validator=validate_job_event_page_result,
         )
-        runtime = ServiceRuntimeV3(self.temporary.resolve(), registrations=(self.registration, cancellation_registration, subscription_registration, event_page_registration), physical_leases=_physical_leases(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda _context, _binding: True))
+        runtime = ServiceRuntimeV3(self.temporary.resolve(), registrations=(self.registration, cancellation_registration, subscription_registration, event_page_registration), physical_leases=_physical_leases(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda _context, _binding: True))
         runtime.store.register_context(
             self.context.canonical_bytes,
             self.binding.canonical_bytes,
@@ -783,7 +784,7 @@ class CrucibleServiceV3Tests(unittest.TestCase):
                     if actual == selected:
                         raise RuntimeError(f"fault at {selected}")
 
-                runtime = ServiceRuntimeV3(root, registrations=(self.registration,), physical_leases=_physical_leases(), recover=False, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda _context, _binding: True, fault_injector=fault))
+                runtime = ServiceRuntimeV3(root, registrations=(self.registration,), physical_leases=_physical_leases(), recover=False, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda _context, _binding: True, fault_injector=fault))
                 runtime.store.register_context(
                     self.context.canonical_bytes,
                     self.binding.canonical_bytes,
@@ -807,7 +808,7 @@ class CrucibleServiceV3Tests(unittest.TestCase):
                     )
                 runtime.close()
 
-                reopened = ServiceRuntimeV3(root, registrations=(self.registration,), physical_leases=_physical_leases(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda _context, _binding: True))
+                reopened = ServiceRuntimeV3(root, registrations=(self.registration,), physical_leases=_physical_leases(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda _context, _binding: True))
                 try:
                     final = reopened.store.handle(handle.job_id)
                     expected = (

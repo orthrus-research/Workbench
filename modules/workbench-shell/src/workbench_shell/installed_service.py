@@ -19,6 +19,7 @@ from referencing import Registry, Resource
 
 from workbench_crucible_service import ContextListHandler, ServiceCapabilitiesHandler, validate_context_list_result, validate_empty_service_arguments, validate_service_capabilities_result
 from workbench_core.service.runtime import LocalServiceAuthenticator, ServiceRuntimeV3
+from workbench_core.service.record_backend import CoreServiceRecordBackend
 from workbench_api.service import ServiceHandlerRegistration
 from workbench_api.host_filesystem import (
     private_path,
@@ -334,7 +335,7 @@ def compose_installed_discovery_service_v3(
         context_binding="none",
         input_binding="none",
     )
-    runtime = ServiceRuntimeV3(store, registrations=(capabilities_registration, contexts_registration), physical_leases=local_service_physical_lease_ports(), maximum_workers=2, maximum_pending_jobs=8, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda _context, _binding: False))
+    runtime = ServiceRuntimeV3(store, registrations=(capabilities_registration, contexts_registration), physical_leases=local_service_physical_lease_ports(), maximum_workers=2, maximum_pending_jobs=8, store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda _context, _binding: False))
     authenticator = LocalServiceAuthenticator(credentials)
     try:
         host = ServiceHostV3(

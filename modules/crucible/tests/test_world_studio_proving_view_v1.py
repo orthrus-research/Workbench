@@ -24,6 +24,7 @@ sys.path[:0] = [
 ]
 
 from workbench_core.service.runtime import LocalServiceAuthenticator, ServiceRuntimeV3
+from workbench_core.service.record_backend import CoreServiceRecordBackend
 from workbench_api.service import ServiceV3Error
 from workbench_api.canonical import canonical_json_bytes
 from workbench_crucible_worldgen import (  # noqa: E402
@@ -164,7 +165,7 @@ class WorldStudioProvingViewV1Tests(unittest.TestCase):
         )
         context_ref = self.envelope["context_ref"]
         input_binding = self.envelope["input_binding"]
-        self.runtime = ServiceRuntimeV3((self.temporary / 'service').resolve(), registrations=(self.registration,), physical_leases=posix_service_physical_lease_ports(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, context_publication_validator=lambda context, binding: context.id == context_ref['id'] and binding.id == input_binding['id']))
+        self.runtime = ServiceRuntimeV3((self.temporary / 'service').resolve(), registrations=(self.registration,), physical_leases=posix_service_physical_lease_ports(), store_factory=lambda root, leases: DurableJobStore(root, physical_leases=leases, record_backend=CoreServiceRecordBackend(root, physical_leases=leases), context_publication_validator=lambda context, binding: context.id == context_ref['id'] and binding.id == input_binding['id']))
         self.runtime.store.register_context(
             canonical_json_bytes(context_ref),
             canonical_json_bytes(input_binding),

@@ -9,7 +9,6 @@ handlers retain all semantic and policy authority.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -42,10 +41,8 @@ from workbench_api.service import (DurableJobHandle, JobSubscriptionPage, Servic
 
 from workbench_api.host_filesystem import (
     DurableRecordError,
-    publish_immutable_bytes,
-    replace_private_bytes,
-    secure_private_path,
 )
+from workbench_api.service_records import ServiceRecordBackend
 from workbench_api.canonical import CANONICALIZER_ID, canonical_json_bytes, content_id, parse_canonical_json
 
 
@@ -1012,6 +1009,7 @@ class DurableJobStore:
         *,
         context_publication_validator: ContextPublicationValidator,
         physical_leases: ServicePhysicalLeasePorts,
+        record_backend: ServiceRecordBackend,
         fault_injector: Callable[[str], None] | None = None,
     ) -> None:
         _require(
@@ -1029,33 +1027,18 @@ class DurableJobStore:
             "service.invalid-physical-lease-provider",
             "durable service custody requires an explicit Host Adapter lease provider",
         )
-        root.mkdir(parents=True, mode=0o700, exist_ok=True)
         _require(
-            root.is_dir() and not root.is_symlink(),
+            record_backend.root == root,
             "service.invalid-root",
-            "durable service root must be a real directory",
+            "durable service backend must bind the selected root",
         )
-        secure_private_path(root, directory=True)
         self.root = root
-        self.jobs = root / "jobs"
-        self.contexts = root / "contexts"
-        self.idempotency = root / "idempotency"
-        self.locks = root / "locks"
-        for directory in (
-            self.jobs,
-            self.contexts,
-            self.idempotency,
-            self.locks,
-        ):
-            directory.mkdir(parents=True, mode=0o700, exist_ok=True)
-            _require(
-                directory.is_dir() and not directory.is_symlink(),
-                "service.invalid-root",
-                "durable service directory must not be a symbolic link",
-            )
-            secure_private_path(directory, directory=True)
+        self._records = record_backend
+        self.jobs = record_backend.namespace("jobs")
+        self.contexts = record_backend.namespace("contexts")
+        self.idempotency = record_backend.namespace("idempotency")
+        self.locks = record_backend.namespace("locks")
         self._context_validator = context_publication_validator
-        self._physical_leases = physical_leases
         _require(
             fault_injector is None or callable(fault_injector),
             "service.invalid-fault-injector",
@@ -1068,81 +1051,20 @@ class DurableJobStore:
         if self._fault_injector is not None:
             self._fault_injector(checkpoint)
 
-    def _record_parent(self, path: Path) -> None:
-        # The service owns its record layout, while Core owns the physical
-        # publication. Keep even old event directories private before handing
-        # them to Core's bounded record writer.
-        _require(
-            isinstance(path, Path)
-            and path.is_absolute()
-            and path.is_relative_to(self.root)
-            and path != self.root
-            and ".." not in path.parts,
-            "service.invalid-root",
-            "service record path is outside its admitted store",
-        )
-        current = self.root
-        try:
-            for part in path.parent.relative_to(self.root).parts:
-                current = current / part
-                _require(
-                    not current.is_symlink() and not getattr(current, "is_junction", lambda: False)(),
-                    "service.invalid-root",
-                    "service record directory is redirected",
-                )
-                current.mkdir(mode=0o700, exist_ok=True)
-            secure_private_path(path.parent, directory=True)
-        except OSError as exc:
-            raise ServiceV3Error(
-                "service.invalid-root", "service record directory is not safely private"
-            ) from exc
-
     def _write_immutable(self, path: Path, raw: bytes) -> None:
-        self._record_parent(path)
         try:
-            publish_immutable_bytes(path, raw, byte_limit=len(raw), idempotent=True)
+            self._records.publish_immutable(path, raw)
         except DurableRecordError as exc:
             code = "service.immutable-collision" if exc.code == "collision" else "service.record-custody-failed"
             raise ServiceV3Error(code, f"cannot publish immutable service record: {exc}") from exc
 
     def _replace(self, path: Path, raw: bytes) -> None:
-        self._record_parent(path)
         try:
-            try:
-                old_size = path.lstat().st_size
-            except FileNotFoundError:
-                old_size = 0
-            replace_private_bytes(path, raw, byte_limit=max(len(raw), old_size))
+            self._records.replace(path, raw)
         except DurableRecordError as exc:
             raise ServiceV3Error(
                 "service.record-custody-failed", f"cannot replace service record: {exc}"
             ) from exc
-
-    @contextmanager
-    def _file_lock(self, key: str):
-        path = self.locks / f"{hashlib.sha256(key.encode()).hexdigest()}.lock"
-        try:
-            lease = self._physical_leases.exclusive(path)
-            enter = lease.__enter__
-            leave = lease.__exit__
-            enter()
-        except ServiceV3Error:
-            raise
-        except Exception as exc:
-            raise ServiceV3Error(
-                "service.physical-lease-failed",
-                "Host Adapter record lease failed closed",
-            ) from exc
-        try:
-            yield
-        finally:
-            try:
-                leave(None, None, None)
-            except Exception as exc:
-                raise ServiceV3Error(
-                    "service.physical-lease-failed",
-                    "Host Adapter record lease release failed closed",
-                ) from exc
 
     def _job_root(self, job_id: str) -> Path:
         _require(
@@ -1228,8 +1150,8 @@ class DurableJobStore:
             "exact context/input pair is not registered",
         )
         context_raw, binding_raw = (
-            context_path.read_bytes(),
-            binding_path.read_bytes(),
+            self._records.read(context_path),
+            self._records.read(binding_path),
         )
         context = load_context_ref(context_raw)
         binding = load_input_binding(binding_raw)
@@ -1254,10 +1176,10 @@ class DurableJobStore:
                 continue
             if re.fullmatch(r"[0-9a-f]{64}", context.name):
                 context_id = load_context_ref(
-                    (context / "context-ref.json").read_bytes()
+                    self._records.read(context / "context-ref.json")
                 ).id
                 binding_id = load_input_binding(
-                    (context / "input-binding.json").read_bytes()
+                    self._records.read(context / "input-binding.json")
                 ).id
                 _require(
                     self._context_root(context_id, binding_id) == context,
@@ -1289,9 +1211,11 @@ class DurableJobStore:
         raw: bytes | None = None
         for _attempt in range(50):
             try:
-                raw = path.read_bytes()
+                raw = self._records.read(path)
                 break
-            except FileNotFoundError:
+            except DurableRecordError as exc:
+                if exc.code not in {"unavailable", "changed"}:
+                    raise
                 # Some supported host filesystems expose a tiny visibility
                 # window while replacing an operational head. Immutable job
                 # records remain authoritative, so retry the bounded head read.
@@ -1326,13 +1250,13 @@ class DurableJobStore:
         return tuple(result)
 
     def _attempt(self, job_id: str) -> ValidatedJobRecord:
-        return load_job_record((self._job_root(job_id) / "attempt.json").read_bytes())
+        return load_job_record(self._records.read(self._job_root(job_id) / "attempt.json"))
 
     def job_binding(self, job_id: str) -> tuple[str, str]:
         """Return the exact context/input pair sealed by a job submission."""
 
         submission = load_job_record(
-            (self._job_root(job_id) / "submission.json").read_bytes()
+            self._records.read(self._job_root(job_id) / "submission.json")
         ).to_dict()
         context_ref_id = submission["context_ref_id"]
         input_binding_id = submission["input_binding_id"]
@@ -1352,8 +1276,8 @@ class DurableJobStore:
         )
         self.validate_complete_job(job_id)
         root = self._job_root(job_id)
-        result_raw = (root / "result.json").read_bytes()
-        terminal = load_job_record((root / "terminal.json").read_bytes())
+        result_raw = self._records.read(root / "result.json")
+        terminal = load_job_record(self._records.read(root / "terminal.json"))
         _require(
             terminal.id == handle.terminal_seal_id
             and terminal.to_dict()["result_object_descriptor_id"]
@@ -1378,11 +1302,11 @@ class DurableJobStore:
         head = (
             None
             if not head_path.exists()
-            else parse_canonical_json(head_path.read_bytes())
+            else parse_canonical_json(self._records.read(head_path))
         )
         ordinal = 0 if head is None else head["latest_event_ordinal"] + 1
         attempt = self._attempt(job_id) if owner_attempt else None
-        submission = load_job_record((root / "submission.json").read_bytes())
+        submission = load_job_record(self._records.read(root / "submission.json"))
         submission_value = submission.to_dict()
         event = seal_job_record(
             {
@@ -1475,13 +1399,18 @@ class DurableJobStore:
         )
         digest = hashlib.sha256(scope).hexdigest()
         link = self.idempotency / f"{digest}.json"
-        with self._thread_lock, self._file_lock("idempotency"):
+        with self._thread_lock, self._records.exclusive("idempotency"):
             if link.is_file():
-                value = parse_canonical_json(link.read_bytes())
+                value = parse_canonical_json(self._records.read(link))
                 return self.handle(value["job_id"]), False
             job_id = _operational("job")
             root = self._job_root(job_id)
-            root.mkdir(mode=0o700)
+            try:
+                self._records.allocate_directory(root)
+            except DurableRecordError as exc:
+                raise ServiceV3Error(
+                    "service.record-custody-failed", "cannot allocate durable job directory"
+                ) from exc
             request_bytes = canonical_json_bytes(dict(arguments))
             self._write_immutable(root / "request.json", request_bytes)
             submission = seal_job_record(
@@ -1583,10 +1512,10 @@ class DurableJobStore:
             }
         )
         link = self.idempotency / f"{hashlib.sha256(scope).hexdigest()}.json"
-        with self._thread_lock, self._file_lock("idempotency"):
+        with self._thread_lock, self._records.exclusive("idempotency"):
             if not link.is_file():
                 return None
-            value = parse_canonical_json(link.read_bytes())
+            value = parse_canonical_json(self._records.read(link))
             _require(
                 type(value) is dict
                 and set(value) == {"job_id", "job_submission_id"},
@@ -1602,7 +1531,7 @@ class DurableJobStore:
             return handle
 
     def start_job(self, job_id: str, *, actor_id: str) -> None:
-        with self._thread_lock, self._file_lock(job_id):
+        with self._thread_lock, self._records.exclusive(job_id):
             head = self._load_head(job_id)
             if head["terminal_seal_id"] is not None:
                 return
@@ -1641,7 +1570,7 @@ class DurableJobStore:
         message: str | None,
         actor_id: str,
     ) -> ValidatedJobRecord:
-        with self._thread_lock, self._file_lock(job_id):
+        with self._thread_lock, self._records.exclusive(job_id):
             head = self._load_head(job_id)
             _require(
                 head["terminal_seal_id"] is None,
@@ -1673,10 +1602,10 @@ class DurableJobStore:
             "service.invalid-mutation-state",
             "mutation state is invalid",
         )
-        with self._thread_lock, self._file_lock(job_id):
+        with self._thread_lock, self._records.exclusive(job_id):
             head = self._load_head(job_id)
             submission = load_job_record(
-                (self._job_root(job_id) / "submission.json").read_bytes()
+                self._records.read(self._job_root(job_id) / "submission.json")
             ).to_dict()
             _require(
                 head["terminal_seal_id"] is None
@@ -1719,7 +1648,7 @@ class DurableJobStore:
         reason: str,
         idempotency_key: str | None = None,
     ) -> DurableJobHandle:
-        with self._thread_lock, self._file_lock(job_id):
+        with self._thread_lock, self._records.exclusive(job_id):
             head = self._load_head(job_id)
             if head["terminal_seal_id"] is not None:
                 return self.handle(job_id)
@@ -1821,7 +1750,7 @@ class DurableJobStore:
     def observe_cancellation(
         self, job_id: str, *, actor_id: str, observation_point: str
     ) -> str:
-        with self._thread_lock, self._file_lock(job_id):
+        with self._thread_lock, self._records.exclusive(job_id):
             self._observe_cancellation_locked(
                 job_id,
                 actor_id=actor_id,
@@ -1833,7 +1762,7 @@ class DurableJobStore:
         root = self._job_root(job_id) / "events"
         values = []
         for path in sorted(root.glob("*.json")):
-            values.append(load_job_record(path.read_bytes()).to_dict())
+            values.append(load_job_record(self._records.read(path)).to_dict())
         return values
 
     @staticmethod
@@ -1908,7 +1837,7 @@ class DurableJobStore:
         root = self._job_root(job_id)
         terminal_path = root / "terminal.json"
         if terminal_path.is_file():
-            return load_job_record(terminal_path.read_bytes())
+            return load_job_record(self._records.read(terminal_path))
         head = self._load_head(job_id)
         body = terminal_event["body"]
         _require(
@@ -1918,7 +1847,7 @@ class DurableJobStore:
             "service.job-corrupt",
             "terminal-ready event is not the durable job head",
         )
-        submission = load_job_record((root / "submission.json").read_bytes())
+        submission = load_job_record(self._records.read(root / "submission.json"))
         attempt = self._attempt(job_id)
         events = self._event_values(job_id)
         cancellation_ids = sorted(
@@ -2011,7 +1940,7 @@ class DurableJobStore:
             "service.invalid-terminal-outcome",
             "terminal outcome is invalid",
         )
-        with self._thread_lock, self._file_lock(job_id):
+        with self._thread_lock, self._records.exclusive(job_id):
             head = self._load_head(job_id)
             if head["terminal_seal_id"] is not None:
                 return self.handle(job_id)
@@ -2083,10 +2012,10 @@ class DurableJobStore:
     def validate_complete_job(self, job_id: str) -> None:
         root = self._job_root(job_id)
         records = [
-            load_job_record((root / "submission.json").read_bytes()),
-            load_job_record((root / "attempt.json").read_bytes()),
-            *(load_job_record(path.read_bytes()) for path in sorted((root / "events").glob("*.json"))),
-            load_job_record((root / "terminal.json").read_bytes()),
+            load_job_record(self._records.read(root / "submission.json")),
+            load_job_record(self._records.read(root / "attempt.json")),
+            *(load_job_record(self._records.read(path)) for path in sorted((root / "events").glob("*.json"))),
+            load_job_record(self._records.read(root / "terminal.json")),
         ]
         by_id = {record.id: record.canonical_bytes for record in records}
         submission = records[0].to_dict()
@@ -2167,7 +2096,7 @@ class DurableJobStore:
             if not path.is_dir():
                 continue
             job_id = self._stored_job_id(path.name)
-            with self._thread_lock, self._file_lock(job_id):
+            with self._thread_lock, self._records.exclusive(job_id):
                 head = self._load_head(job_id)
                 if head["terminal_seal_id"] is not None:
                     continue
