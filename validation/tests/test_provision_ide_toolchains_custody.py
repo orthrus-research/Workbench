@@ -12,7 +12,11 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "validation"))
+sys.path.insert(0, str(ROOT / "api/src"))
+sys.path.insert(0, str(ROOT / "core/src"))
 import provision_ide_toolchains as provision
+from core_run_custody import allocate_ide_toolchain_stage
+from workbench_core.temporary_leases import CoreTemporaryLeases
 
 
 class IdeArchiveCustodyTests(unittest.TestCase):
@@ -121,6 +125,13 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         self.assertEqual(published, after_interruption)
         self.assertTrue(interrupted_tail.is_dir())
         self.assertEqual(3, download.call_count)
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.root / ".ide-toolchain-core", workspace=self.root,
+        )
+        self.assertEqual(1, len(rows))
+        self.assertEqual("retained-unproven", rows[0]["status"])
+        self.assertEqual("ide-toolchain", rows[0]["role"])
+        self.assertTrue((Path(rows[0]["path"]) / ".workbench-temporary-retained.json").is_file())
 
     def test_invalid_lock_root_refuses_before_download_or_stage(self) -> None:
         for archive_root, extracted_root in (
@@ -172,6 +183,22 @@ class IdeExtractionPreservationTests(unittest.TestCase):
         self.assertEqual(self.entry["archive_sha256"] + "\n", marker.read_text(encoding="ascii"))
         self.assertEqual([marker], list(destination.iterdir()))
 
+    def test_active_or_abandoned_core_stage_blocks_exact_target_reuse(self) -> None:
+        destination = self.toolchains / self.entry["archive_root"]
+        _host, stage = allocate_ide_toolchain_stage(
+            destination.absolute(), self.entry["archive_sha256"],
+        )
+        self._extract(self.archive, self.toolchains)
+        (destination / ".workbench-provisioned-sha256").write_text(
+            self.entry["archive_sha256"] + "\n", encoding="ascii",
+        )
+        with patch.object(provision, "download") as download:
+            with self.assertRaisesRegex(provision.ProvisionFailure, "incomplete Core IDE extraction stage"):
+                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+            download.assert_not_called()
+        self.assertTrue(stage.path.is_dir())
+        self.assertEqual(b"exact installed bytes", (destination / "bin").read_bytes())
+
     def test_redirected_destination_or_marker_refuses_without_replacing_tree(self) -> None:
         destination = self.toolchains / self.entry["archive_root"]
         real = self.root / "real"
@@ -222,16 +249,20 @@ class IdeExtractionPreservationTests(unittest.TestCase):
                     self.entry, suffix=".zip", extractor=competing_extraction,
                 )
         self.assertEqual(b"other publisher", (destination / "keep.bin").read_bytes())
-        stages = list(self.toolchains.glob("locked-tool.*"))
+        stages = list(self.toolchains.glob(f"ide-{self.entry['archive_sha256']}-*"))
         self.assertEqual(1, len(stages))
         self.assertEqual(
             (self.entry["archive_sha256"] + "\n").encode(),
             (stages[0] / "locked-tool/.workbench-provisioned-sha256").read_bytes(),
         )
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.root / ".ide-toolchain-core", workspace=self.root,
+        )
+        self.assertEqual("retained-unproven", rows[0]["status"])
         (destination / "keep.bin").unlink()
         destination.rmdir()
         with patch.object(provision, "download") as download:
-            with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted IDE toolchain extraction"):
+            with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted Core IDE extraction stage"):
                 provision.provision_entry(
                     self.entry, suffix=".zip", extractor=self._extract,
                 )
@@ -249,6 +280,20 @@ class IdeExtractionPreservationTests(unittest.TestCase):
             download.assert_not_called()
         self.assertEqual(b"historical residue", (stage / "partial.bin").read_bytes())
 
+    def test_changed_core_stage_marker_blocks_promotion(self) -> None:
+        def changed_marker(archive: Path, temporary: Path) -> None:
+            self._extract(archive, temporary)
+            (temporary / ".workbench-temporary-lease.json").write_bytes(b"changed")
+
+        with patch.object(provision, "download", return_value=self.archive):
+            with self.assertRaisesRegex(provision.ProvisionFailure, "Core IDE toolchain stage or publication"):
+                provision.provision_entry(
+                    self.entry, suffix=".zip", extractor=changed_marker,
+                )
+        self.assertFalse((self.toolchains / self.entry["archive_root"]).exists())
+        stage, = self.toolchains.glob(f"ide-{self.entry['archive_sha256']}-*")
+        self.assertEqual(b"changed", (stage / ".workbench-temporary-lease.json").read_bytes())
+
     def test_failed_extraction_retains_partial_stage_and_refuses_retry(self) -> None:
         def broken_extraction(_archive: Path, temporary: Path) -> None:
             (temporary / "partial.bin").write_bytes(b"unfinished")
@@ -259,9 +304,9 @@ class IdeExtractionPreservationTests(unittest.TestCase):
                 provision.provision_entry(
                     self.entry, suffix=".zip", extractor=broken_extraction,
                 )
-            stage, = self.toolchains.glob("locked-tool.*")
+            stage, = self.toolchains.glob(f"ide-{self.entry['archive_sha256']}-*")
             self.assertEqual(b"unfinished", (stage / "partial.bin").read_bytes())
-            with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted IDE toolchain extraction"):
+            with self.assertRaisesRegex(provision.ProvisionFailure, "interrupted Core IDE extraction stage"):
                 provision.provision_entry(
                     self.entry, suffix=".zip", extractor=self._extract,
                 )

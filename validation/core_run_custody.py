@@ -13,6 +13,7 @@ import re
 import stat
 import sys
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 if TYPE_CHECKING:
     from workbench_api.validation_invocations import ValidationInvocationRecord
@@ -155,31 +156,114 @@ def open_validation_invocation(
         raise OSError(f"Core invocation store is unavailable: {exc}") from exc
 
 
-def promote_ide_toolchain_directory(payload: Path, target: Path, marker: bytes) -> Path:
+def _ide_stage_host(target: Path):
+    _source_core()
+    from workbench_core.temporary_leases import CoreTemporaryLeases
+
+    selected_root = target.parent.parent
+    return CoreTemporaryLeases(
+        workspace=selected_root,
+        configuration_home=selected_root / ".ide-toolchain-core",
+        locations={"ide-toolchain": target.parent}, owner_id="validation",
+    )
+
+
+def allocate_ide_toolchain_stage(target: Path, archive_sha256: str):
+    """Reserve one private extraction stage in Core's local lease catalog."""
+
+    _reject_existing_ide_toolchain_stage(target, archive_sha256)
+    _source_core()
+    from workbench_core.temporary_leases import TemporaryLeaseError
+
+    host = _ide_stage_host(target)
+    prefix = f"ide-{archive_sha256}-"
+    try:
+        reference = host.allocate(
+            "ide-toolchain", prefix + uuid4().hex,
+        )
+    except TemporaryLeaseError as exc:
+        raise OSError(f"Core IDE extraction stage needs review: {exc}") from exc
+    return host, reference
+
+
+def _ide_toolchain_stage_rows(target: Path, archive_sha256: str) -> list[dict]:
+    if (
+        not isinstance(target, Path) or not target.is_absolute()
+        or type(archive_sha256) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", archive_sha256) is None
+    ):
+        raise OSError("IDE toolchain stage target or archive digest is invalid")
+    _source_core()
+    from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
+
+    host = _ide_stage_host(target)
+    prefix = f"ide-{archive_sha256}-"
+    try:
+        rows = CoreTemporaryLeases.inventory_catalog(
+            host.configuration_home, workspace=host.workspace,
+        )
+        return [row for row in rows if (
+            row["owner_id"] == "validation"
+            and row["role"] == "ide-toolchain"
+            and Path(row["path"]).parent == target.parent
+            and Path(row["path"]).name.startswith(prefix)
+        )]
+    except TemporaryLeaseError as exc:
+        raise OSError(f"Core IDE extraction stage needs review: {exc}") from exc
+
+
+def _reject_existing_ide_toolchain_stage(target: Path, archive_sha256: str) -> None:
+    if any(row["status"] != "disposed" for row in _ide_toolchain_stage_rows(target, archive_sha256)):
+        raise OSError("interrupted Core IDE extraction stage requires review")
+
+
+def reject_existing_ide_toolchain_stage(target: Path, archive_sha256: str) -> None:
+    """Refuse an interrupted Core stage before archive acquisition."""
+
+    _reject_existing_ide_toolchain_stage(target, archive_sha256)
+
+
+def review_ide_toolchain_stages_on_reuse(target: Path, archive_sha256: str) -> None:
+    """Refuse a selected target while its Core extraction stage is incomplete."""
+
+    rows = _ide_toolchain_stage_rows(target, archive_sha256)
+    if any(row["status"] not in {"retained-unproven", "disposed"} for row in rows):
+        raise OSError("incomplete Core IDE extraction stage requires review")
+    if sum(row["status"] == "retained-unproven" for row in rows) > 1:
+        raise OSError("multiple retained Core IDE extraction stages require review")
+
+
+def promote_ide_toolchain_directory(
+    payload: Path, target: Path, marker: bytes, *, stage_host, stage_reference,
+) -> Path:
     """Ask Core for an atomic no-replace move of one prepared extraction.
 
-    This bootstrap adapter does not claim exact member admission. A failed
-    promotion retains the prepared stage and every existing destination.
+    The stage's exact Core lease marker remains adjacent to the moved payload.
+    A failed promotion retains the prepared stage and every existing target.
     """
 
     if (
         not isinstance(payload, Path) or not isinstance(target, Path)
         or payload.parent.parent != target.parent
-        or not payload.parent.name.startswith(target.name + ".")
         or type(marker) is not bytes or re.fullmatch(rb"[0-9a-f]{64}\n", marker) is None
+        or getattr(stage_reference, "path", None) != payload.parent
     ):
         raise OSError("IDE toolchain stage or lock marker is invalid")
     _source_core()
+    from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
     from workbench_core.prepared_directory_promotion import (
         PreparedDirectoryError, promote_prepared_directory,
     )
 
     try:
+        if not isinstance(stage_host, CoreTemporaryLeases):
+            raise OSError("IDE toolchain stage has no Core temporary lease")
+        stage_marker = stage_host.prepared_stage_marker(stage_reference)
         return promote_prepared_directory(
             payload, target, marker_name=".workbench-provisioned-sha256",
-            marker_bytes=marker,
+            marker_bytes=marker, stage_marker=stage_marker,
         )
-    except PreparedDirectoryError as exc:
+    except (PreparedDirectoryError, TemporaryLeaseError) as exc:
         raise OSError(f"Core IDE toolchain promotion needs review: {exc}") from exc
 
 
@@ -261,6 +345,9 @@ def publish_ci_plan(
 
 __all__ = [
     "allocate_validation_run", "allocate_validation_scratch", "publish_ci_plan",
-    "publish_validation_timing", "open_validation_invocation", "promote_ide_toolchain_directory",
+    "publish_validation_timing", "open_validation_invocation", "allocate_ide_toolchain_stage",
+    "reject_existing_ide_toolchain_stage",
+    "review_ide_toolchain_stages_on_reuse",
+    "promote_ide_toolchain_directory",
     "verify_ide_toolchain_directory",
 ]

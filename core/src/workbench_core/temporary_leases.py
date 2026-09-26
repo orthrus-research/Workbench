@@ -483,6 +483,25 @@ class CoreTemporaryLeases:
             raise TemporaryLeaseError("temporary.changed", "temporary lease path is unavailable or changed") from exc
         return self._reference(reservation)
 
+    def prepared_stage_marker(
+        self, reference: TemporaryLeaseReference,
+    ) -> tuple[tuple[int, int], str, bytes]:
+        """Describe the exact active lease marker for a pinned member move."""
+
+        if reference.lease_id not in _active.get() or reference != self.open(reference.lease_id):
+            raise TemporaryLeaseError("temporary.lease", "prepared stage requires its active Core lease")
+        reservation = self._reservation(reference.lease_id)
+        activation = self._activation(reference.lease_id)
+        marker = _sealed(_MARKER, {
+            "format": _MARKER, "lease_id": reference.lease_id,
+            "reservation_id": reservation["id"],
+        })
+        return (
+            (activation["device"], activation["inode"]),
+            _MARKER_NAME,
+            check_storage.canonical(marker) + b"\n",
+        )
+
     def retain(self, reference: TemporaryLeaseReference, *, outcome: str) -> None:
         """Mark a completed call as protected until independent drain proof."""
 

@@ -51,6 +51,33 @@ class PreparedDirectoryPromotionTests(unittest.TestCase):
         self.assertTrue(renamed_stage.is_dir())
         self.assertEqual([], list(renamed_stage.iterdir()))
 
+    def test_exact_core_stage_marker_remains_after_member_promotion(self) -> None:
+        lease_marker = self.stage / ".core-lease.json"
+        lease_marker.write_bytes(b"exact sealed lease\n")
+        lease_marker.chmod(0o600)
+        info = self.stage.stat()
+        self.assertEqual(self.target, prepared.promote_prepared_directory(
+            self.payload, self.target,
+            marker_name=".workbench-provisioned-sha256", marker_bytes=self.marker,
+            stage_marker=((info.st_dev, info.st_ino), lease_marker.name, b"exact sealed lease\n"),
+        ))
+        self.assertEqual(b"exact sealed lease\n", lease_marker.read_bytes())
+        self.assertEqual([lease_marker], list(self.stage.iterdir()))
+
+    def test_changed_core_stage_marker_refuses_before_move(self) -> None:
+        lease_marker = self.stage / ".core-lease.json"
+        lease_marker.write_bytes(b"changed\n")
+        lease_marker.chmod(0o600)
+        info = self.stage.stat()
+        with self.assertRaises(prepared.PreparedDirectoryError) as refusal:
+            prepared.promote_prepared_directory(
+                self.payload, self.target,
+                stage_marker=((info.st_dev, info.st_ino), lease_marker.name, b"expected\n"),
+            )
+        self.assertEqual("directory.changed", refusal.exception.code)
+        self.assertFalse(self.target.exists())
+        self.assertEqual(b"changed\n", lease_marker.read_bytes())
+
     def test_private_interrupted_stage_inventory_keeps_empty_and_unpublished_stages(self) -> None:
         first = self.root / ".pack.01"
         first.mkdir(mode=0o700)

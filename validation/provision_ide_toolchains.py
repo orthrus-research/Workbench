@@ -13,11 +13,14 @@ import re
 import stat
 import sys
 import tarfile
-import tempfile
 from typing import Any
 import zipfile
 
-from core_run_custody import promote_ide_toolchain_directory, verify_ide_toolchain_directory
+from core_run_custody import (
+    allocate_ide_toolchain_stage, promote_ide_toolchain_directory,
+    reject_existing_ide_toolchain_stage, review_ide_toolchain_stages_on_reuse,
+    verify_ide_toolchain_directory,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -145,6 +148,12 @@ def provision_entry(
                     stat.S_ISREG(marker_info.st_mode)
                     and marker.read_text(encoding="ascii").strip() == entry["archive_sha256"]
                 ):
+                    try:
+                        review_ide_toolchain_stages_on_reuse(
+                            destination.absolute(), entry["archive_sha256"],
+                        )
+                    except OSError as exc:
+                        raise ProvisionFailure(str(exc)) from exc
                     archive = download(entry, suffix)
                     try:
                         verify_ide_toolchain_directory(
@@ -167,31 +176,52 @@ def provision_entry(
         prefix = archive_root + "."
         if any(member.name.startswith(prefix) for member in TOOLCHAIN_ROOT.iterdir()):
             raise ProvisionFailure(f"interrupted IDE toolchain extraction requires review: {destination}")
+    try:
+        reject_existing_ide_toolchain_stage(destination.absolute(), entry["archive_sha256"])
+    except OSError as exc:
+        raise ProvisionFailure(str(exc)) from exc
 
     archive = download(entry, suffix)
-    TOOLCHAIN_ROOT.mkdir(parents=True, exist_ok=True)
-    temporary = Path(
-        tempfile.mkdtemp(prefix=archive_root + ".", dir=TOOLCHAIN_ROOT)
-    )
     try:
-        extractor(archive, temporary)
-    except Exception as exc:
-        raise ProvisionFailure(f"IDE extraction failed; retain stage for review: {temporary}: {exc}") from exc
-    extracted = temporary / expected_root
-    if not extracted.is_dir():
-        raise ProvisionFailure(f"archive lacks expected root {expected_root}; retain stage for review: {temporary}")
-    try:
-        promote_ide_toolchain_directory(
-            extracted, destination, (entry["archive_sha256"] + "\n").encode("ascii"),
+        stage_host, stage = allocate_ide_toolchain_stage(
+            destination.absolute(), entry["archive_sha256"],
         )
-        verify_ide_toolchain_directory(
-            archive.absolute(), destination.absolute(),
-            archive_sha256=entry["archive_sha256"],
-            archive_size=entry["archive_size"],
-            extracted_root=expected_root, archive_format=archive_format,
-        )
-    except OSError as exc:
-        raise ProvisionFailure(f"IDE toolchain publication needs review: {exc}") from exc
+        with stage_host.execution(stage):
+            try:
+                try:
+                    extractor(archive, stage.path)
+                except Exception as exc:
+                    raise ProvisionFailure(
+                        f"IDE extraction failed; retain stage for review: {stage.path}: {exc}"
+                    ) from exc
+                extracted = stage.path / expected_root
+                if not extracted.is_dir():
+                    raise ProvisionFailure(
+                        f"archive lacks expected root {expected_root}; retain stage for review: {stage.path}"
+                    )
+                promote_ide_toolchain_directory(
+                    extracted, destination,
+                    (entry["archive_sha256"] + "\n").encode("ascii"),
+                    stage_host=stage_host, stage_reference=stage,
+                )
+                verify_ide_toolchain_directory(
+                    archive.absolute(), destination.absolute(),
+                    archive_sha256=entry["archive_sha256"],
+                    archive_size=entry["archive_size"],
+                    extracted_root=expected_root, archive_format=archive_format,
+                )
+            except BaseException as exc:
+                try:
+                    stage_host.retain(stage, outcome="failed")
+                except (OSError, ValueError) as retention_error:
+                    exc.add_note("Core IDE stage retention could not be recorded: " + str(retention_error))
+                raise
+            else:
+                stage_host.retain(stage, outcome="completed")
+    except ProvisionFailure:
+        raise
+    except (OSError, ValueError) as exc:
+        raise ProvisionFailure(f"Core IDE toolchain stage or publication needs review: {exc}") from exc
     return destination
 
 

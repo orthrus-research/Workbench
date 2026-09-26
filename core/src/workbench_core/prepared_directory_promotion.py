@@ -1,9 +1,9 @@
 """Core's bounded no-replace move for a prepared, unadmitted directory.
 
-This bootstrap port deliberately does not inventory members. The caller owns
-the prepared content and any marker meaning; Core owns an optional exact
-marker write and physical promotion. Existing destinations and interrupted
-stages are retained.
+This bootstrap port deliberately does not inventory payload members. The
+caller owns prepared content and destination marker meaning. Core can verify
+an exact active lease marker next to the payload before the no-replace move.
+Existing destinations and interrupted stages are retained.
 """
 
 from __future__ import annotations
@@ -73,12 +73,13 @@ def count_prepared_directory_stages(target: Path, *, stage_prefix: str) -> int:
 def promote_prepared_directory(
     payload: Path, target: Path, *, marker_name: str | None = None,
     marker_bytes: bytes | None = None,
+    stage_marker: tuple[tuple[int, int], str, bytes] | None = None,
 ) -> Path:
     """Optionally write an exact marker, then atomically move one adjacent stage.
 
-    The stage must be a private direct child of a sibling directory. This
-    protects existing outputs but does not attest member bytes or make a
-    matching marker sufficient for admission.
+    The stage must be a private direct child of a sibling directory. An
+    optional pinned Core lease marker may remain beside the moved payload.
+    This protects existing outputs but does not attest payload member bytes.
     """
 
     if (
@@ -87,6 +88,17 @@ def promote_prepared_directory(
         or ".." in payload.parts or ".." in target.parts
         or payload.parent.parent != target.parent
         or payload.name in {"", ".", ".."} or target.name in {"", ".", ".."}
+        or (stage_marker is not None and (
+            type(stage_marker) is not tuple or len(stage_marker) != 3
+            or type(stage_marker[0]) is not tuple or len(stage_marker[0]) != 2
+            or any(type(value) is not int or value < 0 for value in stage_marker[0])
+            or type(stage_marker[1]) is not str
+            or stage_marker[1] in {"", ".", "..", payload.name}
+            or len(stage_marker[1]) > 128
+            or any(char in stage_marker[1] for char in "/\\:\0")
+            or type(stage_marker[2]) is not bytes
+            or not 0 < len(stage_marker[2]) <= 1024 * 1024
+        ))
         or (
             (marker_name is None and marker_bytes is not None)
             or (marker_name is not None and (
@@ -119,13 +131,43 @@ def promote_prepared_directory(
             or _identity(payload_info) != _identity(
                 os.stat(payload.name, dir_fd=stage_fd, follow_symlinks=False)
             )
+            or (stage_marker is not None and _identity(stage_info) != stage_marker[0])
             or parent_info.st_mode & 0o022
             or (hasattr(os, "geteuid") and parent_info.st_uid != os.geteuid())
         ):
             raise PreparedDirectoryError("directory.unsafe", "prepared directory lost its selected custody")
         with os.scandir(stage_fd) as scanned:
-            if {entry.name for entry in scanned} != {payload.name}:
+            expected_children = {payload.name}
+            if stage_marker is not None:
+                expected_children.add(stage_marker[1])
+            if {entry.name for entry in scanned} != expected_children:
                 raise PreparedDirectoryError("directory.incomplete", "prepared directory has unexpected stage children")
+        if stage_marker is not None:
+            marker_name_in_stage = stage_marker[1]
+            expected_marker_bytes = stage_marker[2]
+            marker_info = os.stat(marker_name_in_stage, dir_fd=stage_fd, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(marker_info.st_mode) or marker_info.st_nlink != 1
+                or marker_info.st_size != len(expected_marker_bytes)
+                or marker_info.st_mode & 0o077
+                or (hasattr(os, "geteuid") and marker_info.st_uid != os.geteuid())
+            ):
+                raise PreparedDirectoryError("directory.changed", "prepared Core lease marker changed identity")
+            marker_fd = os.open(
+                marker_name_in_stage,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+                dir_fd=stage_fd,
+            )
+            try:
+                if (
+                    _identity(os.fstat(marker_fd)) != _identity(marker_info)
+                    or os.read(marker_fd, len(expected_marker_bytes) + 1) != expected_marker_bytes
+                    or _identity(os.stat(marker_name_in_stage, dir_fd=stage_fd, follow_symlinks=False))
+                    != _identity(marker_info)
+                ):
+                    raise PreparedDirectoryError("directory.changed", "prepared Core lease marker changed")
+            finally:
+                os.close(marker_fd)
         if marker_name is not None:
             assert marker_bytes is not None
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
