@@ -44,7 +44,9 @@ from workbench_core import cli as core_cli  # noqa: E402
 from workbench_core.state_root_selection import (  # noqa: E402
     effective_state_root, select_state_root,
 )
-from workbench_api.record_stores import record_store_scope  # noqa: E402
+from workbench_api.record_stores import (  # noqa: E402
+    record_store_host_bound, record_store_scope,
+)
 from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
 from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
 import workbench_shell.project_qualification as qualification_module  # noqa: E402
@@ -208,6 +210,44 @@ class ProjectQualificationTests(unittest.TestCase):
             self.assertEqual(
                 str(state_root / "project-qualification-v1/bindings"), rows[0]["path"],
             )
+
+    def test_direct_cli_apply_catalogs_target_at_historical_v1_path(self) -> None:
+        with _temporary_directory() as temporary:
+            root = Path(temporary)
+            project = create_supersymmetry_project(root)
+            state_root = root / "external-state"
+            config = root / "user-config"
+            environment = {"WORKBENCH_CONFIG_HOME": str(config)}
+            self.assertFalse(record_store_host_bound())
+            with patch.dict(os.environ, environment):
+                preview = StringIO()
+                error = StringIO()
+                self.assertEqual(0, main(
+                    [str(project), "--profile", "supersymmetry", "--state-root", str(state_root),
+                     "--plan", "--json"],
+                    root=REPOSITORY_ROOT, default_state_root=state_root,
+                    output=preview, error=error,
+                ), error.getvalue())
+                self.assertFalse(config.exists())
+                plan = json.loads(preview.getvalue())
+                saved = StringIO()
+                self.assertEqual(0, main(
+                    [str(project), "--profile", "supersymmetry", "--state-root", str(state_root),
+                     "--apply", plan["plan_id"], "--json"],
+                    root=REPOSITORY_ROOT, default_state_root=state_root,
+                    output=saved, error=error,
+                ), error.getvalue())
+            result = json.loads(saved.getvalue())
+            self.assertEqual("qualified", result["outcome"])
+            self.assertEqual(plan["binding"]["path"], result["binding"]["path"])
+            self.assertTrue(Path(result["binding"]["path"]).is_file())
+            self.assertEqual([], ResourceCatalog(config).inventory(
+                workspace=REPOSITORY_ROOT,
+            )["record_stores"])
+            rows = ResourceCatalog(config).inventory(workspace=project)["record_stores"]
+            self.assertEqual(1, len(rows))
+            self.assertEqual(str(state_root / "project-qualification-v1/bindings"), rows[0]["path"])
+            self.assertFalse(record_store_host_bound())
 
     def test_core_publication_refuses_raced_absent_binding(self) -> None:
         with _temporary_directory() as temporary:

@@ -31,7 +31,9 @@ from workbench_api.host_filesystem import (
     replace_private_bytes,
     secure_private_path,
 )
-from workbench_api.record_stores import open_target_record_store
+from workbench_api.record_stores import (
+    open_target_record_store, record_store_host_bound,
+)
 from workbench_api.state_root_policies import state_root_policies
 from workbench_project_intelligence import ProjectInspectionError
 from workbench_project_intelligence.git_observation import (
@@ -1604,15 +1606,25 @@ def main(
             if answer == "" or answer.strip().casefold() not in {"y", "yes"}:
                 raise ProjectQualificationCancelled
             expected_plan_id = plan["plan_id"]
-        apply_started = True
-        result = apply_qualification_plan(
-            root,
-            args.workspace,
-            profile_selector=args.profile,
-            state_root=effective_state_root,
-            expected_plan_id=expected_plan_id,
-            expected_state_root_policy_id=args.expected_state_root_policy_id,
-        )
+        custody = nullcontext()
+        if not record_store_host_bound():
+            # A standalone Shell entry has no dispatch scope. Bind the same
+            # Core owner before publishing the historical target binding.
+            from workbench_core.host_services import direct_module_custody_scope
+            custody = direct_module_custody_scope(
+                workspace=Path(root).expanduser().resolve(strict=True),
+                owner_id="workbench-shell",
+            )
+        with custody:
+            apply_started = True
+            result = apply_qualification_plan(
+                root,
+                args.workspace,
+                profile_selector=args.profile,
+                state_root=effective_state_root,
+                expected_plan_id=expected_plan_id,
+                expected_state_root_policy_id=args.expected_state_root_policy_id,
+            )
         stdout.write(
             json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
             if args.json
