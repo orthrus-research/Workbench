@@ -1,5 +1,6 @@
 """Blueprint publication uses a supplied host instead of POSIX directory opens."""
 from pathlib import Path
+import stat
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -54,3 +55,15 @@ class PublicationFilesystemTests(unittest.TestCase):
             target.chmod(0o600)
             application_transaction._atomic_replace(target, b'new')
             self.assertEqual(b'new', target.read_bytes())
+
+    def test_core_upgrades_historical_nonprivate_transaction_parent(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary) / 'transaction-state'
+            parent.mkdir()
+            parent.chmod(0o755)
+            target = parent / 'active-transaction.json'
+            application_transaction._atomic_new(target, b'prepared')
+            self.assertEqual(0o700, stat.S_IMODE(parent.stat().st_mode))
+            self.assertEqual(0o600, stat.S_IMODE(target.stat().st_mode))
+            application_transaction._atomic_replace(target, b'committed')
+            self.assertEqual(b'committed', target.read_bytes())

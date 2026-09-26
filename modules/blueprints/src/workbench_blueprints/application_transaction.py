@@ -16,10 +16,11 @@ import stat
 from typing import Any, Callable, Mapping, NoReturn, Sequence, cast
 import uuid
 from workbench_api.host_filesystem import (
-    DurableRecordError,
+    HostFilesystemError,
     fsync_directory as _fsync_directory,
     publish_immutable_bytes,
     replace_private_bytes,
+    secure_private_path,
 )
 from workbench_api.source_transactions import (
     SourceImage, SourceStage, SourceTransaction, open_source_transaction,
@@ -76,6 +77,20 @@ def _ordinary_directory(path: Path, label: str) -> None:
         raise ApplicationTransactionError(f"cannot inspect {label}") from exc
     if stat.S_ISLNK(state.st_mode) or not stat.S_ISDIR(state.st_mode):
         _fail(f"{label} is not an ordinary directory")
+
+
+def _private_transaction_directory(path: Path, label: str) -> None:
+    """Ask Core to create or upgrade a retained transaction namespace."""
+
+    for component in (path, *path.parents):
+        if component.is_symlink() or getattr(component, "is_junction", lambda: False)():
+            _fail(f"{label} traverses a redirect")
+    if path.exists():
+        _ordinary_directory(path, label)
+    try:
+        secure_private_path(path, directory=True)
+    except HostFilesystemError as exc:
+        raise ApplicationTransactionError(f"cannot secure {label}: {exc}") from exc
 
 
 def _rooted_target(
@@ -147,10 +162,10 @@ def _read_regular(path: Path, label: str) -> bytes:
 def _atomic_new(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
     if mode != 0o600:
         _fail("retained qualification artifacts require owner-private mode")
-    path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        _private_transaction_directory(path.parent, "retained qualification parent")
         publish_immutable_bytes(path, raw, byte_limit=len(raw))
-    except DurableRecordError as exc:
+    except HostFilesystemError as exc:
         raise ApplicationTransactionError(
             f"cannot publish retained qualification artifact: {exc}"
         ) from exc
@@ -167,8 +182,9 @@ def _atomic_replace(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
     except FileNotFoundError:
         prior_size = 0
     try:
+        _private_transaction_directory(path.parent, "transaction record parent")
         replace_private_bytes(path, raw, byte_limit=max(len(raw), prior_size))
-    except DurableRecordError as exc:
+    except HostFilesystemError as exc:
         raise ApplicationTransactionError(
             f"cannot replace retained transaction record: {exc}"
         ) from exc
@@ -641,8 +657,7 @@ def apply_application_transaction(
         or root_resolved.is_relative_to(state_resolved)
     ):
         _fail("transaction state cannot overlap the disposable workspace")
-    state.mkdir(parents=True, exist_ok=True)
-    _ordinary_directory(state, "transaction state root")
+    _private_transaction_directory(state, "transaction state root")
     lock_path = (
         state / "active-transaction.lock"
         if transaction_lock is None
@@ -926,6 +941,7 @@ def recover_application_transaction(
         or root_resolved.is_relative_to(state_resolved)
     ):
         _fail("recovery transaction state cannot overlap the workspace")
+    _private_transaction_directory(state, "recovery transaction state")
     lock_path = (
         state / "active-transaction.lock"
         if transaction_lock is None
@@ -1232,6 +1248,7 @@ def rollback_application_transaction(
     ):
         _fail("transaction state cannot overlap the disposable workspace")
     _ordinary_directory(state, "rollback transaction state")
+    _private_transaction_directory(state, "rollback transaction state")
 
     lock_path = (
         state / "active-transaction.lock"

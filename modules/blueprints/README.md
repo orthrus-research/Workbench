@@ -5,8 +5,10 @@ change. It selects a registered standard or a clearly labeled experimental
 pattern, plans deterministic edits, validates the candidate, and applies the
 result through a recoverable transaction.
 Core performs the physical source staging, replacement, deletion, and guarded
-rollback for a consented direct application. Blueprints retains plan admission,
-source semantics, and its V1 history records.
+rollback for a consented direct application. Core also secures the retained
+transaction record directories before Blueprints publishes its V1 journal and
+history bytes through the filesystem port. Blueprints retains plan admission
+and source semantics.
 
 For native package development, install `api/` and `modules/blueprints/` in a
 dedicated virtual environment. Dependency declarations in `pyproject.toml`
