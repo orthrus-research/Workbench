@@ -24,6 +24,11 @@ path checks. Core can separately extract that retained ZIP into a private,
 exact managed tool tree and reopen its launcher after interruption or restart.
 The extracted tree is still an unqualified input: Java 25 binding, a fixture
 run, and artifact admission need separate reviewed steps.
+Core can now retain a separate binding from the saved workspace Java choice to
+this exact fixture policy and extracted Gradle tree. A verified managed Java 25
+runtime may be bound; a user-supplied path stays lexical and unchecked until
+the Cleanroom fixture preflight inspects that selected path. A general Java 8
+choice remains available but cannot satisfy this fixture's Java 25 policy.
 
 The generic-mod fixture runner accepts `--core-supervised` for a local build.
 Core holds the existing source projection lease while Gradle runs as a child,
