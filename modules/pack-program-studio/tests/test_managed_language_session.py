@@ -4,9 +4,11 @@ from copy import deepcopy
 import hashlib
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -45,6 +47,7 @@ from workbench_pack_program_studio.managed_model import (  # noqa: E402
 from workbench_pack_program_studio.managed_session import (  # noqa: E402
     _parse_windows_processes,
     _replace_if_hash,
+    _shutdown,
     _windows_helper_environment,
     _windows_path_file_uri,
     run_in_core_session_allocation,
@@ -58,7 +61,7 @@ from workbench_api.host_filesystem import (  # noqa: E402
 )
 from workbench_api.modules import ExecutionContext  # noqa: E402
 from workbench_api.source_transactions import (  # noqa: E402
-    SourceTransactionError, source_transactions_scope,
+    SourceImage, SourceTransactionError, source_transactions_scope,
 )
 from workbench_api.working_allocations import (  # noqa: E402
     WorkingAllocationReference, working_allocations_scope,
@@ -244,6 +247,100 @@ class ManagedLanguageSessionTests(unittest.TestCase):
             ):
                 _replace_if_hash(target, b"before\n", b"applied\n")
             self.assertEqual(b"before\n", target.read_bytes())
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX hard-exit source stages")
+    def test_overlay_attempt_reopens_exact_stage_states_after_hard_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            instance = root / "instance"
+            session = root / "session"
+            instance.mkdir(mode=0o700)
+            session.mkdir(mode=0o700)
+            (instance / "first.cfg").write_bytes(b"first before\n")
+            (instance / "second.cfg").write_bytes(b"second before\n")
+            child = r'''
+import os
+from pathlib import Path
+import sys
+sys.path[:0] = [sys.argv[1] + "/api/src", sys.argv[1] + "/core/src", sys.argv[1] + "/modules/pack-program-studio/src"]
+from workbench_core.host_services import install_local_host_services
+from workbench_pack_program_studio.managed_session import OverlayRecord, _OverlayAttempt
+install_local_host_services()
+instance, session = Path(sys.argv[2]), Path(sys.argv[3])
+records = [
+    OverlayRecord("first", instance / "first.cfg", b"first before\n", b"first after\n", session / "first.original"),
+    OverlayRecord("second", instance / "second.cfg", b"second before\n", b"second after\n", session / "second.original"),
+]
+attempt = _OverlayAttempt(
+    instance, session, "hard-exit-test", records,
+    instance_id="test-instance", launch_receipt_sha256="sha256:" + "1" * 64,
+)
+commit = attempt.transaction.commit
+def stop_after_first(stage):
+    commit(stage)
+    os._exit(17)
+attempt.transaction.commit = stop_after_first
+attempt.apply()
+os._exit(99)
+'''
+            result = subprocess.run(
+                [sys.executable, "-c", child, str(ROOT), str(instance), str(session)],
+                capture_output=True, timeout=20, check=False,
+                env={**os.environ, "WORKBENCH_CONFIG_HOME": str(root / "config")},
+            )
+            self.assertEqual(17, result.returncode, result.stderr.decode(errors="replace"))
+            attempt = json.loads(read_private_bytes(
+                session / "overlay-attempt-v1.json", byte_limit=64 * 1024 * 1024,
+            ))
+            self.assertEqual("applying", attempt["state"])
+            self.assertEqual([0], attempt["attempted_ordinals"])
+            self.assertEqual("test-instance", attempt["instance_id"])
+            self.assertEqual(instance.stat().st_ino, attempt["instance_identity"]["inode"])
+            self.assertEqual("sha256:" + "1" * 64, attempt["launch_receipt_sha256"])
+            self.assertEqual(b"first after\n", (instance / "first.cfg").read_bytes())
+            self.assertEqual(b"second before\n", (instance / "second.cfg").read_bytes())
+            transaction = CoreSourceTransactions(owner_id="pack-program-studio").open(
+                instance, binding=attempt["session_id"],
+                staging_token=attempt["transaction_token"],
+            )
+            states = []
+            for ordinal, row in enumerate(attempt["overlays"]):
+                stage = transaction.attach(
+                    row["path"],
+                    before=SourceImage("file", f"{row['role']} before\n".encode(), executable=None),
+                    after=SourceImage("file", f"{row['role']} after\n".encode(), executable=None),
+                    staged_relative=row["staged_relative"],
+                    attempted=ordinal in attempt["attempted_ordinals"],
+                )
+                states.append(transaction.classify(stage))
+            self.assertEqual(["after", "before"], states)
+
+    def test_unresolved_client_keeps_overlay_and_instance_lock_for_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            environment = self._environment(directory)
+
+            def uncertain_shutdown(*args, **kwargs):
+                graceful, forced, _orphans, discovered = _shutdown(*args, **kwargs)
+                return graceful, forced, [987654], discovered
+
+            with patch(
+                "workbench_pack_program_studio.managed_session._shutdown",
+                side_effect=uncertain_shutdown,
+            ):
+                result = self._run(environment)
+            self.assertEqual("blocked", result["state"])
+            self.assertEqual([987654], result["shutdown"]["orphaned_pids"])
+            self.assertTrue((environment["instance"] / ".workbench-groovy-language-service.lock").exists())
+            self.assertTrue(all(row["restore"]["state"] == "conflict" for row in result["overlays"]))
+            attempt = json.loads(read_private_bytes(
+                Path(result["events"]["path"]).parent / "overlay-attempt-v1.json",
+                byte_limit=64 * 1024 * 1024,
+            ))
+            self.assertEqual("blocked", attempt["state"])
+            self.assertIn(
+                "overlay restoration deferred until client absence is proven",
+                result["limitations"],
+            )
 
     def _environment(self, directory: str) -> dict[str, Path]:
         root = Path(directory)
@@ -536,10 +633,23 @@ class ManagedLanguageSessionTests(unittest.TestCase):
             )
             self.assertEqual(
                 {"events-v1.jsonl", "session-descriptor-v1.json",
-                 "session-receipt-v1.json", "overlay-originals/instance.cfg",
+                 "session-receipt-v1.json", "overlay-attempt-v1.json",
+                 "overlay-originals/instance.cfg",
                  "overlay-originals/groovyscript.cfg"},
                 {row["relative_path"] for row in description.evidence},
             )
+            attempt = json.loads(read_private_bytes(
+                description.reference.path / "overlay-attempt-v1.json",
+                byte_limit=64 * 1024 * 1024,
+            ))
+            self.assertEqual("restored", attempt["state"])
+            self.assertEqual([0, 1], attempt["attempted_ordinals"])
+            self.assertEqual(result["session_id"], attempt["session_id"])
+            self.assertEqual(
+                result["runtime"]["launch_receipt_sha256"],
+                attempt["launch_receipt_sha256"],
+            )
+            self.assertTrue(all(row["staged_relative"] for row in attempt["overlays"]))
             reopened = self._custody(root).verify(description.reference.allocation_id)
             self.assertEqual(description, reopened)
 

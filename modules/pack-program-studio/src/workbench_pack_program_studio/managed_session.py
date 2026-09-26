@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import errno
@@ -25,10 +26,13 @@ from workbench_api.host_filesystem import (
     append_private_line,
     publish_immutable_bytes,
     read_private_bytes,
+    replace_private_bytes,
     secure_private_path,
 )
 from workbench_api.processes import ProcessError, execute_process
-from workbench_api.source_transactions import SourceImage, open_source_transaction
+from workbench_api.source_transactions import (
+    SourceImage, SourceStage, SourceTransaction, open_source_transaction,
+)
 from workbench_api.working_allocations import (
     WorkingAllocationReference,
     WorkingAllocations,
@@ -58,6 +62,7 @@ _LOCK_NAME = ".workbench-groovy-language-service.lock"
 _EVENTS_NAME = "events-v1.jsonl"
 _DESCRIPTOR_NAME = "session-descriptor-v1.json"
 _RECEIPT_NAME = "session-receipt-v1.json"
+_OVERLAY_ATTEMPT_NAME = "overlay-attempt-v1.json"
 _POWERSHELL_QUERY = r'''
 $needle = $env:WORKBENCH_GROOVY_INSTANCE_TOKEN
 if ([string]::IsNullOrWhiteSpace($needle)) {
@@ -662,6 +667,7 @@ def run_managed_language_session(
     orphaned: list[int] = []
     cleanup_errors: list[str] = []
     lock_created = False
+    overlay_attempt: _OverlayAttempt | None = None
 
     try:
         _create_lock(lock_path, lock_payload)
@@ -672,7 +678,12 @@ def run_managed_language_session(
                 raise PackProgramError(
                     "the disposable Prism instance already has a matching Java process"
                 )
-        _apply_overlays(overlay_records)
+        overlay_attempt = _OverlayAttempt(
+            binding.instance_root, session_dir, session_id, overlay_records,
+            instance_id=binding.instance_id,
+            launch_receipt_sha256=binding.receipt_sha256,
+        )
+        overlay_attempt.apply()
         emitted(
             "overlays-applied",
             files=[record.path.name for record in overlay_records],
@@ -771,6 +782,7 @@ def run_managed_language_session(
             reservation.close()
         if bridge is not None:
             cleanup_errors.extend(bridge.stop())
+        process_cleared = process is None
         if process is not None:
             try:
                 shutdown_graceful, shutdown_forced, orphaned, discovered = _shutdown(
@@ -782,16 +794,24 @@ def run_managed_language_session(
                     force_seconds=float(lifecycle["force_shutdown_seconds"]),
                 )
                 client_processes.update(discovered)
+                process_cleared = not orphaned and process.poll() is not None
             except (OSError, ValueError, PackProgramError, subprocess.SubprocessError) as exc:
                 cleanup_errors.append(f"process shutdown failed: {_safe_text(str(exc), 2048)}")
-        for record in reversed(overlay_records):
-            try:
-                _restore_overlay(record)
-            except (OSError, PackProgramError) as exc:
-                cleanup_errors.append(
-                    f"overlay restoration failed for {record.path}: {_safe_text(str(exc), 2048)}"
-                )
-        if lock_created:
+        if process_cleared:
+            for record in reversed(overlay_records):
+                try:
+                    _restore_overlay(record)
+                except (OSError, PackProgramError) as exc:
+                    cleanup_errors.append(
+                        f"overlay restoration failed for {record.path}: {_safe_text(str(exc), 2048)}"
+                    )
+        else:
+            for record in overlay_records:
+                if record.applied_to_target:
+                    record.restore_state = "conflict"
+                    record.restore_sha256 = None
+            cleanup_errors.append("overlay restoration deferred until client absence is proven")
+        if lock_created and process_cleared:
             try:
                 _remove_exact_lock(lock_path, lock_payload)
             except (OSError, PackProgramError) as exc:
@@ -802,6 +822,15 @@ def run_managed_language_session(
             )
         if any(not record.restore_state.startswith("restored-") for record in overlay_records):
             cleanup_errors.append("one or more checked overlays were not restored")
+        if overlay_attempt is not None:
+            try:
+                overlay_attempt.finish(
+                    blocked=bool(cleanup_errors or orphaned or outcome != "ready-session-closed"),
+                )
+            except (OSError, ValueError) as exc:
+                cleanup_errors.append(
+                    f"overlay attempt record could not be closed: {_safe_text(str(exc), 2048)}"
+                )
         if cleanup_errors:
             final_state = "blocked"
             outcome = "cleanup-incomplete"
@@ -943,6 +972,7 @@ def run_in_core_session_allocation(
 def _session_allocation_evidence(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
     files = (
         _EVENTS_NAME, _DESCRIPTOR_NAME, _RECEIPT_NAME,
+        _OVERLAY_ATTEMPT_NAME,
         "overlay-originals/instance.cfg", "overlay-originals/groovyscript.cfg",
     )
     evidence = tuple(
@@ -1141,17 +1171,116 @@ def _prepare_overlays(
     return records
 
 
-def _apply_overlays(records: Sequence[OverlayRecord]) -> None:
-    applied: list[OverlayRecord] = []
-    try:
+class _OverlayAttempt:
+    """Persist stage ownership and attempted order before editing Prism files."""
+
+    def __init__(
+        self, instance_root: Path, session_dir: Path, session_id: str,
+        records: Sequence[OverlayRecord], *, instance_id: str,
+        launch_receipt_sha256: str,
+    ) -> None:
+        self.records = records
+        self.path = session_dir / _OVERLAY_ATTEMPT_NAME
+        self.raw: bytes | None = None
+        token = uuid.uuid4().hex
+        self.transaction: SourceTransaction = open_source_transaction(
+            instance_root, binding=session_id, staging_token=token,
+        )
+        self.stages: list[SourceStage | None] = []
+        instance_state = instance_root.lstat()
+        self.value: dict[str, Any] = {
+            "format": "workbench-groovy-overlay-attempt-v1",
+            "schema_version": 1,
+            "session_id": session_id,
+            "instance_root": str(instance_root),
+            "instance_id": instance_id,
+            "instance_identity": {
+                "device": instance_state.st_dev,
+                "inode": instance_state.st_ino,
+            },
+            "launch_receipt_sha256": launch_receipt_sha256,
+            "transaction_token": token,
+            "state": "staging",
+            "attempted_ordinals": [],
+            "overlays": [],
+            "restoration": None,
+        }
         for record in records:
-            _replace_if_hash(record.path, record.original, record.applied)
-            record.applied_to_target = True
-            applied.append(record)
-    except (OSError, PackProgramError):
-        for record in reversed(applied):
-            _restore_overlay(record)
-        raise
+            try:
+                relative = record.path.relative_to(instance_root).as_posix()
+            except ValueError as exc:
+                raise PackProgramError("managed overlay escapes its Prism instance") from exc
+            self.value["overlays"].append({
+                "role": record.role,
+                "path": relative,
+                "original_base64": base64.b64encode(record.original).decode("ascii"),
+                "applied_base64": base64.b64encode(record.applied).decode("ascii"),
+                "staged_relative": None,
+            })
+
+    def _save(self) -> None:
+        payload = canonical_bytes(self.value) + b"\n"
+        replace_private_bytes(
+            self.path, payload, byte_limit=_MAX_CONTROL_BYTES,
+            expected_sha256=None if self.raw is None else "sha256:" + _sha(self.raw),
+            require_absent=self.raw is None,
+        )
+        self.raw = payload
+
+    def apply(self) -> None:
+        self._save()  # The token and exact targets precede every stage.
+        applied: list[OverlayRecord] = []
+        try:
+            for ordinal, record in enumerate(self.records):
+                if record.original == record.applied:
+                    self.stages.append(None)
+                    continue
+                stage = self.transaction.prepare(
+                    self.value["overlays"][ordinal]["path"],
+                    before=SourceImage("file", record.original, executable=None),
+                    after=SourceImage("file", record.applied, executable=None),
+                    preserve_target_mode=True,
+                )
+                self.stages.append(stage)
+                self.value["overlays"][ordinal]["staged_relative"] = stage.staged_relative
+                self._save()
+            for ordinal, record in enumerate(self.records):
+                stage = self.stages[ordinal]
+                if stage is not None:
+                    self.value["state"] = "applying"
+                    self.value["attempted_ordinals"].append(ordinal)
+                    self._save()  # Recovery never guesses whether Core replaced it.
+                    try:
+                        self.transaction.commit(stage)
+                    except BaseException:
+                        if self.transaction.classify(stage) == "after":
+                            self.transaction.rollback(stage)
+                        raise
+                record.applied_to_target = True
+                applied.append(record)
+            self.value["state"] = "applied"
+            self._save()
+        except BaseException:
+            for record in reversed(applied):
+                try:
+                    _restore_overlay(record)
+                except (OSError, PackProgramError):
+                    # The outer session cleanup records the exact blocked row.
+                    pass
+            raise
+        finally:
+            self.transaction.cleanup()
+
+    def finish(self, *, blocked: bool) -> None:
+        if self.raw is None:
+            return
+        self.value["restoration"] = [
+            {"role": record.role, "state": record.restore_state,
+             "sha256": record.restore_sha256}
+            for record in self.records
+        ]
+        self.value["state"] = "blocked" if blocked else "restored"
+        self._save()
 
 
 def _restore_overlay(record: OverlayRecord) -> None:
