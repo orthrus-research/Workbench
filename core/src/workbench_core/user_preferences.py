@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import re
 import stat
@@ -485,6 +486,98 @@ def set_workspace_selection(
         return result
 
 
+def bind_workspace_selection(
+    name: str,
+    expression: str,
+    *,
+    profile_config: str,
+    java_home: str | None,
+    managed_java_feature: int | None,
+    expected_record_id: str,
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Atomically bind an imported environment to one local V3 workspace row.
+
+    The caller has already checked the portable selection and local manifest.
+    This writer still checks custody, duplicate roots and the reviewed registry
+    revision under the existing user-workspaces lock.
+    """
+
+    values = dict(os.environ if environment is None else environment)
+    if type(name) is not str or _WORKSPACE_NAME.fullmatch(name) is None:
+        raise UserPreferencesError("workspace name must be a lowercase slug")
+    if type(profile_config) is not str:
+        raise UserPreferencesError("workspace profile selection must be a path expression")
+    resolve_selection_path(profile_config, environment=values)
+    if java_home is not None:
+        if type(java_home) is not str:
+            raise UserPreferencesError("workspace Java selection must be a path expression")
+        resolve_java_path(java_home, environment=values)
+    if managed_java_feature is not None and (
+        type(managed_java_feature) is not int
+        or managed_java_feature not in MANAGED_JAVA_FEATURES
+    ):
+        raise UserPreferencesError("unsupported managed Java feature")
+    if java_home is not None and managed_java_feature is not None:
+        raise UserPreferencesError("choose a managed Java feature or a Java path")
+    if type(expected_record_id) is not str or not expected_record_id:
+        raise UserPreferencesError("a reviewed user-workspaces revision is required")
+
+    selected_root = resolve_expression(expression, environment=values)
+    path = default_workspaces_path(environment=values)
+    _prepare_home(path)
+    with setup_record_lock(path):
+        current = load_workspaces(path)
+        if current["record_id"] != expected_record_id:
+            raise UserPreferencesError("user workspaces changed after review")
+        entries: list[dict[str, Any]] = []
+        found = False
+        for old in current["entries"]:
+            other = resolve_expression(old["path"], environment=values)
+            if old["name"] != name and (
+                other == selected_root
+                or (other.exists() and selected_root.exists() and other.samefile(selected_root))
+            ):
+                raise UserPreferencesError("another named workspace uses this directory")
+            row = dict(old)
+            if current["schema_version"] == 1:
+                row.update(
+                    workspace_id="workbench-workspace-v1:" + uuid4().hex,
+                    profile_config=None,
+                    java_home=None,
+                )
+            if current["schema_version"] != 3:
+                row["managed_java_feature"] = None
+            if row["name"] == name:
+                if other != selected_root and not (
+                    other.exists() and selected_root.exists() and other.samefile(selected_root)
+                ):
+                    raise UserPreferencesError("workspace name is bound to another directory")
+                found = True
+                row.update(
+                    profile_config=profile_config,
+                    java_home=java_home,
+                    managed_java_feature=managed_java_feature,
+                )
+            entries.append(row)
+        if not found:
+            entries.append({
+                "name": name,
+                "path": expression,
+                "workspace_id": "workbench-workspace-v1:" + uuid4().hex,
+                "profile_config": profile_config,
+                "java_home": java_home,
+                "managed_java_feature": managed_java_feature,
+            })
+        default = current["default"]
+        if not current["entries"] and default is None:
+            default = name
+        result = _workspaces_v3(entries, default)
+        if result != current:
+            _write(path, result)
+        return result
+
+
 __all__ = [
     "LOCATION_ROLES",
     "UserPreferencesError",
@@ -498,6 +591,7 @@ __all__ = [
     "resolve_expression",
     "resolve_java_path",
     "resolve_selection_path",
+    "bind_workspace_selection",
     "set_location",
     "set_workspace_selection",
 ]
