@@ -116,8 +116,21 @@ class CiValidationTests(unittest.TestCase):
             if step.get("name") == "Exercise the installed terminal client"
         )
         self.assertEqual("needs.identify.outputs.component == 'workbench-tui'", tui_test["if"])
-        self.assertIn('tools/release.py artifact "$COMPONENT.wheel"', commands)
-        self.assertIn("tools/verify_component_artifacts.py", commands)
+        self.assertIn('tools/publish_component_candidate.py --component "$COMPONENT"', commands)
+        self.assertIn('--source-directory .workbench/candidate-wheelhouse/wheels --github-output "$GITHUB_OUTPUT"', commands)
+        candidate_step = next(step for step in python_job["steps"] if step.get("id") == "candidate")
+        upload = next(step for step in python_job["steps"] if "actions/upload-artifact@" in step.get("uses", "")
+                      and step.get("with", {}).get("name") == "${{ needs.identify.outputs.component }}")
+        self.assertIn("tools/validate_native_artifacts.py", candidate_step["run"])
+        self.assertEqual("${{ steps.candidate.outputs.path }}/", upload["with"]["path"])
+        client_job = candidate["jobs"]["client"]
+        client_step = next(step for step in client_job["steps"] if step.get("id") == "candidate")
+        self.assertIn("tools/publish_component_candidate.py", client_step["run"])
+        client_upload = next(step for step in client_job["steps"] if "actions/upload-artifact@" in step.get("uses", ""))
+        self.assertEqual("${{ steps.candidate.outputs.path }}/", client_upload["with"]["path"])
+        jvm = candidate["jobs"]["jvm"]
+        self.assertIn("tools/build_axiom.py --provision --output .workbench/candidate",
+                      "\n".join(step.get("run", "") for step in jvm["steps"]))
 
     @patch("ci_validation._current_source_fingerprint", return_value="source:a")
     def test_required_probe_assertion_rejects_skips_stale_ids_and_missing_rows(self, current_source):
