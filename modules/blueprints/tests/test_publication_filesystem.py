@@ -1,5 +1,7 @@
 """Blueprint publication uses a supplied host instead of POSIX directory opens."""
 from pathlib import Path
+import json
+import os
 import stat
 import tempfile
 import unittest
@@ -67,3 +69,19 @@ class PublicationFilesystemTests(unittest.TestCase):
             self.assertEqual(0o600, stat.S_IMODE(target.stat().st_mode))
             application_transaction._atomic_replace(target, b'committed')
             self.assertEqual(b'committed', target.read_bytes())
+
+    def test_m2_lock_keeps_v1_bytes_and_old_exclusion_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            lock = Path(temporary) / 'active-transaction.lock'
+            held = application_transaction._acquire_transaction_lock(lock, 'plan:test')
+            self.assertIsNotNone(held)
+            lease, token, _digest = held
+            self.assertEqual({
+                'binding': 'plan:test',
+                'format': 'workbench-blueprints-m2-transaction-lock-v1',
+                'pid': os.getpid(),
+                'token': token,
+            }, json.loads(lock.read_bytes()))
+            self.assertIsNone(application_transaction._acquire_transaction_lock(lock, 'plan:test'))
+            application_transaction._release_transaction_lock(lease)
+            self.assertFalse(lock.exists())

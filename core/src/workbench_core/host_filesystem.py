@@ -419,6 +419,11 @@ def private_exclusive_marker(path: Path):
     return marker(path)
 
 
+def acquire_private_owned_marker(path: Path, data: bytes):
+    from .durable_records import acquire_private_owned_marker as acquire
+    return acquire(path, data)
+
+
 def append_private_line(
     path: Path, line: bytes, *, expected_size: int, byte_limit: int,
     journal_byte_limit: int | None = None,

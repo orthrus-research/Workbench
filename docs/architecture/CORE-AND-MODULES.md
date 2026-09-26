@@ -246,12 +246,16 @@ file replacement, rollback and token-owned stage cleanup. Blueprints retains
 the V2 attempted-operation journal and decides whether an interrupted plan
 can finish or must restore exact applied bytes. Core can reopen those stages
 after a process exit; it preserves a later source edit instead of replacing
-it during recovery. Existing Cleanroom plans remain bound to their original
-sealed construction owner, while new plans use the current owner record.
+it during recovery. Core holds the M2 transaction marker at its historical
+path with V1 token bytes, and removes only the exact marker Blueprints admits
+as stale during recovery. Existing Cleanroom plans remain bound to their
+original sealed construction owner, while new plans use the current owner
+record.
 Core registers the selected Fresh Project V2 state root and handles physical
 journal and receipt publication, reads, and guarded removal at the existing
-paths. The original and previous Core construction owners reopen only for
-recovery of their already sealed plans.
+paths. The original and retired Core construction owners reopen only for
+recovery of their already sealed plans. Profile-local direct apply still needs
+a Core-composed entry route for state custody.
 
 ## Source layout
 

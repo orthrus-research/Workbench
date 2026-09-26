@@ -16,9 +16,11 @@ import stat
 from typing import Any, Callable, Mapping, NoReturn, Sequence, cast
 import uuid
 from workbench_api.host_filesystem import (
-    HostFilesystemError,
+    HostFilesystemError, PrivateOwnedMarker, acquire_private_owned_marker,
     fsync_directory as _fsync_directory,
     publish_immutable_bytes,
+    read_private_single_link_bytes,
+    remove_private_bytes,
     replace_private_bytes,
     secure_private_path,
 )
@@ -171,7 +173,10 @@ def _atomic_new(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
         ) from exc
 
 
-def _atomic_replace(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
+def _atomic_replace(
+    path: Path, raw: bytes, *, mode: int = 0o600,
+    expected_sha256: str | None = None,
+) -> None:
     """Ask Core to replace one mutable owner-private operational record."""
 
     if mode != 0o600:
@@ -183,7 +188,10 @@ def _atomic_replace(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
         prior_size = 0
     try:
         _private_transaction_directory(path.parent, "transaction record parent")
-        replace_private_bytes(path, raw, byte_limit=max(len(raw), prior_size))
+        replace_private_bytes(
+            path, raw, byte_limit=max(len(raw), prior_size),
+            expected_sha256=expected_sha256,
+        )
     except HostFilesystemError as exc:
         raise ApplicationTransactionError(
             f"cannot replace retained transaction record: {exc}"
@@ -204,90 +212,46 @@ def _read_json_record(path: Path, label: str) -> dict[str, Any]:
 def _acquire_transaction_lock(
     path: Path,
     binding: str,
-) -> tuple[int, str, tuple[int, int]] | None:
+) -> tuple[PrivateOwnedMarker, str, str] | None:
     """Create one token-owned lock without following a replaced pathname."""
 
     _ordinary_directory(path.parent, "transaction lock parent")
-    try:
-        descriptor = os.open(
-            path,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
-            0o600,
-        )
-    except FileExistsError:
-        return None
     token = uuid.uuid4().hex
-    state = os.fstat(descriptor)
-    identity = (state.st_dev, state.st_ino)
+    raw = canonical_json_bytes(
+        {
+            "binding": binding,
+            "format": "workbench-blueprints-m2-transaction-lock-v1",
+            "pid": os.getpid(),
+            "token": token,
+        }
+    )
     try:
-        raw = canonical_json_bytes(
-            {
-                "binding": binding,
-                "format": "workbench-blueprints-m2-transaction-lock-v1",
-                "pid": os.getpid(),
-                "token": token,
-            }
-        )
-        offset = 0
-        while offset < len(raw):
-            written = os.write(descriptor, raw[offset:])
-            if written < 1:
-                raise OSError("transaction lock write made no progress")
-            offset += written
-        os.fsync(descriptor)
-        return descriptor, token, identity
-    except BaseException:
-        _release_transaction_lock(path, descriptor, token, identity)
-        raise
+        lease = acquire_private_owned_marker(path, raw)
+    except HostFilesystemError as exc:
+        raise ApplicationTransactionError(f"cannot create transaction lock: {exc}") from exc
+    return None if lease is None else (lease, token, "sha256:" + sha256(raw).hexdigest())
 
 
 def _release_transaction_lock(
-    path: Path,
-    descriptor: int,
-    token: str,
-    identity: tuple[int, int],
+    lease: PrivateOwnedMarker,
 ) -> None:
     """Remove only the same visible lock created by this transaction."""
 
-    os.close(descriptor)
-    visible: int | None = None
-    remove = False
-    try:
-        visible = os.open(
-            path,
-            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
-        )
-        state = os.fstat(visible)
-        if (state.st_dev, state.st_ino) != identity or state.st_size > 16 * 1024:
-            return
-        raw = os.read(visible, 16 * 1024 + 1)
-        value = json.loads(raw.decode("utf-8", errors="strict"))
-        if type(value) is dict and value.get("token") == token:
-            remove = True
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return
-    finally:
-        if visible is not None:
-            os.close(visible)
-    if remove:
-        try:
-            state = path.lstat()
-            if (state.st_dev, state.st_ino) == identity:
-                path.unlink(missing_ok=True)
-        except OSError:
-            pass
+    lease.release()
 
 
-def _close_transaction_lock(descriptor: int) -> None:
+def _close_transaction_lock(lease: PrivateOwnedMarker) -> None:
     """Close a held lock while deliberately preserving its recovery marker."""
 
     try:
-        os.close(descriptor)
+        lease.preserve()
     except OSError:
         pass
 
 
-def _mark_transaction_lock_recoverable(path: Path, binding: str) -> None:
+def _mark_transaction_lock_recoverable(
+    path: Path, binding: str, *, expected_sha256: str,
+) -> None:
     """Keep the workspace blocked without pretending the caller is still live."""
 
     _atomic_replace(
@@ -300,6 +264,7 @@ def _mark_transaction_lock_recoverable(path: Path, binding: str) -> None:
                 "token": uuid.uuid4().hex,
             }
         ),
+        expected_sha256=expected_sha256,
     )
 
 
@@ -307,25 +272,20 @@ def _transaction_lock_record(
     path: Path,
 ) -> tuple[dict[str, Any], bytes, tuple[int, int]]:
     try:
-        descriptor = os.open(
-            path,
-            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
-        )
+        before = path.lstat()
+        raw = read_private_single_link_bytes(path, byte_limit=16 * 1024)
+        after = path.lstat()
     except OSError as exc:
         raise ApplicationTransactionError(
             "cannot inspect the interrupted transaction lock"
         ) from exc
-    try:
-        before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode) or before.st_size > 16 * 1024:
-            _fail("interrupted transaction lock is not a bounded regular file")
-        raw = os.read(descriptor, 16 * 1024 + 1)
-        after = os.fstat(descriptor)
-    finally:
-        os.close(descriptor)
     if (
-        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+        not stat.S_ISREG(before.st_mode)
+        or (
+            before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns,
+        ) != (
+            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns,
+        )
         or len(raw) != before.st_size
     ):
         _fail("interrupted transaction lock changed while being read")
@@ -401,8 +361,13 @@ def _quarantine_stale_transaction_lock(
         ) from exc
     if (visible.st_dev, visible.st_ino) != identity:
         _fail("interrupted transaction lock was replaced during recovery")
-    path.unlink()
-    _fsync_directory(path.parent)
+    try:
+        remove_private_bytes(
+            path, expected_sha256="sha256:" + sha256(raw).hexdigest(),
+            byte_limit=16 * 1024,
+        )
+    except HostFilesystemError as exc:
+        raise ApplicationTransactionError("cannot quarantine interrupted transaction lock") from exc
     return value
 
 
@@ -677,7 +642,7 @@ def apply_application_transaction(
             "state": "rejected",
         }
         return seal(receipt_content_kind, body)
-    lock_descriptor, lock_token, lock_identity = held_lock
+    lock_lease, lock_token, lock_digest = held_lock
     journal_path = state / "active-transaction.json"
     prepared_receipt_path = state / "prepared-receipt.json"
     staged: list[SourceStage] = []
@@ -897,15 +862,12 @@ def apply_application_transaction(
                 _fsync_directory(state)
         finally:
             if preserve_recovery:
-                _close_transaction_lock(lock_descriptor)
-                _mark_transaction_lock_recoverable(lock_path, value["id"])
-            else:
-                _release_transaction_lock(
-                    lock_path,
-                    lock_descriptor,
-                    lock_token,
-                    lock_identity,
+                _close_transaction_lock(lock_lease)
+                _mark_transaction_lock_recoverable(
+                    lock_path, value["id"], expected_sha256=lock_digest,
                 )
+            else:
+                _release_transaction_lock(lock_lease)
 
 
 def recover_application_transaction(
@@ -955,7 +917,7 @@ def recover_application_transaction(
     held_lock = _acquire_transaction_lock(lock_path, plan["id"])
     if held_lock is None:
         _fail("another transaction acquired the workspace during recovery")
-    lock_descriptor, lock_token, lock_identity = held_lock
+    lock_lease, lock_token, lock_digest = held_lock
     journal_path = state / "active-transaction.json"
     prepared_receipt_path = state / "prepared-receipt.json"
     preserve_recovery = False
@@ -1132,15 +1094,12 @@ def recover_application_transaction(
         }
     finally:
         if preserve_recovery:
-            _close_transaction_lock(lock_descriptor)
-            _mark_transaction_lock_recoverable(lock_path, plan["id"])
-        else:
-            _release_transaction_lock(
-                lock_path,
-                lock_descriptor,
-                lock_token,
-                lock_identity,
+            _close_transaction_lock(lock_lease)
+            _mark_transaction_lock_recoverable(
+                lock_path, plan["id"], expected_sha256=lock_digest,
             )
+        else:
+            _release_transaction_lock(lock_lease)
 
 
 def validate_applied_application_receipt(
@@ -1267,7 +1226,7 @@ def rollback_application_transaction(
             "workspace_mutated": False,
         }
         return seal(rollback_content_kind, body)
-    lock_descriptor, lock_token, lock_identity = held_lock
+    lock_lease, lock_token, _lock_digest = held_lock
     source_transaction: SourceTransaction | None = None
 
     try:
@@ -1323,12 +1282,7 @@ def rollback_application_transaction(
             if source_transaction is not None:
                 source_transaction.cleanup()
         finally:
-            _release_transaction_lock(
-                lock_path,
-                lock_descriptor,
-                lock_token,
-                lock_identity,
-            )
+            _release_transaction_lock(lock_lease)
 
 
 __all__ = [

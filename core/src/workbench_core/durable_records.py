@@ -329,6 +329,117 @@ def private_record_lock(lock_path: Path, *, wait: bool = False) -> Iterator[None
             os.close(descriptor)
 
 
+class _PrivateOwnedMarkerLease:
+    def __init__(self, path: Path, descriptor: int, data: bytes, identity: tuple[int, int]):
+        self.path = path
+        self.descriptor = descriptor
+        self.data = data
+        self.identity = identity
+
+    def preserve(self) -> None:
+        """Keep the marker for its owner's recovery decision."""
+
+        if self.descriptor >= 0:
+            os.close(self.descriptor)
+            self.descriptor = -1
+
+    def release(self) -> None:
+        """Remove only this lease's still-identical visible marker."""
+
+        if self.descriptor < 0:
+            raise DurableRecordError("changed", "owned marker lease is already closed")
+        try:
+            opened = os.fstat(self.descriptor)
+            visible = self.path.lstat()
+            if (
+                (opened.st_dev, opened.st_ino) != self.identity
+                or (visible.st_dev, visible.st_ino) != self.identity
+                or opened.st_nlink != 1 or visible.st_nlink != 1
+                or read_private_single_link_bytes(
+                    self.path, byte_limit=len(self.data),
+                ) != self.data
+            ):
+                raise DurableRecordError("changed", "owned marker changed while held")
+        except DurableRecordError:
+            raise
+        except OSError as exc:
+            raise DurableRecordError("changed", "owned marker is unavailable") from exc
+        finally:
+            self.preserve()
+        try:
+            visible = self.path.lstat()
+            if (
+                (visible.st_dev, visible.st_ino) != self.identity
+                or visible.st_nlink != 1
+                or read_private_single_link_bytes(
+                    self.path, byte_limit=len(self.data),
+                ) != self.data
+            ):
+                raise DurableRecordError("changed", "owned marker changed before release")
+            self.path.unlink()
+            fsync_directory(self.path.parent)
+        except DurableRecordError:
+            raise
+        except OSError as exc:
+            raise DurableRecordError("changed", "cannot release owned marker") from exc
+
+
+def acquire_private_owned_marker(path: Path, data: bytes) -> _PrivateOwnedMarkerLease | None:
+    """Create an exact nonempty marker that excludes historical writers.
+
+    Existence is the old lock protocol. Core writes the owner's bytes at that
+    same pathname and retains an open descriptor to pin the original inode.
+    A failed seal leaves visible residue for recovery review.
+    """
+
+    _parent(path)
+    if type(data) is not bytes or not 0 < len(data) <= 16 * 1024:
+        raise DurableRecordError("bounds", "owned marker bytes are invalid")
+    try:
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
+            0o600,
+        )
+    except FileExistsError:
+        return None
+    except OSError as exc:
+        raise DurableRecordError("write", "cannot create owned marker") from exc
+    leased = False
+    try:
+        offset = 0
+        while offset < len(data):
+            written = os.write(descriptor, data[offset:])
+            if written < 1:
+                raise OSError("owned marker write made no progress")
+            offset += written
+        secure_private_path(path, directory=False)
+        opened = os.fstat(descriptor)
+        visible = path.lstat()
+        identity = (opened.st_dev, opened.st_ino)
+        if (
+            not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+            or (visible.st_dev, visible.st_ino) != identity
+            or visible.st_size != len(data)
+            or not private_path(path, directory=False)
+            or read_private_single_link_bytes(path, byte_limit=len(data)) != data
+        ):
+            raise DurableRecordError("changed", "owned marker changed during creation")
+        os.fsync(descriptor)
+        fsync_directory(path.parent)
+        lease = _PrivateOwnedMarkerLease(path, descriptor, data, identity)
+        leased = True
+        return lease
+    except DurableRecordError:
+        raise
+    except OSError as exc:
+        raise DurableRecordError("write", "cannot seal owned marker") from exc
+    finally:
+        if not leased:
+            os.close(descriptor)
+
+
 @contextmanager
 def private_exclusive_marker(path: Path) -> Iterator[None]:
     """Hold a V1-compatible create-exclusive marker in a private store.

@@ -41,6 +41,8 @@ class HostPortTests(unittest.TestCase):
                 port.update_preference_bytes(Path("unused"), lambda _old: b"new", byte_limit=16)
             with self.assertRaisesRegex(port.HostFilesystemError, "single-link bounded reads"):
                 port.read_bounded_single_link_bytes(Path("unused"), byte_limit=16)
+            with self.assertRaisesRegex(port.HostFilesystemError, "owned markers"):
+                port.acquire_private_owned_marker(Path("unused"), b"token")
 
             host.read_bounded_single_link_bytes = lambda path, *, byte_limit: (
                 observed.append((path, byte_limit)) or b"reviewed\n"

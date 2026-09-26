@@ -14,7 +14,8 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api.host_filesystem import (
-    DurableRecordError, append_private_line, count_interrupted_create_once_stages,
+    DurableRecordError, acquire_private_owned_marker, append_private_line,
+    count_interrupted_create_once_stages,
     inspect_private_journal, private_exclusive_marker, private_record_lock,
     publish_create_once_bytes,
     publish_immutable_bytes, read_bounded_bytes, read_bounded_single_link_bytes,
@@ -299,6 +300,58 @@ class DurableRecordTests(unittest.TestCase):
                     pass
         self.assertEqual("unsafe", unsafe.exception.code)
         self.assertFalse(marker.exists())
+
+    def test_owned_marker_excludes_old_writer_and_preserves_exact_recovery_bytes(self) -> None:
+        marker = self.root / "active-transaction.lock"
+        raw = b'{"binding":"plan:one","pid":123,"token":"abc"}'
+        lease = acquire_private_owned_marker(marker, raw)
+        self.assertIsNotNone(lease)
+        assert lease is not None
+        self.assertEqual(raw, read_private_single_link_bytes(marker, byte_limit=1024))
+        self.assertIsNone(acquire_private_owned_marker(marker, b"other"))
+        lease.preserve()
+        self.assertEqual(raw, marker.read_bytes())
+        self.assertIsNone(acquire_private_owned_marker(marker, b"other"))
+        remove_private_bytes(
+            marker, expected_sha256="sha256:" + sha256(raw).hexdigest(),
+            byte_limit=1024,
+        )
+        reopened = acquire_private_owned_marker(marker, raw)
+        self.assertIsNotNone(reopened)
+        assert reopened is not None
+        reopened.release()
+        self.assertFalse(marker.exists())
+
+    def test_owned_marker_release_preserves_replaced_path(self) -> None:
+        marker = self.root / "active-transaction.lock"
+        lease = acquire_private_owned_marker(marker, b"original")
+        assert lease is not None
+        marker.unlink()
+        marker.write_bytes(b"replacement")
+        marker.chmod(0o600)
+        with self.assertRaises(DurableRecordError) as changed:
+            lease.release()
+        self.assertEqual("changed", changed.exception.code)
+        self.assertEqual(b"replacement", marker.read_bytes())
+
+    def test_owned_marker_release_preserves_changed_bytes(self) -> None:
+        marker = self.root / "active-transaction.lock"
+        lease = acquire_private_owned_marker(marker, b"original")
+        assert lease is not None
+        marker.write_bytes(b"changed!")
+        with self.assertRaises(DurableRecordError) as changed:
+            lease.release()
+        self.assertEqual("changed", changed.exception.code)
+        self.assertEqual(b"changed!", marker.read_bytes())
+
+    def test_owned_marker_retains_uncertain_creation(self) -> None:
+        marker = self.root / "active-transaction.lock"
+        with patch.object(durable_records, "fsync_directory", side_effect=OSError("barrier failed")):
+            with self.assertRaises(DurableRecordError) as failed:
+                acquire_private_owned_marker(marker, b"recoverable")
+        self.assertEqual("write", failed.exception.code)
+        self.assertEqual(b"recoverable", marker.read_bytes())
+        self.assertIsNone(acquire_private_owned_marker(marker, b"later"))
 
     def test_append_journal_reopens_exact_bytes_and_refuses_stale_or_torn_tail(self) -> None:
         first = b'{"sequence":1}\n'

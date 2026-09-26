@@ -38,6 +38,7 @@ SCHEMAS = PROFILE / "schemas"
 OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core.json"
 HISTORICAL_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2.json"
 PREVIOUS_CORE_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-previous.json"
+BOOTSTRAP_CORE_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-bootstrap.json"
 KIND = PROFILE / "new-project-kinds/cleanroom-mod.json"
 
 
@@ -197,12 +198,14 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             ),
         )
 
-    def _previous_core_plan(self, target: Path) -> dict[str, object]:
+    def _previous_core_plan(
+        self, target: Path, *, owner_id: str = construction.PREVIOUS_CORE_OWNER_ID,
+    ) -> dict[str, object]:
         request = construction.build_cleanroom_mod_request(
             target, output_mode="direct-apply", allow_direct_apply=True,
         )
         owner = construction._historical_construction_owner(
-            ROOT, construction.PREVIOUS_CORE_OWNER_ID,
+            ROOT, owner_id,
         )
         return construction._sealed(
             construction.PLAN_KIND,
@@ -362,6 +365,42 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             self.assertEqual("restored", result["state"])
             self.assertFalse(target.exists())
 
+    def test_recovery_quarantines_historical_m2_lock_before_mutation(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh-project"
+            state_root = root / "state"
+            plan = self._preview(target, direct=True)["plan"]
+            fresh_project.prepare_fresh_target(
+                target, plan["target_observation"], state_root, plan_id=plan["id"],
+            )
+            token = "d" * 32
+            lock = state_root / "active-transaction.lock"
+            raw = application_transaction.canonical_json_bytes({
+                "binding": plan["id"],
+                "format": "workbench-blueprints-m2-transaction-lock-v1",
+                "pid": 2_147_483_647,
+                "token": token,
+            })
+            lock.write_bytes(raw)
+            lock.chmod(0o600)
+            recovered = application_transaction.recover_application_transaction(
+                target, plan, state_root,
+                receipt_format=construction.RECEIPT_FORMAT,
+                receipt_kind=construction.RECEIPT_KIND,
+                receipt_content_kind=construction.RECEIPT_KIND,
+                success_mutation_state="constructed-owner-admitted-project",
+            )
+            self.assertEqual("restored", recovered["outcome"])
+            self.assertEqual(
+                "BLUEPRINTS_M2_INTERRUPTED_BEFORE_MUTATION",
+                recovered["diagnostic_code"],
+            )
+            self.assertFalse(lock.exists())
+            self.assertEqual(raw + b"\n", (state_root / "stale-locks" / f"{token}.json").read_bytes())
+            fresh_project.restore_fresh_target(target, state_root, plan_id=plan["id"])
+            self.assertFalse(target.exists())
+
     def test_historical_owner_plan_reopens_only_for_recovery(self) -> None:
         self.assertEqual(
             construction.HISTORICAL_OWNER_SHA256,
@@ -404,6 +443,37 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             target = root / "fresh-project"
             state_root = root / "state"
             plan = self._previous_core_plan(target)
+            with self.assertRaisesRegex(ValueError, "owner binding changed"):
+                construction.validate_cleanroom_mod_plan(ROOT, plan)
+            self.assertEqual(plan, construction.validate_cleanroom_mod_plan(
+                ROOT, plan, allow_historical_owner=True,
+            ))
+            fresh_project.prepare_fresh_target(
+                target, plan["target_observation"], state_root, plan_id=plan["id"],
+            )
+            recovered = construction.recover_cleanroom_mod_construction(
+                ROOT, plan, state_root,
+            )
+            self.assertEqual("restored", recovered["state"])
+            self.assertFalse(target.exists())
+
+    def test_bootstrap_core_owner_plan_reopens_only_for_recovery(self) -> None:
+        self.assertEqual(
+            construction.BOOTSTRAP_CORE_OWNER_SHA256,
+            sha256(BOOTSTRAP_CORE_OWNER.read_bytes()).hexdigest(),
+        )
+        package = tomllib.loads((PROFILE / "pyproject.toml").read_text(encoding="utf-8"))
+        resources = package["tool"]["setuptools"]["package-data"][
+            "workbench_resources.profiles.platforms.cleanroom"
+        ]
+        self.assertIn("new-project-kinds/cleanroom-mod-construction-owner-v2-core-bootstrap.json", resources)
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh-project"
+            state_root = root / "state"
+            plan = self._previous_core_plan(
+                target, owner_id=construction.BOOTSTRAP_CORE_OWNER_ID,
+            )
             with self.assertRaisesRegex(ValueError, "owner binding changed"):
                 construction.validate_cleanroom_mod_plan(ROOT, plan)
             self.assertEqual(plan, construction.validate_cleanroom_mod_plan(

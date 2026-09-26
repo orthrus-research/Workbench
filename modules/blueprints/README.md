@@ -7,14 +7,18 @@ result through a recoverable transaction.
 Core performs the physical source staging, replacement, deletion, and guarded
 rollback for a consented direct application. Core also secures the retained
 transaction record directories before Blueprints publishes its V1 journal and
-history bytes through the filesystem port. The resumable session holds its
+history bytes through the filesystem port. Core also creates and holds the M2
+transaction lock at its historical path with its V1 token bytes. Blueprints
+decides whether an interrupted lock is live or should be quarantined, then asks
+Core to remove the exact stale marker. The resumable session holds its
 historical exclusive marker through Core, so older Blueprints processes still
 exclude a concurrent writer. Blueprints retains plan admission and source
 semantics.
 For Cleanroom fresh-project V2, Core also registers the selected bootstrap
 state root and publishes, reads, revises, and removes its historical journal
 and retained receipt. Blueprints decides the V2 state transitions and the
-exact Git and project bytes involved in recovery.
+exact Git and project bytes involved in recovery. Profile-local direct apply
+still requires a Core-composed entry route for that state custody.
 
 For native package development, install `api/` and `modules/blueprints/` in a
 dedicated virtual environment. Dependency declarations in `pyproject.toml`

@@ -16,6 +16,13 @@ class DurableRecordError(HostFilesystemError):
         self.code = code
 
 
+class PrivateOwnedMarker(Protocol):
+    """One exact Core-created marker held until release or retained recovery."""
+
+    def release(self) -> None: ...
+    def preserve(self) -> None: ...
+
+
 class HostFilesystem(Protocol):
     def private_path(self, path: Path, *, directory: bool) -> bool: ...
     def secure_private_path(self, path: Path, *, directory: bool) -> Path: ...
@@ -41,6 +48,7 @@ class HostFilesystem(Protocol):
     ) -> None: ...
     def private_record_lock(self, path: Path, *, wait: bool = False) -> ContextManager[None]: ...
     def private_exclusive_marker(self, path: Path) -> ContextManager[None]: ...
+    def acquire_private_owned_marker(self, path: Path, data: bytes) -> PrivateOwnedMarker | None: ...
     def append_private_line(
         self, path: Path, line: bytes, *, expected_size: int, byte_limit: int,
         journal_byte_limit: int | None = None,
@@ -220,6 +228,19 @@ def private_exclusive_marker(path: Path) -> ContextManager[None]:
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide exclusive markers")
     return operation(path)
+
+
+def acquire_private_owned_marker(path: Path, data: bytes) -> PrivateOwnedMarker | None:
+    """Create one exact owner-selected marker through Core, or return busy.
+
+    The marker is visible to older existence-based writers. Its lease releases
+    only the original inode and bytes; preserving it keeps recovery blocked.
+    """
+
+    operation = getattr(_filesystem(), "acquire_private_owned_marker", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide owned markers")
+    return operation(path, data)
 
 
 def append_private_line(
