@@ -137,6 +137,31 @@ class DurableResourceTests(unittest.TestCase):
             CoreRecordStores(workspace=self.workspace, configuration_home=self.config,
                              owner_id="workbench-shell").open("blueprints-simulation-evidence-v1", root)
 
+    def test_blueprints_artifacts_register_each_selected_v1_cas_root(self) -> None:
+        provider = CoreRecordStores(
+            workspace=self.workspace, configuration_home=self.config,
+            owner_id="blueprints",
+        )
+        roots = [
+            self.workspace / ".workbench/blueprints/release",
+            self.workspace / ".workbench/blueprints/history/cas",
+            self.workspace / ".workbench/blueprints/interface/session-cas",
+        ]
+        opened = [provider.open("blueprints-artifact-v1", root) for root in roots]
+        self.assertEqual(roots, [row.root for row in opened])
+        self.assertEqual(opened, [provider.open("blueprints-artifact-v1", root) for root in roots])
+        records = [
+            json.loads(path.read_text(encoding="utf-8"))
+            for path in (self.config / "resources-v1/stores").glob("*.json")
+        ]
+        self.assertEqual(
+            {(row.store_id, str(row.root), "blueprints-artifact-v1") for row in opened},
+            {(row["store_id"], row["root"], row["family"]) for row in records},
+        )
+        with self.assertRaises(DurableResourceError):
+            CoreRecordStores(workspace=self.workspace, configuration_home=self.config,
+                             owner_id="workbench-shell").open("blueprints-artifact-v1", roots[0])
+
     def test_dispatch_binds_core_and_inventory_sees_external_root(self) -> None:
         captured = []
 

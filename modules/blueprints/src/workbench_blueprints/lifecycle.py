@@ -17,6 +17,12 @@ from typing import Any, Callable, NoReturn
 
 from jsonschema import Draft202012Validator
 
+from workbench_api.durable_resources import DurableResourceError
+from workbench_api.host_filesystem import (
+    DurableRecordError, HostFilesystemError, publish_immutable_bytes,
+    read_private_bytes, secure_private_path,
+)
+from workbench_api.record_stores import open_record_store
 from workbench_blueprints import planner, simulation, standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
 
@@ -101,7 +107,9 @@ def _validate(value: dict[str, Any], path: Path, source: str) -> None:
         )
 
 
-def _read_regular(path: Path, code: str) -> bytes:
+def _read_regular(path: Path, code: str, *, byte_limit: int | None = None) -> bytes:
+    if byte_limit is not None and (type(byte_limit) is not int or byte_limit < 0):
+        _fail(code, str(path), "invalid approved byte size")
     try:
         descriptor = os.open(
             path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
@@ -112,11 +120,19 @@ def _read_regular(path: Path, code: str) -> bytes:
         if not stat.S_ISREG(os.fstat(descriptor).st_mode):
             _fail(code, str(path), "path is not a regular file")
         chunks: list[bytes] = []
+        total = 0
         while True:
-            chunk = os.read(descriptor, 1024 * 1024)
+            amount = (
+                1024 * 1024 if byte_limit is None
+                else min(1024 * 1024, byte_limit - total + 1)
+            )
+            chunk = os.read(descriptor, amount)
             if not chunk:
                 break
             chunks.append(chunk)
+            total += len(chunk)
+            if byte_limit is not None and total > byte_limit:
+                _fail(code, str(path), "file exceeds its approved byte size")
         return b"".join(chunks)
     finally:
         os.close(descriptor)
@@ -225,47 +241,42 @@ class ArtifactStore:
     def put_bytes(self, content: bytes) -> str:
         digest = _digest_bytes(content)
         path = self._path(digest)
-        self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            managed = open_record_store("blueprints-artifact-v1", self.root)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPA108_STORE_ROOT", str(self.root), str(exc))
+        if managed is None or managed.root != self.root:
+            _fail("BPA108_STORE_ROOT", str(self.root), "artifact publication requires its Core store")
         objects = self.root / "objects"
-        objects.mkdir(mode=0o700, exist_ok=True)
-        path.parent.mkdir(mode=0o700, exist_ok=True)
         if any(item.is_symlink() for item in (self.root, objects, path.parent)):
             _fail(
                 "BPA108_STORE_ROOT",
                 str(path.parent),
                 "store path contains a symlink",
             )
-        if path.exists():
-            if path.is_symlink() or _read_regular(
-                path, "BPA109_STORE_COLLISION"
-            ) != content:
-                _fail(
-                    "BPA109_STORE_COLLISION",
-                    str(path),
-                    "content-addressed artifact collision",
-                )
-        else:
-            temporary: str | None = None
-            try:
-                with tempfile.NamedTemporaryFile(
-                    mode="wb",
-                    dir=path.parent,
-                    prefix=".artifact.",
-                    delete=False,
-                ) as handle:
-                    temporary = handle.name
-                    os.fchmod(handle.fileno(), 0o600)
-                    handle.write(content)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(temporary, path)
-                _fsync_directory(path.parent, "BPA109_STORE_COLLISION")
-                temporary = None
-            finally:
-                if temporary is not None:
-                    Path(temporary).unlink(missing_ok=True)
-        os.chmod(self.root, 0o700)
-        os.chmod(path, 0o600)
+        try:
+            secure_private_path(objects, directory=True)
+            secure_private_path(path.parent, directory=True)
+        except (HostFilesystemError, OSError) as exc:
+            _fail("BPA108_STORE_ROOT", str(path.parent), str(exc))
+        if path.is_symlink():
+            _fail("BPA109_STORE_COLLISION", str(path), "artifact path is a symlink")
+        try:
+            # V1 admits arbitrary bytes. The selected content gives this
+            # operation its exact bound without adding a new resource cap.
+            publish_immutable_bytes(path, content, byte_limit=len(content), idempotent=True)
+            observed = read_private_bytes(path, byte_limit=len(content))
+        except DurableRecordError as exc:
+            code = (
+                "BPA109_STORE_COLLISION"
+                if exc.code in {"collision", "changed", "unavailable", "unsafe"}
+                else "BPA108_STORE_ROOT"
+            )
+            _fail(code, str(path), str(exc))
+        except (HostFilesystemError, OSError) as exc:
+            _fail("BPA108_STORE_ROOT", str(path), str(exc))
+        if observed != content:
+            _fail("BPA109_STORE_COLLISION", str(path), "content-addressed artifact collision")
         return "local-blueprints-artifact:sha256:" + digest
 
     def put_json(self, value: dict[str, Any]) -> str:
@@ -281,11 +292,31 @@ class ArtifactStore:
         path = self._path(digest)
         if (
             self.root.is_symlink()
+            or (self.root / "objects").is_symlink()
             or path.parent.is_symlink()
             or path.is_symlink()
         ):
             _fail("BPA108_STORE_ROOT", str(path), "artifact path is symlinked")
-        content = _read_regular(path, "BPA111_ARTIFACT_MISSING")
+        if not path.is_file():
+            _fail("BPA111_ARTIFACT_MISSING", str(path), "artifact file is missing")
+        try:
+            managed = open_record_store("blueprints-artifact-v1", self.root)
+        except (DurableResourceError, OSError, ValueError) as exc:
+            _fail("BPA108_STORE_ROOT", str(self.root), str(exc))
+        try:
+            # Historical V1 artifacts had no fixed size ceiling. Core checks
+            # the identity of the selected file against this observed bound.
+            size = path.lstat().st_size
+            if managed is None:
+                content = _read_regular(path, "BPA111_ARTIFACT_MISSING", byte_limit=size)
+            else:
+                if managed.root != self.root:
+                    _fail("BPA108_STORE_ROOT", str(self.root), "Core selected a different artifact root")
+                content = read_private_bytes(path, byte_limit=size)
+        except DurableRecordError as exc:
+            _fail("BPA111_ARTIFACT_MISSING", str(path), str(exc))
+        except (HostFilesystemError, OSError) as exc:
+            _fail("BPA111_ARTIFACT_MISSING", str(path), str(exc))
         if _digest_bytes(content) != digest:
             _fail("BPA112_ARTIFACT_DIGEST", locator, "artifact digest drift")
         return content

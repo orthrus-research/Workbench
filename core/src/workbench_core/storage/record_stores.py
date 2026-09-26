@@ -42,6 +42,10 @@ class CoreRecordStores:
             # Keep the V1 evidence locator's exact selected CAS root while
             # registering its physical custody with Core.
             root = selected
+        elif self.owner_id == "blueprints" and family == "blueprints-artifact-v1":
+            # Release, history and session callers select distinct historical
+            # CAS roots. Keep their V1 object keys and locators unchanged.
+            root = selected
         else:
             raise DurableResourceError("resource.policy", "record store family is unsupported")
         _private_directory(root)

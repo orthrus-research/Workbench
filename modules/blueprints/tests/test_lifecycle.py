@@ -10,12 +10,13 @@ import json
 from pathlib import Path
 import shutil
 import sys
+import tempfile
 from typing import Any
 import unittest
 
 from jsonschema import Draft202012Validator
 
-from _support import SCHEMA_ROOT, SOURCE_ROOT, WORKBENCH_ROOT
+from _support import SCHEMA_ROOT, SOURCE_ROOT, WORKBENCH_ROOT, sealed_store_scope
 
 REPO_ROOT = WORKBENCH_ROOT
 BLUEPRINTS_TOOLS = SOURCE_ROOT
@@ -28,6 +29,63 @@ from workbench_blueprints import planner  # noqa: E402
 from workbench_blueprints import simulation  # noqa: E402
 from workbench_blueprints import standards  # noqa: E402
 import test_simulation as simulation_fixture  # noqa: E402
+
+
+class ArtifactStoreTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.workspace = Path(self.temporary.name) / "workspace"
+        self.workspace.mkdir()
+        self.config = Path(self.temporary.name) / "config"
+        self.root = self.workspace / ".workbench/blueprints/release"
+        self.store = lifecycle.ArtifactStore(self.root)
+
+    def test_core_publication_keeps_v1_locator_and_reopens_idempotently(self) -> None:
+        content = b"\x00" + b"blueprints-artifact" * 131072
+        digest = hashlib.sha256(content).hexdigest()
+        with sealed_store_scope(self.workspace, self.config):
+            locator = self.store.put_bytes(content)
+            self.assertEqual("local-blueprints-artifact:sha256:" + digest, locator)
+            self.assertEqual(self.root / "objects" / digest[:2] / digest, self.store._path(digest))
+            self.assertEqual(locator, lifecycle.ArtifactStore(self.root).put_bytes(content))
+            self.assertEqual(content, lifecycle.ArtifactStore(self.root).read_bytes(locator))
+        self.assertEqual(content, self.store.read_bytes(locator))
+
+    def test_historical_v1_object_reopens_with_and_without_core(self) -> None:
+        content = b"historical artifact bytes"
+        digest = hashlib.sha256(content).hexdigest()
+        locator = "local-blueprints-artifact:sha256:" + digest
+        path = self.store._path(digest)
+        path.parent.mkdir(mode=0o700, parents=True)
+        path.write_bytes(content)
+        path.chmod(0o600)
+        self.assertEqual(content, self.store.read_bytes(locator))
+        with sealed_store_scope(self.workspace, self.config):
+            self.assertEqual(content, self.store.read_bytes(locator))
+
+    def test_new_publication_requires_core_and_preserves_wrong_existing_bytes(self) -> None:
+        content = b"expected artifact"
+        digest = hashlib.sha256(content).hexdigest()
+        path = self.store._path(digest)
+        with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA108_STORE_ROOT"):
+            self.store.put_bytes(content)
+        self.assertFalse(path.exists())
+        path.parent.mkdir(mode=0o700, parents=True)
+        path.write_bytes(b"different artifact")
+        path.chmod(0o600)
+        with sealed_store_scope(self.workspace, self.config):
+            with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA109_STORE_COLLISION"):
+                self.store.put_bytes(content)
+            with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA112_ARTIFACT_DIGEST"):
+                self.store.read_bytes("local-blueprints-artifact:sha256:" + digest)
+        self.assertEqual(b"different artifact", path.read_bytes())
+
+    def test_artifact_json_retains_canonical_validation(self) -> None:
+        with sealed_store_scope(self.workspace, self.config):
+            locator = self.store.put_bytes(b'{"z": 1, "a": 2}')
+            with self.assertRaisesRegex(lifecycle.LifecycleDiagnostic, "BPA114_ARTIFACT_CANONICAL"):
+                self.store.read_json(locator)
 
 
 class LifecycleTest(unittest.TestCase):
