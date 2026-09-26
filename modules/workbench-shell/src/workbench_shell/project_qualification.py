@@ -26,6 +26,7 @@ from workbench_api.host_filesystem import (
     DurableRecordError,
     HostFilesystemError,
     private_path,
+    private_record_lock,
     read_private_bytes,
     replace_private_bytes,
     secure_private_path,
@@ -43,7 +44,6 @@ from workbench_core.configuration import (
     WorkbenchConfigurationError,
     load_workbench_configuration,
 )
-from workbench_core.setup_cli import SetupError, setup_record_lock
 from .workspace_dashboard import (
     WorkspaceHomeV2Error,
     _workspace_content_fingerprint,
@@ -1191,9 +1191,11 @@ def _write_binding(
 @contextmanager
 def _qualification_lock(path: Path):
     try:
-        with setup_record_lock(path):
+        # Reuse the historical lock name so an older qualification writer
+        # cannot race a Core-hosted transition of the same binding.
+        with private_record_lock(path.parent / f".{path.name}.lock", wait=True):
             yield
-    except SetupError as exc:
+    except (OSError, HostFilesystemError) as exc:
         raise ProjectQualificationError(
             f"cannot lock qualification state: {exc}"
         ) from exc
