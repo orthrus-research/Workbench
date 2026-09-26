@@ -85,3 +85,7 @@ Machine-readable forms:
 - [`gtceu-worldgen-inventory-v1.schema.json`](../schemas/gtceu-worldgen-inventory-v1.schema.json)
 - [`gtceu-worldgen-overlay-v1.schema.json`](../schemas/gtceu-worldgen-overlay-v1.schema.json)
 - [`gtceu-worldgen-overlay-materialization-v1.schema.json`](../schemas/gtceu-worldgen-overlay-materialization-v1.schema.json)
+
+The separate [V2 copied-tree inventory](gtceu-worldgen-overlay-copy-inventory-v2.md)
+binds non-JSON sidecars and directory entries for a future Core-published
+overlay. It does not change this V1 source-only command or its receipts.

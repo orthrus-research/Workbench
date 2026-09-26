@@ -14,6 +14,11 @@ from .overlay import (
     parse_overlay_materialization,
     parse_overlay_plan,
 )
+from .transport_inventory import (
+    build_gtceu_overlay_copy_inventory,
+    parse_gtceu_overlay_copy_inventory,
+    verify_gtceu_overlay_copy_source,
+)
 
 __all__ = [
     "GTCEU_WORLDGEN_FORMAT",
@@ -26,4 +31,7 @@ __all__ = [
     "materialize_overlay",
     "parse_overlay_materialization",
     "parse_overlay_plan",
+    "build_gtceu_overlay_copy_inventory",
+    "parse_gtceu_overlay_copy_inventory",
+    "verify_gtceu_overlay_copy_source",
 ]

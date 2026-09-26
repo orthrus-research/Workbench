@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from hashlib import sha256
 import json
 from pathlib import Path
+import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from zipfile import ZipFile
 
 
@@ -20,10 +23,15 @@ from workbench_crucible_gtceu_worldgen import (  # noqa: E402
     materialize_overlay,
     parse_overlay_materialization,
     parse_gtceu_worldgen_inventory,
+    build_gtceu_overlay_copy_inventory,
+    parse_gtceu_overlay_copy_inventory,
+    verify_gtceu_overlay_copy_source,
 )
 from workbench_crucible_gtceu_worldgen.inventory import (  # noqa: E402
     REQUIRED_API_CLASSES,
+    canonical_json_bytes,
 )
+from workbench_crucible_gtceu_worldgen import transport_inventory  # noqa: E402
 
 
 class GtceuWorldgenInventoryTests(unittest.TestCase):
@@ -124,6 +132,19 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
             config_root=self.config,
             strataview_path=self.package,
         )
+
+    def build_copy_inventory(self, source_inventory: dict) -> tuple[dict, list[bytes]]:
+        chunks: dict[int, bytes] = {}
+
+        def emit(index: int, raw: bytes) -> None:
+            self.assertNotIn(index, chunks)
+            chunks[index] = raw
+
+        manifest = build_gtceu_overlay_copy_inventory(
+            config_root=self.config, source_inventory=source_inventory,
+            emit_chunk=emit,
+        )
+        return manifest, [chunks[index] for index in range(len(chunks))]
 
     def test_exact_inventory_quantifies_and_correlates_without_causality(self) -> None:
         report = self.build()
@@ -276,6 +297,157 @@ class GtceuWorldgenInventoryTests(unittest.TestCase):
                 plan=plan,
                 output_config_root=self.root / "materialized/config/gregtech",
             )
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_binds_sidecars_and_keeps_v1_bytes(self) -> None:
+        report = self.build()
+        v1_bytes = canonical_json_bytes(report)
+        sidecar = self.config / "worldgen/vein/overworld/notes.txt"
+        sidecar.write_bytes(b"copied sidecar\n")
+        manifest, chunks = self.build_copy_inventory(report)
+        self.assertEqual(manifest, parse_gtceu_overlay_copy_inventory(manifest, chunks))
+        self.assertEqual(
+            manifest, verify_gtceu_overlay_copy_source(
+                config_root=self.config, source_inventory=report,
+                manifest=manifest, chunks=chunks,
+                expected_inventory_id=manifest["inventory_id"],
+            ),
+        )
+        rows = [json.loads(line) for chunk in chunks for line in chunk.splitlines()]
+        self.assertEqual(
+            next(row for row in rows if row["path"].endswith("notes.txt"))["sha256"],
+            sha256(b"copied sidecar\n").hexdigest(),
+        )
+        self.assertEqual(canonical_json_bytes(self.build()), v1_bytes)
+        with self.assertRaisesRegex(GtceuWorldgenValidationError, "after selection"):
+            verify_gtceu_overlay_copy_source(
+                config_root=self.config, source_inventory=report,
+                manifest=manifest, chunks=chunks,
+                expected_inventory_id="crucible-gtceu-overlay-copy:sha256:" + "0" * 64,
+            )
+        sidecar.write_bytes(b"changed sidecar\n")
+        with self.assertRaisesRegex(GtceuWorldgenValidationError, "copied source changed"):
+            verify_gtceu_overlay_copy_source(
+                config_root=self.config, source_inventory=report,
+                manifest=manifest, chunks=chunks,
+                expected_inventory_id=manifest["inventory_id"],
+            )
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_refuses_external_symlink(self) -> None:
+        report = self.build()
+        external = self.root / "external.txt"
+        external.write_bytes(b"external bytes\n")
+        (self.config / "worldgen/vein/overworld/sidecar.txt").symlink_to(external)
+        with self.assertRaisesRegex(GtceuWorldgenValidationError, "symlink or special"):
+            self.build_copy_inventory(report)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_chunks_more_than_4096_entries_and_four_mib(self) -> None:
+        report = self.build()
+        sidecars = self.config / "worldgen/vein/overworld" / ("x" * 200)
+        sidecars.mkdir()
+        for index in range(12000):
+            (sidecars / f"{index:05d}-{'y' * 120}.txt").write_bytes(b"x")
+        manifest, chunks = self.build_copy_inventory(report)
+        self.assertGreater(manifest["entry_count"], 4096)
+        self.assertGreater(sum(map(len, chunks)), 4 * 1024 * 1024)
+        self.assertLess(len(canonical_json_bytes(manifest)), 16 * 1024)
+        self.assertGreater(manifest["chunk_count"], 4)
+        self.assertTrue(all(0 < len(chunk) <= transport_inventory.CHUNK_BYTES for chunk in chunks))
+        self.assertEqual(manifest, parse_gtceu_overlay_copy_inventory(manifest, chunks))
+        self.assertEqual(
+            manifest, verify_gtceu_overlay_copy_source(
+                config_root=self.config, source_inventory=report,
+                manifest=manifest, chunks=chunks,
+                expected_inventory_id=manifest["inventory_id"],
+            ),
+        )
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_rejects_chunk_tampering_and_extra_chunk(self) -> None:
+        manifest, chunks = self.build_copy_inventory(self.build())
+        changed = chunks.copy()
+        changed[0] = changed[0].replace(b"worldgen", b"worldgex", 1)
+        with self.assertRaises(GtceuWorldgenValidationError):
+            parse_gtceu_overlay_copy_inventory(manifest, changed)
+        with self.assertRaisesRegex(GtceuWorldgenValidationError, "unexpected chunk"):
+            parse_gtceu_overlay_copy_inventory(manifest, [*chunks, b"{}\n"])
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_refuses_drift_between_scans(self) -> None:
+        report = self.build()
+        sidecar = self.config / "worldgen/vein/overworld/notes.txt"
+        sidecar.write_bytes(b"before\n")
+        original = transport_inventory._source_rows
+        scans = 0
+        emitted: list[bytes] = []
+
+        def racing(root: Path):
+            nonlocal scans
+            scans += 1
+            if scans == 2:
+                sidecar.write_bytes(b"after\n")
+            yield from original(root)
+
+        with patch.object(transport_inventory, "_source_rows", racing):
+            with self.assertRaisesRegex(GtceuWorldgenValidationError, "between inventory scans"):
+                build_gtceu_overlay_copy_inventory(
+                    config_root=self.config, source_inventory=report,
+                    emit_chunk=lambda _index, raw: emitted.append(raw),
+                )
+        self.assertTrue(emitted)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_refuses_linked_file_and_redirected_parent(self) -> None:
+        report = self.build()
+        external = self.root / "external.txt"
+        external.write_bytes(b"external bytes\n")
+        os.link(external, self.config / "worldgen/vein/overworld/linked.txt")
+        with self.assertRaisesRegex(GtceuWorldgenValidationError, "linked or nonregular"):
+            self.build_copy_inventory(report)
+        (self.config / "worldgen/vein/overworld/linked.txt").unlink()
+        redirected = self.root / "redirected"
+        redirected.symlink_to(self.config / "worldgen/vein", target_is_directory=True)
+        with self.assertRaises(GtceuWorldgenValidationError):
+            build_gtceu_overlay_copy_inventory(
+                config_root=redirected, source_inventory=report,
+                emit_chunk=lambda _index, _raw: None,
+            )
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_refuses_portable_name_collision(self) -> None:
+        report = self.build()
+        folder = self.config / "worldgen/vein/overworld"
+        (folder / "Sidecar.txt").write_bytes(b"first")
+        (folder / "sidecar.txt").write_bytes(b"second")
+        with self.assertRaisesRegex(GtceuWorldgenValidationError, "collide"):
+            self.build_copy_inventory(report)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_refuses_nonportable_names(self) -> None:
+        report = self.build()
+        folder = self.config / "worldgen/vein/overworld"
+        for name in ("CON.txt", "bad\x7f.txt"):
+            selected = folder / name
+            selected.write_bytes(b"sidecar")
+            with self.assertRaisesRegex(GtceuWorldgenValidationError, "nonportable"):
+                self.build_copy_inventory(report)
+            selected.unlink()
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "V2 inventory uses Linux mount IDs")
+    def test_v2_copy_inventory_refuses_child_mount_identity(self) -> None:
+        report = self.build()
+        original = transport_inventory._mount_id
+        vein_inode = (self.config / "worldgen/vein").stat().st_ino
+
+        def different_mount(descriptor: int) -> int:
+            observed = original(descriptor)
+            return observed + 1 if os.fstat(descriptor).st_ino == vein_inode else observed
+
+        with patch.object(transport_inventory, "_mount_id", different_mount):
+            with self.assertRaisesRegex(GtceuWorldgenValidationError, "mount boundary"):
+                self.build_copy_inventory(report)
 
 
 if __name__ == "__main__":
