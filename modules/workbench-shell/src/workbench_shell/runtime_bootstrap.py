@@ -17,10 +17,12 @@ from urllib.request import url2pathname
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
 from workbench_core.artifact_store import (
-    ArtifactStoreError,
     DOWNLOAD_CHUNK_BYTES,
-    fetch_verified_artifact,
     sha256_file,
+)
+from workbench_api.verified_artifacts import (
+    VerifiedArtifactError,
+    acquire_verified_artifact,
 )
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
@@ -594,7 +596,7 @@ def materialize_client_bootstrap(
         )
 
     try:
-        cache_path, artifact_outcome = fetch_verified_artifact(
+        acquired = acquire_verified_artifact(
             url=artifact["url"],
             expected_sha256=artifact["sha256"],
             expected_size=artifact_size,
@@ -603,8 +605,9 @@ def materialize_client_bootstrap(
             timeout_seconds=timeout_seconds,
             user_agent="Workbench-Cleanroom-Bootstrap/0.1",
         )
-    except ArtifactStoreError as exc:
+    except VerifiedArtifactError as exc:
         raise RuntimeBootstrapError(str(exc)) from exc
+    cache_path, artifact_outcome = acquired.path, acquired.outcome
     fixture_root.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(
         prefix=f".{fixture_root.name}.bootstrap-",

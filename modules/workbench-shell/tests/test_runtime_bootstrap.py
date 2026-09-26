@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from zipfile import ZipFile
 
 
@@ -25,6 +26,8 @@ from workbench_shell import (  # noqa: E402
     build_runtime_plan,
     materialize_client_bootstrap,
 )
+from workbench_api import verified_artifacts  # noqa: E402
+from workbench_core.host_services import install_local_host_services  # noqa: E402
 
 
 SOURCE_REVISION = "9" * 40
@@ -144,6 +147,10 @@ def _plan(
 
 
 class RuntimeBootstrapTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        install_local_host_services()
+
     def test_materializes_verified_instance_and_reuses_exact_target(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -152,11 +159,24 @@ class RuntimeBootstrapTest(unittest.TestCase):
             state_root = root / "state"
             plan = _plan(state_root, archive)
 
-            created = materialize_client_bootstrap(
-                plan,
-                artifact_size=archive.stat().st_size,
-                artifact_source_revision=SOURCE_REVISION,
+            with patch(
+                "workbench_shell.runtime_bootstrap.acquire_verified_artifact",
+                wraps=verified_artifacts.acquire_verified_artifact,
+            ) as acquire:
+                created = materialize_client_bootstrap(
+                    plan,
+                    artifact_size=archive.stat().st_size,
+                    artifact_source_revision=SOURCE_REVISION,
+                    state_root=state_root,
+                )
+            acquire.assert_called_once_with(
+                url=archive.as_uri(),
+                expected_sha256=sha256(archive.read_bytes()).hexdigest(),
+                expected_size=archive.stat().st_size,
                 state_root=state_root,
+                label="Cleanroom client artifact",
+                timeout_seconds=30.0,
+                user_agent="Workbench-Cleanroom-Bootstrap/0.1",
             )
 
             self.assertEqual(created["outcome"], "created")
@@ -201,6 +221,25 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 reused["receipt"]["bootstrap_id"],
                 receipt["bootstrap_id"],
             )
+
+    def test_missing_core_host_refuses_without_creating_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            with patch.object(verified_artifacts, "_host", None):
+                with self.assertRaisesRegex(
+                    RuntimeBootstrapError, "no verified artifact host",
+                ):
+                    materialize_client_bootstrap(
+                        plan,
+                        artifact_size=archive.stat().st_size,
+                        artifact_source_revision=SOURCE_REVISION,
+                        state_root=state_root,
+                    )
+            self.assertFalse(state_root.exists())
 
     def test_modified_existing_target_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

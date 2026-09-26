@@ -35,7 +35,12 @@ import time
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
-from workbench_core.artifact_store import ArtifactStoreError, fetch_verified_artifact, sha256_file
+from workbench_core.artifact_store import sha256_file
+from workbench_api.verified_artifacts import (
+    VerifiedArtifact,
+    VerifiedArtifactError,
+    acquire_verified_artifact,
+)
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
     WorkbenchConfiguration,
@@ -1533,10 +1538,10 @@ def materialize_susy_server(
             "receipt": receipt,
         }
 
-    fetched: dict[str, tuple[Path, str]] = {}
+    fetched: dict[str, VerifiedArtifact] = {}
     for artifact_id, lock in locks.items():
         try:
-            fetched[artifact_id] = fetch_verified_artifact(
+            fetched[artifact_id] = acquire_verified_artifact(
                 url=str(lock["url"]),
                 expected_sha256=str(lock["sha256"]),
                 expected_size=int(lock["size"]),
@@ -1545,11 +1550,13 @@ def materialize_susy_server(
                 timeout_seconds=90.0,
                 user_agent="Workbench-SUSY-Server-Materializer/0.1",
             )
-        except ArtifactStoreError as exc:
+        except VerifiedArtifactError as exc:
             raise SusyServerMaterializationError(str(exc)) from exc
     artifacts = {
-        artifact_id: _artifact_record(path, locks[artifact_id], outcome)
-        for artifact_id, (path, outcome) in fetched.items()
+        artifact_id: _artifact_record(
+            artifact.path, locks[artifact_id], artifact.outcome,
+        )
+        for artifact_id, artifact in fetched.items()
     }
 
     if _ensure_state_directory(
@@ -1618,7 +1625,7 @@ def materialize_susy_server(
                 [
                     str(java_path),
                     "-jar",
-                    str(fetched["cleanroom_server"][0]),
+                    str(fetched["cleanroom_server"].path),
                     "--install-server",
                     str(runtime),
                 ],
@@ -1657,7 +1664,7 @@ def materialize_susy_server(
                 [
                     str(java_path),
                     "-cp",
-                    str(fetched["packwiz_installer"][0]),
+                    str(fetched["packwiz_installer"].path),
                     INSTALLER_MAIN_CLASS,
                     "--no-gui",
                     "--side",

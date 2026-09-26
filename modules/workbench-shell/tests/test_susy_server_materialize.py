@@ -42,6 +42,8 @@ from workbench_shell.susy_server_materialize import (  # noqa: E402
     render_susy_server_materialization,
 )
 import workbench_shell.susy_server_materialize as server_materialize  # noqa: E402
+from workbench_api.verified_artifacts import VerifiedArtifact  # noqa: E402
+from workbench_api.state_paths import default_suite_state_root  # noqa: E402
 
 
 RUN_ID = "susy-mod-20260820T120000000000Z-abcdef123456"
@@ -966,11 +968,20 @@ class _MaterializationFixture:
                 raise AssertionError(f"unexpected artifact request: {request!r}")
             if path.stat().st_size != request.get("expected_size"):
                 raise AssertionError(f"artifact size request drifted: {request!r}")
-            return path, "fixture"
+            if request.get("state_root") != default_suite_state_root(self.suite):
+                raise AssertionError(f"artifact state root drifted: {request!r}")
+            if request.get("timeout_seconds") != 90.0:
+                raise AssertionError(f"artifact timeout drifted: {request!r}")
+            if request.get("user_agent") != "Workbench-SUSY-Server-Materializer/0.1":
+                raise AssertionError(f"artifact user agent drifted: {request!r}")
+            return VerifiedArtifact(
+                path=path, sha256=request["expected_sha256"],
+                size=request["expected_size"], outcome="fixture",
+            )
 
         with patch.object(
             server_materialize,
-            "fetch_verified_artifact",
+            "acquire_verified_artifact",
             side_effect=fetch,
         ):
             return materialize_susy_server(
