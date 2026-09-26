@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 from native_distribution import ROOT, build, derive, selected_components
+from native_build_custody import build_managed_assembly
 from validation_diagnostics import DiagnosticRun, default_directory
 
 
@@ -23,11 +24,22 @@ def main(argv=None):
         with DiagnosticRun(args.diagnostics or default_directory(ROOT, "native-build"), "native-build", ("assembly",)) as diagnostics:
             with diagnostics.phase("assembly"):
                 if args.from_wheelhouse:
-                    result = derive(args.from_wheelhouse, args.output, args.components, suite=args.suite)
+                    result, custody = build_managed_assembly(
+                        args.output,
+                        lambda output: derive(args.from_wheelhouse, output, args.components, suite=args.suite),
+                    )
                 else:
-                    result = build(args.output, args.components, suite=args.suite,
-                                   command_runner=lambda command: diagnostics.command(command, cwd=ROOT, timeout=1200))
-            diagnostics.document["metadata"].update(source_sha256=result["source_sha256"], target=result["target"], wheels=result["wheels"])
+                    result, custody = build_managed_assembly(
+                        args.output,
+                        lambda output: build(output, args.components, suite=args.suite,
+                                             command_runner=lambda command: diagnostics.command(command, cwd=ROOT, timeout=1200)),
+                    )
+            diagnostics.document["metadata"].update(
+                source_sha256=result["source_sha256"], target=result["target"],
+                wheels=result["wheels"], artifact_tree_id=custody.tree_id,
+                artifact_path=str(custody.path),
+            )
+        result = {**result, "artifact_tree_id": custody.tree_id, "artifact_path": str(custody.path)}
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 

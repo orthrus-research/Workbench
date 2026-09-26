@@ -11,6 +11,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 import native_distribution as distribution
+from native_build_custody import build_managed_assembly
 from verify_wheelhouse import WheelhouseError
 
 
@@ -111,3 +112,45 @@ class NativeReuseTests(unittest.TestCase):
             with self.assertRaisesRegex(distribution.DistributionError, "new directory"):
                 self.derive(source, output)
             self.assertEqual("retain", retained.read_text())
+
+    def test_native_cli_custody_publishes_verified_tree_at_selected_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            source, output = base / "source", base / "native-output"
+            self.assembly(source)
+            result, reference = build_managed_assembly(
+                output,
+                lambda staged: self.derive(source, staged),
+                configuration_home=base / "core-home",
+            )
+            self.assertEqual(result, distribution.verify(output))
+            self.assertEqual(output, reference.path)
+            self.assertEqual("native-build", reference.owner_id)
+            self.assertEqual("artifacts", reference.role)
+            self.assertTrue(reference.domain_id.startswith("workbench-native-wheelhouse-v1:sha256:"))
+            from workbench_core.storage.registered import ResourceCatalog
+            rows = ResourceCatalog(base / "core-home").inventory(workspace=ROOT)["trees"]
+            self.assertEqual([reference.tree_id], [row["tree_id"] for row in rows])
+            (output / "requirements.lock").write_text("tampered\n")
+            with self.assertRaises(WheelhouseError):
+                distribution.verify(output)
+
+    def test_failed_native_build_retains_staging_without_publishing_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            output = base / "native-output"
+
+            def fail(staged):
+                staged.mkdir()
+                (staged / "partial.txt").write_text("unqualified bytes")
+                raise RuntimeError("build interrupted")
+
+            with self.assertRaisesRegex(RuntimeError, "interrupted"):
+                build_managed_assembly(
+                    output, fail, configuration_home=base / "core-home",
+                )
+            self.assertFalse(output.exists())
+            self.assertEqual(
+                [b"unqualified bytes"],
+                [path.read_bytes() for path in base.glob(".workbench-tree-*.pending/payload/partial.txt")],
+            )
