@@ -143,7 +143,7 @@ class SavedMaterialCheckTests(unittest.TestCase):
         self.assertEqual('configured', configured['state'])
         self.assertEqual('disabled', self.client_command('retention', 'maintain')['result']['state'])
 
-    def test_registered_history_remains_honest_through_retirement_restore_and_expiry(self):
+    def test_registered_history_and_export_remain_available_when_cleanup_is_protected(self):
         from workbench_core import check_lifecycle as life
         from workbench_core.storage import manager
         request = self.prepare()
@@ -151,18 +151,20 @@ class SavedMaterialCheckTests(unittest.TestCase):
         attempt = self.directory(request)
         root = attempt.parent.parent.parent
         self.assertEqual(request['attempt_id'], life.history(root)['checks'][0]['attempt_id'])
-        life.export_bundle(root, attempt.name, self.base / 'evidence-bundle')
+        bundle = self.base / 'evidence-bundle'
+        life.export_bundle(root, attempt.name, bundle)
         item = next(row for row in manager.inventory_storage(root)['items'] if row['path'] == str(attempt))
-        receipt = manager.execute_cleanup(root, manager.plan_cleanup(root, selector=item['item_id']))
-        self.assertEqual('retired', self.client_command('history')['result']['attempts'][0]['state'])
-        with self.assertRaisesRegex(ValueError, 'details are retired'):
-            saved._load(root, attempt.name, self.selection)
-        trash = next(row for row in manager.inventory_storage(root)['items'] if row['resource_id'] == receipt['result']['trash_id'])
-        manager.execute_purge_trash(root, manager.plan_purge_trash(root, selector=trash['item_id'], confirmation=trash['resource_id']))
+        self.assertIn('registered-catalog-unproven', item['deletion']['reason_codes'])
+        plan = manager.plan_cleanup(root, selector=item['item_id'])
+        self.assertEqual('blocked', plan['status'])
+        self.assertIn('deletion-protected', {row['code'] for row in plan['blockers']})
+        with self.assertRaisesRegex(manager.RuntimeManagerError, 'blocked operation plans'):
+            manager.execute_cleanup(root, plan)
         row = self.client_command('history')['result']['attempts'][0]
-        self.assertEqual('expired', row['state'])
-        self.assertEqual('completed', row['original_summary']['state'])
-        self.assertFalse(attempt.exists())
+        self.assertEqual('completed', row['state'])
+        self.assertTrue(attempt.is_dir())
+        saved._load(root, attempt.name, self.selection)
+        self.assertEqual('complete-inspectable-evidence', life.verify_bundle(bundle)['closure'])
 
     def test_historical_reader_support_is_separate_from_capture_and_unknown_details_export(self):
         request = self.prepare()

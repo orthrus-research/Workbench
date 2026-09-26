@@ -86,7 +86,7 @@ class SavedRecipeChecksTests(unittest.TestCase):
             verified = verify_developer_owner_reference(response['owner_record_ref'],self.selection,suite_root=saved.ROOT)
             self.assertEqual(verified['last_verified_state'],result['state'])
         self.assertFalse(self.command('show',first['attempt_id'])['presentation']['source_current'])
-        self.assertEqual(result['cleanup']['state'],'trashed')
+        saved.SavedCheckTests.assert_protected_projection(self, result)
 
     def test_unsupported_sources_never_launch_and_selected_bytes_are_rechecked(self):
         (self.pack/PATH).write_text(SOURCE.replace('duration(20)','duration(dynamic())'))

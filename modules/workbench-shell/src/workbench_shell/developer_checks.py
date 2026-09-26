@@ -215,8 +215,18 @@ def _recover(root, identity, selection, consent):
             storage.write_json(
                 attempt / ("recovered-logs-" + uuid4().hex + ".json"), evidence
             )
-            receipt = storage.cleanup_projection(root, projection)
-            cleanup = {"state": "trashed", "receipt": receipt}
+            try:
+                receipt = storage.cleanup_projection(root, projection)
+            except storage.ProjectionCleanupBlocked as exc:
+                cleanup = {
+                    "state": "blocked",
+                    "reason": str(exc),
+                    "plan_id": exc.plan_id,
+                    "blockers": list(exc.blockers),
+                    "runtime_uri": projection.as_uri(),
+                }
+            else:
+                cleanup = {"state": "trashed", "receipt": receipt}
         else:
             cleanup = {"state": "not-present"}
         result = storage.seal(

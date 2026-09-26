@@ -24,6 +24,15 @@ class CheckExecutionBusy(CheckStorageError):
     pass
 
 
+class ProjectionCleanupBlocked(CheckStorageError):
+    """The exact Core cleanup plan protects a retained check projection."""
+
+    def __init__(self, plan):
+        self.plan_id = plan["plan_id"]
+        self.blockers = tuple(row["code"] for row in plan["blockers"])
+        super().__init__("Core cleanup plan is blocked")
+
+
 def canonical(value):
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), allow_nan=False
@@ -548,9 +557,10 @@ def cleanup_projection(root, projection):
         raise CheckStorageError(
             "exact check projection is not one managed inventory item"
         )
-    return manager.execute_cleanup(
-        root, manager.plan_cleanup(root, selector=rows[0]["item_id"])
-    )
+    plan = manager.plan_cleanup(root, selector=rows[0]["item_id"])
+    if plan["status"] == "blocked":
+        raise ProjectionCleanupBlocked(plan)
+    return manager.execute_cleanup(root, plan)
 
 
 def provision_projection(

@@ -85,6 +85,13 @@ class SavedCheckTests(unittest.TestCase):
             "execute", request["attempt_id"], "--confirm", request["id"]
         )
 
+    def assert_protected_projection(self, result):
+        projection = self.root / ".workbench/tmp" / result["attempt_id"]
+        self.assertEqual(result["cleanup"]["state"], "blocked", result)
+        self.assertEqual(result["cleanup"]["reason"], "Core cleanup plan is blocked")
+        self.assertEqual(result["cleanup"]["runtime_uri"], projection.as_uri())
+        self.assertTrue(projection.is_dir())
+
     def test_saved_add_delete_modes_execute_and_reopen_without_source_mutation(self):
         path = self.pack / "groovy/new.groovy"
         path.write_text("// developer addition\n")
@@ -98,7 +105,7 @@ class SavedCheckTests(unittest.TestCase):
         response = self.execute(request)
         result = response["result"]
         self.assertEqual(result["state"], "completed", result)
-        self.assertEqual(result["cleanup"]["state"], "trashed", result)
+        self.assert_protected_projection(result)
         self.assertEqual(before, capture_source_inputs(self.pack))
         self.assertEqual(self.command("show", request["attempt_id"])["result"], result)
         verified = verify_developer_owner_reference(
@@ -206,7 +213,7 @@ class SavedCheckTests(unittest.TestCase):
         result = self.execute(request)["result"]
         self.assertEqual(result["state"], "failed", result)
         self.assertEqual(result["execution"]["stop_reason"], "failure-observed")
-        self.assertEqual(result["cleanup"]["state"], "trashed")
+        self.assert_protected_projection(result)
         self.assertIn("crash-reports/crash-client.txt", {row["path"] for row in result["evidence"]})
         self.assertIn("InjectionError", self.command("log", request["attempt_id"], "--path", "crash-reports/crash-client.txt")["result"]["text"])
 
@@ -257,7 +264,14 @@ with patch.object(policy, 'validate_image', return_value=None):
                     self.command("recover", request["attempt_id"], "--confirm", "wrong")
                 recovery = self.command("recover", request["attempt_id"], "--confirm", request["id"])["result"]
                 self.assertEqual(recovery["process"]["state"], "closed")
-                self.assertEqual(recovery["cleanup"]["state"], "trashed")
+                self.assertEqual(recovery["cleanup"]["state"], "blocked")
+                self.assertIn("deletion-protected", recovery["cleanup"]["blockers"])
+                self.assertEqual(recovery["cleanup"]["runtime_uri"], marker.parent.as_uri())
+                self.assertTrue(marker.parent.is_dir())
+                self.assertEqual(
+                    self.command("recover", request["attempt_id"], "--confirm", request["id"])["result"],
+                    recovery,
+                )
                 self.assertEqual(self.command("show", request["attempt_id"])["result"]["state"], "recovered-incomplete")
         finally:
             if worker.poll() is None:
@@ -356,11 +370,19 @@ with patch.object(policy, 'validate_image', return_value=None):
             result = self.execute(request)["result"]
         self.assertEqual(result["state"], "completed")
         self.assertEqual(result["cleanup"]["state"], "blocked")
+        self.assertIn("busy", result["cleanup"]["reason"])
+        with patch.object(check_storage, "cleanup_projection", side_effect=OSError("busy again")):
+            with self.assertRaisesRegex(OSError, "busy again"):
+                self.command("recover", request["attempt_id"], "--confirm", request["id"])
+        attempt = self.root / ".workbench/check-attempts" / request["attempt_id"]
+        self.assertFalse((attempt / "recovery.json").exists())
         recovery = self.command(
             "recover", request["attempt_id"], "--confirm", request["id"]
         )["result"]
         self.assertEqual(recovery["state"], "recovered")
-        self.assertEqual(recovery["cleanup"]["state"], "trashed")
+        self.assertEqual(recovery["cleanup"]["state"], "blocked")
+        self.assertIn("deletion-protected", recovery["cleanup"]["blockers"])
+        self.assertEqual(self.command("recover", request["attempt_id"], "--confirm", request["id"])["result"], recovery)
         self.assertEqual(self.command("show", request["attempt_id"])["result"], result)
 
     def test_source_edits_after_launch_do_not_retarget_the_running_candidate(self):
@@ -518,7 +540,7 @@ with patch.object(policy, 'validate_image', return_value=None):
         )["result"]
         self.assertEqual(result["state"], "cancelled")
         self.assertEqual(result["execution"]["state"], "closed")
-        self.assertEqual(result["cleanup"]["state"], "trashed")
+        self.assert_protected_projection(result)
 
     def test_checkpoint_shutdown_does_not_hide_observed_or_process_failures(self):
         from workbench_crucible.developer_checks import outcome
