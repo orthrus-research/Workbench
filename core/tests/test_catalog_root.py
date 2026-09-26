@@ -353,8 +353,24 @@ class CatalogRootTests(unittest.TestCase):
         original = catalog._root_manifest().read_bytes()
         lease_root = catalog.root / "registration-attempt-leases"
         lease_root.mkdir(mode=0o700)
+        valid = lease_root / ("a" * 64 + ".lock")
+        valid.write_bytes(b"")
+        valid.chmod(0o600)
         self.assertEqual(1, len(catalog.inventory(workspace=self.workspace)["resources"]))
         self.assertEqual(original, catalog._root_manifest().read_bytes())
+        unexpected = lease_root / "unexpected.lock"
+        unexpected.write_bytes(b"")
+        with self.assertRaises(DurableResourceError) as unknown:
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual(unknown.exception.code, "resource.changed")
+        unexpected.unlink()
+        linked = lease_root / ("b" * 64 + ".lock")
+        os.link(valid, linked)
+        with self.assertRaises(DurableResourceError) as duplicate:
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual(duplicate.exception.code, "resource.changed")
+        linked.unlink()
+        valid.unlink()
         lease_root.rmdir()
         lease_root.symlink_to(catalog.root / "leases", target_is_directory=True)
         with self.assertRaises(DurableResourceError) as redirected:

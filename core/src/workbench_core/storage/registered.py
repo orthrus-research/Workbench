@@ -648,6 +648,17 @@ class ResourceCatalog:
                 for entry in self.root.iterdir()
             ):
                 raise DurableResourceError("resource.changed", "resource catalog has an unknown root entry")
+            auxiliary_leases = self._directory("registration-attempt-leases")
+            if auxiliary_leases.exists():
+                for path in auxiliary_leases.iterdir():
+                    info = path.lstat()
+                    if (
+                        re.fullmatch(r"[0-9a-f]{64}\.lock", path.name) is None
+                        or not stat.S_ISREG(info.st_mode)
+                        or info.st_nlink != 1
+                        or not private_path(path, directory=False)
+                    ):
+                        raise DurableResourceError("resource.changed", "registration attempt lease catalog has an unsafe entry")
             for name in ("reservations", "intents", "commits", "aborts", "leases"):
                 check_storage.ordinary(self._directory(name), directory=True)
             for name in ("reservations", "intents", "commits", "aborts"):
