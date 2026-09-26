@@ -18,9 +18,12 @@ exclude a concurrent writer. Blueprints retains plan admission and source
 semantics.
 For Cleanroom fresh-project V2, Core also registers the selected bootstrap
 state root and publishes, reads, revises, and removes its historical journal
-and retained receipt. Blueprints decides the V2 state transitions and the
-exact Git and project bytes involved in recovery. Profile-local direct apply
-still requires a Core-composed entry route for that state custody.
+and retained receipt. Core physically replaces and restores the reviewed Git
+exclude bytes and creates and removes the exact bootstrap marker at their
+historical paths. Blueprints decides the V2 state transitions and recovery
+admission. Git initialization and whole-tree bootstrap cleanup are a separate
+physical custody boundary. Profile-local direct apply still requires a
+Core-composed entry route for that state custody.
 
 For native package development, install `api/` and `modules/blueprints/` in a
 dedicated virtual environment. Dependency declarations in `pyproject.toml`

@@ -13,12 +13,14 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api.host_filesystem import bind_host_filesystem
+from workbench_api.git_bootstrap import git_bootstrap_scope
 from workbench_api.record_stores import record_store_scope
 from workbench_api.source_transactions import source_transactions_scope
 from workbench_api.state_root_policies import (
     StateRootPolicyError, state_root_policies_scope,
 )
 from workbench_core import host_filesystem
+from workbench_core.git_bootstrap import HOST as GIT_BOOTSTRAP_HOST
 from workbench_core.durable_records import read_bounded_single_link_bytes
 from workbench_core.source_transactions import CoreSourceTransactions
 from workbench_core.storage.record_stores import CoreRecordStores
@@ -164,8 +166,10 @@ class CleanroomNewProjectCoreRouteTests(unittest.TestCase):
                 self.assertEqual((status, error.getvalue()), (0, ""))
                 return json.loads(output.getvalue())
 
-            with record_store_scope(provider), source_transactions_scope(
-                CoreSourceTransactions(owner_id="workbench-shell")
+            with (
+                record_store_scope(provider),
+                source_transactions_scope(CoreSourceTransactions(owner_id="workbench-shell")),
+                git_bootstrap_scope(GIT_BOOTSTRAP_HOST),
             ):
                 target = home / "applied"
                 plan_path = home / "applied-plan.json"

@@ -16,10 +16,10 @@ import os
 from pathlib import Path, PurePosixPath
 import stat
 import subprocess
-import tempfile
 from typing import Any, Mapping, NoReturn, Sequence, cast
+from workbench_api.git_bootstrap import git_bootstrap_host
 from workbench_api.host_filesystem import (
-    count_interrupted_create_once_stages, fsync_directory,
+    count_interrupted_create_once_stages,
     publish_create_once_bytes, publish_immutable_bytes, read_private_bytes,
     remove_private_bytes, replace_private_bytes, secure_private_path,
 )
@@ -143,48 +143,6 @@ def _read_optional_regular(path: Path, label: str) -> bytes | None:
     except OSError as exc:
         raise FreshProjectError(f"cannot inspect {label}") from exc
     return _read_regular(path, label, _MAXIMUM_GIT_METADATA_BYTES)
-
-
-def _atomic_replace(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
-    _ordinary_directory(path.parent, "fresh-project state parent")
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(raw)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.chmod(temporary, mode)
-        os.replace(temporary, path)
-        fsync_directory(path.parent)
-    finally:
-        Path(temporary).unlink(missing_ok=True)
-
-
-def _atomic_new(path: Path, raw: bytes, *, mode: int = 0o600) -> None:
-    _ordinary_directory(path.parent, "fresh-project state parent")
-    try:
-        descriptor = os.open(
-            path,
-            os.O_WRONLY
-            | os.O_CREAT
-            | os.O_EXCL
-            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
-            mode,
-        )
-    except OSError as exc:
-        raise FreshProjectError(f"cannot create retained {path.name}") from exc
-    try:
-        raw_offset = 0
-        while raw_offset < len(raw):
-            written = os.write(descriptor, raw[raw_offset:])
-            if written < 1:
-                raise OSError("fresh-project retained write made no progress")
-            raw_offset += written
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
 
 
 def _git(target: Path, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -450,6 +408,34 @@ def _exclude_after(before: bytes | None) -> bytes:
     return raw + _EXCLUDE_BLOCK
 
 
+def _marker_bytes(observation_id: str, plan_id: str) -> bytes:
+    return application_transaction.canonical_json_bytes({
+        "format": "workbench-blueprints-fresh-bootstrap-marker-v2",
+        "observation_id": observation_id,
+        "plan_id": plan_id,
+        "schema_version": 2,
+    }) + b"\n"
+
+
+def _journal_exclude_bytes(journal: Mapping[str, Any]) -> tuple[bytes | None, bytes]:
+    try:
+        before_encoded = journal["exclude_before_base64"]
+        after_encoded = journal["exclude_after_base64"]
+        if before_encoded is not None and type(before_encoded) is not str:
+            _fail("fresh bootstrap exclude-before encoding changed")
+        if type(after_encoded) is not str:
+            _fail("fresh bootstrap exclude-after encoding is missing")
+        before = None if before_encoded is None else base64.b64decode(before_encoded, validate=True)
+        after = base64.b64decode(after_encoded, validate=True)
+    except (KeyError, ValueError) as exc:
+        raise FreshProjectError("fresh bootstrap exclude encoding changed") from exc
+    if len(after) > _MAXIMUM_GIT_METADATA_BYTES or (
+        before is not None and len(before) > _MAXIMUM_GIT_METADATA_BYTES
+    ) or after != _exclude_after(before):
+        _fail("fresh bootstrap exclude bytes changed")
+    return before, after
+
+
 def prepare_fresh_target(
     target: Path | str,
     observation: Mapping[str, Any],
@@ -506,32 +492,32 @@ def prepare_fresh_target(
         exclude_path = git_path / "info/exclude"
         before_exclude = _read_optional_regular(exclude_path, "Git exclude file")
         after_exclude = _exclude_after(before_exclude)
-        if after_exclude != before_exclude:
-            _atomic_replace(exclude_path, after_exclude)
-        marker = {
-            "format": "workbench-blueprints-fresh-bootstrap-marker-v2",
-            "observation_id": reviewed["id"],
-            "plan_id": plan_id,
-            "schema_version": 2,
-        }
-        marker_path = git_path / "workbench-fresh-project-v2.json"
-        if marker_path.exists() or marker_path.is_symlink():
-            _fail("fresh-project bootstrap marker already exists")
-        _atomic_new(
-            marker_path,
-            application_transaction.canonical_json_bytes(marker) + b"\n",
-        )
         journal = {
             **journal,
             "exclude_after_base64": base64.b64encode(after_exclude).decode("ascii"),
             "exclude_before_base64": (
-                None
-                if before_exclude is None
+                None if before_exclude is None
                 else base64.b64encode(before_exclude).decode("ascii")
             ),
+        }
+        # Publish the exact rollback bytes before touching an existing Git
+        # repository. A crash in the preparing phase can then be classified.
+        _write_journal(journal_path, journal, expected=initial_journal)
+        prepared_journal = application_transaction.canonical_json_bytes(journal) + b"\n"
+        git_bootstrap_host().replace_exclude(
+            path, before=before_exclude, after=after_exclude,
+        )
+        marker_path = git_path / "workbench-fresh-project-v2.json"
+        if marker_path.exists() or marker_path.is_symlink():
+            _fail("fresh-project bootstrap marker already exists")
+        git_bootstrap_host().create_marker(
+            path, _marker_bytes(reviewed["id"], plan_id),
+        )
+        journal = {
+            **journal,
             "phase": "bootstrapped",
         }
-        _write_journal(journal_path, journal, expected=initial_journal)
+        _write_journal(journal_path, journal, expected=prepared_journal)
         return journal
     except BaseException:
         try:
@@ -678,6 +664,38 @@ def _load_bootstrap_journal(
     return journal, raw
 
 
+def _matches_original_unborn_observation(
+    target: Path, journal: Mapping[str, Any], before_exclude: bytes | None,
+) -> bool:
+    """Bind an interrupted metadata rollback to the original Git inode."""
+
+    try:
+        current = observe_fresh_target(target)
+    except (FreshProjectError, OSError):
+        return False
+    if current["state"] != "unborn-git":
+        return False
+    body = dict(current)
+    body.pop("id")
+    git = dict(body["git"])
+    git["exclude_sha256"] = (
+        None if before_exclude is None else sha256(before_exclude).hexdigest()
+    )
+    git["exclude_size"] = None if before_exclude is None else len(before_exclude)
+    body["git"] = git
+    return application_transaction.content_id(OBSERVATION_KIND, body) == journal["observation_id"]
+
+
+def _restored_result(target: Path, plan_id: str) -> dict[str, Any]:
+    return {
+        "format": "workbench-blueprints-fresh-bootstrap-recovery-v2",
+        "outcome": "restored",
+        "plan_id": plan_id,
+        "schema_version": 2,
+        "target_uri": target.as_uri(),
+    }
+
+
 def restore_fresh_target(
     target: Path | str,
     state_root: Path | str,
@@ -691,10 +709,47 @@ def restore_fresh_target(
     _validate_state_root(path, state)
     _state_store(state)
     journal, journal_raw = _load_bootstrap_journal(path, state, plan_id)
+    marker_path = path / ".git/workbench-fresh-project-v2.json"
+    marker_present = marker_path.exists() or marker_path.is_symlink()
+    if marker_present and not journal["created_git"]:
+        # A historical preparing journal without rollback bytes cannot
+        # authorize any mutation of a preexisting Git repository.
+        _journal_exclude_bytes(journal)
+    if not marker_present and journal["created_git"]:
+        try:
+            original_restored = (
+                observe_fresh_target(path)["id"] == journal["observation_id"]
+            )
+        except (FreshProjectError, OSError):
+            original_restored = False
+        if original_restored:
+            _remove_journal(_journal_path(state), expected=journal_raw)
+            return _restored_result(path, plan_id)
+    if not marker_present and not journal["created_git"]:
+        # The V2 preparing journal may precede any metadata mutation, or a
+        # previous recovery may have removed the marker before process death.
+        # Reconstruct the reviewed observation using the retained old exclude
+        # bytes before asking Core to restore anything.
+        if journal["exclude_after_base64"] is None:
+            before_exclude = _read_optional_regular(
+                path / ".git/info/exclude", "Git exclude file",
+            )
+            if not _matches_original_unborn_observation(path, journal, before_exclude):
+                _fail("incomplete bootstrap changed before metadata recovery")
+        else:
+            before_exclude, after_exclude = _journal_exclude_bytes(journal)
+            if not _matches_original_unborn_observation(path, journal, before_exclude):
+                _fail("fresh Git target changed before metadata recovery")
+            git_bootstrap_host().restore_exclude(
+                path, before=before_exclude, after=after_exclude,
+            )
+            if observe_fresh_target(path)["id"] != journal["observation_id"]:
+                _fail("fresh Git target changed during metadata recovery")
+        _remove_journal(_journal_path(state), expected=journal_raw)
+        return _restored_result(path, plan_id)
     if path.exists() or path.is_symlink():
         _ordinary_directory(path, "bootstrap recovery target")
-        marker_path = path / ".git/workbench-fresh-project-v2.json"
-        if journal["phase"] == "preparing" and not marker_path.exists():
+        if journal["phase"] == "preparing" and not marker_present:
             entries = list(path.iterdir())
             if entries and not (
                 journal["created_git"] and len(entries) == 1 and entries[0].name == ".git"
@@ -705,13 +760,7 @@ def restore_fresh_target(
             if journal["created_target"]:
                 path.rmdir()
             _remove_journal(_journal_path(state), expected=journal_raw)
-            return {
-                "format": "workbench-blueprints-fresh-bootstrap-recovery-v2",
-                "outcome": "restored",
-                "plan_id": plan_id,
-                "schema_version": 2,
-                "target_uri": path.as_uri(),
-            }
+            return _restored_result(path, plan_id)
         marker = _load_json(marker_path, "fresh bootstrap marker")
         if marker != {
             "format": "workbench-blueprints-fresh-bootstrap-marker-v2",
@@ -730,26 +779,23 @@ def restore_fresh_target(
         if journal["created_git"]:
             _remove_tree_no_symlinks(path / ".git")
         else:
-            before_encoded = journal["exclude_before_base64"]
-            exclude_path = path / ".git/info/exclude"
-            if before_encoded is None:
-                exclude_path.unlink(missing_ok=True)
-            else:
-                _atomic_replace(
-                    exclude_path,
-                    base64.b64decode(before_encoded, validate=True),
-                )
-            marker_path.unlink()
+            before_exclude, after_exclude = _journal_exclude_bytes(journal)
+            if not _matches_original_unborn_observation(path, journal, before_exclude):
+                _fail("fresh Git target changed before metadata recovery")
+            git_bootstrap_host().restore_exclude(
+                path, before=before_exclude, after=after_exclude,
+            )
+            git_bootstrap_host().remove_marker(
+                path, expected=_marker_bytes(journal["observation_id"], plan_id),
+            )
+            if observe_fresh_target(path)["id"] != journal["observation_id"]:
+                _fail("fresh Git target changed during metadata recovery")
         if journal["created_target"]:
             path.rmdir()
+    elif not journal["created_target"]:
+        _fail("fresh bootstrap recovery target disappeared")
     _remove_journal(_journal_path(state), expected=journal_raw)
-    return {
-        "format": "workbench-blueprints-fresh-bootstrap-recovery-v2",
-        "outcome": "restored",
-        "plan_id": plan_id,
-        "schema_version": 2,
-        "target_uri": path.as_uri(),
-    }
+    return _restored_result(path, plan_id)
 
 
 def finalize_fresh_target(
@@ -766,10 +812,16 @@ def finalize_fresh_target(
     _state_store(state)
     journal, journal_raw = _load_bootstrap_journal(path, state, plan_id)
     marker_path = path / ".git/workbench-fresh-project-v2.json"
-    marker = _load_json(marker_path, "fresh bootstrap marker")
-    if marker.get("plan_id") != plan_id or marker.get("observation_id") != journal["observation_id"]:
-        _fail("fresh bootstrap marker identity changed")
-    marker_path.unlink()
+    marker_present = marker_path.exists() or marker_path.is_symlink()
+    if marker_present:
+        marker = _load_json(marker_path, "fresh bootstrap marker")
+        if marker != {
+            "format": "workbench-blueprints-fresh-bootstrap-marker-v2",
+            "observation_id": journal["observation_id"],
+            "plan_id": plan_id,
+            "schema_version": 2,
+        }:
+            _fail("fresh bootstrap marker identity changed")
     body = {
         "created_git": journal["created_git"],
         "created_target": journal["created_target"],
@@ -785,7 +837,10 @@ def finalize_fresh_target(
     receipts = state / "bootstrap-receipts"
     secure_private_path(receipts, directory=True)
     destination = _receipt_path(state, plan_id)
-    if destination.exists() or destination.is_symlink():
+    receipt_present = destination.exists() or destination.is_symlink()
+    if not marker_present and not receipt_present:
+        _fail("fresh bootstrap marker disappeared before receipt publication")
+    if receipt_present:
         retained, _ = _state_json(destination, "bootstrap receipt")
         if retained != receipt:
             _fail("retained bootstrap receipt identity changed")
@@ -794,6 +849,10 @@ def finalize_fresh_target(
             destination,
             application_transaction.canonical_json_bytes(receipt) + b"\n",
             byte_limit=_MAXIMUM_GIT_METADATA_BYTES,
+        )
+    if marker_present:
+        git_bootstrap_host().remove_marker(
+            path, expected=_marker_bytes(journal["observation_id"], plan_id),
         )
     _remove_journal(_journal_path(state), expected=journal_raw)
     return receipt
