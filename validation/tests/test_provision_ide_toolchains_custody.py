@@ -1,6 +1,7 @@
 """IDE archive acquisition uses Core without erasing historical inputs."""
 
 from hashlib import sha256
+import os
 from pathlib import Path
 import stat
 import sys
@@ -16,6 +17,7 @@ sys.path.insert(0, str(ROOT / "api/src"))
 sys.path.insert(0, str(ROOT / "core/src"))
 import provision_ide_toolchains as provision
 from core_run_custody import allocate_ide_toolchain_stage
+from workbench_core import prepared_directory_promotion as prepared
 from workbench_core.temporary_leases import CoreTemporaryLeases
 
 
@@ -198,6 +200,33 @@ class IdeExtractionPreservationTests(unittest.TestCase):
             download.assert_not_called()
         self.assertTrue(stage.path.is_dir())
         self.assertEqual(b"exact installed bytes", (destination / "bin").read_bytes())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX hard-exit injection")
+    def test_hard_exit_after_core_move_keeps_target_and_blocks_reuse(self) -> None:
+        original = prepared._rename_no_replace
+
+        def exit_after_move(*args: object, **kwargs: object) -> None:
+            original(*args, **kwargs)
+            os._exit(73)
+
+        child = os.fork()
+        if child == 0:
+            with patch.object(provision, "download", return_value=self.archive):
+                with patch.object(prepared, "_rename_no_replace", side_effect=exit_after_move):
+                    provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+            os._exit(74)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(73, os.waitstatus_to_exitcode(status))
+        destination = self.toolchains / self.entry["archive_root"]
+        self.assertEqual(b"exact installed bytes", (destination / "bin").read_bytes())
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.root / ".ide-toolchain-core", workspace=self.root,
+        )
+        self.assertEqual("active-or-abandoned", rows[0]["status"])
+        with patch.object(provision, "download") as download:
+            with self.assertRaisesRegex(provision.ProvisionFailure, "incomplete Core IDE extraction stage"):
+                provision.provision_entry(self.entry, suffix=".zip", extractor=self._extract)
+            download.assert_not_called()
 
     def test_redirected_destination_or_marker_refuses_without_replacing_tree(self) -> None:
         destination = self.toolchains / self.entry["archive_root"]
