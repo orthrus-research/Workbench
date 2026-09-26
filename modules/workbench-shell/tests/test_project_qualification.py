@@ -672,9 +672,9 @@ class ProjectQualificationTests(unittest.TestCase):
 
     def test_state_identity_observation_failures_are_not_treated_as_distinct(self) -> None:
         # This test does not create private retained state, so the platform
-        # default temp location is intentional: it provides an ordinary path
-        # outside the Workbench repository whose non-repository result can be
-        # tested without contradicting its real ancestor markers.
+        # default temp location is intentional. The non-repository probe
+        # supplies its own marker result because the host may have a marker
+        # in an ancestor of the temporary directory.
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             project = create_supersymmetry_project(root)
@@ -713,6 +713,9 @@ class ProjectQualificationTests(unittest.TestCase):
             with patch(
                 "workbench_shell.project_qualification.run_git_observation",
                 return_value=non_repository,
+            ), patch(
+                "workbench_shell.project_qualification._path_has_git_marker",
+                return_value=False,
             ):
                 self.assertIsNone(_git_directory(root, required=False))
 
