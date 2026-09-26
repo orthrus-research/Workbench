@@ -36,7 +36,7 @@ from workbench_api.host_filesystem import (
 )
 from workbench_api.processes import ProcessError, execute_logged_process
 from workbench_api.temporary_leases import (
-    TemporaryScratchError, packwiz_source_scratch,
+    TemporaryScratchError, TemporaryScratchReference, packwiz_source_scratch_reference,
 )
 from workbench_api.managed_trees import ManagedTreeError, managed_trees
 from workbench_core.artifact_store import DOWNLOAD_CHUNK_BYTES, sha256_file
@@ -79,7 +79,7 @@ class PackwizMaterializationError(ValueError):
 @contextmanager
 def _source_scratch(*, workspace: Path, state: Path, plan_digest: str):
     try:
-        with packwiz_source_scratch(
+        with packwiz_source_scratch_reference(
             workspace=workspace, state_root=state, plan_digest=plan_digest,
         ) as path:
             yield path
@@ -103,10 +103,13 @@ def _packwiz_tree_host(workspace: Path):
 
 def _retain_v2_dependencies(
     tree_host, *, receipt: Mapping[str, Any], receipt_bytes: bytes,
-    staged_source: Path, refresh_log: Path, installer_log: Path,
+    staged_source: Path, source_scratch: TemporaryScratchReference,
+    refresh_log: Path, installer_log: Path,
 ) -> str:
     """Preserve the exact tool logs and immutable V2 input identity evidence."""
 
+    if staged_source != source_scratch.path / "source":
+        raise PackwizMaterializationError("Packwiz V2 source scratch binding changed")
     try:
         log_rows = {}
         log_references = []
@@ -125,11 +128,12 @@ def _retain_v2_dependencies(
             }
             log_references.append(reference.resource_id)
         witness = {
-            "format": "workbench-packwiz-v2-dependencies-v1",
-            "schema_version": 1,
+            "format": "workbench-packwiz-v2-dependencies-v2",
+            "schema_version": 2,
             "materialization_id": receipt["materialization_id"],
             "receipt_sha256": sha256(receipt_bytes).hexdigest(),
             "source_scratch_uri": staged_source.as_uri(),
+            "source_scratch_lease_id": source_scratch.lease_id,
             "source_snapshot": receipt["source_snapshot"],
             "refreshed_pack": receipt["refreshed_pack"],
             "bootstrap_source": receipt["bootstrap_source"],
@@ -1873,7 +1877,7 @@ def materialize_packwiz_workspace_v2(
         "packwiz-materialization-v2",
     )
     with _source_scratch(workspace=workspace, state=state, plan_digest=plan_digest) as staging:
-        staged_source = staging / "source"
+        staged_source = staging.path / "source"
         source, exclusions = copy_tracked_workspace(
             workspace,
             staged_source,
@@ -2059,7 +2063,7 @@ def materialize_packwiz_workspace_v2(
                 staged_payload,
                 decisions,
             )
-            launcher_sentinel = staging / "launcher-sentinel"
+            launcher_sentinel = staging.path / "launcher-sentinel"
             launcher_sentinel.mkdir()
             installer_log = evidence_root / "packwiz-installer.log"
             _run_logged(
@@ -2132,6 +2136,7 @@ def materialize_packwiz_workspace_v2(
                     receipt=receipt,
                     receipt_bytes=expected_receipt_bytes,
                     staged_source=staged_source,
+                    source_scratch=staging,
                     refresh_log=refresh_log,
                     installer_log=installer_log,
                 )
@@ -2155,7 +2160,7 @@ def materialize_packwiz_workspace_v2(
                     reference = tree_stage.publish(
                         validate=validate_staged_tree,
                         domain_id=receipt["materialization_id"],
-                        references=(dependency_reference,),
+                        references=(dependency_reference, staging.lease_id),
                         inventory_policy="posix-exact-v1",
                     )
                 except (ManagedTreeError, OSError, ValueError) as exc:

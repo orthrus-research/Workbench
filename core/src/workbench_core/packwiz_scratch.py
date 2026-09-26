@@ -8,7 +8,7 @@ import re
 from typing import Iterator
 from uuid import uuid4
 
-from workbench_api.temporary_leases import TemporaryScratchError
+from workbench_api.temporary_leases import TemporaryScratchError, TemporaryScratchReference
 
 from .temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
@@ -29,6 +29,15 @@ class CorePackwizScratch:
     def packwiz_source(
         self, *, workspace: Path, state_root: Path, plan_digest: str,
     ) -> Iterator[Path]:
+        with self.packwiz_source_reference(
+            workspace=workspace, state_root=state_root, plan_digest=plan_digest,
+        ) as reference:
+            yield reference.path
+
+    @contextmanager
+    def packwiz_source_reference(
+        self, *, workspace: Path, state_root: Path, plan_digest: str,
+    ) -> Iterator[TemporaryScratchReference]:
         if (not isinstance(workspace, Path) or not workspace.is_absolute()
                 or not isinstance(state_root, Path) or not state_root.is_absolute()
                 or not isinstance(plan_digest, str) or _DIGEST.fullmatch(plan_digest) is None):
@@ -44,7 +53,7 @@ class CorePackwizScratch:
             )
             with leases.execution(reference):
                 try:
-                    yield reference.path
+                    yield TemporaryScratchReference(reference.lease_id, reference.path)
                 except BaseException as exc:
                     try:
                         leases.retain(reference, outcome="failed")

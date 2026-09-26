@@ -36,7 +36,10 @@ EXACT_INTENT_KIND = "workbench-tree-intent-v3"
 COMMIT_KIND = "workbench-tree-commit-v1"
 ABORT_KIND = "workbench-tree-abort-v1"
 _TREE_ID = re.compile(r"workbench-tree-v1:([0-9a-f]{32})\Z")
-_REFERENCE = re.compile(r"(?:workbench-(?:resource|tree)-v1:[0-9a-f]{32}|workbench-check-v1:[0-9a-f]{64})\Z")
+_REFERENCE = re.compile(
+    r"(?:workbench-(?:resource|tree|temporary-lease)-v1:[0-9a-f]{32}"
+    r"|workbench-check-v1:[0-9a-f]{64})\Z"
+)
 _OWNER = re.compile(r"[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*\Z")
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 _ATLAS_GRAPH_ID = re.compile(r"workbench-atlas-graph-set-v[23]:sha256:[0-9a-f]{64}\Z")

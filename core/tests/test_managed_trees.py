@@ -22,6 +22,7 @@ from workbench_core.storage.tree_catalog import (
     ABORT_KIND, COMMIT_KIND, DERIVED_INTENT_KIND, INTENT_KIND, TreeCatalog,
 )
 from workbench_core.storage import manager
+from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
 
 class ManagedTreeTests(unittest.TestCase):
@@ -51,6 +52,34 @@ class ManagedTreeTests(unittest.TestCase):
                 derived_members=derived,
             )
         return result
+
+    def test_typed_temporary_lease_reference_blocks_disposal_and_reopens(self) -> None:
+        leases = CoreTemporaryLeases(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"source": self.home / "scratch"}, owner_id="atlas",
+        )
+        source = leases.allocate("source", "copied-source")
+        (source.path / "input.txt").write_bytes(b"input")
+        with leases.execution(source):
+            tree = self._publish(references=(source.lease_id,))
+            leases.retain(source, outcome="completed")
+        self.assertEqual((source.lease_id,), self.host.reconcile(tree.tree_id).references)
+        catalog = ResourceCatalog(self.config).inventory(workspace=self.workspace)
+        self.assertEqual((source.lease_id,), tuple(catalog["trees"][0]["references"]))
+        with self.assertRaises(TemporaryLeaseError) as caught:
+            leases.reconcile(source.lease_id, drained=lambda: True)
+        self.assertEqual("temporary.referenced", caught.exception.code)
+        self.assertTrue(source.path.is_dir())
+
+    def test_typed_temporary_lease_reference_rejects_other_owner(self) -> None:
+        leases = CoreTemporaryLeases(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"source": self.home / "scratch"}, owner_id="validation",
+        )
+        source = leases.allocate("source", "foreign-source")
+        with leases.execution(source):
+            with self.assertRaisesRegex(ManagedTreeError, "referenced temporary lease"):
+                self._publish(references=(source.lease_id,))
 
     @staticmethod
     def _atlas_manifest(graph_set_id: str, *, index: str, scope: str = "fixture") -> bytes:

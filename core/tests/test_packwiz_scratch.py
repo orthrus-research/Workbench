@@ -9,11 +9,12 @@ from unittest.mock import patch
 
 from workbench_api import Capability, ExecutionContext, Module
 from workbench_api.temporary_leases import (
-    TemporaryScratchError, packwiz_source_scratch,
+    TemporaryScratchError, packwiz_source_scratch, packwiz_source_scratch_reference,
 )
 from workbench_core.host_services import direct_packwiz_scratch_scope
 from workbench_core.modules import InstalledModule, dispatch
 from workbench_core.storage.registered import ResourceCatalog
+from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
 
 PLAN = "a" * 64
@@ -58,6 +59,22 @@ class PackwizScratchTests(unittest.TestCase):
         self.assertEqual("failed", retained["outcome"])
         self.assertEqual("process-absence-unproven", retained["reason"])
         self.assertEqual(b"partial", (source / "source.txt").read_bytes())
+
+    def test_packwiz_source_remains_non_disposable_after_restart(self) -> None:
+        with direct_packwiz_scratch_scope(configuration_home=self.config):
+            with packwiz_source_scratch_reference(
+                workspace=self.workspace, state_root=self.state, plan_digest=PLAN,
+            ) as source:
+                (source.path / "source.txt").write_bytes(b"retained")
+        restarted = CoreTemporaryLeases(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"packwiz-v2": self.state / "staging/packwiz-v2"},
+            owner_id="workbench-shell",
+        )
+        with self.assertRaises(TemporaryLeaseError) as caught:
+            restarted.reconcile(source.lease_id, drained=lambda: True)
+        self.assertEqual("temporary.policy", caught.exception.code)
+        self.assertEqual(b"retained", (source.path / "source.txt").read_bytes())
 
     def test_wsl_like_private_mode_failure_refuses_before_allocation(self) -> None:
         with direct_packwiz_scratch_scope(configuration_home=self.config):

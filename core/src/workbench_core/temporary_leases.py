@@ -199,6 +199,58 @@ class CoreTemporaryLeases:
             path=Path(reservation["path"]),
         )
 
+    @classmethod
+    @contextmanager
+    def reference_lease(
+        cls, configuration_home: Path, lease_id: str, *, workspace: Path,
+        owner_id: str, role: str | None = None, path: Path | None = None,
+    ) -> Iterator[TemporaryLeaseReference]:
+        """Hold and reopen one typed dependency on a live scratch lease.
+
+        Its active execution already holds the lock in this context. A later
+        reader takes that same lock, excluding disposal while it checks the
+        sealed reservation, activation and physical marker.
+        """
+
+        nonce = _nonce(lease_id)
+        reservation_path = (
+            ResourceCatalog(configuration_home).root / "temporary-leases"
+            / "reservations" / f"{nonce}.json"
+        )
+        try:
+            raw = json.loads(read_private_single_link_bytes(
+                reservation_path, byte_limit=_RECORD_LIMIT,
+            ))
+            if (not isinstance(raw, dict) or not isinstance(raw.get("role"), str)
+                    or not isinstance(raw.get("store_root"), str)):
+                raise ValueError("temporary lease reservation is invalid")
+            host = cls(
+                workspace=workspace, configuration_home=configuration_home,
+                locations={raw["role"]: Path(raw["store_root"])}, owner_id=owner_id,
+            )
+            def reopen() -> TemporaryLeaseReference:
+                reservation = host._reservation(lease_id)
+                if (role is not None and reservation["role"] != role
+                        or path is not None and Path(reservation["path"]) != path
+                        or host._path("disposal-intents", nonce).exists()
+                        or host._disposed(lease_id)):
+                    raise TemporaryLeaseError(
+                        "temporary.reference", "referenced temporary lease is unavailable or changed",
+                    )
+                return host.open(lease_id)
+
+            if lease_id in _active.get():
+                yield reopen()
+            else:
+                with private_record_lock(host._directory("leases") / f"{nonce}.lock"):
+                    yield reopen()
+        except (OSError, ValueError, TypeError, KeyError, DurableRecordError) as exc:
+            if isinstance(exc, TemporaryLeaseError):
+                raise
+            raise TemporaryLeaseError(
+                "temporary.reference", "referenced temporary lease is unavailable or changed",
+            ) from exc
+
     def _disposed(self, lease_id: str) -> bool:
         nonce = _nonce(lease_id)
         if not self._path("disposals", nonce).exists():
@@ -594,12 +646,30 @@ class CoreTemporaryLeases:
 
     def _dispose_locked(self, reference: TemporaryLeaseReference,
                         drained: Callable[[], bool]) -> None:
-        if not callable(drained) or drained() is not True:
-            raise TemporaryLeaseError("temporary.active", "temporary lease process tree is not confirmed drained")
         nonce = _nonce(reference.lease_id)
         if self._disposed(reference.lease_id):
             return
         reservation = self._reservation(reference.lease_id)
+        if reservation["role"] == "packwiz-v2":
+            raise TemporaryLeaseError(
+                "temporary.policy",
+                "Packwiz source scratch remains retained until its dependency and process absence policy is complete",
+            )
+        if not callable(drained) or drained() is not True:
+            raise TemporaryLeaseError("temporary.active", "temporary lease process tree is not confirmed drained")
+        try:
+            for tree in ResourceCatalog(self.configuration_home).trees.inventory():
+                if reference.lease_id in tree["references"]:
+                    raise TemporaryLeaseError(
+                        "temporary.referenced",
+                        "temporary lease is retained by a managed tree",
+                    )
+        except (OSError, ValueError) as exc:
+            if isinstance(exc, TemporaryLeaseError):
+                raise
+            raise TemporaryLeaseError(
+                "temporary.unsafe", "managed tree dependencies cannot be inspected",
+            ) from exc
         activation = self._activation(reference.lease_id)
         target = Path(reservation["path"])
         parent = check_storage.ordinary(target.parent, directory=True)

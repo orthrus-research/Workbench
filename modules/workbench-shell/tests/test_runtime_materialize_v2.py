@@ -634,10 +634,10 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
             self.assertEqual("committed", trees[0]["status"])
             self.assertEqual(str(target), trees[0]["path"])
             self.assertGreater(trees[0]["member_count"], 1)
-            self.assertEqual(1, len(trees[0]["references"]))
+            self.assertEqual(2, len(trees[0]["references"]))
             witness = json.loads(catalog.read_bytes(trees[0]["references"][0]))
             self.assertEqual(
-                "workbench-packwiz-v2-dependencies-v1", witness["format"],
+                "workbench-packwiz-v2-dependencies-v2", witness["format"],
             )
             self.assertEqual(receipt["materialization_id"], witness["materialization_id"])
             self.assertEqual(
@@ -649,9 +649,10 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
             self.assertEqual(receipt["tools"], witness["tools"])
             self.assertEqual(receipt["payload"], witness["payload"])
             source_lease = _local_path(witness["source_scratch_uri"]).parent
+            self.assertEqual(witness["source_scratch_lease_id"], trees[0]["references"][1])
             self.assertEqual(
-                [(str(source_lease), "retained-unproven")],
-                [(row["path"], row["status"]) for row in catalog.inventory(
+                [(witness["source_scratch_lease_id"], str(source_lease), "retained-unproven")],
+                [(row["lease_id"], row["path"], row["status"]) for row in catalog.inventory(
                     workspace=Path(case["workspace"]),
                 )["temporary_leases"]],
             )
@@ -784,6 +785,31 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                 "earlier Core Packwiz V2 result requires review",
             ):
                 _materialize(case)
+
+    def test_changed_retained_source_lease_blocks_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            case = _case(Path(temporary))
+            created = _materialize(case)
+            catalog = ResourceCatalog(Path(case["root"]) / "config")
+            tree = catalog.inventory(workspace=Path(case["workspace"]))["trees"][0]
+            witness = json.loads(catalog.read_bytes(tree["references"][0]))
+            self.assertEqual(witness["source_scratch_lease_id"], tree["references"][1])
+            retained = (
+                _local_path(witness["source_scratch_uri"]).parent
+                / ".workbench-temporary-retained.json"
+            )
+            original = retained.read_bytes()
+            retained.write_bytes(b"{}\n")
+            try:
+                with self.assertRaisesRegex(
+                    PackwizMaterializationError,
+                    "earlier Core Packwiz V2 result requires review",
+                ):
+                    _materialize(case)
+            finally:
+                retained.write_bytes(original)
+            target = _local_path(created["receipt"]["target"]["fixture_root_uri"])
+            self.assertTrue(target.is_dir())
 
     def test_reuse_rejects_decision_pack_tool_and_payload_drift(self) -> None:
         for drift in ("decision", "pack", "tool", "payload"):

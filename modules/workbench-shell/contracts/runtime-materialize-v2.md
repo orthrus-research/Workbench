@@ -97,9 +97,13 @@ On Linux, Core inventories the complete fixture tree before publishing it at
 the existing target path. The catalog binds that tree to the V2
 `materialization_id`; reuse first reopens or reconciles the exact Core record.
 Core retains exact refresh and Installer log snapshots and a dependency record
-linked from that tree. The record binds the receipt bytes and names the source
-scratch, bootstrap, tools, payload, and retained logs. The historical V2
-receipt and log paths stay the same.
+linked from that tree. The tree also references the exact Core source scratch
+lease. The record binds the receipt bytes, source lease ID and path, bootstrap,
+tools, payload, and retained logs. Core verifies that the referenced scratch
+lease still belongs to this workspace and owner before publication or reuse;
+that retained source cannot be disposed under the current policy. The tool and
+bootstrap source paths remain identity evidence pending their own custody
+links. The historical V2 receipt and log paths stay the same.
 An interrupted publication with a complete Core intent can be reconciled. A
 target without a Core record, or a failed or ambiguous prepared stage, requires
 review before another materialization. The Windows compatibility route retains

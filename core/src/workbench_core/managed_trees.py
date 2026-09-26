@@ -38,6 +38,7 @@ _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _FILE_ID = re.compile(r"workbench-resource-v1:[0-9a-f]{32}\Z")
 _TREE_ID = re.compile(r"workbench-tree-v1:[0-9a-f]{32}\Z")
 _CHECK_ID = re.compile(r"workbench-check-v1:[0-9a-f]{64}\Z")
+_TEMP_ID = re.compile(r"workbench-temporary-lease-v1:[0-9a-f]{32}\Z")
 
 
 def _now() -> str:
@@ -370,10 +371,10 @@ class CoreManagedTrees:
     def _references(self, references: tuple[str, ...]) -> Iterator[None]:
         if (not isinstance(references, tuple) or len(references) > 128
                 or any(not isinstance(value, str) or not (_FILE_ID.fullmatch(value) or _TREE_ID.fullmatch(value)
-                                                       or _CHECK_ID.fullmatch(value))
+                                                       or _CHECK_ID.fullmatch(value) or _TEMP_ID.fullmatch(value))
                        for value in references)
                 or len(set(references)) != len(references)):
-            raise ManagedTreeError("tree.references", "managed tree references must be unique Core resources")
+            raise ManagedTreeError("tree.references", "managed tree references must be unique Core dependencies")
         with ExitStack() as stack:
             held_resources: set[str] = set()
 
@@ -403,6 +404,18 @@ class CoreManagedTrees:
                     if intent["workspace"] != str(self.workspace):
                         raise ManagedTreeError("tree.references", "referenced tree belongs to another workspace")
                     self.catalog.trees._verify(intent)
+                elif _TEMP_ID.fullmatch(reference):
+                    from .temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
+
+                    try:
+                        stack.enter_context(CoreTemporaryLeases.reference_lease(
+                            self.configuration_home, reference,
+                            workspace=self.workspace, owner_id=self.owner_id,
+                        ))
+                    except TemporaryLeaseError as exc:
+                        raise ManagedTreeError(
+                            "tree.references", "referenced temporary lease is unavailable or changed",
+                        ) from exc
                 else:
                     stack.enter_context(check_lifecycle.lease(self.workspace))
                     try:

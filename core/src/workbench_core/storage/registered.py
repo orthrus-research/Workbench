@@ -918,6 +918,20 @@ class ResourceCatalog:
                         raise DurableResourceError(
                             "resource.changed", "referenced managed tree belongs to another workspace",
                         )
+                elif reference.startswith("workbench-temporary-lease-v1:"):
+                    from ..temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
+
+                    try:
+                        owner_id = str(tree_catalog.intent(tree_id)["owner_id"])
+                        with CoreTemporaryLeases.reference_lease(
+                            self.configuration_home, reference,
+                            workspace=Path(owner_workspace), owner_id=owner_id,
+                        ):
+                            pass
+                    except (ManagedTreeError, TemporaryLeaseError, OSError, ValueError) as exc:
+                        raise DurableResourceError(
+                            "resource.changed", "referenced temporary lease is unavailable or changed",
+                        ) from exc
                 else:
                     check_edges.setdefault(owner_workspace, set()).add((tree_id, reference))
 
