@@ -22,6 +22,7 @@ from workbench_api import ModuleError
 from workbench_api.state_paths import default_runtime_state_root
 from workbench_api.profiles import profile_scope, profile_status
 from .modules import discover
+from .package_operations import PackageOperation, PackageOperationStore
 from .dependencies import dependency_errors, reverse_dependency_errors
 from .package_ownership import validate_wheel_ownership
 from packaging.specifiers import SpecifierSet
@@ -173,7 +174,8 @@ def _wheel(path: Path) -> WheelCandidate:
     return WheelCandidate(selected, name, str(version), module_ids, tuple(message.get_all("Requires-Dist", [])), profile_ids)
 
 
-def _install(candidate: WheelCandidate, *, update: bool, state: Path) -> int:
+def _install(candidate: WheelCandidate, *, update: bool, state: Path,
+             operation: PackageOperation | None = None) -> int:
     failures = dependency_errors(candidate.requirements, replacements={candidate.distribution: candidate.version})
     failures += reverse_dependency_errors(candidate.distribution, candidate.version)
     for group, ids in (("modules", candidate.modules), ("profiles", candidate.profiles)):
@@ -184,6 +186,8 @@ def _install(candidate: WheelCandidate, *, update: bool, state: Path) -> int:
         raise ModuleError("package preflight failed: " + "; ".join(failures))
     validate_wheel_ownership(candidate.path, candidate.distribution)
     command = ["install", "--no-index", "--no-deps", *(["--upgrade"] if update else []), str(candidate.path)]
+    if operation is not None:
+        operation.before_external()
     result = _pip(command)
     if result:
         return result
@@ -230,17 +234,53 @@ def main(argv, *, root: Path, kind: str = "modules") -> int:
     for name in ("install", "update"):
         command = commands.add_parser(name)
         command.add_argument("wheel", type=Path)
+    operations = commands.add_parser("operations")
+    operations.add_argument("operation_id", nargs="?")
+    operations.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    if args.action == "operations":
+        store = PackageOperationStore.current()
+        result = (
+            store.inspect(args.operation_id)
+            if args.operation_id is not None else store.list(kind=kind)
+        )
+        if args.operation_id is not None and result["kind"] != kind:
+            raise ModuleError("package operation belongs to another component kind")
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     package_change = args.action in {"install", "update", "remove"}
     if package_change and sys.prefix == sys.base_prefix:
         raise ModuleError("package changes require a dedicated Workbench virtual environment")
     from .package_guard import PackageActivity, package_change as mutation_guard
     # Enable/disable affect running code just as installation does.
     with (PackageActivity() if args.action == "list" else mutation_guard()):
+        if package_change:
+            target = (
+                str(args.wheel.expanduser().absolute())
+                if args.action in {"install", "update"} else args.component_id
+            )
+            operation = PackageOperationStore.current().begin(
+                kind=kind, action=args.action, target=target,
+            )
+            try:
+                result = _execute(args, root=root, kind=kind, operation=operation)
+            except BaseException as exc:
+                operation.finish(
+                    "incomplete" if operation.external_started else "rejected",
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+                raise
+            operation.finish(
+                "completed" if result == 0 else "incomplete",
+                result_code=result,
+                error=None if result == 0 else f"package command exited with code {result}",
+            )
+            return result
         return _execute(args, root=root, kind=kind)
 
 
-def _execute(args, *, root: Path, kind: str = "modules") -> int:
+def _execute(args, *, root: Path, kind: str = "modules",
+             operation: PackageOperation | None = None) -> int:
     state = default_runtime_state_root(root)
     # Do not import the old plugin into this process before replacing its wheel.
     modules = () if args.action in {"install", "update"} else (
@@ -272,13 +312,20 @@ def _execute(args, *, root: Path, kind: str = "modules") -> int:
         if failures:
             raise ModuleError("package removal would break installed consumers: " + "; ".join(failures))
         command = ["uninstall", "--yes", distribution]
+        if operation is not None:
+            operation.bind_distribution(distribution)
     else:
         with _snapshot_wheel(args.wheel) as wheel:
             if not getattr(wheel, kind):
                 raise ModuleError(f"selected wheel does not declare {kind}")
-            return _install(wheel, update=args.action == "update", state=state)
+            if operation is not None:
+                operation.bind_distribution(wheel.distribution, wheel=wheel.path)
+            return _install(wheel, update=args.action == "update", state=state,
+                            operation=operation)
     # pip is optional so a Core-only installation has no installer dependency.
     # Wheel installation executes trusted local code on subsequent discovery.
+    if operation is not None:
+        operation.before_external()
     result = _pip(command)
     if result == 0:
         print("Package change complete. Workspace data and retained resources were not removed.")
