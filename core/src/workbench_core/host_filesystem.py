@@ -501,10 +501,30 @@ def fsync_directory(path: Path) -> None:
         kernel32.CloseHandle(handle)
 
 
+def promote_prepared_directory(payload: Path, target: Path) -> Path:
+    """Expose Core's pinned no-replace directory move to API consumers."""
+
+    # The promotion module uses this module's private-path guard. Import only
+    # at call time to keep that dependency acyclic.
+    from .prepared_directory_promotion import promote_prepared_directory as promote
+
+    return promote(payload, target)
+
+
+def count_prepared_directory_stages(target: Path, *, stage_prefix: str) -> int:
+    """Expose Core's private prepared-stage inventory to API consumers."""
+
+    from .prepared_directory_promotion import count_prepared_directory_stages as count
+
+    return count(target, stage_prefix=stage_prefix)
+
+
 __all__ = [
     "HostFilesystemError",
+    "count_prepared_directory_stages",
     "fsync_directory",
     "private_path",
+    "promote_prepared_directory",
     "secure_private_endpoint",
     "secure_private_path",
 ]

@@ -29,6 +29,47 @@ def _identity(info: os.stat_result) -> tuple[int, int]:
     return info.st_dev, info.st_ino
 
 
+def count_prepared_directory_stages(target: Path, *, stage_prefix: str) -> int:
+    """Count private sibling stages without adopting or removing their contents."""
+
+    if (
+        not isinstance(target, Path) or not target.is_absolute()
+        or ".." in target.parts or target.name in {"", ".", ".."}
+        or not isinstance(stage_prefix, str) or not stage_prefix.startswith(".")
+        or len(stage_prefix) > 128 or any(char in stage_prefix for char in "/\\:\0")
+    ):
+        raise PreparedDirectoryError("directory.policy", "prepared stage inventory path or prefix is invalid")
+    if os.name != "posix":
+        raise PreparedDirectoryError("directory.filesystem", "pinned prepared-stage inventory requires POSIX")
+
+    parent_fd = -1
+    try:
+        parent_fd = pinned_directory(target.parent, create=False)
+        parent_info = os.fstat(parent_fd)
+        if (parent_info.st_mode & 0o022
+                or hasattr(os, "geteuid") and parent_info.st_uid != os.geteuid()):
+            raise PreparedDirectoryError("directory.unsafe", "prepared stage parent lost its selected custody")
+        count = 0
+        for name in os.listdir(parent_fd):
+            if not name.startswith(stage_prefix):
+                continue
+            info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if (not stat.S_ISDIR(info.st_mode)
+                    or info.st_mode & 0o077
+                    or hasattr(os, "geteuid") and info.st_uid != os.geteuid()
+                    or not private_path(target.parent / name, directory=True)):
+                raise PreparedDirectoryError("directory.unsafe", "prepared stage is redirected or not owner-private")
+            count += 1
+        return count
+    except PreparedDirectoryError:
+        raise
+    except OSError as exc:
+        raise PreparedDirectoryError("directory.unavailable", "cannot inventory prepared directory stages") from exc
+    finally:
+        if parent_fd >= 0:
+            os.close(parent_fd)
+
+
 def promote_prepared_directory(
     payload: Path, target: Path, *, marker_name: str | None = None,
     marker_bytes: bytes | None = None,
@@ -140,4 +181,4 @@ def promote_prepared_directory(
                 os.close(descriptor)
 
 
-__all__ = ["PreparedDirectoryError", "promote_prepared_directory"]
+__all__ = ["PreparedDirectoryError", "count_prepared_directory_stages", "promote_prepared_directory"]

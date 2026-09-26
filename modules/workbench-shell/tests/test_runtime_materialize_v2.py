@@ -28,6 +28,7 @@ from workbench_shell import (  # noqa: E402
     materialize_packwiz_workspace_v2,
     verify_packwiz_materialization_receipt_identity,
 )
+from workbench_core.host_services import install_local_host_services  # noqa: E402
 
 
 JAVA_IDENTITY = {
@@ -503,6 +504,10 @@ def _materialize(
 
 
 class RuntimeMaterializeV2Test(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        install_local_host_services()
+
     def test_seed_root_symlink_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             case = _case(Path(temporary))
@@ -749,7 +754,10 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                         Path(case["root"])
                         / "state/fixtures/packwiz-v2"
                     )
-                    self.assertEqual(list(variants.iterdir()), [])
+                    prepared = list(variants.iterdir())
+                    self.assertEqual(len(prepared), 1)
+                    self.assertTrue(prepared[0].name.startswith("."))
+                    self.assertTrue((prepared[0] / "variant/instance/.minecraft/packwiz.json").is_file())
                     self.assertEqual(
                         _tree_bytes(bootstrap_fixture),
                         bootstrap_before,
@@ -774,7 +782,19 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                 _materialize(case)
 
             variants = Path(case["root"]) / "state/fixtures/packwiz-v2"
-            self.assertEqual(list(variants.iterdir()), [])
+            prepared = list(variants.iterdir())
+            self.assertEqual(len(prepared), 1)
+            self.assertTrue(prepared[0].name.startswith("."))
+            self.assertTrue((prepared[0] / "variant/instance/.minecraft/packwiz.json").is_file())
+            (Path(case["java"]).with_name("installer-mode")).write_text(
+                "normal\n", encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                PackwizMaterializationError,
+                "earlier Packwiz V2 prepared stage requires review",
+            ):
+                _materialize(case)
+            self.assertEqual(prepared, list(variants.iterdir()))
             staging = Path(case["root"]) / "state/staging/packwiz-v2"
             self.assertEqual(list(staging.iterdir()), [])
             self.assertEqual(

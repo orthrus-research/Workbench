@@ -46,6 +46,8 @@ class HostFilesystem(Protocol):
         journal_byte_limit: int | None = None,
     ) -> int: ...
     def inspect_private_journal(self, path: Path, *, byte_limit: int) -> dict: ...
+    def promote_prepared_directory(self, payload: Path, target: Path) -> Path: ...
+    def count_prepared_directory_stages(self, target: Path, *, stage_prefix: str) -> int: ...
 
 
 _host: HostFilesystem | None = None
@@ -248,3 +250,26 @@ def inspect_private_journal(path: Path, *, byte_limit: int) -> dict:
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide private journals")
     return operation(path, byte_limit=byte_limit)
+
+
+def promote_prepared_directory(payload: Path, target: Path) -> Path:
+    """Ask Core to move one prepared directory into an absent adjacent target.
+
+    The owner validates its members and historical receipt separately. Core
+    pins the paths and performs the physical no-replace move. This host port
+    does not register the result as a managed tree.
+    """
+
+    operation = getattr(_filesystem(), "promote_prepared_directory", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide prepared directory promotion")
+    return operation(payload, target)
+
+
+def count_prepared_directory_stages(target: Path, *, stage_prefix: str) -> int:
+    """Inspect matching private stages before starting a new publication."""
+
+    operation = getattr(_filesystem(), "count_prepared_directory_stages", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide prepared stage inventory")
+    return operation(target, stage_prefix=stage_prefix)

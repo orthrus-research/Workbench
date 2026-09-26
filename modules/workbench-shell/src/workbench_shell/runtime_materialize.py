@@ -5,8 +5,6 @@ from __future__ import annotations
 from workbench_project_intelligence.working_tree import copy_tracked_workspace
 
 from hashlib import sha256
-import ctypes
-import errno
 import hashlib
 import json
 import os
@@ -29,6 +27,10 @@ from workbench_project_intelligence.git_observation import (
 
 from workbench_api.verified_artifacts import (
     VerifiedArtifactError, acquire_verified_artifact,
+)
+from workbench_api.host_filesystem import (
+    HostFilesystemError, count_prepared_directory_stages,
+    promote_prepared_directory,
 )
 from workbench_core.artifact_store import DOWNLOAD_CHUNK_BYTES, sha256_file
 from workbench_core.configuration import (
@@ -912,7 +914,7 @@ def _copy_launcher_base(source: Path, destination: Path) -> dict[str, Any]:
 
 
 def _rename_directory_no_replace(source: Path, destination: Path) -> None:
-    if os.name == "nt":  # pragma: no cover - host dependent
+    if os.name == "nt":  # pragma: no cover - retained Windows compatibility path
         try:
             source.rename(destination)
             return
@@ -920,80 +922,13 @@ def _rename_directory_no_replace(source: Path, destination: Path) -> None:
             raise PackwizMaterializationError(
                 "Packwiz V2 target appeared during publication"
             ) from exc
-    if os.name != "posix":  # pragma: no cover - host dependent
+    try:
+        promote_prepared_directory(source, destination)
+    except (HostFilesystemError, ValueError) as exc:
         raise PackwizMaterializationError(
-            "atomic Packwiz V2 publication is unavailable on this host"
-        )
-    libc = ctypes.CDLL(None, use_errno=True)
-    renameat2 = getattr(libc, "renameat2", None)
-    if renameat2 is None:  # pragma: no cover - platform dependent
-        raise PackwizMaterializationError(
-            "atomic Packwiz V2 publication requires renameat2"
-        )
-    renameat2.argtypes = (
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_uint,
-    )
-    renameat2.restype = ctypes.c_int
-    if renameat2(
-        -100,
-        os.fsencode(source),
-        -100,
-        os.fsencode(destination),
-        1,
-    ) != 0:
-        error_number = ctypes.get_errno()
-        if error_number in {errno.EEXIST, errno.ENOTEMPTY}:
-            raise PackwizMaterializationError(
-                "Packwiz V2 target appeared during publication"
-            )
-        if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
-            mover = shutil.which("mv")
-            if mover is None:  # pragma: no cover - minimal host image
-                raise PackwizMaterializationError(
-                    "atomic Packwiz V2 publication is unavailable on this "
-                    "filesystem"
-                )
-            try:
-                completed = subprocess.run(
-                    [
-                        mover,
-                        "-T",
-                        "--no-clobber",
-                        "--",
-                        str(source),
-                        str(destination),
-                    ],
-                    check=False,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    timeout=30.0,
-                )
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                raise PackwizMaterializationError(
-                    "cannot execute no-replace Packwiz V2 publication"
-                ) from exc
-            if source.exists() or source.is_symlink():
-                raise PackwizMaterializationError(
-                    "Packwiz V2 target appeared during publication"
-                )
-            if (
-                completed.returncode
-                or not destination.is_dir()
-                or destination.is_symlink()
-            ):
-                raise PackwizMaterializationError(
-                    "cannot atomically publish the Packwiz V2 target"
-                )
-            return
-        raise PackwizMaterializationError(
-            "cannot atomically publish the Packwiz V2 target: "
-            + os.strerror(error_number)
-        )
+            "cannot atomically publish the Packwiz V2 target through Core: "
+            + str(exc)
+        ) from exc
 
 
 def _ensure_state_subdirectory(state_root: Path, *parts: str) -> Path:
@@ -2000,7 +1935,28 @@ def materialize_packwiz_workspace_v2(
                 "existing Packwiz V2 target is incomplete or unrecorded"
             )
 
-        staged_fixture = staging / "variant"
+        if os.name == "posix":
+            try:
+                interrupted_stages = count_prepared_directory_stages(
+                    fixture_root, stage_prefix=f".{plan_digest[:16]}.",
+                )
+            except (HostFilesystemError, ValueError) as exc:
+                raise PackwizMaterializationError(
+                    "cannot inspect earlier Packwiz V2 prepared stages through Core"
+                ) from exc
+            if interrupted_stages:
+                raise PackwizMaterializationError(
+                    "earlier Packwiz V2 prepared stage requires review"
+                )
+
+        # The native process still uses its separate source scratch. The
+        # prepared result is adjacent to the historical fixture target so
+        # Core can pin both parents for its no-replace move. An interrupted
+        # result stage stays visible for owner recovery.
+        prepared_stage = Path(tempfile.mkdtemp(
+            prefix=f".{plan_digest[:16]}.", dir=fixture_parent,
+        ))
+        staged_fixture = prepared_stage / "variant"
         staged_instance = staged_fixture / "instance"
         launcher_tree = _copy_launcher_base(base_instance, staged_instance)
         if launcher_tree != bootstrap_source["launcher_tree"]:
@@ -2091,11 +2047,28 @@ def materialize_packwiz_workspace_v2(
         )
         _write_receipt(staged_fixture / RECEIPT_V2_PATH, receipt)
         _rename_directory_no_replace(staged_fixture, fixture_root)
+        if _launcher_tree_identity(instance_root) != bootstrap_source["launcher_tree"]:
+            raise PackwizMaterializationError(
+                "published Packwiz V2 launcher base changed"
+            )
+        reopened = _reuse_existing_v2(
+            plan,
+            variant_id=variant_id,
+            receipt_path=receipt_path,
+            fixture_root=fixture_root,
+            source=source,
+            pack=pack,
+            tools=tools,
+            launcher_manifest_sha256=launcher_digest,
+            bootstrap_source=bootstrap_source,
+            decisions=decisions,
+            decisions_sha256=decisions_sha256,
+        )
         return {
             "format": "workbench-packwiz-materialization-result-v2",
             "schema_version": 2,
             "outcome": "installed",
-            "receipt": receipt,
+            "receipt": reopened["receipt"],
         }
     finally:
         if staging.exists():

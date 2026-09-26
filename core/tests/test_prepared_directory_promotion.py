@@ -51,6 +51,31 @@ class PreparedDirectoryPromotionTests(unittest.TestCase):
         self.assertTrue(renamed_stage.is_dir())
         self.assertEqual([], list(renamed_stage.iterdir()))
 
+    def test_private_interrupted_stage_inventory_keeps_empty_and_unpublished_stages(self) -> None:
+        first = self.root / ".pack.01"
+        first.mkdir(mode=0o700)
+        (first / "variant").mkdir()
+        second = self.root / ".pack.02"
+        second.mkdir(mode=0o700)
+        self.assertEqual(2, prepared.count_prepared_directory_stages(
+            self.target, stage_prefix=".pack.",
+        ))
+        self.assertEqual(0, prepared.count_prepared_directory_stages(
+            self.target, stage_prefix=".other.",
+        ))
+
+    def test_prepared_stage_inventory_refuses_redirected_or_shared_stage(self) -> None:
+        stage = self.root / ".pack.01"
+        stage.symlink_to(self.stage, target_is_directory=True)
+        with self.assertRaises(prepared.PreparedDirectoryError) as refusal:
+            prepared.count_prepared_directory_stages(self.target, stage_prefix=".pack.")
+        self.assertEqual("directory.unsafe", refusal.exception.code)
+        stage.unlink()
+        stage.mkdir(mode=0o755)
+        with self.assertRaises(prepared.PreparedDirectoryError) as refusal:
+            prepared.count_prepared_directory_stages(self.target, stage_prefix=".pack.")
+        self.assertEqual("directory.unsafe", refusal.exception.code)
+
     def test_invalid_marker_name_refuses_before_promotion(self) -> None:
         with self.assertRaises(prepared.PreparedDirectoryError) as refusal:
             prepared.promote_prepared_directory(
