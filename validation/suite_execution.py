@@ -32,7 +32,9 @@ from orchestration import (
     new_run_id,
     require_successful_process,
     select_runnable,
+    validate_run_id,
 )
+from core_run_custody import allocate_validation_run
 from suite_measurement import environment_provenance, inventory_digest
 from suite_catalog import (
     SUITES_BY_NAME,
@@ -577,17 +579,17 @@ def _finish_run(
     return paths
 
 
-def run_python_suites(
+def _run_python_suites_at_paths(
     *,
+    run_paths: ValidationRunPaths,
     tier: str,
     selected: tuple[str, ...],
     jobs: int,
     source_fingerprint: str,
     repository_files: Callable[[], list[Path]],
-    run_id: str | None = None,
     selection_plan: dict | None = None,
 ) -> ValidationRunPaths:
-    """Run and validate registered suites, retaining one run-scoped record."""
+    """Run the selected suites within a Core-reserved retained directory."""
 
     suites = (
         tuple(SUITES_BY_NAME[name] for name in selected)
@@ -595,11 +597,6 @@ def run_python_suites(
         else suites_for_tier(tier)
     )
     effective_jobs = min(jobs, len(suites))
-    run_paths = create_run_paths(
-        ROOT / ".workbench/validation/runs",
-        run_id or new_run_id(),
-        temporary_storage_root=_validation_temporary_storage(),
-    )
     requests = _suite_requests(
         suites,
         paths=run_paths,
@@ -816,3 +813,86 @@ def run_python_suites(
             details=details,
         )
         raise
+
+
+def _finish_core_run(host, allocation, *, outcome: str, source_fingerprint: str,
+                     failure: str | None = None) -> None:
+    manifest = allocation.path / "run.json"
+    evidence = (manifest,) if manifest.is_file() or manifest.is_symlink() else ()
+    references = tuple(
+        path for path in (allocation.path / "reports", allocation.path / "logs")
+        if path.is_dir() or path.is_symlink()
+    )
+
+    def validate(path: Path) -> None:
+        try:
+            document = json.loads((path / "run.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise SuiteExecutionFailure("Core validation run manifest is unavailable") from exc
+        if (not isinstance(document, dict)
+                or document.get("format") != "workbench-validation-run-v1"
+                or document.get("run_id") != allocation.label
+                or document.get("source_fingerprint") != source_fingerprint
+                or document.get("state") != "passed"):
+            raise SuiteExecutionFailure("Core validation run manifest is not a passed run")
+
+    host.finish(
+        allocation, outcome=outcome, evidence=evidence,
+        absolute_references=references,
+        validate=validate if outcome == "complete" else None,
+        failure=failure[:4096] if failure is not None else None,
+    )
+
+
+def run_python_suites(
+    *,
+    tier: str,
+    selected: tuple[str, ...],
+    jobs: int,
+    source_fingerprint: str,
+    repository_files: Callable[[], list[Path]],
+    run_id: str | None = None,
+    selection_plan: dict | None = None,
+) -> ValidationRunPaths:
+    """Run registered suites and retain their fresh tree through Core custody."""
+
+    selected_run_id = validate_run_id(run_id or new_run_id())
+    host, allocation = allocate_validation_run(ROOT, selected_run_id)
+    with host.execution(allocation):
+        try:
+            paths = create_run_paths(
+                ROOT / ".workbench/validation/runs",
+                selected_run_id,
+                temporary_storage_root=_validation_temporary_storage(),
+                allocated_root=allocation.path,
+            )
+            result = _run_python_suites_at_paths(
+                run_paths=paths,
+                tier=tier, selected=selected, jobs=jobs,
+                source_fingerprint=source_fingerprint,
+                repository_files=repository_files,
+                selection_plan=selection_plan,
+            )
+        except BaseException as error:
+            try:
+                explanation = f"{type(error).__name__}: {error}" or "validation run failed"
+                _finish_core_run(
+                    host, allocation, outcome="failed",
+                    source_fingerprint=source_fingerprint, failure=explanation,
+                )
+            except Exception as custody_error:
+                error.add_note(
+                    "Core could not retain terminal validation evidence: "
+                    f"{custody_error}"
+                )
+            raise
+        try:
+            _finish_core_run(
+                host, allocation, outcome="complete",
+                source_fingerprint=source_fingerprint,
+            )
+        except Exception as error:
+            raise SuiteExecutionFailure(
+                "Python suites finished, but Core could not retain their run evidence"
+            ) from error
+        return result

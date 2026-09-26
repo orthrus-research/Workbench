@@ -27,6 +27,43 @@ from suite_catalog import PythonTestSuite  # noqa: E402
 
 
 class ParallelValidationSchedulerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        configuration = tempfile.TemporaryDirectory()
+        self.addCleanup(configuration.cleanup)
+        self.configuration_home = Path(configuration.name) / "config"
+        environment = patch.dict(
+            os.environ, {"WORKBENCH_CONFIG_HOME": str(self.configuration_home)},
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def _registered_run(self, root: Path, run_id: str):
+        from workbench_core.working_allocations import WorkingAllocationCatalog
+
+        rows = WorkingAllocationCatalog(self.configuration_home).inventory_rows(workspace=root)
+        return next(row for row in rows if row["label"] == run_id)
+
+    def test_fresh_core_run_preserves_historical_tree_and_secures_parent(self) -> None:
+        from core_run_custody import allocate_validation_run
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            historic = root / ".workbench/validation/runs/old-run/run.json"
+            historic.parent.mkdir(parents=True)
+            historic.write_bytes(b'{"legacy":true}\n')
+            historic.parent.parent.chmod(0o755)
+            host, current = allocate_validation_run(root, "new-run")
+            from workbench_api.working_allocations import WorkingAllocationError
+            self.assertEqual(root / ".workbench/validation/runs/new-run", current.path)
+            self.assertEqual(b'{"legacy":true}\n', historic.read_bytes())
+            self.assertEqual("incomplete", host.describe(current.allocation_id).status)
+            self.assertEqual("new-run", self._registered_run(root, "new-run")["label"])
+            self.assertEqual(1, len(host.inventory()), "legacy run must not be silently adopted")
+            with self.assertRaisesRegex(WorkingAllocationError, "already exists"):
+                allocate_validation_run(root, "old-run")
+            if os.name == "posix":
+                self.assertEqual(0o700, historic.parent.parent.stat().st_mode & 0o777)
+
     def test_parent_retains_admission_when_child_rewrites_its_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -170,6 +207,19 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
             self.assertEqual(2, maximum_active)
             manifest = json.loads((paths.root / "run.json").read_text())
             self.assertEqual("passed", manifest["state"])
+            retained = self._registered_run(root, paths.run_id)
+            self.assertEqual("complete", retained["status"])
+            self.assertEqual("protected-until-reviewed-policy", retained["retention"])
+            self.assertEqual(["run.json"], [row["relative_path"] for row in retained["evidence"]])
+            from workbench_api.working_allocations import WorkingAllocationError
+            from workbench_core.working_allocations import CoreWorkingAllocations
+
+            reopened = CoreWorkingAllocations(
+                workspace=root, configuration_home=self.configuration_home,
+                locations={"evidence": root / ".workbench/validation/runs"},
+                owner_id="validation",
+            )
+            self.assertEqual("complete", reopened.verify(retained["allocation_id"]).status)
             self.assertEqual(["alpha", "beta"], manifest["selected_suites"])
             self.assertEqual(
                 {"alpha", "beta"},
@@ -183,6 +233,9 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                         / f"{suite.name}.json"
                     ).is_file()
                 )
+            (paths.root / "run.json").write_text("changed\n", encoding="utf-8")
+            with self.assertRaisesRegex(WorkingAllocationError, "terminal evidence changed"):
+                reopened.verify(retained["allocation_id"])
 
     def test_failure_stops_new_admission_but_drains_active_suite(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -253,6 +306,9 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 ).read_text()
             )
             self.assertEqual("failed", manifest["state"])
+            retained = self._registered_run(root, "run-failure")
+            self.assertEqual("failed", retained["status"])
+            self.assertEqual(["run.json"], [row["relative_path"] for row in retained["evidence"]])
             self.assertEqual(
                 ["beta"],
                 [row["name"] for row in manifest["completed_suites"]],
@@ -338,6 +394,7 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
             terminate_process.assert_called_once_with(owned_process)
             run_root = root / ".workbench/validation/runs/run-interrupted"
             manifest = json.loads((run_root / "run.json").read_text())
+            self.assertEqual("failed", self._registered_run(root, "run-interrupted")["status"])
             self.assertEqual("failed", manifest["state"])
             self.assertEqual([], manifest["completed_suites"])
             self.assertIn(
@@ -398,6 +455,7 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 ).read_text()
             )
             self.assertEqual("failed", manifest["state"])
+            self.assertEqual("failed", self._registered_run(root, "run-cleanup")["status"])
             self.assertIn(
                 "could not remove isolated suite temporary storage: busy",
                 manifest["failures"],

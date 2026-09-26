@@ -101,8 +101,9 @@ def create_run_paths(
     run_id: str,
     *,
     temporary_storage_root: Path | None = None,
+    allocated_root: Path | None = None,
 ) -> ValidationRunPaths:
-    """Create a new run tree, refusing to reuse stale run-scoped evidence."""
+    """Prepare a fresh run, including one already reserved and created by Core."""
 
     validated = validate_run_id(run_id)
     root = Path(storage_root) / validated
@@ -112,7 +113,13 @@ def create_run_paths(
         else root / "tmp"
     )
     try:
-        root.mkdir(parents=True, exist_ok=False)
+        if allocated_root is None:
+            root.mkdir(parents=True, exist_ok=False)
+        elif (Path(allocated_root) != root or root.is_symlink() or not root.is_dir()
+              or {path.name for path in root.iterdir()} != {".workbench-allocation.json"}):
+            raise OrchestrationFailure(
+                f"Core allocation is not a fresh validation run tree for {validated}"
+            )
         reports = root / "reports"
         logs = root / "logs"
         for path in (reports, logs):

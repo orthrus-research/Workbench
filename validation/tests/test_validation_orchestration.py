@@ -74,6 +74,20 @@ class ValidationRunIdentityTests(unittest.TestCase):
             self.assertTrue(paths.temporary.is_dir())
             self.assertFalse(paths.temporary.is_relative_to(paths.root))
 
+    def test_core_allocated_run_requires_a_fresh_marker_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            allocation = root / "runs/run-003"
+            allocation.mkdir(parents=True)
+            (allocation / ".workbench-allocation.json").write_text("reserved\n")
+            paths = create_run_paths(
+                root / "runs", "run-003", allocated_root=allocation,
+            )
+            self.assertEqual(allocation, paths.root)
+            self.assertTrue(paths.reports.is_dir())
+            with self.assertRaisesRegex(OrchestrationFailure, "not a fresh"):
+                create_run_paths(root / "runs", "run-003", allocated_root=allocation)
+
 
 class SourceFingerprintTests(unittest.TestCase):
     def test_fingerprint_is_order_independent_but_binds_paths_and_bytes(self) -> None:
