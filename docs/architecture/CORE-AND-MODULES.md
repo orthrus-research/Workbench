@@ -157,8 +157,8 @@ Its private binding reader and revisioned replacement use the Core filesystem
 port while Shell keeps the profile and workspace validation. Core registers
 the historical binding namespace against the explicitly reviewed qualification
 target, which can differ from the dispatch workspace. Workspace Home adoption
-uses the same target-aware registration. Direct invocations without a bound
-record-store scope remain a compatibility route.
+uses the same target-aware registration. New adoption bindings require a bound
+Core record-store scope; historical bindings remain readable without one.
 
 `workbench settings workspace list --json` reads the named workspace registry.
 `workbench settings workspace select NAME --profile-config PATH --java-home PATH`

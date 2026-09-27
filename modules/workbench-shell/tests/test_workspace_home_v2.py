@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextvars import Context
 from copy import deepcopy
 import hashlib
 import io
@@ -34,7 +35,10 @@ from workbench_api.state_paths import (  # noqa: E402
     default_product_spine_state_root,
 )
 from workbench_api.profiles import profile_scope  # noqa: E402
-from workbench_api.record_stores import record_store_scope  # noqa: E402
+from workbench_api.record_stores import (  # noqa: E402
+    record_store_host_bound,
+    record_store_scope,
+)
 from workbench_core.human_presentation import human_command  # noqa: E402
 from workbench_core.host_services import install_local_host_services  # noqa: E402
 from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
@@ -73,11 +77,17 @@ def _adopt_in_process(
     output: multiprocessing.Queue,
 ) -> None:
     try:
-        result = adopt_workspace_home_v2(
-            REPOSITORY_ROOT,
-            Path(workspace_text),
-            state_root=Path(state_text),
+        host = CoreRecordStores(
+            workspace=REPOSITORY_ROOT,
+            configuration_home=Path(state_text).parent / "concurrent-catalog",
+            owner_id="workbench-shell",
         )
+        with record_store_scope(host):
+            result = adopt_workspace_home_v2(
+                REPOSITORY_ROOT,
+                Path(workspace_text),
+                state_root=Path(state_text),
+            )
     except WorkspaceHomeV2Error as exc:
         output.put(("error", str(exc)))
     else:
@@ -102,6 +112,63 @@ class WorkspaceHomeV2Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         install_local_host_services()
+
+    def setUp(self) -> None:
+        configuration = tempfile.TemporaryDirectory(dir="/tmp")
+        self.addCleanup(configuration.cleanup)
+        self._configuration_home = Path(configuration.name) / "config"
+        scope = record_store_scope(CoreRecordStores(
+            workspace=REPOSITORY_ROOT,
+            configuration_home=self._configuration_home,
+            owner_id="workbench-shell",
+        ))
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
+
+    def test_unbound_adoption_refuses_before_state_creation_but_reads_history(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            base = Path(temporary)
+            workspace = self._workspace(base)
+            state = base / "state"
+            unbound = Context()
+            self.assertFalse(unbound.run(record_store_host_bound))
+            with self.assertRaisesRegex(WorkspaceHomeV2Error, "Core custody"):
+                unbound.run(
+                    adopt_workspace_home_v2,
+                    REPOSITORY_ROOT,
+                    workspace,
+                    state_root=state,
+                )
+            self.assertFalse(state.exists())
+
+            adopted = adopt_workspace_home_v2(
+                REPOSITORY_ROOT, workspace, state_root=state,
+            )
+            binding_id = adopted["adoption"]["binding_id"]
+            retained = unbound.run(
+                load_workspace_home_adoption,
+                REPOSITORY_ROOT,
+                binding_id,
+                state_root=state,
+            )
+            binding_path = (
+                state / "workspace-home-v2/adoptions"
+                / f"{binding_id.rsplit(':', 1)[-1]}.json"
+            )
+            self.assertEqual(_canonical_bytes(retained), binding_path.read_bytes())
+            stores = ResourceCatalog(self._configuration_home).inventory(
+                workspace=workspace,
+            )["record_stores"]
+            self.assertEqual(1, len(stores))
+            self.assertEqual(str(binding_path.parent), stores[0]["path"])
+            reopened = unbound.run(
+                reopen_workspace_home_v2,
+                REPOSITORY_ROOT,
+                binding_id,
+                state_root=state,
+            )
+            self.assertEqual(binding_id, retained["binding_id"])
+            self.assertEqual("current", reopened["adoption"]["freshness"])
 
     def _workspace(self, base: Path, *, searchable: bool = False) -> Path:
         workspace = base / "workspace"

@@ -36,7 +36,10 @@ from workbench_api.host_filesystem import (
     read_private_single_link_bytes,
     secure_private_path,
 )
-from workbench_api.record_stores import open_target_record_store
+from workbench_api.record_stores import (
+    open_target_record_store,
+    record_store_host_bound,
+)
 
 from workbench_project_intelligence.workspace_doctor import (
     new_report,
@@ -2586,6 +2589,10 @@ def adopt_workspace_home_v2(
 ) -> dict[str, Any]:
     """Persist one private binding without writing the target checkout."""
 
+    if not record_store_host_bound():
+        raise WorkspaceHomeV2Error(
+            "Workspace Home adoption requires Workbench Core custody"
+        )
     home = build_workspace_home_v2(
         suite_root,
         requested_path,
@@ -2606,7 +2613,11 @@ def adopt_workspace_home_v2(
             "workspace-home-adoption-v2", selected_state,
             Path(home["workspace"]["root"]),
         )
-        if opened_store is not None and opened_store.root != bindings:
+        if opened_store is None:
+            raise WorkspaceHomeV2Error(
+                "Workspace Home adoption requires Workbench Core custody"
+            )
+        if opened_store.root != bindings:
             raise WorkspaceHomeV2Error("Core adoption binding namespace changed")
         interrupted_write_count = _interrupted_adoption_count(binding_path)
         owner_revisions = _retained_owner_revisions(home["owner_records"])
