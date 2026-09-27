@@ -166,6 +166,17 @@ intent; an unvalidated stage remains blocked for review. These operations do
 not merge the mod and resource-pack trees, install a Minecraft instance, or
 establish the external files' origin or runtime compatibility.
 
+Once the mod, resource-pack and override trees share one Core catalog,
+`plan_release_client_composition` reviews their sealed source locks and all
+selected manifest IDs without the release ZIP. An exact plan can be retained
+with `apply_release_client_composition` as a private managed tree containing
+`minecraft-root/` and a separate source lock. The tree references all three
+Core sources; `reopen_release_client_composition` verifies their identities and
+the complete payload, while `reconcile_release_client_composition` accepts only
+an interrupted, validated Core publication. This is byte custody for a
+selected layout. The result remains not installed, with external-file origin
+and runtime compatibility still unqualified.
+
 ## Contents
 
 - `source-locks/`: exact upstream source and binary provenance.
