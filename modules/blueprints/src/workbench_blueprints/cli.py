@@ -92,6 +92,15 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="local dependency files keyed by locked dependency id",
     )
+    observe = commands.add_parser(
+        interface.OBSERVE_V2_COMMAND,
+        help="retain an unqualified V2 simulation observation",
+    )
+    observe.add_argument("--environment-lock", type=Path, required=True)
+    observe.add_argument(
+        "--dependency-source", type=Path,
+        help="local dependency files keyed by locked dependency id",
+    )
 
     commands.add_parser("generate", help="release the passing candidate")
     commands.add_parser("apply", help="apply a consented direct release")
@@ -242,6 +251,10 @@ def _execute(
         )
     if arguments.command == "simulate":
         return core.simulate(interface.load_json(arguments.environment_lock))
+    if arguments.command == interface.OBSERVE_V2_COMMAND:
+        return core.observe_simulation_v2(
+            interface.load_json(arguments.environment_lock)
+        )
     if arguments.command == "generate":
         return core.generate()
     if arguments.command == "apply":
@@ -277,6 +290,8 @@ def main(
     argv: list[str] | None = None,
     *,
     adapters: interface.AdapterSet | None = None,
+    selected_workspace: Path | None = None,
+    selected_configuration_home: Path | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
@@ -287,7 +302,7 @@ def main(
     command = "init"
     supplied = sys.argv[1:] if argv is None else argv
     command = next(
-        (token for token in supplied if token in interface.COMMANDS),
+        (token for token in supplied if token in (*interface.COMMANDS, interface.OBSERVE_V2_COMMAND)),
         command,
     )
     workspace: Path | None = None
@@ -295,6 +310,24 @@ def main(
         arguments = _parser().parse_args(argv)
         command = arguments.command
         workspace = arguments.workspace
+        if command == interface.OBSERVE_V2_COMMAND and selected_workspace is not None:
+            if (
+                not selected_workspace.is_absolute()
+                or selected_configuration_home is None
+                or not selected_configuration_home.is_absolute()
+                or not record_store_host_bound()
+            ):
+                raise interface.InterfaceDiagnostic(
+                    "BPI159_CORE_CUSTODY", "/workspace",
+                    "installed V2 observation requires the selected Core custody scope",
+                )
+            if not arguments.workspace.absolute().is_relative_to(
+                selected_workspace / ".workbench/blueprints"
+            ):
+                raise interface.InterfaceDiagnostic(
+                    "BPI159_CORE_CUSTODY", "/workspace",
+                    "V2 session is outside the selected Core workspace",
+                )
         if record_store_host_bound():
             custody = nullcontext()
         else:
@@ -313,7 +346,11 @@ def main(
                 run = interface.SessionStore(workspace).load()["run"]
             except Exception:
                 pass
-        result = interface.rejected_result(command, diagnostic, run=run)
+        result = (
+            interface.observation_result_v2(run=run, diagnostic=diagnostic)
+            if command == interface.OBSERVE_V2_COMMAND
+            else interface.rejected_result(command, diagnostic, run=run)
+        )
         err.write(standards.canonical_json(result) + "\n")
         return diagnostic.exit_code
     out.write(standards.canonical_json(result) + "\n")

@@ -17,4 +17,8 @@ def module():
 def blueprints(argv, *, context):
     context.check_cancelled()
     from workbench_blueprints.cli import main
-    return main(argv)
+    return main(
+        argv,
+        selected_workspace=context.workspace,
+        selected_configuration_home=context.configuration_home,
+    )

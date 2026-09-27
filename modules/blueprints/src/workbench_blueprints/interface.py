@@ -30,6 +30,7 @@ from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
 REPO_ROOT = WORKBENCH_ROOT
 SESSION_SCHEMA = SCHEMA_ROOT / "blueprints-session-v1.schema.json"
 RESULT_SCHEMA = SCHEMA_ROOT / "blueprints-interface-result-v1.schema.json"
+OBSERVATION_RESULT_V2_SCHEMA = SCHEMA_ROOT / "blueprints-observation-result-v2.schema.json"
 ENGINE_CONTRACT_ID = "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
 SESSION_FORMAT = "susy-blueprints-session-v1"
 RESULT_FORMAT = "susy-blueprints-interface-result-v1"
@@ -44,6 +45,7 @@ COMMANDS = (
     "history",
     "export-proof",
 )
+OBSERVE_V2_COMMAND = "observe-simulation-v2"
 RUN_STATES = {
     "initialized",
     "planned",
@@ -216,6 +218,38 @@ def rejected_result(
             )
         ],
     )
+
+
+def observation_result_v2(
+    *, run: dict[str, Any] | None,
+    observation: dict[str, Any] | None = None,
+    diagnostic: InterfaceDiagnostic | None = None,
+) -> dict[str, Any]:
+    """Keep diagnostic observations outside the V1 release envelope."""
+
+    if (observation is None) == (diagnostic is None):
+        raise ValueError("exactly one observation or diagnostic is required")
+    if observation is not None:
+        simulation._validate(
+            observation, simulation.SIMULATION_OBSERVATION_V2_SCHEMA,
+            "simulation-observation-v2",
+        )
+    value = {
+        "schema_version": 2,
+        "format": "susy-blueprints-observation-result-v2",
+        "contract_id": "BLUEPRINTS-SIMULATION-OBSERVATION-V2",
+        "command": OBSERVE_V2_COMMAND,
+        "status": "observed-unqualified" if observation is not None else "rejected",
+        "exit_code": 5 if diagnostic is None else diagnostic.exit_code,
+        "run_id": None if run is None else run["run_id"],
+        "state": None if run is None else run["state"],
+        "data": {} if observation is None else {"observation": copy.deepcopy(observation)},
+        "diagnostics": [] if diagnostic is None else [
+            _diagnostic(diagnostic.code, diagnostic.location, diagnostic.message)
+        ],
+    }
+    _validate(value, OBSERVATION_RESULT_V2_SCHEMA, "observation-result-v2")
+    return value
 
 
 @dataclass
@@ -966,6 +1000,34 @@ class BlueprintsCore:
                 ]
             ),
         )
+
+    def observe_simulation_v2(self, environment_lock: dict[str, Any]) -> dict[str, Any]:
+        """Return a retained diagnostic observation without advancing the V1 run."""
+
+        with self.store.lock():
+            session = self.store.load()
+            run = session["run"]
+            _admit(run, OBSERVE_V2_COMMAND, {"planned"})
+            planning_result = session["planning_result"]
+            planning_evidence = session["planning_evidence"]
+            if planning_result is None or planning_evidence is None:
+                _fail(
+                    "BPI110_SESSION_BINDING", "/planning",
+                    "planned session inputs are missing",
+                )
+            result = self._simulator(session).execute(
+                planning_result,
+                intake=session["intake"],
+                target_manifest=session["target_manifest"],
+                planning_evidence=planning_evidence,
+                environment_lock=environment_lock,
+                choices=session["choices"],
+                edit_generation=run["candidate"]["edit_generation"],
+                custody_mode="retained-v2",
+            )
+            return observation_result_v2(
+                run=run, observation=result["observation_v2"],
+            )
 
     def generate(self) -> dict[str, Any]:
         with self.store.lock():

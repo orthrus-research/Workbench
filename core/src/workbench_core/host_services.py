@@ -1,6 +1,6 @@
 """Compose concrete host services at process entry, before worker startup."""
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Iterator, Mapping
 
@@ -89,6 +89,14 @@ def direct_module_custody_scope(
 
     install_local_host_services()
     configuration_home = default_user_config_home(environment=environment)
+    if owner_id == "blueprints":
+        from workbench_api.simulation_scratch import simulation_scratch_scope
+        from .simulation_scratch import CoreSimulationScratch
+        simulation_scratch = simulation_scratch_scope(CoreSimulationScratch(
+            workspace=workspace, configuration_home=configuration_home,
+        ))
+    else:
+        simulation_scratch = nullcontext()
     with record_store_scope(CoreRecordStores(
         workspace=workspace,
         configuration_home=configuration_home,
@@ -101,7 +109,7 @@ def direct_module_custody_scope(
         location_sources={"artifacts": "direct-workspace"},
     )), source_transactions_scope(CoreSourceTransactions(owner_id=owner_id)), registration_attempts_scope(CoreRegistrationAttempts(
         configuration_home=configuration_home, owner_id=owner_id,
-    ) if owner_id == "workbench-shell" else None):
+    ) if owner_id == "workbench-shell" else None), simulation_scratch:
         yield
 
 

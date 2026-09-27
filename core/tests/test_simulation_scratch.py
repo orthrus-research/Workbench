@@ -5,10 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from workbench_api import Capability, ExecutionContext, Module, ModuleError
 from workbench_api.simulation_scratch import (
     SimulationScratchError, allocate_simulation_scratch, simulation_scratch_scope,
 )
+from workbench_core.modules import InstalledModule, dispatch
 from workbench_core.simulation_scratch import CoreSimulationScratch
 from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
@@ -73,6 +77,44 @@ class SimulationScratchTests(unittest.TestCase):
             with allocate_simulation_scratch(parent=outside, plan_id=_PLAN):
                 self.fail("outside scratch should not be issued")
         self.assertFalse(outside.exists())
+
+    def test_installed_blueprints_scope_uses_selected_workspace_and_home(self) -> None:
+        module = Module("blueprints", "0.1.0", (
+            Capability("blueprints.scratch", ("scratch",), "scratch_plugin:run", "scratch"),
+        ))
+        installed = (InstalledModule(
+            "blueprints", "workbench-blueprints", "0.1.0", "available", module=module,
+        ),)
+
+        def run(_arguments, *, context):
+            with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN):
+                pass
+            return 0
+
+        context = ExecutionContext(
+            self.workspace, self.workspace.parent / "state",
+            configuration_home=self.configuration_home,
+        )
+        with patch("workbench_core.modules.import_module", return_value=SimpleNamespace(run=run)):
+            self.assertEqual(0, dispatch(["scratch"], context, installed))
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.workspace,
+        )
+        self.assertEqual(1, len(rows))
+        self.assertEqual("retained-unproven", rows[0]["status"])
+
+        other = self.workspace.parent / "other"
+        other.mkdir()
+        mismatched = ExecutionContext(
+            other, self.workspace.parent / "state",
+            configuration_home=self.configuration_home,
+        )
+        with patch("workbench_core.modules.import_module", return_value=SimpleNamespace(run=run)):
+            with self.assertRaises(ModuleError):
+                dispatch(["scratch"], mismatched, installed)
+        self.assertEqual(1, len(CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.workspace,
+        )))
 
 
 if __name__ == "__main__":

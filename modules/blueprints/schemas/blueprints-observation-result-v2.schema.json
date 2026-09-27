@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-observation-result-v2.schema.json",
+  "title": "Supersymmetry Blueprints diagnostic observation result v2",
+  "type": "object",
+  "required": [
+    "schema_version", "format", "contract_id", "command", "status", "exit_code",
+    "run_id", "state", "data", "diagnostics"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 2},
+    "format": {"const": "susy-blueprints-observation-result-v2"},
+    "contract_id": {"const": "BLUEPRINTS-SIMULATION-OBSERVATION-V2"},
+    "command": {"const": "observe-simulation-v2"},
+    "status": {"enum": ["observed-unqualified", "rejected"]},
+    "exit_code": {"enum": [2, 3, 4, 5, 6]},
+    "run_id": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^blueprints-run:sha256:[0-9a-f]{64}$"}
+      ]
+    },
+    "state": {
+      "oneOf": [
+        {"type": "null"},
+        {"enum": [
+          "initialized", "planned", "simulation-failed", "simulated",
+          "released", "application-rejected", "applied",
+          "verification-failed", "verified", "invalidated"
+        ]}
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"observation": {"type": "object"}}
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "location", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+          "location": {"type": "string", "minLength": 1},
+          "message": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "status": {"const": "observed-unqualified"},
+        "exit_code": {"const": 5},
+        "state": {"const": "planned"},
+        "data": {"required": ["observation"]},
+        "diagnostics": {"maxItems": 0}
+      }
+    },
+    {
+      "properties": {
+        "status": {"const": "rejected"},
+        "data": {"maxProperties": 0},
+        "diagnostics": {"minItems": 1, "maxItems": 1}
+      }
+    }
+  ]
+}

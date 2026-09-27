@@ -1,6 +1,6 @@
 # Blueprints retained simulation observation v2
 
-Status: internal API milestone; no supported CLI binding or release admission
+Status: opt-in diagnostic interface; no release admission
 
 `Simulator.execute(..., custody_mode="retained-v2")` runs the existing domain
 validation stages against a Core-issued private scratch lease. Core records
@@ -11,9 +11,24 @@ gate passed. This observation cannot be supplied to the V1 Blueprints release
 path. The default `Simulator.execute` and historical V1 evidence remain
 unchanged.
 
-A caller must explicitly bind `CoreSimulationScratch` through the API scope.
-The current Blueprints CLI and installed interface do not bind that scope or
-expose the V2 mode. Wiring a user route is separate work.
+`BlueprintsCore.observe_simulation_v2(environment_lock)` and the
+`observe-simulation-v2 --environment-lock <file>` CLI command expose this
+diagnostic route from a planned session. The optional `--dependency-source`
+argument has the same local, digest-checked meaning as V1 simulation. The
+direct CLI derives the target from the validated session and binds Core's
+scratch host to that target and the selected configuration home. Installed
+dispatch binds the same Core host to its selected workspace and configuration
+home; an observation outside that selected workspace is refused.
+
+The separate `susy-blueprints-observation-result-v2` envelope reports
+`observed-unqualified` and exits with code 5 on stdout when an observation was
+captured. This exit is deliberately nonzero even when `gate_status` is
+`passed`, so a caller checking process success cannot mistake a diagnostic for
+a releasable simulation. A pre-observation refusal reports `rejected` with a
+diagnostic on stderr. The V1 session pointer, run state, events, simulation
+result, and release admission are unchanged: `generate` still requires a V1
+`simulated` run. The private V2 evidence locator is not included in the CLI
+result.
 
 The V2 observation and its separate private evidence record identify the
 scratch lease and report `retained-process-absence-unproven`. They report the

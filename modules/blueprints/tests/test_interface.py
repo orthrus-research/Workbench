@@ -18,6 +18,9 @@ from unittest.mock import patch
 from jsonschema import Draft202012Validator
 
 from _support import SCHEMA_ROOT, SOURCE_ROOT, WORKBENCH_ROOT
+from workbench_api import Capability, ExecutionContext, Module
+from workbench_core.modules import InstalledModule, dispatch
+from workbench_core.temporary_leases import CoreTemporaryLeases
 
 REPO_ROOT = WORKBENCH_ROOT
 BLUEPRINTS_TOOLS = SOURCE_ROOT
@@ -120,10 +123,161 @@ class InterfaceTest(unittest.TestCase):
         for name in (
             "blueprints-session-v1.schema.json",
             "blueprints-interface-result-v1.schema.json",
+            "blueprints-observation-result-v2.schema.json",
         ):
             schema = json.loads((SCHEMA_ROOT / name).read_text(encoding="utf-8"))
             Draft202012Validator.check_schema(schema)
             self.assertFalse(schema["additionalProperties"])
+
+    def test_direct_v2_observation_retains_scratch_without_advancing_v1(self) -> None:
+        core = self._core("instructions")
+        core.plan(self.fixture.planning_evidence)
+        pointer = (self.workspace / "current.json").read_bytes()
+        environment_lock = self._write_json("observation-lock.json", self.fixture.environment)
+        environment = dict(os.environ)
+        environment["WORKBENCH_CONFIG_HOME"] = str(self.fixture.configuration_home)
+        environment["PYTHONPATH"] = os.pathsep.join(filter(None, (
+            str(WORKBENCH_ROOT / "api/src"),
+            str(WORKBENCH_ROOT / "core/src"),
+            str(SOURCE_ROOT.parent),
+            str(WORKBENCH_ROOT / "modules/project-intelligence/src"),
+            environment.get("PYTHONPATH", ""),
+        )))
+        completed = subprocess.run(
+            [sys.executable, "-m", "workbench_blueprints.cli",
+             "--workspace", str(self.workspace), "observe-simulation-v2",
+             "--environment-lock", str(environment_lock)],
+            cwd=self.fixture.root, env=environment,
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(5, completed.returncode, completed.stderr)
+        self.assertEqual("", completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertEqual("observed-unqualified", result["status"])
+        self.assertEqual("planned", result["state"])
+        self.assertEqual("observed-unqualified", result["data"]["observation"]["status"])
+        self.assertNotIn("evidence_locator_v2", completed.stdout)
+        self.assertEqual(pointer, (self.workspace / "current.json").read_bytes())
+        self.assertIsNone(interface.SessionStore(self.workspace).load()["simulation_result"])
+        with self.assertRaises(interface.InterfaceDiagnostic) as rejected:
+            core.generate()
+        self.assertEqual("BPI120_ILLEGAL_PREDECESSOR", rejected.exception.code)
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.fixture.configuration_home, workspace=self.fixture.repository,
+        )
+        self.assertEqual(1, len(rows))
+        self.assertEqual("retained-unproven", rows[0]["status"])
+        self.assertEqual(result["data"]["observation"]["scratch_lease_id"], rows[0]["lease_id"])
+
+    def test_installed_v2_observation_with_passing_gates_stays_planned(self) -> None:
+        core = self._core("instructions")
+        core.plan(self.fixture.planning_evidence)
+        pointer = (self.workspace / "current.json").read_bytes()
+        environment_lock = self._write_json("installed-observation-lock.json", self.fixture.environment)
+        module = Module("blueprints", "0.1.0", (
+            Capability(
+                "blueprints.blueprints", ("blueprints",),
+                "workbench_registration_blueprints:blueprints", "Blueprints",
+            ),
+        ))
+        installed = (InstalledModule(
+            "blueprints", "workbench-blueprints", "0.1.0", "available", module=module,
+        ),)
+        context = ExecutionContext(
+            self.fixture.repository, self.fixture.root / "state",
+            configuration_home=self.fixture.configuration_home,
+        )
+        out, err = StringIO(), StringIO()
+        original_main = cli.main
+        def invoke(arguments, **kwargs):
+            return original_main(
+                arguments, adapters=self.adapters, stdout=out, stderr=err,
+                **kwargs,
+            )
+        command = {
+            "exit_code": 0, "timed_out": False, "output_limited": False,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "command_sha256": "a" * 64,
+        }
+        with patch("workbench_blueprints.cli.main", side_effect=invoke), patch(
+            "workbench_blueprints.simulation._command_result", return_value=command,
+        ):
+            exit_code = dispatch(
+                ["blueprints", "--workspace", str(self.workspace),
+                 "observe-simulation-v2", "--environment-lock", str(environment_lock)],
+                context, installed,
+            )
+        self.assertEqual(5, exit_code, err.getvalue())
+        self.assertEqual("", err.getvalue())
+        result = json.loads(out.getvalue())
+        self.assertEqual("observed-unqualified", result["status"])
+        self.assertEqual("passed", result["data"]["observation"]["gate_status"])
+        self.assertEqual("planned", result["state"])
+        self.assertEqual(pointer, (self.workspace / "current.json").read_bytes())
+        self.assertIsNone(interface.SessionStore(self.workspace).load()["run"]["simulation"])
+        with patch("workbench_blueprints.simulation._command_result", return_value=command):
+            simulated = core.simulate(self.fixture.environment)
+        self.assertEqual("simulated", simulated["state"])
+        self.assertEqual("succeeded", simulated["status"])
+        self.assertEqual("released", core.generate()["state"])
+
+    def test_installed_v2_refuses_another_selected_workspace(self) -> None:
+        core = self._core("instructions")
+        core.plan(self.fixture.planning_evidence)
+        pointer = (self.workspace / "current.json").read_bytes()
+        environment_lock = self._write_json("mismatched-observation-lock.json", self.fixture.environment)
+        out, err = StringIO(), StringIO()
+        code = cli.main(
+            ["--workspace", str(self.workspace), "observe-simulation-v2",
+             "--environment-lock", str(environment_lock)],
+            selected_workspace=self.fixture.root / "different-target",
+            selected_configuration_home=self.fixture.configuration_home,
+            stdout=out, stderr=err,
+        )
+        self.assertEqual(4, code)
+        self.assertEqual("", out.getvalue())
+        self.assertEqual("rejected", json.loads(err.getvalue())["status"])
+        self.assertEqual("BPI159_CORE_CUSTODY", json.loads(err.getvalue())["diagnostics"][0]["code"])
+        self.assertEqual(pointer, (self.workspace / "current.json").read_bytes())
+        self.assertEqual([], CoreTemporaryLeases.inventory_catalog(
+            self.fixture.configuration_home, workspace=self.fixture.repository,
+        ))
+
+    def test_installed_v2_refuses_redirected_session_inside_selected_workspace(self) -> None:
+        core = self._core("instructions")
+        core.plan(self.fixture.planning_evidence)
+        redirected = self.workspace.parent / "redirected-session"
+        redirected.symlink_to(self.workspace, target_is_directory=True)
+        environment_lock = self._write_json("redirected-observation-lock.json", self.fixture.environment)
+        out, err = StringIO(), StringIO()
+        code = cli.main(
+            ["--workspace", str(redirected), "observe-simulation-v2",
+             "--environment-lock", str(environment_lock)],
+            selected_workspace=self.fixture.repository,
+            selected_configuration_home=self.fixture.configuration_home,
+            stdout=out, stderr=err,
+        )
+        self.assertEqual(4, code)
+        self.assertEqual("", out.getvalue())
+        self.assertEqual("BPI106_WORKSPACE", json.loads(err.getvalue())["diagnostics"][0]["code"])
+        self.assertEqual([], CoreTemporaryLeases.inventory_catalog(
+            self.fixture.configuration_home, workspace=self.fixture.repository,
+        ))
+
+    def test_v2_rejection_uses_distinct_result_without_session_event(self) -> None:
+        self._core("instructions")
+        environment_lock = self._write_json("rejected-observation-lock.json", self.fixture.environment)
+        before = interface.SessionStore(self.workspace).load()["run"]
+        code, result, stderr = self._cli([
+            "observe-simulation-v2", "--environment-lock", str(environment_lock),
+        ])
+        self.assertEqual(3, code)
+        self.assertTrue(stderr)
+        self.assertEqual("susy-blueprints-observation-result-v2", result["format"])
+        self.assertEqual("rejected", result["status"])
+        self.assertEqual("BPI120_ILLEGAL_PREDECESSOR", result["diagnostics"][0]["code"])
+        self.assertEqual(before, interface.SessionStore(self.workspace).load()["run"])
 
     def test_init_requires_explicit_profile_authority_paths(self) -> None:
         with self.assertRaises(interface.InterfaceDiagnostic) as context:
