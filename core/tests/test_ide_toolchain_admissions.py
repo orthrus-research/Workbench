@@ -298,6 +298,57 @@ class IdeToolchainAdmissionTests(unittest.TestCase):
         self.assertEqual(["unbound-record-stage", "catalog-only"], [row["status"] for row in rows])
         self.assertTrue(stage.exists())
 
+    def test_interrupted_record_stage_refuses_new_admission_and_reuse(self) -> None:
+        admitted = self.admit()
+        record = self.record()
+        original = record.read_bytes()
+        displaced = self.home / "held-admission.json"
+        record.rename(displaced)
+        stage = record.parent / f".{record.name}.abcdefgh"
+        stage.write_bytes(b"unlinked publication")
+        try:
+            with self.assertRaisesRegex(IdeToolchainAdmissionError, "record stage needs review"):
+                self.admit()
+            self.assertFalse(record.exists())
+            self.assertEqual(b"unlinked publication", stage.read_bytes())
+            self.assertTrue(self.target.is_dir())
+            displaced.rename(record)
+            with self.assertRaisesRegex(IdeToolchainAdmissionError, "record stage needs review"):
+                self.admit()
+            self.assertEqual(original, record.read_bytes())
+            self.assertEqual(admitted["target_inode"], self.target.stat().st_ino)
+        finally:
+            if displaced.exists():
+                displaced.rename(record)
+
+    def test_held_admission_refuses_target_stage_but_not_other_target_stage(self) -> None:
+        self.admit()
+        record = self.record()
+        original = record.read_bytes()
+        stage = record.parent / f".{record.name}.abcdefgh"
+        arguments = dict(
+            archive_sha256=self.digest, archive_size=self.archive.stat().st_size,
+            expected_root="locked-tool", archive_format="zip",
+        )
+        stage.write_bytes(b"ambiguous publication")
+        with self.assertRaisesRegex(IdeToolchainAdmissionError, "record stage needs review"):
+            with self.host.hold(self.archive, self.target, **arguments):
+                self.fail("hold crossed an interrupted record stage")
+        self.assertEqual(original, record.read_bytes())
+        stage.unlink()
+
+        other = _record_path(record.parent, self.root / "other-tool")
+        other_stage = other.parent / f".{other.name}.abcdefgh"
+        other_stage.write_bytes(b"different target")
+        self.admit()
+        with self.host.hold(self.archive, self.target, **arguments):
+            self.assertTrue(other_stage.exists())
+        with self.assertRaisesRegex(IdeToolchainAdmissionError, "record stage needs review"):
+            with self.host.hold(self.archive, self.target, **arguments):
+                stage.write_bytes(b"interrupted while held")
+        self.assertEqual(original, record.read_bytes())
+        self.assertTrue(stage.exists())
+
     def test_catalog_refuses_admission_with_missing_parent_registration(self) -> None:
         self.admit()
         catalog = ResourceCatalog(self.host.configuration_home)

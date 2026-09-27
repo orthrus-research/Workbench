@@ -64,6 +64,21 @@ def _read_record(path: Path) -> dict[str, Any]:
         raise IdeToolchainAdmissionError("IDE toolchain admission is unavailable or changed") from exc
 
 
+def _reject_record_stages(path: Path) -> None:
+    """Keep an ambiguous publication stage attached to its exact target."""
+
+    prefix = f".{path.name}."
+    try:
+        if any(member.name.startswith(prefix) for member in path.parent.iterdir()):
+            raise IdeToolchainAdmissionError(
+                "interrupted IDE admission record stage needs review",
+            )
+    except OSError as exc:
+        raise IdeToolchainAdmissionError(
+            "IDE admission record stages cannot be inspected",
+        ) from exc
+
+
 class CoreIdeToolchainAdmissions:
     """Admit and reopen one historical target under a registered Core store."""
 
@@ -216,6 +231,7 @@ class CoreIdeToolchainAdmissions:
             ).open("validation-ide-toolchain-admissions-v1", self.workspace)
             path = _record_path(store.root, destination)
             with private_record_lock(path.with_suffix(".lock"), wait=True):
+                _reject_record_stages(path)
                 stages = self._source_stages(destination, archive_sha256)
                 live = [row for row in stages if row["status"] != "disposed"]
                 retained = _read_record(path) if path.exists() or path.is_symlink() else None
@@ -278,6 +294,7 @@ class CoreIdeToolchainAdmissions:
                         raise IdeToolchainAdmissionError(
                             "retained IDE toolchain admission differs from the selected tree",
                         )
+                    _reject_record_stages(path)
                     return retained
                 publish_immutable_bytes(
                     path, check_storage.canonical(expected) + b"\n",
@@ -285,6 +302,7 @@ class CoreIdeToolchainAdmissions:
                 )
                 if _read_record(path) != expected:
                     raise IdeToolchainAdmissionError("IDE toolchain admission changed after publication")
+                _reject_record_stages(path)
                 return expected
         except (DurableRecordError, OSError, ValueError) as exc:
             if isinstance(exc, IdeToolchainAdmissionError):
@@ -344,6 +362,7 @@ class CoreIdeToolchainAdmissions:
                     raise IdeToolchainAdmissionError("IDE toolchain hold differs from its admission")
 
                 def readback() -> None:
+                    _reject_record_stages(path)
                     stages = [
                         row for row in self._source_stages(destination, archive_sha256)
                         if row["status"] != "disposed"
@@ -367,6 +386,7 @@ class CoreIdeToolchainAdmissions:
                         or _read_record(path) != retained
                     ):
                         raise IdeToolchainAdmissionError("IDE toolchain changed during held readback")
+                    _reject_record_stages(path)
 
                 readback()
                 try:
