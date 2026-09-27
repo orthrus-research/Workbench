@@ -28,6 +28,7 @@ from supersymmetry_project_fixture import (  # noqa: E402
 )
 from workbench_shell.cli import main as cli_main  # noqa: E402
 from workbench_api.feature_exports import feature_export_scope, feature_exports  # noqa: E402
+from workbench_api.managed_trees import managed_trees  # noqa: E402
 from workbench_core.feature_exports import CoreFeatureExports  # noqa: E402
 from workbench_core.configuration import (  # noqa: E402
     load_workbench_configuration,
@@ -295,6 +296,51 @@ class WorkbenchCliTest(unittest.TestCase):
                 unquote(urlparse(plan["target"]["fixture_root_uri"]).path)
             )
             self.assertFalse(fixture_path.exists())
+
+    def test_runtime_bootstrap_binds_exact_core_tree_custody(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            workspace = root / "pack"
+            workspace.mkdir()
+            state_root = root / "state"
+            configuration_home = root / "configuration"
+            configuration = load_workbench_configuration(REPOSITORY_ROOT)
+            result = {"format": "workbench-runtime-bootstrap-result-v1", "outcome": "reused"}
+            selected = []
+
+            def bootstrap(*_args, **_kwargs):
+                host = managed_trees()
+                selected.append((host.workspace, host.owner_id, host.configuration_home))
+                return result
+
+            output = io.StringIO()
+            with (
+                patch(
+                    "workbench_shell.cli.load_workbench_configuration",
+                    return_value=configuration,
+                ),
+                patch(
+                    "workbench_shell.cli.bootstrap_project_runtime",
+                    side_effect=bootstrap,
+                ) as operation,
+                redirect_stdout(output),
+            ):
+                status = cli_main([
+                    "runtime-bootstrap", str(workspace),
+                    "--suite-root", str(REPOSITORY_ROOT), "--json",
+                ], runtime_state_root=state_root,
+                    runtime_configuration_home=configuration_home)
+
+            self.assertEqual(status, 0)
+            self.assertEqual(json.loads(output.getvalue()), result)
+            self.assertEqual(
+                selected,
+                [(workspace, "workbench-shell", configuration_home)],
+            )
+            operation.assert_called_once_with(
+                REPOSITORY_ROOT.resolve(), workspace, launcher="prism",
+                state_root=state_root, configuration=configuration,
+            )
 
     def test_runtime_materialize_routes_seed_roots_through_the_core(
         self,

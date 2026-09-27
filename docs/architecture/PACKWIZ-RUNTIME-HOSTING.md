@@ -109,6 +109,15 @@ Cleanroom launcher base or server bootstrap before installing a payload.
 The Packwiz Installer archive is acquired through Core's verified-artifact API
 using the selected platform profile's URL, SHA-256 and byte size. Core rechecks
 cached bytes before reuse and keeps the existing state-root cache location.
+The Cleanroom client ZIP follows the same verified acquisition boundary. On
+Linux, including WSL's Linux side, Core stages and catalogs the extracted
+launcher base as one exact managed tree at the planned state path. Reuse checks
+both Core's catalog and the historical V1 receipt. An uncataloged fixture can
+still be read through its exact V1 receipt, whether it predates the catalog or
+its catalog state was lost. That read does not adopt the fixture or authorize
+cleanup. Incomplete stages remain for review.
+Core refuses publication when the selected filesystem cannot provide its
+atomic no-replace directory operation; Windows keeps its existing V1 route.
 
 For Prism Launcher and MultiMC clients, the materializer enforces these
 invariants:

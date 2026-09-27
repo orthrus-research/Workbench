@@ -26,8 +26,12 @@ from workbench_shell import (  # noqa: E402
     build_runtime_plan,
     materialize_client_bootstrap,
 )
+from workbench_shell import runtime_bootstrap as bootstrap  # noqa: E402
 from workbench_api import verified_artifacts  # noqa: E402
+from workbench_api.managed_trees import ManagedTreeError, managed_trees  # noqa: E402
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+from workbench_core.packwiz_tree_scope import direct_packwiz_tree_scope  # noqa: E402
+from workbench_core.storage.tree_catalog import TreeCatalog  # noqa: E402
 
 
 SOURCE_REVISION = "9" * 40
@@ -151,6 +155,26 @@ class RuntimeBootstrapTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         install_local_host_services()
 
+    @staticmethod
+    def _tree_scope(state_root: Path):
+        return direct_packwiz_tree_scope(
+            workspace=Path("/workspace/supersymmetry"),
+            state_root=state_root,
+            configuration_home=state_root.parent / "config",
+        )
+
+    def _materialize(
+        self, plan: dict[str, object], *, artifact_size: int,
+        artifact_source_revision: str, state_root: Path,
+    ) -> dict[str, object]:
+        with self._tree_scope(state_root):
+            return materialize_client_bootstrap(
+                plan,
+                artifact_size=artifact_size,
+                artifact_source_revision=artifact_source_revision,
+                state_root=state_root,
+            )
+
     def test_materializes_verified_instance_and_reuses_exact_target(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -163,7 +187,7 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 "workbench_shell.runtime_bootstrap.acquire_verified_artifact",
                 wraps=verified_artifacts.acquire_verified_artifact,
             ) as acquire:
-                created = materialize_client_bootstrap(
+                created = self._materialize(
                     plan,
                     artifact_size=archive.stat().st_size,
                     artifact_source_revision=SOURCE_REVISION,
@@ -209,8 +233,19 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 / sha256(archive.read_bytes()).hexdigest()
             )
             self.assertTrue(cache_path.is_file())
+            fixture_root = Path(
+                receipt["target"]["fixture_root_uri"].removeprefix("file://")
+            )
+            if sys.platform.startswith("linux"):
+                with self._tree_scope(state_root):
+                    target = managed_trees().lookup_target("artifacts", fixture_root)
+                    cataloged = managed_trees().reconcile(target.tree_id)
+                self.assertEqual(target.status, "committed")
+                self.assertEqual(cataloged.domain_id, receipt["bootstrap_id"])
+                self.assertEqual(cataloged.inventory_policy, "posix-exact-v1")
+                self.assertEqual(cataloged.derived_status, "current")
 
-            reused = materialize_client_bootstrap(
+            reused = self._materialize(
                 plan,
                 artifact_size=archive.stat().st_size,
                 artifact_source_revision=SOURCE_REVISION,
@@ -221,6 +256,157 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 reused["receipt"]["bootstrap_id"],
                 receipt["bootstrap_id"],
             )
+
+    def test_historical_receipt_only_fixture_reopens_without_adoption(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            fixture_root = bootstrap._local_path(
+                plan["target"]["fixture_root_uri"], "fixture root",
+            )
+            instance_root = fixture_root / "instance"
+            bootstrap._extract_client_archive(archive, instance_root)
+            bootstrap._validate_client_instance(
+                instance_root, minecraft_version="1.12.2",
+                cleanroom_version="0.6.8-alpha",
+            )
+            receipt = bootstrap._receipt(
+                plan, artifact=bootstrap._client_artifact(plan),
+                artifact_size=archive.stat().st_size,
+                artifact_source_revision=SOURCE_REVISION,
+                cache_path=archive, fixture_root=fixture_root,
+                instance=bootstrap._tree_manifest(instance_root),
+            )
+            receipt_path = fixture_root / bootstrap.RECEIPT_PATH
+            receipt_path.parent.mkdir(parents=True)
+            receipt_path.write_text(
+                json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True)
+                + "\n", encoding="utf-8",
+            )
+
+            reopened = self._materialize(
+                plan, artifact_size=archive.stat().st_size,
+                artifact_source_revision=SOURCE_REVISION,
+                state_root=state_root,
+            )
+            self.assertEqual(reopened["outcome"], "reused")
+            self.assertEqual(reopened["receipt"], receipt)
+            with self._tree_scope(state_root):
+                with self.assertRaises(ManagedTreeError) as missing:
+                    managed_trees().lookup_target("artifacts", fixture_root)
+            self.assertEqual(missing.exception.code, "tree.unavailable")
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
+    def test_published_without_commit_reconciles_exact_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            fixture_root = bootstrap._local_path(
+                plan["target"]["fixture_root_uri"], "fixture root",
+            )
+            original_write = TreeCatalog._write
+            interrupted = False
+
+            def interrupted_commit(catalog, name, nonce, kind, body):
+                nonlocal interrupted
+                if name == "commits" and not interrupted:
+                    interrupted = True
+                    raise OSError("synthetic lost commit")
+                return original_write(catalog, name, nonce, kind, body)
+
+            with patch.object(TreeCatalog, "_write", interrupted_commit):
+                with self.assertRaisesRegex(
+                    RuntimeBootstrapError, "Core cannot publish runtime bootstrap",
+                ):
+                    self._materialize(
+                        plan, artifact_size=archive.stat().st_size,
+                        artifact_source_revision=SOURCE_REVISION,
+                        state_root=state_root,
+                    )
+            self.assertTrue(interrupted)
+            self.assertTrue(fixture_root.is_dir())
+
+            recovered = self._materialize(
+                plan, artifact_size=archive.stat().st_size,
+                artifact_source_revision=SOURCE_REVISION,
+                state_root=state_root,
+            )
+            self.assertEqual(recovered["outcome"], "reused")
+            with self._tree_scope(state_root):
+                target = managed_trees().lookup_target("artifacts", fixture_root)
+                reference = managed_trees().reconcile(target.tree_id)
+            self.assertEqual(target.status, "committed")
+            self.assertEqual(reference.domain_id, recovered["receipt"]["bootstrap_id"])
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
+    def test_unsupported_publication_retains_stage_and_blocks_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            fixture_root = bootstrap._local_path(
+                plan["target"]["fixture_root_uri"], "fixture root",
+            )
+            with patch(
+                "workbench_core.managed_trees._rename_no_replace",
+                side_effect=ManagedTreeError(
+                    "output.filesystem", "selected filesystem lacks atomic publication",
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeBootstrapError, "atomic publication",
+                ):
+                    self._materialize(
+                        plan, artifact_size=archive.stat().st_size,
+                        artifact_source_revision=SOURCE_REVISION,
+                        state_root=state_root,
+                    )
+            self.assertFalse(fixture_root.exists())
+            self.assertEqual(
+                len(list(fixture_root.parent.glob(".workbench-tree-*.pending"))), 1,
+            )
+            with self.assertRaisesRegex(
+                RuntimeBootstrapError, "requires review",
+            ):
+                self._materialize(
+                    plan, artifact_size=archive.stat().st_size,
+                    artifact_source_revision=SOURCE_REVISION,
+                    state_root=state_root,
+                )
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
+    def test_historical_incomplete_stage_is_retained_and_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            fixture_root = bootstrap._local_path(
+                plan["target"]["fixture_root_uri"], "fixture root",
+            )
+            fixture_root.parent.mkdir(parents=True)
+            incomplete = fixture_root.parent / f".{fixture_root.name}.bootstrap-incomplete"
+            incomplete.mkdir(mode=0o700)
+
+            with self.assertRaisesRegex(
+                RuntimeBootstrapError, "prepared stage requires review",
+            ):
+                self._materialize(
+                    plan, artifact_size=archive.stat().st_size,
+                    artifact_source_revision=SOURCE_REVISION,
+                    state_root=state_root,
+                )
+            self.assertTrue(incomplete.is_dir())
+            self.assertFalse(fixture_root.exists())
 
     def test_missing_core_host_refuses_without_creating_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -233,12 +419,31 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                     RuntimeBootstrapError, "no verified artifact host",
                 ):
-                    materialize_client_bootstrap(
+                    self._materialize(
                         plan,
                         artifact_size=archive.stat().st_size,
                         artifact_source_revision=SOURCE_REVISION,
                         state_root=state_root,
                     )
+            self.assertFalse(state_root.exists())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
+    def test_unbound_linux_tree_host_refuses_new_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+
+            with self.assertRaisesRegex(
+                RuntimeBootstrapError, "Core Cleanroom bootstrap custody is unavailable",
+            ):
+                materialize_client_bootstrap(
+                    plan, artifact_size=archive.stat().st_size,
+                    artifact_source_revision=SOURCE_REVISION,
+                    state_root=state_root,
+                )
             self.assertFalse(state_root.exists())
 
     def test_modified_existing_target_fails_closed(self) -> None:
@@ -248,7 +453,7 @@ class RuntimeBootstrapTest(unittest.TestCase):
             _write_archive(archive)
             state_root = root / "state"
             plan = _plan(state_root, archive)
-            created = materialize_client_bootstrap(
+            created = self._materialize(
                 plan,
                 artifact_size=archive.stat().st_size,
                 artifact_source_revision=SOURCE_REVISION,
@@ -268,7 +473,7 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 RuntimeBootstrapError,
                 "drifted",
             ):
-                materialize_client_bootstrap(
+                self._materialize(
                     plan,
                     artifact_size=archive.stat().st_size,
                     artifact_source_revision=SOURCE_REVISION,
@@ -282,7 +487,7 @@ class RuntimeBootstrapTest(unittest.TestCase):
             _write_archive(archive)
             state_root = root / "state"
             plan = _plan(state_root, archive)
-            created = materialize_client_bootstrap(
+            created = self._materialize(
                 plan,
                 artifact_size=archive.stat().st_size,
                 artifact_source_revision=SOURCE_REVISION,
@@ -305,7 +510,7 @@ class RuntimeBootstrapTest(unittest.TestCase):
             ).write_text("{}\n", encoding="utf-8")
 
             with self.assertRaisesRegex(RuntimeBootstrapError, "drifted"):
-                materialize_client_bootstrap(
+                self._materialize(
                     plan,
                     artifact_size=archive.stat().st_size,
                     artifact_source_revision=SOURCE_REVISION,
@@ -326,7 +531,7 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 RuntimeBootstrapError,
                 "SHA-256 mismatch",
             ):
-                materialize_client_bootstrap(
+                self._materialize(
                     plan,
                     artifact_size=archive.stat().st_size,
                     artifact_source_revision=SOURCE_REVISION,
@@ -356,7 +561,7 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 RuntimeBootstrapError,
                 "unsafe archive member",
             ):
-                materialize_client_bootstrap(
+                self._materialize(
                     plan,
                     artifact_size=archive.stat().st_size,
                     artifact_source_revision=SOURCE_REVISION,
@@ -387,7 +592,7 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 RuntimeBootstrapError,
                 "identity mismatch",
             ):
-                materialize_client_bootstrap(
+                self._materialize(
                     plan,
                     artifact_size=archive.stat().st_size,
                     artifact_source_revision=SOURCE_REVISION,

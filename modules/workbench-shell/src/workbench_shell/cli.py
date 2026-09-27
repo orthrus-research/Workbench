@@ -3263,12 +3263,20 @@ def main(
             )
         elif args.command == "runtime-bootstrap":
             assert active_configuration is not None
-            result = bootstrap_project_runtime(
-                suite_root,
-                args.workspace,
-                launcher=args.launcher,
-                configuration=active_configuration,
-            )
+            from workbench_core.packwiz_tree_scope import direct_packwiz_tree_scope
+            with direct_packwiz_tree_scope(
+                workspace=Path(args.workspace).expanduser().resolve(),
+                suite_root=suite_root,
+                state_root=runtime_state_root,
+                configuration_home=runtime_configuration_home,
+            ):
+                result = bootstrap_project_runtime(
+                    suite_root,
+                    args.workspace,
+                    launcher=args.launcher,
+                    state_root=runtime_state_root,
+                    configuration=active_configuration,
+                )
         elif args.command == "runtime-materialize":
             assert active_configuration is not None
             _require_manual_artifact_preflight(

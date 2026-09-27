@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
+import sys
 import tempfile
 from typing import Any
 from urllib.parse import urlparse
@@ -24,6 +25,10 @@ from workbench_api.verified_artifacts import (
     VerifiedArtifactError,
     acquire_verified_artifact,
 )
+from workbench_api.host_filesystem import (
+    HostFilesystemError, count_prepared_directory_stages,
+)
+from workbench_api.managed_trees import ManagedTreeError, managed_trees
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
     WorkbenchConfiguration,
@@ -562,6 +567,100 @@ def _reuse_existing(
     }
 
 
+def _bootstrap_tree_host(plan: dict[str, Any]):
+    workspace = plan.get("workspace")
+    if not isinstance(workspace, dict):
+        raise RuntimeBootstrapError("runtime plan lacks a workspace")
+    selected_workspace = _local_path(
+        workspace.get("root_uri"), "runtime workspace root",
+    ).resolve()
+    try:
+        host = managed_trees()
+    except ManagedTreeError as exc:
+        raise RuntimeBootstrapError(
+            "Core Cleanroom bootstrap custody is unavailable: " + str(exc)
+        ) from exc
+    if host.workspace != selected_workspace or host.owner_id != "workbench-shell":
+        raise RuntimeBootstrapError(
+            "Core Cleanroom bootstrap custody belongs to another workspace or owner"
+        )
+    return host
+
+
+def _cataloged_bootstrap(tree_host, fixture_root: Path):
+    try:
+        target = tree_host.lookup_target("artifacts", fixture_root)
+    except ManagedTreeError as exc:
+        if exc.code == "tree.unavailable":
+            # A target without a Core row may be historical or have lost its
+            # catalog. Permit receipt-only readback, never adoption or cleanup.
+            return None
+        if exc.code == "tree.changed":
+            raise RuntimeBootstrapError(
+                "runtime fixture target has drifted from its Core catalog"
+            ) from exc
+        raise RuntimeBootstrapError(
+            "Core cannot inspect runtime bootstrap custody: " + str(exc)
+        ) from exc
+    except (OSError, ValueError) as exc:
+        raise RuntimeBootstrapError(
+            "Core cannot inspect runtime bootstrap custody: " + str(exc)
+        ) from exc
+    if target.status in {"failed", "allocated", "conflict", "unavailable", "changed"}:
+        raise RuntimeBootstrapError(
+            "earlier Core runtime bootstrap requires review"
+        )
+    try:
+        reference = tree_host.reconcile(target.tree_id)
+    except (ManagedTreeError, OSError, ValueError) as exc:
+        raise RuntimeBootstrapError(
+            "earlier Core runtime bootstrap requires review: " + str(exc)
+        ) from exc
+    if (
+        reference.path != fixture_root
+        or reference.workspace != tree_host.workspace
+        or reference.owner_id != "workbench-shell"
+        or reference.role != "artifacts"
+        or reference.inventory_policy != "posix-exact-v1"
+        or reference.derived_status != "current"
+    ):
+        raise RuntimeBootstrapError(
+            "Core cataloged another runtime bootstrap fixture"
+        )
+    return reference
+
+
+def _prepare_bootstrap_fixture(
+    staging: Path, plan: dict[str, Any], *, cache_path: Path,
+    artifact: dict[str, str], artifact_size: int,
+    artifact_source_revision: str, fixture_root: Path,
+) -> tuple[dict[str, Any], bytes]:
+    instance_root = staging / "instance"
+    _extract_client_archive(cache_path, instance_root)
+    _validate_client_instance(
+        instance_root,
+        minecraft_version=plan["project"].get("minecraft_version"),
+        cleanroom_version=plan["target"].get("cleanroom_version"),
+    )
+    instance = _tree_manifest(instance_root)
+    receipt = _receipt(
+        plan,
+        artifact=artifact,
+        artifact_size=artifact_size,
+        artifact_source_revision=artifact_source_revision,
+        cache_path=cache_path,
+        fixture_root=fixture_root,
+        instance=instance,
+    )
+    receipt_bytes = (
+        json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    receipt_path = staging / RECEIPT_PATH
+    receipt_path.parent.mkdir(parents=True)
+    receipt_path.write_bytes(receipt_bytes)
+    return receipt, receipt_bytes
+
+
 def materialize_client_bootstrap(
     plan: dict[str, Any],
     *,
@@ -586,14 +685,43 @@ def materialize_client_bootstrap(
         )
     state = Path(state_root).expanduser().resolve()
     fixture_root, artifact = _validate_plan(plan, state)
+    # WSL enters this branch as a Linux process. Unsupported DrvFS atomic
+    # publication fails in Core and retains the unresolved stage for review.
+    tree_host = _bootstrap_tree_host(plan) if sys.platform.startswith("linux") else None
+    cataloged = _cataloged_bootstrap(tree_host, fixture_root) if tree_host else None
     if fixture_root.exists() or fixture_root.is_symlink():
-        return _reuse_existing(
+        reused = _reuse_existing(
             plan,
             artifact=artifact,
             artifact_size=artifact_size,
             artifact_source_revision=artifact_source_revision,
             fixture_root=fixture_root,
         )
+        if cataloged is not None and cataloged.domain_id != reused["receipt"]["bootstrap_id"]:
+            raise RuntimeBootstrapError(
+                "Core runtime bootstrap identity differs from its receipt"
+            )
+        return reused
+    if cataloged is not None:
+        raise RuntimeBootstrapError(
+            "Core runtime bootstrap target is missing after reconciliation"
+        )
+
+    if tree_host is not None and (
+        fixture_root.parent.exists() or fixture_root.parent.is_symlink()
+    ):
+        try:
+            interrupted_stages = count_prepared_directory_stages(
+                fixture_root, stage_prefix=f".{fixture_root.name}.bootstrap-",
+            )
+        except (HostFilesystemError, ValueError) as exc:
+            raise RuntimeBootstrapError(
+                "cannot inspect earlier runtime bootstrap prepared stages through Core"
+            ) from exc
+        if interrupted_stages:
+            raise RuntimeBootstrapError(
+                "earlier runtime bootstrap prepared stage requires review"
+            )
 
     try:
         acquired = acquire_verified_artifact(
@@ -608,40 +736,71 @@ def materialize_client_bootstrap(
     except VerifiedArtifactError as exc:
         raise RuntimeBootstrapError(str(exc)) from exc
     cache_path, artifact_outcome = acquired.path, acquired.outcome
+    if tree_host is not None:
+        try:
+            with tree_host.stage(
+                "artifacts", fixture_root.name, requested_path=fixture_root,
+            ) as tree_stage:
+                receipt, receipt_bytes = _prepare_bootstrap_fixture(
+                    tree_stage.path, plan, cache_path=cache_path,
+                    artifact=artifact, artifact_size=artifact_size,
+                    artifact_source_revision=artifact_source_revision,
+                    fixture_root=fixture_root,
+                )
+
+                def validate_staged_tree(root: Path) -> None:
+                    if (root / RECEIPT_PATH).read_bytes() != receipt_bytes:
+                        raise RuntimeBootstrapError(
+                            "staged runtime bootstrap receipt changed before Core publication"
+                        )
+                    if _tree_manifest(root / "instance") != receipt["instance"]:
+                        raise RuntimeBootstrapError(
+                            "staged runtime bootstrap instance changed before Core publication"
+                        )
+
+                reference = tree_stage.publish(
+                    validate=validate_staged_tree,
+                    domain_id=receipt["bootstrap_id"],
+                    inventory_policy="posix-exact-v1",
+                )
+        except (ManagedTreeError, OSError, ValueError) as exc:
+            raise RuntimeBootstrapError(
+                "Core cannot publish runtime bootstrap fixture: " + str(exc)
+            ) from exc
+        if (
+            reference.path != fixture_root
+            or reference.domain_id != receipt["bootstrap_id"]
+            or reference.inventory_policy != "posix-exact-v1"
+        ):
+            raise RuntimeBootstrapError(
+                "Core published another runtime bootstrap fixture"
+            )
+        _reuse_existing(
+            plan, artifact=artifact, artifact_size=artifact_size,
+            artifact_source_revision=artifact_source_revision,
+            fixture_root=fixture_root,
+        )
+        return {
+            "format": "workbench-runtime-bootstrap-result-v1",
+            "schema_version": 1,
+            "outcome": "created",
+            "artifact_outcome": artifact_outcome,
+            "receipt": receipt,
+        }
+
+    # Historical Windows and other non-Linux route. Its V1 receipts remain
+    # subject to the same complete owner-side reuse validation above.
     fixture_root.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(
         prefix=f".{fixture_root.name}.bootstrap-",
         dir=fixture_root.parent,
     ))
     try:
-        instance_root = staging / "instance"
-        _extract_client_archive(cache_path, instance_root)
-        _validate_client_instance(
-            instance_root,
-            minecraft_version=plan["project"].get("minecraft_version"),
-            cleanroom_version=plan["target"].get("cleanroom_version"),
-        )
-        instance = _tree_manifest(instance_root)
-        receipt = _receipt(
-            plan,
-            artifact=artifact,
-            artifact_size=artifact_size,
+        receipt, _receipt_bytes = _prepare_bootstrap_fixture(
+            staging, plan, cache_path=cache_path,
+            artifact=artifact, artifact_size=artifact_size,
             artifact_source_revision=artifact_source_revision,
-            cache_path=cache_path,
             fixture_root=fixture_root,
-            instance=instance,
-        )
-        receipt_path = staging / RECEIPT_PATH
-        receipt_path.parent.mkdir(parents=True)
-        receipt_path.write_text(
-            json.dumps(
-                receipt,
-                ensure_ascii=False,
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
         )
         try:
             staging.rename(fixture_root)
