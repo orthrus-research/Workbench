@@ -21,7 +21,6 @@ import os
 from pathlib import Path
 import re
 import secrets
-import shutil
 import stat
 from typing import Any, Iterator, Mapping, NoReturn
 from urllib.parse import urlparse
@@ -1034,21 +1033,6 @@ def _reopen_started_setup(
     return start, raw
 
 
-def _remove_incomplete_setup(path: Path, label: str) -> None:
-    """Remove only a session-scoped setup path while its owner lock is held."""
-
-    if not path.exists() and not path.is_symlink():
-        return
-    try:
-        metadata = path.lstat()
-        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
-            _fail(f"{label} is not an ordinary directory")
-        shutil.rmtree(path)
-        fsync_directory(path.parent)
-    except OSError as exc:
-        raise FeatureChangeWorkspaceError(f"cannot clean {label}: {exc}") from exc
-
-
 def bind_material_fluid_recipe_session_context(
     suite_root: Path | str,
     session_record_path: Path | str,
@@ -1098,9 +1082,13 @@ def bind_material_fluid_recipe_session_context(
                 )
             _verify_session_owner(suite, validated)
         else:
-            for stale in contexts.glob(f".{session_id}.staging-*"):
-                _remove_incomplete_setup(
-                    stale, "stale feature change Work Session staging directory"
+            # Pre-Core V1 staging names have no allocation or publication
+            # witness. Their contents and writer state cannot be inferred from
+            # a filename or from release of this cooperative bind lock.
+            if next(contexts.glob(f".{session_id}.staging-*"), None) is not None:
+                _fail(
+                    "legacy feature change Work Session staging requires Core review; "
+                    "retained without deletion"
                 )
             intent = SessionOwnerSetupIntent(
                 session_record_id=session["session_record_id"],

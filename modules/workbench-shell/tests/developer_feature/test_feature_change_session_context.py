@@ -327,6 +327,66 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         self.assertEqual(before, allocation.read_bytes())
         self.assertTrue(owner.is_dir())
 
+    def test_legacy_context_stage_is_retained_and_blocks_new_setup(self) -> None:
+        contexts = self.record_provider.open(
+            "feature-change-session-context-v1", ROOT,
+        ).root / "contexts"
+        contexts.mkdir(mode=0o700, exist_ok=True)
+        record, created = self._session("legacy-stage-directory")
+        session_id = str(created["session_id"])
+        stage = contexts / f".{session_id}.staging-{'a' * 32}"
+        stage.mkdir(mode=0o700)
+        payload = stage / "unknown-payload"
+        payload.write_bytes(b"keep unknown stage bytes\n")
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "staging requires Core review"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config,
+                **self._request("Thermal Solvent Legacy Stage Directory"),
+            )
+        self.assertEqual(b"keep unknown stage bytes\n", payload.read_bytes())
+        self.assertFalse((self._context_root / "session-owners" / session_id).exists())
+
+        if os.name != "posix":
+            return  # POSIX and WSL can create this redirect without host privileges.
+        record, created = self._session("legacy-stage-redirect")
+        session_id = str(created["session_id"])
+        foreign = self.root / "foreign-stage"
+        foreign.mkdir()
+        (foreign / "unknown-payload").write_bytes(b"foreign stays\n")
+        redirect = contexts / f".{session_id}.staging-{'b' * 32}"
+        redirect.symlink_to(foreign, target_is_directory=True)
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "staging requires Core review"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config,
+                **self._request("Thermal Solvent Legacy Stage Redirect"),
+            )
+        self.assertTrue(redirect.is_symlink())
+        self.assertEqual(b"foreign stays\n", (foreign / "unknown-payload").read_bytes())
+        self.assertFalse((self._context_root / "session-owners" / session_id).exists())
+
+    def test_completed_context_reader_ignores_retained_legacy_stage(self) -> None:
+        context, created = self._bind("completedlegacy")
+        stage = (
+            self._context_root / "contexts"
+            / f".{created['session_id']}.staging-{'c' * 32}"
+        )
+        stage.mkdir(mode=0o700)
+        (stage / "unknown-payload").write_bytes(b"retain\n")
+        self.assertEqual(
+            context["context_id"],
+            resolve_material_fluid_recipe_session_context(ROOT)[0]["context_id"],
+        )
+        record = feature_change_workspace._local_uri(
+            context["session_record_uri"], "Work Session record",
+        )
+        reopened = bind_material_fluid_recipe_session_context(
+            ROOT, record,
+            self.runtime_config,
+            **self._request("Thermal Solvent completedlegacy"),
+        )
+        self.assertEqual(context["context_id"], reopened["context_id"])
+        self.assertEqual(b"retain\n", (stage / "unknown-payload").read_bytes())
+
     @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
     def test_exit_after_started_binding_forward_completes_exact_setup(self) -> None:
         record, created = self._session("started-retry")
@@ -549,6 +609,9 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         (self._context_root / "owner-allocations" / f"{session_id}.json").unlink()
         (self._context_root / "owner-allocations" / f"{session_id}.setup.json").unlink()
         (self._context_root / "owner-allocations" / f"{session_id}.started.json").unlink()
+        old_stage = self._context_root / "contexts" / f".{session_id}.staging-{'d' * 32}"
+        old_stage.mkdir(mode=0o700)
+        (old_stage / "unknown-payload").write_bytes(b"historical stage retained\n")
         legacy = CoreManagedTrees(
             workspace=ROOT, configuration_home=self.root / "legacy-v1-config",
             locations={"artifacts": ROOT}, owner_id="workbench-shell",
@@ -556,6 +619,7 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         with managed_trees_scope(legacy):
             reopened = resolve_material_fluid_recipe_session_context(ROOT)[0]
         self.assertEqual(context["context_id"], reopened["context_id"])
+        self.assertEqual(b"historical stage retained\n", (old_stage / "unknown-payload").read_bytes())
 
     def test_core_owner_rejects_same_byte_state_and_start_replacements(self) -> None:
         for label, target_name in (("statereplaced", "owner-state"), ("startreplaced", "start-result-v1.json")):
