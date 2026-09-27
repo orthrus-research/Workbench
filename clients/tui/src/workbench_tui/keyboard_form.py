@@ -112,6 +112,15 @@ class KeyboardFormScreen(Screen[None]):
     def on_key(self, event: events.Key) -> None:
         key = event.key
         focused = self.app.focused
+        if isinstance(focused, OptionList):
+            # A focused list owns its arrow and Enter keys; form navigation
+            # resumes when focus returns to a field or button.
+            if key == "escape" and self.KEYBOARD_CANCEL is not None:
+                cancel = self.query_one(f"#{self.KEYBOARD_CANCEL}", Button)
+                if not cancel.disabled:
+                    cancel.press()
+                event.stop()
+            return
         if (self._keyboard_editing is None and isinstance(focused, Input)
                 and focused.id in self.KEYBOARD_FIELDS):
             self._keyboard_editing = focused.id

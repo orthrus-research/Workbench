@@ -155,6 +155,7 @@ class InstallHookTests(unittest.TestCase):
         self._archive(self.bundle_archive, {
             "workbench-linux-x64-py314/verify_install_bundle.py": (b"# stubbed by runtime fixture\n", 0o644),
             "workbench-linux-x64-py314/wheelhouse/install_workbench.py": (b"# stubbed by runtime fixture\n", 0o644),
+            "workbench-linux-x64-py314/axiom/workbench-axiom-engine-0.1.0.zip": (b"fixture archive", 0o644),
         })
         self.bad_bundle = self.root / "bad-bundle.tar.gz"
         self.bad_bundle.write_bytes(self.bundle_archive.read_bytes() + b"changed")
@@ -269,7 +270,10 @@ class InstallHookTests(unittest.TestCase):
         output = result.stdout.decode()
         self.assertIn("guided Supersymmetry setup", output)
         self.assertNotIn("IDE clients:", output)
-        self.assertNotIn("Axiom engine archive:", output)
+        self.assertIn(
+            f"Axiom engine ZIP: {self.install_root}/bundles/test-v1/axiom/workbench-axiom-engine-0.1.0.zip",
+            output,
+        )
 
     def test_changed_managed_python_archive_is_rejected_before_extraction(self) -> None:
         result = self.invoke(TEST_RUNTIME_ARCHIVE=str(self.bad_runtime))
@@ -325,6 +329,10 @@ class InstallHookTests(unittest.TestCase):
         second = self.invoke(TEST_CURL_FAIL="1")
         self.assertEqual(0, second.returncode, second.stderr.decode())
         self.assertIn("already installed", second.stdout.decode())
+        self.assertIn(
+            f"Axiom engine ZIP: {self.install_root}/bundles/test-v1/axiom/workbench-axiom-engine-0.1.0.zip",
+            second.stdout.decode(),
+        )
         self.assertEqual(receipt, (destination / "workbench-install.json").read_bytes())
         self.assertEqual(hook_receipt, (destination / "workbench-hook.json").read_bytes())
         self.assertEqual(downloads, self.download_log.read_bytes())

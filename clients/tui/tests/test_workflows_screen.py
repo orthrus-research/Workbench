@@ -31,6 +31,10 @@ def catalog_core() -> Mock:
         "workspace": {"path": "/tmp/workbench", "source": "user-workspaces"},
     })
     core.setup_check = AsyncMock(return_value={"format": "workbench-setup-check-v2", "selection": {}, "dependencies": [], "blockers": []})
+    core.installed_axiom_engine = AsyncMock(return_value={
+        "format": "workbench-installed-axiom-engine-v1", "state": "unavailable",
+        "archive_path": None, "reason": "No installed bundle",
+    })
     core.modules = AsyncMock(return_value=[])
     core.profiles = AsyncMock(return_value=[])
     core.catalog = AsyncMock(return_value={
@@ -249,6 +253,9 @@ class CatalogAdmissionTests(unittest.TestCase):
         self.assertFalse(_runnable_catalog_action({**base, "risk": "mutating"}))
         self.assertFalse(_runnable_catalog_action({**base, "preview": "inert-only"}))
         self.assertFalse(_runnable_catalog_action({**base, "availability": "unavailable"}))
+        self.assertFalse(_runnable_catalog_action({
+            **base, "command_id": "atlas.observations-session",
+        }))
         self.assertFalse(_runnable_catalog_action({**base, "options": [{
             "key": "paths", "kind": "path", "nargs": "one", "repeat": True,
         }]}))

@@ -326,12 +326,69 @@ Select.keyboard-selected > SelectCurrent .arrow {
     display: none;
 }
 
+AtlasSearchScreen #atlas-search-detail,
+AtlasObservationSearchScreen #atlas-observation-detail {
+    height: 1fr;
+    overflow-y: auto;
+}
+
 #result-log {
     height: 1fr;
     border: solid $secondary;
     margin: 1 2;
     padding: 1;
     background: $panel;
+    overflow-x: hidden;
+}
+
+#axiom-journey-body {
+    padding: 0 2 1 2;
+}
+
+#axiom-journey-body .field-label {
+    margin-top: 0;
+}
+
+#axiom-journey-body .button-row {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.axiom-path-row {
+    height: 3;
+}
+
+.axiom-path-row Input {
+    width: 1fr;
+}
+
+.axiom-path-row Button {
+    width: 12;
+    margin-left: 1;
+}
+
+#axiom-guide {
+    height: auto;
+    color: $description;
+    margin: 0;
+}
+
+#axiom-status,
+#axiom-history-status {
+    height: auto;
+    min-height: 2;
+    color: $metadata;
+}
+
+#axiom-history-list {
+    height: 1fr;
+    margin: 0 1;
+    border: solid $secondary;
+}
+
+#atlas-search-detail {
+    height: 1fr;
+    overflow-y: auto;
 }
 
 ReviewModal, ReleaseUpdateModal, InstancePathPicker, CatalogInputsScreen, CatalogValueScreen {
@@ -493,6 +550,52 @@ Screen.-narrow #setup-scroll .path-row Button {
     margin-right: 0;
 }
 
+Screen.-narrow #axiom-journey-body {
+    padding: 0 1;
+}
+
+Screen.-narrow #axiom-journey-body .field-label {
+    margin-top: 0;
+}
+
+Screen.-narrow #axiom-journey-body #axiom-guide {
+    max-height: 3;
+    overflow-y: auto;
+}
+
+Screen.-narrow #axiom-journey-body #axiom-status {
+    min-height: 1;
+}
+
+Screen.-narrow #axiom-journey-body .button-row {
+    height: 2;
+}
+
+Screen.-narrow #axiom-journey-body .button-row Button {
+    width: 1fr;
+    min-width: 0;
+    height: 2;
+    min-height: 2;
+    border: none;
+    margin-right: 1;
+}
+
+AtlasSearchScreen.-narrow #atlas-search-context {
+    display: block;
+    height: 2;
+    min-height: 2;
+    overflow-y: auto;
+    padding-bottom: 0;
+}
+
+AtlasObservationSearchScreen.-narrow #atlas-observation-scope {
+    display: block;
+    height: 2;
+    min-height: 2;
+    overflow-y: auto;
+    padding-bottom: 0;
+}
+
 Screen.-narrow #inventory-tabs {
     margin: 0 1;
 }
@@ -536,6 +639,11 @@ Screen.-narrow #workflow-brief {
 
 Screen.-narrow #workflow-search {
     margin: 0 1;
+}
+
+Screen.-narrow #result-log {
+    margin: 0 1;
+    padding: 0 1;
 }
 
 Screen.-narrow #workflow-body {

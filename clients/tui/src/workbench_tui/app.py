@@ -55,6 +55,8 @@ _HAS_PICKER = find_spec("textual_fspicker") is not None
 
 def _runnable_catalog_action(action: Mapping[str, Any]) -> bool:
     """Admit only catalog actions this client can collect and execute."""
+    if action.get("command_id") == "atlas.observations-session":
+        return False  # The interactive JSONL session needs a persistent stdin client.
     if (action.get("risk") != "read-only"
             or action.get("preview") != "none"
             or action.get("availability") not in {"available", "experimental"}):
@@ -464,16 +466,18 @@ class InstancePathPicker(ModalScreen[Path | None]):
         Binding("ctrl+g", "focus_location", "Go to folder"),
     ]
 
-    def __init__(self, location: Path, *, choose_zip: bool) -> None:
+    def __init__(self, location: Path, *, choose_zip: bool,
+                 heading: str | None = None) -> None:
         super().__init__()
         self.location = location
         self.choose_zip = choose_zip
+        self.heading = heading
 
     def compose(self) -> ComposeResult:
         with Vertical(id="instance-path-dialog"):
             yield Static(
-                "Choose a complete Prism ZIP" if self.choose_zip else
-                "Choose an existing Prism data folder",
+                self.heading or ("Choose a complete Prism ZIP" if self.choose_zip else
+                                 "Choose an existing Prism data folder"),
                 id="instance-path-heading",
             )
             yield Static(
@@ -1403,6 +1407,1286 @@ class ResultScreen(Screen[None]):
 
     def action_back(self) -> None:
         self.app.pop_screen()
+
+
+def _evidence_note(record: Mapping[str, Any]) -> str:
+    gaps = record.get("evidence_gaps")
+    if not isinstance(gaps, list) or not gaps:
+        return ""
+    lines = []
+    for gap in gaps[:5]:
+        if isinstance(gap, dict):
+            code = str(gap.get("code", "unknown"))
+            message = gap.get("message")
+            lines.append(f"• {message} ({code})" if isinstance(message, str) and message else
+                         f"• {code}")
+    if len(gaps) > 5:
+        lines.append(f"• {len(gaps) - 5} more limits in the full record")
+    return "Evidence limits:\n" + "\n".join(lines) if lines else ""
+
+
+def _analysis_summary(owner: str, record: Mapping[str, Any]) -> str:
+    """A small, truthful reading surface; the complete owner record stays available."""
+    lines: list[str] = []
+    if owner == "atlas":
+        if record.get("format") == "workbench-atlas-initialization-projection-v1":
+            lines.extend((
+                "Axiom observations are ready in Atlas.",
+                f"Graph folder: {record.get('root', '?')}",
+                f"Checked side: {record.get('selected_side', '?')}",
+                f"Native outcome: {record.get('native_outcome', '?')}",
+                f"Coverage: {record.get('capture_coverage', '?')}",
+                "Choose Search this graph to inspect recorded values.",
+            ))
+            limitations = record.get("limitations")
+            if isinstance(limitations, list) and limitations:
+                lines.extend(("", "Limits:"))
+                lines.extend(f"• {item}" for item in limitations[:5])
+            return "\n".join(lines)
+        if str(record.get("format", "")).startswith("workbench-atlas-observation-"):
+            context = record.get("context")
+            if isinstance(context, dict) and context.get("root"):
+                lines.append(f"Observation graph: {context['root']}")
+            if isinstance(context, dict):
+                binding = context.get("evidence_binding")
+                if isinstance(binding, dict):
+                    for key, label in (("native_outcome", "Native outcome"),
+                                       ("coverage", "Capture coverage")):
+                        if binding.get(key) is not None:
+                            lines.append(f"{label}: {binding[key]}")
+            selection = record.get("selection")
+            if isinstance(selection, dict):
+                lines.append(f"Selected: {selection.get('semantic_key', selection.get('id', '?'))}")
+                lines.append(f"Kind: {selection.get('kind', '?')}")
+                if isinstance(selection.get("properties"), dict):
+                    lines.extend(("", "Recorded properties:",
+                                  json.dumps(selection["properties"], ensure_ascii=False,
+                                             indent=2, sort_keys=True)))
+            if record.get("query") is not None:
+                lines.append(f"Search: {record['query']}")
+            results = record.get("results")
+            if isinstance(results, list):
+                lines.append(f"Results in this page: {len(results)}")
+                for row in results[:50]:
+                    if not isinstance(row, dict):
+                        continue
+                    node = row.get("node") if isinstance(row.get("node"), dict) else row
+                    edge = row.get("edge") if isinstance(row.get("edge"), dict) else None
+                    relation = f"{edge.get('relation', '?')} → " if edge else ""
+                    lines.append(f"• {relation}{node.get('semantic_key', node.get('id', '?'))}")
+            page = record.get("page")
+            if isinstance(page, dict) and page.get("next_cursor"):
+                lines.append("More results exist; narrow the search or request another page.")
+            if isinstance(context, dict) and context.get("claim_boundary"):
+                lines.extend(("", str(context["claim_boundary"])))
+            return "\n".join(lines) or "Atlas returned an observation record."
+        context = record.get("context")
+        if not isinstance(context, dict):
+            context = record
+        kind = str(context.get("context_type", "unknown"))
+        lines.append(
+            "Source-only checkout: text occurrences, not observed recipes."
+            if "source-only" in kind else
+            "Captured recipe graph: observed relationships from this exact graph."
+            if "graph" in kind else
+            f"Evidence context: {kind}"
+        )
+        for key, label in (("root", "Source"), ("recipe_count", "Recipes"),
+                           ("graph_set_id", "Graph")):
+            if context.get(key) is not None:
+                lines.append(f"{label}: {context[key]}")
+        if record.get("query") is not None:
+            results = record.get("results", [])
+            lines.append(f"Search: {record['query']}")
+            lines.append(f"Matches shown: {len(results) if isinstance(results, list) else 0}")
+            if record.get("truncated"):
+                lines.append("More matches exist. Narrow the search or raise its limit.")
+        selection = record.get("selection")
+        if isinstance(selection, dict):
+            lines.append(f"Selection: {selection.get('semantic_key', selection.get('selection_id', '?'))}")
+            lines.append(f"Kind: {selection.get('kind', '?')}")
+        if record.get("role"):
+            lines.append(f"Evidence role: {record['role']}")
+        ownership = record.get("ownership")
+        if isinstance(ownership, dict) and ownership.get("status"):
+            lines.append(f"Ownership: {ownership['status']}")
+        page = record.get("page")
+        if isinstance(page, dict):
+            lines.append(f"Relationships: {page.get('offset', 0)}–"
+                         f"{page.get('offset', 0) + len(record.get('links', []))}"
+                         f" of {page.get('total', '?')}")
+        if isinstance(record.get("links"), list):
+            for row in record["links"][:100]:
+                if isinstance(row, dict):
+                    node = row.get("node") or {}
+                    relationship = row.get("relationship") or {}
+                    lines.append(
+                        f"{row.get('direction', '?')} {relationship.get('relation', '?')}: "
+                        f"{node.get('semantic_key', '?')}"
+                    )
+        note = _evidence_note(record)
+        if note:
+            lines.extend(("", note))
+    elif owner == "axiom":
+        result = record.get("result")
+        if not isinstance(result, dict):
+            result = record
+        presentation = record.get("presentation")
+        if not isinstance(presentation, dict):
+            presentation = {}
+        state = result.get("state", presentation.get("attempt_state", "unknown"))
+        lines.append(f"Check state: {state}")
+        if record.get("exit_code") not in (None, 0) and not result.get("native_status"):
+            lines.append(f"Owner exit code: {record['exit_code']}")
+        for key, label in (("native_status", "Native status"),
+                           ("attempt_id", "Attempt"), ("findings_count", "Findings"),
+                           ("coverage", "Coverage"), ("context_id", "Checked context"),
+                           ("setup_state", "Setup"), ("setup_id", "Setup ID")):
+            value = result.get(key)
+            if value is not None:
+                lines.append(f"{label}: {value}")
+        if (result.get("native_outcome") is not None
+                and result.get("native_outcome") != result.get("native_status")):
+            lines.append(f"Native outcome: {result['native_outcome']}")
+        if presentation.get("source_current") is False:
+            lines.append("Saved source has changed since this check. Recheck before using locations.")
+        if isinstance(result.get("pending"), list) and result["pending"]:
+            lines.append("Still needed: " + ", ".join(map(str, result["pending"])))
+        if isinstance(result.get("finding_page"), dict):
+            page = result["finding_page"]
+            payload = page.get("payload") or {}
+            rows = payload.get("records", []) if isinstance(payload, dict) else []
+            labels = presentation.get("finding_labels") or {}
+            if isinstance(rows, list):
+                findings = [row["value"] for row in rows if isinstance(row, dict)
+                            and isinstance(row.get("value"), dict)]
+                errors: list[dict[str, Any]] = []
+                warnings: list[dict[str, Any]] = []
+                others: list[dict[str, Any]] = []
+                for finding in findings:
+                    severity = str(finding.get("severity", "")).casefold()
+                    if severity in {"error", "fatal", "critical"}:
+                        errors.append(finding)
+                    elif severity in {"warning", "warn"}:
+                        warnings.append(finding)
+                    else:
+                        others.append(finding)
+                shown = errors[:20] + others[:3] + warnings[:6]
+                lines.extend(("", f"Findings in this page: {len(findings)}"
+                              + (f" · showing {len(shown)}" if len(shown) < len(findings) else "")))
+                if errors or warnings:
+                    lines.append(f"Page severity: {len(errors)} error, {len(warnings)} warning"
+                                 + (f", {len(others)} other" if others else ""))
+                for finding in shown:
+                    location = finding.get("location") or finding.get("nativeLocation") or {}
+                    where = (f" · {location.get('path')}:{location.get('line')}"
+                             if isinstance(location, dict) and location.get("path") else "")
+                    label = labels.get(finding.get("id")) if isinstance(labels, dict) else None
+                    severity = str(finding.get("severity", "finding")).upper()
+                    lines.append(f"• {severity}: {label or finding.get('message') or finding.get('id', 'finding')}{where}")
+                if len(shown) < len(findings):
+                    lines.append(f"{len(findings) - len(shown)} more findings on this page are retained.")
+                total = result.get("findings_count")
+                if isinstance(total, int) and total > len(findings):
+                    lines.append(f"{total - len(findings)} further findings are retained beyond this page.")
+        if result.get("detail_state") == "not-loaded":
+            lines.append("Open History to revisit this retained attempt.")
+        if isinstance(result.get("attempts"), list):
+            lines.extend(("", f"Retained checks: {len(result['attempts'])}"))
+            for row in result["attempts"][:100]:
+                if isinstance(row, dict):
+                    lines.append(f"• {row.get('attempt_id', '?')} · {row.get('state', '?')}")
+        if presentation.get("attempt_uri"):
+            lines.extend(("", "Retained attempt for Atlas import:", str(presentation["attempt_uri"])))
+        diagnostics = record.get("diagnostics")
+        if diagnostics:
+            lines.extend(("", "Diagnostics", str(diagnostics)))
+        if result.get("attempt_id"):
+            lines.extend(("", "To inspect more findings, use Check history, then open this attempt."))
+    return "\n".join(lines) or "The owner returned a record without a compact summary. Open the full record."
+
+
+class AnalysisResultScreen(Screen[None]):
+    """Readable Atlas/Axiom answer with lossless owner JSON one key away."""
+
+    BINDINGS = [
+        ("escape", "back", "Back"),
+        ("r", "toggle_raw", "Full record"),
+        Binding("i", "import_atlas", "Open in Atlas", show=False),
+        Binding("s", "search_graph", "Search graph", show=False),
+    ]
+
+    def __init__(self, heading: str, owner: str, record: Mapping[str, Any]) -> None:
+        super().__init__()
+        self.heading = heading
+        self.owner = owner
+        self.record = record
+        self.raw = False
+
+    def _can_import_atlas(self) -> bool:
+        return (self.owner == "axiom" and _axiom_import_source(self.record) is not None
+                and _atlas_import_action(self.app.view.catalog) is not None)
+
+    def _can_search_graph(self) -> bool:
+        return (_observation_graph_root(self.record) is not None
+                and _atlas_read_action(self.app.view.catalog,
+                                       "atlas.observations-search") is not None)
+
+    def compose(self) -> ComposeResult:
+        yield Header(icon="W")
+        yield Static(self.heading, classes="screen-heading")
+        hint = "↑/↓ Scroll · R Full"
+        if self._can_import_atlas():
+            hint += " · I Open in Atlas"
+        if self._can_search_graph():
+            hint += " · S Search graph"
+        yield Static(hint + " · Esc Back", classes="keyboard-hint")
+        yield RichLog(id="result-log", wrap=True, highlight=False, markup=False,
+                      auto_scroll=False)
+        with Horizontal(classes="button-row"):
+            if self._can_import_atlas():
+                yield Button("Open in Atlas", id="analysis-import-atlas")
+            if self._can_search_graph():
+                yield Button("Search this graph", id="analysis-search-graph")
+            yield Button("Full record", id="analysis-raw")
+            yield Button("Back", id="analysis-back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self._render_record()
+        self.query_one("#result-log", RichLog).focus()
+
+    def _render_record(self) -> None:
+        log = self.query_one("#result-log", RichLog)
+        log.clear()
+        log.write(
+            json.dumps(self.record, ensure_ascii=False, indent=2, sort_keys=True)
+            if self.raw else _analysis_summary(self.owner, self.record)
+        )
+        self.query_one("#analysis-raw", Button).label = (
+            "Readable view" if self.raw else "Full record"
+        )
+
+    def action_toggle_raw(self) -> None:
+        self.raw = not self.raw
+        self._render_record()
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
+
+    def action_import_atlas(self) -> None:
+        if not self._can_import_atlas():
+            return
+        source = _axiom_import_source(self.record)
+        if source is not None:
+            self.app.push_screen(AtlasImportScreen(self.record, source))
+
+    def action_search_graph(self) -> None:
+        if not self._can_search_graph():
+            return
+        root = _observation_graph_root(self.record)
+        if root is not None and self.app.view.catalog is not None:
+            self.app.push_screen(AtlasObservationSearchScreen(
+                self.app.view.catalog, root
+            ))
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "analysis-import-atlas":
+            self.action_import_atlas()
+        elif event.button.id == "analysis-search-graph":
+            self.action_search_graph()
+        elif event.button.id == "analysis-raw":
+            self.action_toggle_raw()
+        elif event.button.id == "analysis-back":
+            self.action_back()
+
+
+def _axiom_import_source(record: Mapping[str, Any]) -> Path | None:
+    """Use the attempt directory supplied by Axiom/Core, never derive one from an ID."""
+    result = record.get("result")
+    presentation = record.get("presentation")
+    if (not isinstance(result, dict) or not isinstance(result.get("snapshot_id"), str)
+            or not isinstance(presentation, dict)
+            or not isinstance(presentation.get("attempt_uri"), str)):
+        return None
+    parsed = urlparse(presentation["attempt_uri"])
+    if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
+        return None
+    source = Path(unquote(parsed.path))
+    return source if source.is_absolute() else None
+
+
+def _atlas_import_action(catalog: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    """Only present Atlas admission when the installed catalog can execute it."""
+    commands = catalog.get("commands") if isinstance(catalog, dict) else None
+    if not isinstance(commands, list):
+        return None
+    return next((row for row in commands
+                 if isinstance(row, dict)
+                 and row.get("command_id") == "atlas.observations-import-snapshot"
+                 and row.get("availability") in {"available", "experimental"}
+                 and row.get("risk") == "mutating"
+                 and row.get("preview") == "inert-only"), None)
+
+
+def _atlas_read_action(catalog: Mapping[str, Any] | None,
+                       command_id: str) -> Mapping[str, Any] | None:
+    commands = catalog.get("commands") if isinstance(catalog, dict) else None
+    if not isinstance(commands, list):
+        return None
+    return next((row for row in commands
+                 if isinstance(row, dict) and row.get("command_id") == command_id
+                 and _runnable_catalog_action(row)), None)
+
+
+def _observation_graph_root(record: Mapping[str, Any]) -> Path | None:
+    if (record.get("format") != "workbench-atlas-initialization-projection-v1"
+            or record.get("state") != "complete"):
+        return None
+    raw = record.get("root")
+    if not isinstance(raw, str) or not raw or any(c in raw for c in "\0\r\n"):
+        return None
+    root = Path(raw)
+    return root if root.is_absolute() else None
+
+
+class AtlasImportScreen(KeyboardFormScreen):
+    """Review one Axiom-owned snapshot before Atlas publishes a new graph."""
+
+    KEYBOARD_CANCEL = "atlas-import-back"
+    KEYBOARD_FIELDS = ("atlas-import-output", "atlas-import-side",
+                       "atlas-import-run", "atlas-import-back")
+
+    def __init__(self, record: Mapping[str, Any], source: Path) -> None:
+        super().__init__()
+        self.record = record
+        self.source = source
+        self.busy = False
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        view = self.app.view  # type: ignore[attr-defined]
+        locations = (view.environment or {}).get("locations", {})
+        evidence = locations.get("evidence", {}) if isinstance(locations, dict) else {}
+        root = evidence.get("path") if isinstance(evidence, dict) else None
+        proposed = str(Path(root) / ("atlas-" + self.source.name)) if isinstance(root, str) else ""
+        yield Header(icon="W")
+        yield Static("Open this check in Atlas", classes="screen-heading")
+        yield Static(
+            "Atlas will verify Axiom's retained check and publish a new observation graph. "
+            "The original check and pack files stay unchanged.", classes="screen-intro",
+        )
+        yield Static("↑/↓ Choose  ·  Enter Edit or Run  ·  Esc Back", classes="keyboard-hint")
+        with VerticalScroll(id="atlas-import-body"):
+            yield Static(f"Retained check: {self.source}", id="atlas-import-source")
+            yield Static("New graph folder", classes="field-label")
+            yield Input(value=proposed, placeholder="Choose an unused absolute folder",
+                        id="atlas-import-output")
+            yield Static("Check side", classes="field-label")
+            yield Select((('Single check', 'single'), ('Candidate', 'candidate'),
+                          ('Baseline', 'baseline')), value="single", id="atlas-import-side")
+            yield Static("", id="atlas-import-status")
+            with Horizontal(classes="button-row"):
+                yield Button("Import in Atlas", id="atlas-import-run")
+                yield Button("Back", id="atlas-import-back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.start_keyboard_navigation()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "atlas-import-back" and not self.busy:
+            self.app.pop_screen()
+        elif event.button.id == "atlas-import-run":
+            self.import_snapshot()
+
+    @work(exclusive=True, group="atlas-import")
+    async def import_snapshot(self) -> None:
+        if self.busy:
+            return
+        status = self.query_one("#atlas-import-status", Static)
+        raw = self.query_one("#atlas-import-output", Input).value.strip()
+        target = Path(raw).expanduser() if raw else Path("")
+        if not raw or not target.is_absolute() or target.exists():
+            status.update("Choose a new absolute graph folder.")
+            return
+        side = self.query_one("#atlas-import-side", Select).value
+        if side not in {"single", "candidate", "baseline"}:
+            status.update("Choose the check side to import.")
+            return
+        catalog = self.app.view.catalog  # type: ignore[attr-defined]
+        action = _atlas_import_action(catalog)
+        if action is None:
+            status.update("Atlas snapshot import is not installed for this profile.")
+            return
+        values = {"path": str(self.source), "pack_profile": "supersymmetry",
+                  "output": str(target), "side": side, "json": True}
+        try:
+            review = await self.core.command_review(catalog, action, values)
+            approved = await self.app.push_screen_wait(ReviewModal(
+                "Import this check into Atlas?",
+                f"Retained check: {self.source}\nNew graph: {target}\nSide: {side}\n\n"
+                "Atlas will verify the retained evidence through the selected pack profile "
+                "and publish a new graph under Core's custody. This does not rerun Axiom.",
+                confirm_label="Import graph",
+            ))
+            if not approved:
+                return
+            self.busy = True
+            self.query_one("#atlas-import-run", Button).disabled = True
+            status.update("Verifying retained evidence and publishing the Atlas graph…")
+            output = await self.core.import_reviewed_atlas_snapshot(
+                catalog, action, values, review
+            )
+            result = _atlas_record(output, "atlas.observations-import-snapshot")
+            if result.get("format") != "workbench-atlas-initialization-projection-v1" or result.get("state") != "complete":
+                raise CoreClientError("Atlas did not report a complete observation graph")
+            self.app.push_screen(AnalysisResultScreen(
+                "Atlas observation graph", "atlas", result
+            ))
+            status.update("Atlas graph ready. Choose Search this graph in the result.")
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(f"Atlas import could not complete: {exc}")
+        finally:
+            self.busy = False
+            self.query_one("#atlas-import-run", Button).disabled = False
+
+
+def _atlas_record(output: CommandOutput, command_id: str) -> Mapping[str, Any]:
+    if output.exit_code != 0:
+        raise CoreClientError(output.stderr.strip() or output.stdout.strip()
+                              or f"Atlas exited {output.exit_code}")
+    try:
+        events = [json.loads(line) for line in output.stdout.splitlines() if line.strip()]
+        if not all(isinstance(event, dict) for event in events):
+            raise ValueError("console events are not objects")
+        owner_lines = [str(event["message"]) for event in events
+                       if event.get("source") == command_id
+                       and event.get("stream") == "stdout"
+                       and isinstance(event.get("message"), str)]
+        record = json.loads("\n".join(owner_lines))
+    except (json.JSONDecodeError, ValueError, KeyError) as exc:
+        raise CoreClientError("Atlas did not return a readable result: "
+                              + (output.stderr.strip() or output.stdout.strip())[:800]) from exc
+    if not isinstance(record, dict) or not str(record.get("format", "")).startswith("workbench-atlas-"):
+        raise CoreClientError("Atlas returned an unsupported result")
+    return record
+
+
+def _atlas_match_name(row: Mapping[str, Any]) -> str:
+    key = row.get("semantic_key")
+    if isinstance(key, str) and key:
+        return key
+    source = row.get("source_path")
+    line = row.get("line")
+    column = row.get("column")
+    if isinstance(source, str) and source:
+        if isinstance(line, int) and isinstance(column, int):
+            return f"{source}:{line}:{column}"
+        return f"{source}:{line}" if isinstance(line, int) else source
+    return str(row.get("snippet") or row.get("selection_id") or "Unknown match")
+
+
+def _atlas_search_scope(record: Mapping[str, Any]) -> str:
+    context = record.get("context")
+    kind = str(context.get("context_type", "")) if isinstance(context, dict) else ""
+    if "source-only" in kind:
+        scope = "Source text only: matches are file occurrences, not observed recipes."
+    elif "graph" in kind:
+        scope = "Captured graph: matches show observed recipes and their links."
+    else:
+        scope = "Atlas search in the selected evidence context."
+    if record.get("truncated"):
+        scope += " More matches exist; narrow the search."
+    return scope
+
+
+class AtlasSearchScreen(Screen[None]):
+    """Let one exact search selection open its owner-backed report or links."""
+
+    BINDINGS = [("escape", "back", "Back"), ("b", "browse", "Browse links")]
+
+    def __init__(self, catalog: Mapping[str, Any], path: str,
+                 record: Mapping[str, Any]) -> None:
+        super().__init__()
+        self.catalog = catalog
+        self.path = path
+        self.record = record
+        self.selected: Mapping[str, Any] | None = None
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        yield Header(icon="W")
+        yield Static("Atlas recipe search", classes="screen-heading")
+        yield Static("↑/↓ Choose  ·  Enter Inspect  ·  B Browse links  ·  Esc Back",
+                     classes="keyboard-hint")
+        yield Static(_atlas_search_scope(self.record), classes="screen-intro",
+                     id="atlas-search-context")
+        with Horizontal(id="workflow-body"):
+            yield OptionList(id="atlas-search-results")
+            with Vertical(id="workflow-detail-panel"):
+                yield Static("Select a result", id="atlas-search-detail")
+                with Horizontal(classes="button-row"):
+                    yield Button("Inspect", id="atlas-search-inspect", disabled=True)
+                    yield Button("Browse links", id="atlas-search-browse", disabled=True)
+        with Horizontal(classes="button-row"):
+            yield Button("Back", id="atlas-search-back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        rows = self.record.get("results", [])
+        listing = self.query_one("#atlas-search-results", OptionList)
+        if isinstance(rows, list):
+            listing.set_options([
+                Option(f"{_atlas_match_name(row)}  ·  {row.get('kind', '?')}",
+                       id=str(index))
+                for index, row in enumerate(rows) if isinstance(row, dict)
+            ])
+        if listing.option_count:
+            listing.highlighted = 0
+            self._select(0)
+        else:
+            self.query_one("#atlas-search-detail", Static).update(
+                "No matches in this evidence context. Go back and try another query."
+            )
+        listing.focus()
+
+    def _select(self, index: int) -> None:
+        rows = self.record.get("results", [])
+        self.selected = rows[index] if isinstance(rows, list) and 0 <= index < len(rows) else None
+        selected = self.selected
+        self.query_one("#atlas-search-inspect", Button).disabled = selected is None
+        context = self.record.get("context") or {}
+        graph = isinstance(context, dict) and "graph" in str(context.get("context_type", ""))
+        can_browse = graph and any(
+            row.get("command_id") == "atlas.recipes-browse"
+            for row in self.catalog.get("commands", []) if isinstance(row, dict)
+        )
+        self.query_one("#atlas-search-browse", Button).disabled = not (selected and can_browse)
+        if selected:
+            detail = Text()
+            detail.append(_atlas_match_name(selected), style="bold")
+            detail.append("\nKind: " + str(selected.get("kind", "?")))
+            if selected.get("snippet"):
+                detail.append("\n" + str(selected["snippet"]), style=_DESCRIPTION_COLOR)
+            detail.append("\n\nEnter to inspect exact evidence. "
+                          + ("Browse links to follow observed relationships." if graph else
+                             "This source-only view has no observed links."))
+            self.query_one("#atlas-search-detail", Static).update(detail)
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if event.option_list.id == "atlas-search-results" and event.option_id is not None:
+            self._select(int(event.option_id))
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id == "atlas-search-results":
+            self.inspect_selection()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "atlas-search-inspect":
+            self.inspect_selection()
+        elif event.button.id == "atlas-search-browse":
+            self.browse_selection()
+        elif event.button.id == "atlas-search-back":
+            self.action_back()
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
+
+    def inspect_selection(self) -> None:
+        self._follow("atlas.recipes-inspect")
+
+    def browse_selection(self) -> None:
+        self._follow("atlas.recipes-browse")
+
+    def action_browse(self) -> None:
+        if not self.query_one("#atlas-search-browse", Button).disabled:
+            self.browse_selection()
+
+    @work(exclusive=True, group="atlas-follow")
+    async def _follow(self, command_id: str) -> None:
+        if not self.selected or not isinstance(self.selected.get("selection_id"), str):
+            return
+        action = next((row for row in self.catalog.get("commands", [])
+                       if isinstance(row, dict) and row.get("command_id") == command_id), None)
+        if not action or not _runnable_catalog_action(action):
+            self.app.push_screen(ResultScreen("Atlas unavailable", "This Atlas action is not installed."))
+            return
+        values: dict[str, Any] = {"path": self.path,
+                                  "selection_id": self.selected["selection_id"],
+                                  "json": True}
+        if command_id == "atlas.recipes-browse":
+            context = self.record.get("context") or {}
+            if isinstance(context, dict) and isinstance(context.get("graph_set_id"), str):
+                values["expect_graph"] = context["graph_set_id"]
+        try:
+            review = await self.core.command_review(self.catalog, action, values)
+            output = await self.core.run_reviewed_command(
+                self.catalog, action, values, review, console="jsonl"
+            )
+            record = _atlas_record(output, command_id)
+            self.app.push_screen(AnalysisResultScreen(str(action.get("title", "Atlas result")),
+                                                      "atlas", record))
+        except (CoreClientError, TimeoutError) as exc:
+            self.app.push_screen(ResultScreen("Atlas could not inspect this selection", str(exc)))
+
+
+class AtlasObservationSearchScreen(KeyboardFormScreen):
+    """Explore one admitted Axiom graph through Atlas's read-only query actions."""
+
+    KEYBOARD_CANCEL = "atlas-observation-back"
+    KEYBOARD_FIELDS = ("atlas-observation-query", "atlas-observation-search",
+                       "atlas-observation-inspect", "atlas-observation-links",
+                       "atlas-observation-more", "atlas-observation-back")
+
+    def __init__(self, catalog: Mapping[str, Any], root: Path) -> None:
+        super().__init__()
+        self.catalog = catalog
+        self.root = root
+        self.results: list[Mapping[str, Any]] = []
+        self.selected: Mapping[str, Any] | None = None
+        self.next_cursor: str | None = None
+        self.current_query = ""
+        self.busy = False
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        yield Header(icon="W")
+        yield Static("Atlas observations", classes="screen-heading")
+        yield Static("↑/↓ Choose  ·  Enter Inspect  ·  ← Query  ·  → Actions  ·  Esc Back",
+                     classes="keyboard-hint")
+        yield Static("Recorded values and links from this Axiom check. They do not prove causes or gameplay behavior.",
+                     classes="screen-intro", id="atlas-observation-scope")
+        with Horizontal(classes="axiom-path-row"):
+            yield Input(placeholder="Material, registration, recipe family…",
+                        id="atlas-observation-query")
+            yield Button("Search", id="atlas-observation-search")
+        yield Static(f"Graph: {self.root}", id="atlas-observation-status")
+        with Horizontal(id="workflow-body"):
+            yield OptionList(id="atlas-observation-results")
+            with Vertical(id="workflow-detail-panel"):
+                yield Static("Enter a term and choose Search.", id="atlas-observation-detail")
+                with Horizontal(classes="button-row"):
+                    yield Button("Inspect", id="atlas-observation-inspect", disabled=True)
+                    yield Button("Links", id="atlas-observation-links", disabled=True)
+                    yield Button("More", id="atlas-observation-more", disabled=True)
+        with Horizontal(classes="button-row"):
+            yield Button("Back", id="atlas-observation-back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.start_keyboard_navigation()
+
+    def on_key(self, event: events.Key) -> None:
+        if isinstance(self.app.focused, OptionList):
+            if event.key in {"left", "right"}:
+                target = ("atlas-observation-links" if event.key == "right"
+                          and not self.query_one("#atlas-observation-links", Button).disabled
+                          else "atlas-observation-query")
+                self.app.set_focus(None)
+                items = self._keyboard_items()
+                self._keyboard_highlight(next((index for index, item in enumerate(items)
+                                               if item.id == target), 0))
+                event.stop()
+            elif event.key == "enter":
+                self.follow("atlas.observations-inspect")
+                event.stop()
+            return
+        # Textual also dispatches KeyboardFormScreen.on_key for form focus.
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "atlas-observation-query" and event.value.strip() != self.current_query:
+            self.next_cursor = None
+            self.query_one("#atlas-observation-more", Button).disabled = True
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "atlas-observation-back":
+            self.app.pop_screen()
+        elif event.button.id == "atlas-observation-search":
+            self.search()
+        elif event.button.id == "atlas-observation-more":
+            self.search(more=True)
+        elif event.button.id == "atlas-observation-inspect":
+            self.follow("atlas.observations-inspect")
+        elif event.button.id == "atlas-observation-links":
+            self.follow("atlas.observations-relationships")
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if event.option_list.id != "atlas-observation-results" or event.option_id is None:
+            return
+        try:
+            selected = self.results[int(event.option_id)]
+        except (ValueError, IndexError):
+            return
+        self.selected = selected
+        available = isinstance(selected.get("id"), str)
+        self.query_one("#atlas-observation-inspect", Button).disabled = not available
+        self.query_one("#atlas-observation-links", Button).disabled = not available
+        evidence = selected.get("evidence")
+        self.query_one("#atlas-observation-detail", Static).update(
+            f"{selected.get('semantic_key', selected.get('id', '?'))}\n"
+            f"Kind: {selected.get('kind', '?')}\n"
+            f"Recorded evidence: {len(evidence) if isinstance(evidence, list) else 'unknown'}\n\n"
+            "Enter to inspect this exact observation. Links shows recorded relationships."
+        )
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id == "atlas-observation-results":
+            self.follow("atlas.observations-inspect")
+
+    @work(exclusive=True, group="atlas-observation-search")
+    async def search(self, *, more: bool = False) -> None:
+        if self.busy:
+            return
+        query = self.query_one("#atlas-observation-query", Input).value.strip()
+        status = self.query_one("#atlas-observation-status", Static)
+        if not query:
+            status.update("Enter a material, registration, or recipe-family term.")
+            return
+        if more and not self.next_cursor:
+            return
+        action = _atlas_read_action(self.catalog, "atlas.observations-search")
+        if action is None:
+            status.update("Atlas observation search is unavailable in this installation.")
+            return
+        values: dict[str, Any] = {"path": str(self.root), "query": query,
+                                  "limit": 50, "json": True}
+        if more:
+            values["cursor"] = self.next_cursor
+        self.busy = True
+        try:
+            status.update("Searching the verified observation graph…")
+            review = await self.core.command_review(self.catalog, action, values)
+            output = await self.core.run_reviewed_command(
+                self.catalog, action, values, review, console="jsonl",
+            )
+            record = _atlas_record(output, "atlas.observations-search")
+            if record.get("format") != "workbench-atlas-observation-search-v1":
+                raise CoreClientError("Atlas returned an unsupported observation search")
+            rows = record.get("results")
+            if not isinstance(rows, list):
+                raise CoreClientError("Atlas returned no observation result list")
+            if not more:
+                self.results = []
+            prior_count = len(self.results)
+            self.results.extend(row for row in rows if isinstance(row, dict))
+            self.current_query = query
+            page = record.get("page")
+            cursor = page.get("next_cursor") if isinstance(page, dict) else None
+            self.next_cursor = cursor if isinstance(cursor, str) and cursor else None
+            listing = self.query_one("#atlas-observation-results", OptionList)
+            listing.set_options([
+                Option(f"{row.get('semantic_key', row.get('id', '?'))}  ·  {row.get('kind', '?')}",
+                       id=str(index)) for index, row in enumerate(self.results)
+            ])
+            self.query_one("#atlas-observation-more", Button).disabled = not self.next_cursor
+            status.update(f"{len(self.results)} observations shown" +
+                          (" · more available" if self.next_cursor else ""))
+            if listing.option_count:
+                listing.highlighted = prior_count if more and prior_count < len(self.results) else 0
+                listing.focus()
+            else:
+                self.selected = None
+                self.query_one("#atlas-observation-detail", Static).update(
+                    "No observations match this term. Try a material or registration name."
+                )
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(f"Atlas search could not complete: {exc}")
+        finally:
+            self.busy = False
+
+    @work(exclusive=True, group="atlas-observation-follow")
+    async def follow(self, command_id: str) -> None:
+        if self.busy or self.selected is None or not isinstance(self.selected.get("id"), str):
+            return
+        action = _atlas_read_action(self.catalog, command_id)
+        if action is None:
+            self.query_one("#atlas-observation-status", Static).update(
+                "This Atlas observation action is unavailable."
+            )
+            return
+        values: dict[str, Any] = {"path": str(self.root),
+                                  "selection_id": self.selected["id"], "json": True}
+        if command_id == "atlas.observations-relationships":
+            values.update({"direction": "outgoing", "limit": 50})
+        try:
+            review = await self.core.command_review(self.catalog, action, values)
+            output = await self.core.run_reviewed_command(
+                self.catalog, action, values, review, console="jsonl",
+            )
+            record = _atlas_record(output, command_id)
+            self.app.push_screen(AnalysisResultScreen(str(action.get("title", "Atlas result")),
+                                                      "atlas", record))
+        except (CoreClientError, TimeoutError) as exc:
+            self.query_one("#atlas-observation-status", Static).update(
+                f"Atlas could not open this observation: {exc}"
+            )
+
+
+_AXIOM_MATERIAL_CONTEXT = "supersymmetry:material-authoring-pack"
+
+
+def _axiom_problem(exc: Exception) -> str:
+    detail = str(exc)
+    if "Core setup has no selected Java" in detail:
+        return "Choose Java in Workbench setup, apply that selection, then retry Prepare."
+    if "install and enable" in detail.casefold() and "axiom" in detail.casefold():
+        return (
+            "Axiom is not installed or enabled in this Workbench installation. "
+            "Install the Axiom component, restart Workbench, then reopen this check.\n\n"
+            + detail
+        )
+    return detail
+
+
+class AxiomHistoryScreen(Screen[None]):
+    """Open retained native checks without copying attempt IDs."""
+
+    BINDINGS = [("escape", "back", "Back")]
+
+    def __init__(self, session_id: str, record: Mapping[str, Any]) -> None:
+        super().__init__()
+        self.session_id = session_id
+        self.record = record
+        result = record.get("result") or {}
+        self.attempts = result.get("attempts", []) if isinstance(result, dict) else []
+        self.attempt_by_id = {
+            row["attempt_id"]: row for row in self.attempts
+            if isinstance(row, dict) and isinstance(row.get("attempt_id"), str)
+        } if isinstance(self.attempts, list) else {}
+        self.selected: str | None = None
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        yield Header(icon="W")
+        yield Static("Axiom check history", classes="screen-heading")
+        yield Static("↑/↓ Browse  ·  Enter Open  ·  Esc Back", classes="keyboard-hint")
+        yield Static("Retained checks for this selected pack. Open one to read its scoped result.",
+                     classes="screen-intro")
+        yield OptionList(id="axiom-history-list")
+        yield Static("", id="axiom-history-status")
+        with Horizontal(classes="button-row"):
+            yield Button("Open check", id="axiom-history-open", disabled=True)
+            yield Button("Back", id="axiom-history-back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        listing = self.query_one("#axiom-history-list", OptionList)
+        if isinstance(self.attempts, list):
+            listing.set_options([
+                Option(f"{row.get('state', '?')}  ·  {row.get('attempt_id', '?')}",
+                       id=str(row.get("attempt_id")))
+                for row in self.attempts
+                if isinstance(row, dict) and isinstance(row.get("attempt_id"), str)
+            ])
+        if listing.option_count:
+            listing.highlighted = 0
+            self.selected = listing.options[0].id
+            self._show_selection()
+        else:
+            self.query_one("#axiom-history-status", Static).update(
+                "No retained checks yet. Return to Axiom setup and run a check."
+            )
+        listing.focus()
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if event.option_list.id == "axiom-history-list":
+            self.selected = event.option_id
+            self._show_selection()
+
+    def _show_selection(self) -> None:
+        row = self.attempt_by_id.get(self.selected) if self.selected else None
+        can_open = isinstance(row, dict) and isinstance(row.get("record_id"), str)
+        self.query_one("#axiom-history-open", Button).disabled = not can_open
+        if isinstance(row, dict) and not can_open:
+            reason = row.get("reason") or row.get("original_summary")
+            note = (str(reason) if isinstance(reason, str) else
+                    json.dumps(reason, ensure_ascii=False) if reason is not None else "")
+            self.query_one("#axiom-history-status", Static).update(
+                f"{row.get('state', 'Past check')}: retained details cannot be opened. "
+                + note[:300]
+            )
+        elif can_open:
+            self.query_one("#axiom-history-status", Static).update(
+                "Retained details are available. Press Enter to open this check."
+            )
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id == "axiom-history-list":
+            self.open_selected()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "axiom-history-open":
+            self.open_selected()
+        elif event.button.id == "axiom-history-back":
+            self.action_back()
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
+
+    @work(exclusive=True, group="axiom-history-open")
+    async def open_selected(self) -> None:
+        if not self.selected or self.query_one("#axiom-history-open", Button).disabled:
+            return
+        self.query_one("#axiom-history-status", Static).update("Opening retained check…")
+        try:
+            record = await self.core.developer_materials_action(
+                self.session_id, "show", self.selected
+            )
+            self.app.push_screen(AnalysisResultScreen("Axiom retained check", "axiom", record))
+        except (CoreClientError, TimeoutError) as exc:
+            self.app.push_screen(ResultScreen("Could not open check", _axiom_problem(exc)))
+
+
+class AxiomJourneyScreen(KeyboardFormScreen):
+    """Keyboard-first native-check setup, execution, and retained results."""
+
+    KEYBOARD_CANCEL = "axiom-back"
+    KEYBOARD_FIELDS = (
+        "axiom-pack", "axiom-pack-browse", "axiom-engine", "axiom-engine-browse",
+        "axiom-java-path", "axiom-java-detect", "axiom-check-setup", "axiom-prepare", "axiom-run", "axiom-java",
+        "axiom-history", "axiom-back",
+    )
+
+    def __init__(self, view: EnvironmentView) -> None:
+        super().__init__()
+        self.view = view
+        self.session_id: str | None = None
+        self.session_pack = ""
+        self.setup_ready = False
+        self.busy = False
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        yield Header(icon="W")
+        yield Static("Axiom native check", classes="screen-heading")
+        yield Static(
+            "Check saved Supersymmetry edits through Core and Axiom. "
+            "The selected pack stays unchanged; results are retained for inspection.",
+            classes="screen-intro",
+        )
+        yield Static("↑/↓ Choose  ·  Enter Edit or Open  ·  Esc Back", classes="keyboard-hint")
+        with VerticalScroll(id="axiom-journey-body"):
+            yield Static("Supersymmetry source checkout", classes="field-label")
+            with Horizontal(classes="axiom-path-row"):
+                yield Input(value=self.view.workspace, placeholder="Choose a checkout containing pack source",
+                            id="axiom-pack")
+                yield Button("Browse", id="axiom-pack-browse")
+            yield Static("Axiom engine ZIP or installed engine folder", classes="field-label")
+            with Horizontal(classes="axiom-path-row"):
+                yield Input(placeholder="Choose an engine source when preparing setup",
+                            id="axiom-engine")
+                yield Button("Browse", id="axiom-engine-browse")
+            yield Static("Java executable · optional if already saved in Core", classes="field-label")
+            with Horizontal(classes="axiom-path-row"):
+                yield Input(placeholder="Use saved Java or select an installed JDK",
+                            id="axiom-java-path")
+                yield Button("Find", id="axiom-java-detect")
+            yield Static(
+                "Check setup → choose engine → Prepare → Run check. "
+                "Java can come from the saved Workbench choice or this field.",
+                id="axiom-guide",
+            )
+            yield Static("Select the pack source checkout, then check setup.", id="axiom-status")
+            with Horizontal(classes="button-row"):
+                yield Button("Check setup", id="axiom-check-setup")
+                yield Button("Prepare", id="axiom-prepare", disabled=True)
+                yield Button("Run check", id="axiom-run", disabled=True)
+            with Horizontal(classes="button-row"):
+                yield Button("Manage Java", id="axiom-java")
+                yield Button("History", id="axiom-history")
+                yield Button("Back", id="axiom-back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self._refresh_actions()
+        self.start_keyboard_navigation()
+        self.prefill_installed_engine()
+
+    @work(exclusive=True, group="axiom-installed-engine")
+    async def prefill_installed_engine(self) -> None:
+        try:
+            record = await self.core.installed_axiom_engine()
+        except (CoreClientError, TimeoutError):
+            return
+        if (record.get("state") == "verified"
+                and not self.query_one("#axiom-engine", Input).value.strip()):
+            self.query_one("#axiom-engine", Input).value = str(record["archive_path"])
+            self._status("Bundled Axiom engine found. Check setup, then Prepare if needed.")
+            self._refresh_actions()
+
+    def _set_busy(self, busy: bool) -> None:
+        self.busy = busy
+        self._refresh_actions()
+
+    def _refresh_actions(self) -> None:
+        engine = self.query_one("#axiom-engine", Input).value.strip()
+        self.query_one("#axiom-check-setup", Button).disabled = self.busy
+        self.query_one("#axiom-history", Button).disabled = self.busy
+        self.query_one("#axiom-prepare", Button).disabled = self.busy or not engine
+        self.query_one("#axiom-run", Button).disabled = self.busy or not self.setup_ready
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "axiom-pack":
+            self.session_id = None
+            self.setup_ready = False
+        if event.input.id in {"axiom-pack", "axiom-engine"}:
+            self._refresh_actions()
+
+    def _status(self, message: str) -> None:
+        self.query_one("#axiom-status", Static).update(message)
+
+    async def _ensure_session(self) -> str:
+        raw = self.query_one("#axiom-pack", Input).value.strip()
+        pack = Path(raw).expanduser().absolute()
+        if not raw or not pack.is_dir():
+            raise CoreClientError("Choose an existing Supersymmetry source checkout first.")
+        if self.session_id and self.session_pack == str(pack):
+            return self.session_id
+        self._status("Selecting saved pack through Core…")
+        selected = await self.core.developer_context_select(str(pack))
+        self.session_id = str(selected["session_id"])
+        self.session_pack = str(pack)
+        return self.session_id
+
+    @work(exclusive=True, group="axiom-path-pick")
+    async def _pick_path(self, *, engine: bool) -> None:
+        if engine:
+            kind = await self.app.push_screen_wait(ChoicePicker(
+                "Choose Axiom engine source",
+                [("Engine ZIP", "zip"), ("Installed engine folder", "folder")],
+                "zip",
+            ))
+            if kind is None:
+                return
+            choose_zip = kind == "zip"
+            current = self.query_one("#axiom-engine", Input).value.strip()
+        else:
+            choose_zip = False
+            current = self.query_one("#axiom-pack", Input).value.strip()
+        location = Path(current).expanduser() if current else Path.home()
+        if not location.is_dir():
+            location = location.parent if location.parent.is_dir() else Path.home()
+        chosen = await self.app.push_screen_wait(InstancePathPicker(
+            location, choose_zip=choose_zip,
+            heading=("Choose an Axiom engine ZIP" if choose_zip else
+                     "Choose an installed Axiom engine folder" if engine else
+                     "Choose your Supersymmetry source checkout"),
+        ))
+        if chosen is not None:
+            self.query_one("#axiom-engine" if engine else "#axiom-pack", Input).value = str(chosen)
+            if not engine:
+                self.session_id = None
+                self.setup_ready = False
+            self._refresh_actions()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        action = event.button.id
+        if action == "axiom-back":
+            self.app.pop_screen()
+        elif action == "axiom-pack-browse":
+            self._pick_path(engine=False)
+        elif action == "axiom-engine-browse":
+            self._pick_path(engine=True)
+        elif action == "axiom-check-setup":
+            self.check_setup()
+        elif action == "axiom-prepare":
+            self.prepare()
+        elif action == "axiom-run":
+            self.run_check()
+        elif action == "axiom-history":
+            self.history()
+        elif action == "axiom-java":
+            self.app.open_workspace_choices()
+        elif action == "axiom-java-detect":
+            self.find_java()
+
+    @work(exclusive=True, group="axiom-java-inventory")
+    async def find_java(self) -> None:
+        try:
+            inventory = await self.core.java_inventory()
+            detected, options = _detected_jdk_options(inventory)
+            if not options:
+                self._status("No installed JDKs found. Manage Java or enter a Java executable path.")
+                return
+            chosen = await self.app.push_screen_wait(ChoicePicker(
+                "Choose an installed JDK", options, options[0][1]
+            ))
+            if chosen in detected:
+                home = Path(detected[chosen])
+                executable = home / "bin" / "java"
+                if executable.is_file():
+                    self.query_one("#axiom-java-path", Input).value = str(executable)
+                    self._status(f"Using installed Java from {home}")
+                else:
+                    self._status("This JDK has no Linux Java executable. Choose another JDK or enter a path.")
+        except (CoreClientError, TimeoutError) as exc:
+            self._status(f"Could not list installed Java: {exc}")
+
+    @work(exclusive=True, group="axiom-operation")
+    async def check_setup(self) -> None:
+        if self.busy:
+            return
+        self._set_busy(True)
+        try:
+            session = await self._ensure_session()
+            record = await self.core.developer_materials_action(
+                session, "setup-status", "--context", _AXIOM_MATERIAL_CONTEXT
+            )
+            state = record["result"].get("state", "unknown")
+            self.setup_ready = state == "ready"
+            self._status(
+                "Native check is ready. Choose Run check."
+                if state == "ready" else
+                "Native check needs preparation. Choose an engine source, then Prepare."
+            )
+            self.app.push_screen(AnalysisResultScreen("Axiom setup status", "axiom", record))
+        except (CoreClientError, TimeoutError) as exc:
+            self._status(_axiom_problem(exc))
+        finally:
+            self._set_busy(False)
+
+    @work(exclusive=True, group="axiom-operation")
+    async def prepare(self) -> None:
+        if self.busy:
+            return
+        engine_raw = self.query_one("#axiom-engine", Input).value.strip()
+        if not engine_raw:
+            self._status("Choose an Axiom engine ZIP or installed engine folder before Prepare.")
+            return
+        engine = Path(engine_raw).expanduser().absolute()
+        if not engine.is_file() and not engine.is_dir():
+            self._status("The engine source does not exist. Choose an engine ZIP or folder.")
+            return
+        engine_arg = "--engine-archive" if engine.is_file() else "--engine-home"
+        if engine.is_file() and engine.suffix.casefold() != ".zip":
+            self._status("Choose an Axiom engine ZIP file, or an installed engine folder.")
+            return
+        java_raw = self.query_one("#axiom-java-path", Input).value.strip()
+        explicit_java = Path(java_raw).expanduser().absolute() if java_raw else None
+        if explicit_java is not None and not explicit_java.is_file():
+            self._status("Choose an existing Java executable, or leave Java blank to use a saved choice.")
+            return
+        try:
+            session = await self._ensure_session()
+            java = explicit_java
+            java_source = "selected executable" if java is not None else "Core setup selection"
+            if java is None:
+                try:
+                    resolved = await self.core.environment_resolve(self.session_pack)
+                    candidates = resolved.get("tool_candidates")
+                    home = candidates.get("java_home") if isinstance(candidates, dict) else None
+                    candidate = Path(home) / "bin" / "java" if isinstance(home, str) else None
+                    if candidate is not None and candidate.is_file():
+                        java = candidate
+                        java_source = "saved workspace choice"
+                except (CoreClientError, TimeoutError):
+                    pass  # Core setup's selected Java remains the fallback.
+            approved = await self.app.push_screen_wait(ReviewModal(
+                "Prepare Axiom native check?",
+                f"Saved pack: {self.session_pack}\nEngine source: {engine}\n"
+                f"Java: {java or java_source} ({java_source})\n\n"
+                "Core will acquire the selected native inputs and assemble a runtime for this pack. "
+                "This can take several minutes.",
+                confirm_label="Prepare setup",
+            ))
+            if not approved:
+                return
+            self._set_busy(True)
+            self._status("Preparing original native inputs and Axiom runtime…")
+            record = await self.core.developer_materials_action(
+                session, "setup", "--prepare", "--context", _AXIOM_MATERIAL_CONTEXT,
+                engine_arg, str(engine), *(("--java", str(java)) if java is not None else ()),
+            )
+            state = record["result"].get("state")
+            self.setup_ready = False
+            self._status(
+                "Preparation complete. Choose Check setup, then Run check."
+                if state == "configured-not-run" else
+                "Preparation is incomplete. Open the result for the remaining inputs."
+            )
+            self.app.push_screen(AnalysisResultScreen("Axiom preparation", "axiom", record))
+        except (CoreClientError, TimeoutError) as exc:
+            self._status(_axiom_problem(exc))
+        finally:
+            self._set_busy(False)
+
+    @work(exclusive=True, group="axiom-operation")
+    async def run_check(self) -> None:
+        if self.busy:
+            return
+        try:
+            session = await self._ensure_session()
+            status = await self.core.developer_materials_action(
+                session, "setup-status", "--context", _AXIOM_MATERIAL_CONTEXT
+            )
+            if status["result"].get("state") != "ready":
+                self.setup_ready = False
+                self._status("Native setup is not ready. Choose an engine source and Prepare first.")
+                self.app.push_screen(AnalysisResultScreen("Axiom setup needed", "axiom", status))
+                return
+            approved = await self.app.push_screen_wait(ReviewModal(
+                "Run native initialization check?",
+                f"Saved pack: {self.session_pack}\n"
+                f"Scope: {_AXIOM_MATERIAL_CONTEXT}\n\n"
+                "Axiom will run the original native initialization in a Core-managed worker. "
+                "Core will retain the attempt and its findings for later inspection.",
+                confirm_label="Run check",
+            ))
+            if not approved:
+                return
+            self._set_busy(True)
+            self._status("Axiom is running the native check. This can take several minutes…")
+            record = await self.core.developer_materials_action(
+                session, "run", "--context", _AXIOM_MATERIAL_CONTEXT
+            )
+            result = record["result"]
+            display_record = record
+            attempt_id = result.get("attempt_id")
+            if isinstance(attempt_id, str) and attempt_id:
+                try:
+                    shown = await self.core.developer_materials_action(
+                        session, "show", attempt_id
+                    )
+                    if shown["result"].get("attempt_id") == attempt_id:
+                        display_record = shown
+                except (CoreClientError, TimeoutError):
+                    pass  # The run record remains available if saved detail cannot reopen.
+            self._status(f"Check {result.get('state', 'finished')}. Open History to revisit this attempt.")
+            self.app.push_screen(AnalysisResultScreen("Axiom native check", "axiom", display_record))
+        except (CoreClientError, TimeoutError) as exc:
+            self._status(_axiom_problem(exc))
+        finally:
+            self._set_busy(False)
+
+    @work(exclusive=True, group="axiom-operation")
+    async def history(self) -> None:
+        if self.busy:
+            return
+        self._set_busy(True)
+        try:
+            session = await self._ensure_session()
+            record = await self.core.developer_materials_action(session, "history")
+            self.app.push_screen(AxiomHistoryScreen(session, record))
+        except (CoreClientError, TimeoutError) as exc:
+            self._status(_axiom_problem(exc))
+        finally:
+            self._set_busy(False)
 
 
 class WorkspaceRegisterScreen(KeyboardFormScreen):
@@ -2815,10 +4099,28 @@ class WorkflowsScreen(Screen[None]):
         catalog = self.view.catalog
         if not catalog:
             return ()
-        return (
+        actions = [
             item for item in catalog.get("commands", [])
             if isinstance(item, dict) and _runnable_catalog_action(item)
-        )
+        ]
+        enabled = {row.get("id") for row in self.view.modules
+                   if row.get("state") == "available"}
+        profiles = {row.get("id") for row in self.view.profiles
+                    if row.get("state") == "available"}
+        if "axiom" in enabled and {"supersymmetry", "cleanroom"} <= profiles:
+            actions.append({
+                "command_id": "axiom.native-check-journey",
+                "title": "Check saved pack edits",
+                "summary": "Prepare and run Axiom native initialization checks, then inspect retained findings.",
+                "suite_id": "axiom",
+                "authority": "Axiom through Core developer context",
+                "risk": "guided",
+                "preview": "none",
+                "availability": "available",
+                "options": [],
+                "document": None,
+            })
+        return actions
 
     @staticmethod
     def _option_prompt(action: Mapping[str, Any], width: int) -> Text:
@@ -2932,11 +4234,14 @@ class WorkflowsScreen(Screen[None]):
         self.query_one("#workflow-detail", Static).update(detail)
         self.query_one("#workflow-run", Button).disabled = False
         self.query_one("#workflow-run", Button).label = (
-            "Open document" if action.get("document") else "Run action"
+            "Open document" if action.get("document") else
+            "Open check" if action.get("command_id") == "axiom.native-check-journey" else
+            "Run action"
         )
 
     def _launchable(self, action: Mapping[str, Any]) -> bool:
-        return _runnable_catalog_action(action)
+        return (action.get("command_id") == "axiom.native-check-journey"
+                or _runnable_catalog_action(action))
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "workflow-search":
@@ -2968,6 +4273,9 @@ class WorkflowsScreen(Screen[None]):
         catalog = self.view.catalog
         if not action or not catalog or not self._launchable(action):
             return
+        if action.get("command_id") == "axiom.native-check-journey":
+            self.app.push_screen(AxiomJourneyScreen(self.view))
+            return
         values: dict[str, Any] = {}
         if (self.view.workspace and Path(self.view.workspace).is_dir()
                 and any(field.get("key") == "workspace"
@@ -2988,6 +4296,11 @@ class WorkflowsScreen(Screen[None]):
                 if collected is None:
                     return
                 values = collected
+            atlas_json = (action.get("suite_id") == "atlas"
+                          and any(field.get("key") == "json" and field.get("flags") == ["--json"]
+                                  for field in action.get("options", []) if isinstance(field, dict)))
+            if atlas_json:
+                values["json"] = True
             review = await self.core.command_review(catalog, action, values)
             body = (
                 f"Owner: {action.get('authority', '?')}\n"
@@ -3002,8 +4315,20 @@ class WorkflowsScreen(Screen[None]):
             if not approved:
                 return
             output: CommandOutput = await self.core.run_reviewed_command(
-                catalog, action, values, review
+                catalog, action, values, review,
+                **({"console": "jsonl"} if atlas_json else {}),
             )
+            if atlas_json:
+                record = _atlas_record(output, str(action.get("command_id")))
+                if (action.get("command_id") == "atlas.recipes-search"
+                        and isinstance(record.get("results"), list)
+                        and isinstance(values.get("path"), str)):
+                    self.app.push_screen(AtlasSearchScreen(catalog, values["path"], record))
+                else:
+                    self.app.push_screen(AnalysisResultScreen(
+                        str(action.get("title", "Atlas result")), "atlas", record
+                    ))
+                return
             result = (
                 f"Exit code: {output.exit_code}\n\n"
                 f"{output.stdout}"

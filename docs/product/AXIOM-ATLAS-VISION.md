@@ -1,8 +1,10 @@
 # Axiom and Atlas: from native checks to explainable change
 
-Status: proposed product direction. This document describes the intended
-integration, not an installed capability or release qualification. Atlas MVP
-readiness and integration readiness are separate workstreams.
+Status: proposed product direction with one implemented evidence handoff.
+Atlas can import a selected, retained Axiom initialization snapshot through the
+Supersymmetry profile and query its observation graph. This document's richer
+explanations and cross-run claims remain targets, not release qualification.
+Atlas MVP readiness and integration readiness are separate workstreams.
 
 ## Vision
 
@@ -31,7 +33,8 @@ scope, and source navigation. Atlas adds explanations when the required evidence
 is ready. Developers can continue working while derived analysis runs; an
 unfinished Atlas analysis does not replace a native result with a spinner.
 
-These are target experiences, not claims about current integration:
+These are target experiences beyond the current retained-snapshot import and
+exact observation queries:
 
 | Situation | Useful explanation | Required evidence |
 | --- | --- | --- |
@@ -202,9 +205,13 @@ provenance normalization/query contracts. Axiom supplies original native
 initialization observations, immutable retained results, and diagnostic delivery
 before full snapshot finalization. These are reusable foundations.
 
-The integration still needs explicit Axiom evidence admission, relevant native
-operation observations, supported cross-run correspondence, variance
-interpretation, and qualified end-to-end presentation. The current Atlas runtime
+The current integration admits a selected retained Axiom snapshot, projects its
+recorded initialization values into an Atlas observation graph, and supports
+exact search, inspection, relationship and evidence-reference queries. It does
+not run initialization again or turn captured structure into gameplay claims.
+The integration still needs further native operation observations, supported
+cross-run correspondence, variance interpretation, causal explanations, and
+qualified end-to-end presentation. The current Atlas runtime
 recipe comparator requires a complete `post-start-end-tick` GT capture and does
 not publish changed-recipe correspondence. Its existing format must retain those
 semantics. Provenance fixtures demonstrate contract behavior; they do not prove
@@ -224,11 +231,12 @@ candidate focus, not a declaration of final MVP scope. Existing material and
 other domains should be assessed on their own evidence rather than silently
 discarded or made mandatory by this document.
 
-**Axiom–Atlas integration** adds explanations over native checks. Its first
-product increment should make retained Axiom results admissible and inspectable
-without changing their scope. Subsequent increments add variance interpretation,
-registration provenance, and downstream impact. Each increment needs an explicit
-supported boundary and may remain unavailable while other Atlas workflows ship.
+**Axiom–Atlas integration** adds explanations over native checks. Retained Axiom
+results are now admissible and inspectable as bounded initialization observations
+through an explicit profile adapter. Subsequent increments add variance
+interpretation, registration provenance, and downstream impact. Each increment
+needs an explicit supported boundary and may remain unavailable while other
+Atlas workflows ship.
 
 Workbench's first release can compose qualified modules and supported version
 combinations. More modules should mean more dependable developer workflows, not

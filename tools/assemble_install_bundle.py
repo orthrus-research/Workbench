@@ -46,8 +46,8 @@ CLIENT_DESCRIPTOR_FORMAT = "workbench-install-bundle-descriptor-v2"
 FULL_EDITION = "full-suite"
 CLIENT_EDITION = "supersymmetry-client"
 CLIENT_ROOT_COMPONENTS = (
-    "workbench-core", "workbench-profile-supersymmetry", "workbench-shell",
-    "workbench-tui",
+    "workbench-atlas", "workbench-axiom", "workbench-core",
+    "workbench-profile-supersymmetry", "workbench-shell", "workbench-tui",
 )
 CLIENT_MANIFEST = "workbench-developer-clients-manifest-v1.json"
 TARGET = {"platform": "linux", "machine": "x86_64", "python": "3.14"}
@@ -340,9 +340,14 @@ def verify_bundle_archive(archive_path: Path, descriptor: dict[str, Any] | None 
                     "wheelhouse/install_workbench.py", "wheelhouse/verify_wheelhouse.py",
                     "wheelhouse/wheelhouse.json", "wheelhouse/requirements.lock",
                 } <= set(records)
-                or any(name.startswith(("axiom/", "clients/")) for name in records)
+                or any(name.startswith("clients/") for name in records)
+                or len([name for name in records if name.startswith("axiom/")]) != 1
+                or not isinstance(manifest.get("engine_archive"), str)
+                or manifest.get("engine_archive") not in records
+                or not str(manifest.get("engine_archive", "")).startswith("axiom/workbench-axiom-engine-")
+                or not str(manifest.get("engine_archive", "")).endswith(".zip")
             ):
-                raise BundleError("Supersymmetry client bundle has missing or excluded files")
+                raise BundleError("Supersymmetry client bundle needs one verified Axiom engine and no IDE clients")
             if {name.removeprefix(prefix + "/") for name in names if name != manifest_name} != set(records):
                 raise BundleError("bundle has missing or extra members")
             if sum(row.size for row in members) > MAX_BUNDLE_BYTES:
@@ -398,8 +403,10 @@ def _assemble_into(*, wheelhouse: Path, guide: Path, release_tag: str,
         if any(value is None for value in (engine_zip, vscode_vsix, intellij_zip, clients_manifest)):
             raise BundleError("full Suite bundle requires the engine and both IDE clients")
     else:
-        if any(value is not None for value in (engine_zip, vscode_vsix, intellij_zip, clients_manifest)):
-            raise BundleError("Supersymmetry client bundle excludes engine and IDE artifacts")
+        if engine_zip is None:
+            raise BundleError("Supersymmetry client bundle requires an Axiom engine archive")
+        if any(value is not None for value in (vscode_vsix, intellij_zip, clients_manifest)):
+            raise BundleError("Supersymmetry client bundle excludes IDE artifacts")
         _roots, closure = selected_components(CLIENT_ROOT_COMPONENTS, root=root)
         expected_versions = {row["id"]: row["version"] for row in closure}
         expected_selection = set(CLIENT_ROOT_COMPONENTS)
@@ -414,6 +421,10 @@ def _assemble_into(*, wheelhouse: Path, guide: Path, release_tag: str,
         engine = _verify_engine(engine_zip, root=root)
         files[f"axiom/{engine.name}"] = engine
         files.update(_verify_clients(clients_manifest, vscode_vsix, intellij_zip, root=root))
+    else:
+        assert engine_zip is not None
+        engine = _verify_engine(engine_zip, root=root)
+        files[f"axiom/{engine.name}"] = engine
     guide = _direct_file(guide, limit=1024 * 1024)
     files["GETTING-STARTED.md"] = guide
     files["verify_install_bundle.py"] = _direct_file(root / "tools/verify_install_bundle.py", limit=1024 * 1024)
@@ -435,6 +446,7 @@ def _assemble_into(*, wheelhouse: Path, guide: Path, release_tag: str,
     if edition == CLIENT_EDITION:
         manifest["edition"] = CLIENT_EDITION
         manifest["selected_components"] = list(CLIENT_ROOT_COMPONENTS)
+        manifest["engine_archive"] = f"axiom/{engine.name}"
     manifest_raw = _json_bytes(manifest)
     folder = "workbench-linux-x64-py314"
     archive_name = f"workbench-linux-x64-py314-{release_tag}.tar.gz"

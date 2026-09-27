@@ -870,6 +870,9 @@ def _run(selection, argv, *, state_root, cancelled=lambda: False):
                       "result_id": result["id"], "source": finding, "text": raw.decode("utf-8"), "read_only": True}
     if args.action in {"show", "execute", "run"}:
         attempt, request, _ = _load(root, args.attempt, selection)
+        # Consumers can use the Core-validated attempt without reconstructing
+        # a private storage path from its ID.
+        presentation["attempt_uri"] = attempt.as_uri()
         if args.action != 'show':
             if (cancelled() or check_attempts().cancellation_requested(
                     _checked_attempt(root, args.attempt), request['id'])) and not (

@@ -130,31 +130,31 @@ artifacts. Only Linux x64 with GNU libc 2.28 or newer is admitted; qualify
 other targets with their own artifacts and hooks before advertising them.
 
 1. Freeze one clean reviewed commit. For the Supersymmetry client edition,
-   build the Linux x64/Python 3.14 wheelhouse with four explicit roots. Its
-   dependency closure currently contains twelve Workbench wheels:
+   build the Linux x64/Python 3.14 wheelhouse with six explicit roots. The
+   current dependency closure contains thirteen Workbench wheels:
 
    ```text
-   python tools/build_native_distribution.py --component workbench-core --component workbench-shell --component workbench-profile-supersymmetry --component workbench-tui --output .workbench/build/install-supersymmetry-client
+   python tools/build_native_distribution.py --component workbench-atlas --component workbench-axiom --component workbench-core --component workbench-shell --component workbench-profile-supersymmetry --component workbench-tui --output .workbench/build/install-supersymmetry-client
    python tools/install_workbench.py .workbench/build/install-supersymmetry-client --destination /absolute/new/install-client-check
    /absolute/new/install-client-check/bin/workbench version --json
    /absolute/new/install-client-check/bin/workbench-tui --help
    ```
 
    The full Suite edition remains available with `--suite --with-tui` and
-   `tools/validate_native_packages.py --wheelhouse`. Build and qualify the
-   independent Axiom engine and both IDE clients only when selecting that
-   edition. Use one edition per release tag.
-2. Assemble the exact Supersymmetry client wheelhouse and guide, then generate
+   `tools/validate_native_packages.py --wheelhouse`. Build and independently
+   verify the Axiom engine ZIP for either edition. The full Suite edition also
+   requires both IDE clients. Use one edition per release tag.
+2. Assemble the exact Supersymmetry client wheelhouse, Axiom engine and guide, then generate
    the release-bound hook. Use new output directories and exact input paths:
 
    ```text
-   python tools/assemble_install_bundle.py assemble --edition supersymmetry-client --wheelhouse .workbench/build/install-supersymmetry-client --guide docs/guides/getting-started.md --release-tag TAG --output-dir .workbench/build/install-bundle
+   python tools/assemble_install_bundle.py assemble --edition supersymmetry-client --wheelhouse .workbench/build/install-supersymmetry-client --engine-zip modules/axiom/jvm/build/distributions/workbench-axiom-engine-0.1.0.zip --guide docs/guides/getting-started.md --release-tag TAG --output-dir .workbench/build/install-bundle
    python tools/assemble_install_bundle.py verify --archive .workbench/build/install-bundle/workbench-linux-x64-py314-TAG.tar.gz --descriptor .workbench/build/install-bundle/workbench-linux-x64-py314-install.json
    python tools/render_install_hook.py --descriptor .workbench/build/install-bundle/workbench-linux-x64-py314-install.json --output .workbench/build/install-hook/workbench-install-linux-x64.sh
    ```
 
-   The full Suite assembler invocation additionally requires `--engine-zip`,
-   `--vscode-vsix`, `--intellij-zip` and `--clients-manifest`. The composer
+   The full Suite assembler invocation additionally requires `--vscode-vsix`,
+   `--intellij-zip` and `--clients-manifest`. The composer
    requires a clean checkout, current-source wheelhouse and matching native
    versions. Core stages and catalogs
    the exact archive and descriptor as one tree; the command reports its tree

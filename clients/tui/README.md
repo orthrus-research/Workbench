@@ -176,8 +176,29 @@ file and must be supplied again on import without managed acquisition.
   Documents open through Core's catalog binding. Actions requiring repeated
   inputs or changes to local files stay out of this runnable list until their
   interaction is implemented. Core also marks actions unavailable when their
-  installed command or document is absent. Runs use plain output and do not
+  installed command or document is absent. Interactive Atlas sessions are not
+  shown because the TUI has no persistent input stream for them. Runs do not
   retain console sessions.
+- **Atlas recipe search:** Choose a pack source or captured graph in Workflows,
+  enter a term, then use arrows and Enter to inspect a result. A captured graph
+  also offers recorded links. Source-only results are labeled as text matches,
+  not observed recipes. Atlas records are read through Core's reviewed JSONL
+  command route; the full owner record is one key away from the readable view.
+- **Axiom native check:** The dedicated Workflows journey selects a saved
+  Supersymmetry checkout and Axiom engine ZIP or folder with file trees. Check
+  setup, prepare the runtime, run a check, and reopen retained checks from
+  History. A bundle installation prefills its exact engine ZIP only after Core
+  verifies the retained installation receipts and archive bytes. Java comes
+  from Core's saved choice for that workspace, the Core
+  setup selection, or an executable selected in the TUI. Native outcome,
+  coverage, findings and original messages remain visible even when the check
+  fails. Prepare and Run each show their effects before execution.
+- **Axiom to Atlas:** A completed Axiom result with a retained snapshot offers
+  **Open in Atlas** when the installed Atlas import action is available. Core
+  reviews the exact original attempt and a new graph folder before Atlas
+  imports the snapshot. The graph result offers **Search this graph**; arrows
+  and Enter then open Atlas observations and their recorded outgoing links.
+  This does not rerun Axiom or infer gameplay behavior from recorded values.
 
 Core remains responsible for environment mutation, command construction, and
 owner policy. Core's current JSON setup

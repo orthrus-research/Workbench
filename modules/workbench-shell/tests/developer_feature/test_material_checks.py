@@ -837,6 +837,14 @@ class SavedMaterialCheckTests(unittest.TestCase):
             page = self.client_command('query', request['attempt_id'], '--query', json.dumps(query))['result']
         self.assertEqual(retained['result']['findings'], found)
 
+    def test_show_exposes_validated_attempt_uri_for_observation_handoff(self):
+        request = self.prepare()
+        self.execute(request)
+        with patch('workbench_axiom.cli.invoke', side_effect=AssertionError('show must not rerun native work')):
+            view = self.client_command('show', request['attempt_id'])
+        self.assertEqual(self.directory(request).as_uri(), view['presentation']['attempt_uri'])
+        self.assertEqual(request['attempt_id'], view['result']['attempt_id'])
+
     def test_compiler_label_uses_original_finding_message_without_resealing_old_evidence(self):
         request = self.prepare()
         native = self.response(request)

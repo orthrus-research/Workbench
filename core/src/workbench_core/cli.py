@@ -39,6 +39,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             return 2
         try:
             if (arguments[:1] == ["settings"]
+                    or arguments[:2] == ["installed", "axiom-engine"]
                     or arguments[:2] in (["environment", "resolve"], ["storage", "resources"])):
                 return _dispatch(arguments, root, caller_environment=caller_environment)
             from .module_cli import disabled_profiles, main as package_main
@@ -75,6 +76,17 @@ def _dispatch(
     if arguments[:1] == ["tooling"]:
         from .tooling_provision import main as tooling
         return tooling(arguments[1:])
+    if arguments[:2] == ["installed", "axiom-engine"]:
+        parser = argparse.ArgumentParser(prog="workbench installed axiom-engine")
+        parser.add_argument("--json", action="store_true")
+        selected = parser.parse_args(arguments[2:])
+        from .installed_assets import resolve_axiom_engine_source
+        result = resolve_axiom_engine_source()
+        if selected.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print(result["archive_path"] if result["state"] == "verified" else result["reason"])
+        return 0 if result["state"] == "verified" else 1
     if arguments[:1] == ["settings"]:
         from .settings_cli import main as settings
         from workbench_api.resources import repository_root
@@ -166,7 +178,7 @@ def _dispatch_available(
     if not arguments or arguments[:1] in (["-h"], ["--help"]):
         from workbench_api.profiles import profiles
         admitted_profiles = {profile.id for profile in profiles()}
-        print("Workbench Core: setup, settings, repair, tooling, pack release, sandbox recover, environment status, environment resolve, storage, runtime, world, modules list, profiles list, version")
+        print("Workbench Core: setup, settings, repair, tooling, installed axiom-engine, pack release, sandbox recover, environment status, environment resolve, storage, runtime, world, modules list, profiles list, version")
         for module in modules:
             if module.module:
                 for capability in module.module.capabilities:

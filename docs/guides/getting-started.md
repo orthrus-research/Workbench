@@ -24,9 +24,10 @@ The hook downloads a pinned Python 3.14 runtime and the exact release bundle,
 checks their SHA-256 hashes, then installs the release's selected native
 components and terminal client into a user-owned versioned environment. A
 full Suite bundle retains the matching Axiom engine and IDE clients; the
-Supersymmetry client bundle includes Core, Shell, the pack/platform profiles
-and their native dependencies. The hook does not select a pack, game context,
-Java runtime or IDE installation on your behalf. Its first command after
+Supersymmetry client bundle includes Core, Shell, Atlas, Axiom, the matching
+Axiom engine, the pack/platform profiles and their native dependencies. The
+hook does not select a pack, game context, Java runtime or IDE installation on
+your behalf. Its first command after
 installation is the printed `workbench setup --check` path. The hook targets
 Linux x64 with GNU libc 2.28 or newer, including a compatible WSL2 Linux
 environment. It needs HTTPS access, `curl`, `sha256sum`, `tar` and common POSIX
@@ -158,9 +159,11 @@ or offline profile is handled when launching. See
 source, integrity and recovery details. This stage does not replace project
 setup or Java selection.
 
-For Axiom's native saved-edit checks, select the profile's exact Java 25 runtime
-through `workbench setup`, then use a matching Axiom engine ZIP from the same
-release. The first `checks materials setup --prepare` acquires the profile's
+For Axiom's native saved-edit checks, Textual can use Core's saved Java choice
+or accept an explicit Java executable; choose the profile's Java 25 runtime.
+The Linux installer prints the matching Axiom engine ZIP's exact path, and
+`workbench installed axiom-engine --json` verifies it so Textual can fill that
+choice. The first `checks materials setup --prepare` acquires the profile's
 original inputs through Core and assembles a retained runtime. Subsequent checks
 reuse it and capture the current saved checkout. Follow the
 [Axiom setup and run sequence](../../modules/axiom/spec/material-program-preflight.md#retained-checks-in-the-developer-workflow)

@@ -173,6 +173,7 @@ class CatalogTests(unittest.TestCase):
                 "atlas.observations-index",
                 "atlas.observations-import-snapshot",
                 "atlas.recipes-assess-plan",
+                "atlas.recipes-browse",
                 "atlas.recipes-compare-runtime",
                 "atlas.recipes-context",
                 "atlas.recipes-import-capture",
@@ -1490,6 +1491,32 @@ class CatalogTests(unittest.TestCase):
             with self.subTest(missing=missing), self.assertRaises(CatalogError):
                 command.build_argv({k: v for k, v in values.items() if k != missing}, root=ROOT, execute=True)
 
+    def test_atlas_recipe_browse_is_a_reviewed_read_only_action(self) -> None:
+        from workbench_atlas_recipe_health.cli import build_parser
+
+        browse = self.catalog.command("atlas.recipes-browse")
+        self.assertEqual((browse.risk, browse.preview), ("read-only", "none"))
+        self.assertNotEqual(browse.availability, "unavailable")
+        argv, intent = browse.build_argv(
+            {
+                "path": "/tmp/graph",
+                "selection_id": "workbench-atlas-node-v2:gt-recipe:example",
+                "offset": 10,
+                "limit": 25,
+                "expect_graph": "workbench-atlas-graph-set-v2:sha256:" + "a" * 64,
+                "json": True,
+            },
+            root=ROOT, execute=True,
+        )
+        self.assertEqual(intent, "execute")
+        parsed = build_parser().parse_args(argv[4:])
+        self.assertEqual(parsed.action, "browse")
+        self.assertEqual(parsed.path, Path("/tmp/graph"))
+        self.assertEqual(parsed.selection_id, "workbench-atlas-node-v2:gt-recipe:example")
+        self.assertEqual((parsed.offset, parsed.limit), (10, 25))
+        self.assertEqual(parsed.expect_graph, "workbench-atlas-graph-set-v2:sha256:" + "a" * 64)
+        self.assertTrue(parsed.json)
+
     def test_atlas_recipe_catalog_uses_exact_context_bound_routes(self) -> None:
         commands = {
             item.command_id: item
@@ -1504,6 +1531,7 @@ class CatalogTests(unittest.TestCase):
                 "atlas.recipes-index",
                 "atlas.recipes-search",
                 "atlas.recipes-inspect",
+                "atlas.recipes-browse",
                 "atlas.recipes-routes",
                 "atlas.recipes-audit-dead-ends",
                 "atlas.recipes-impact",
@@ -1574,6 +1602,29 @@ class CatalogTests(unittest.TestCase):
             ],
         )
         self.assertTrue(commands["atlas.recipes-inspect"].limitations)
+        browse_argv, browse_intent = commands["atlas.recipes-browse"].build_argv(
+            {
+                "path": "/tmp/captured-graph",
+                "selection_id": "workbench-atlas-node-v2:gt-recipe:example",
+                "offset": 20,
+                "limit": 10,
+                "expect_graph": "workbench-atlas-graph-set-v2:sha256:" + "a" * 64,
+                "json": True,
+            },
+            root=ROOT,
+            execute=True,
+        )
+        self.assertEqual("execute", browse_intent)
+        self.assertEqual(
+            browse_argv[2:],
+            [
+                "atlas", "recipes", "browse", "/tmp/captured-graph",
+                "workbench-atlas-node-v2:gt-recipe:example",
+                "--offset", "20", "--limit", "10", "--expect-graph",
+                "workbench-atlas-graph-set-v2:sha256:" + "a" * 64,
+                "--json",
+            ],
+        )
         impact_argv, intent = commands["atlas.recipes-impact"].build_argv(
             {
                 "path": "/tmp/graph",
@@ -2161,6 +2212,7 @@ class CatalogTests(unittest.TestCase):
             ("atlas.recipes-index", atlas_recipes.build_parser(), ("index",), {}),
             ("atlas.recipes-search", atlas_recipes.build_parser(), ("search",), {}),
             ("atlas.recipes-inspect", atlas_recipes.build_parser(), ("inspect",), {}),
+            ("atlas.recipes-browse", atlas_recipes.build_parser(), ("browse",), {}),
             ("atlas.recipes-routes", atlas_recipes.build_parser(), ("routes",), {}),
             ("atlas.recipes-audit-dead-ends", atlas_recipes.build_parser(), ("audit-dead-ends",), {}),
             ("atlas.recipes-impact", atlas_recipes.build_parser(), ("impact",), {}),

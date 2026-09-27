@@ -17,11 +17,11 @@ FORMAT = "workbench-install-bundle-v1"
 CLIENT_FORMAT = "workbench-install-bundle-v2"
 CLIENT_EDITION = "supersymmetry-client"
 CLIENT_ROOT_COMPONENTS = [
-    "workbench-core", "workbench-profile-supersymmetry", "workbench-shell",
-    "workbench-tui",
+    "workbench-atlas", "workbench-axiom", "workbench-core",
+    "workbench-profile-supersymmetry", "workbench-shell", "workbench-tui",
 ]
 CLIENT_NATIVE_COMPONENTS = {
-    "workbench-api", "workbench-atlas", "workbench-core", "workbench-crucible",
+    "workbench-api", "workbench-atlas", "workbench-axiom", "workbench-core", "workbench-crucible",
     "workbench-material-semantics", "workbench-pack-program-studio",
     "workbench-profile-cleanroom", "workbench-profile-supersymmetry",
     "workbench-project-intelligence", "workbench-runtime-explorer",
@@ -115,9 +115,14 @@ def verify(root: Path, *, release_tag: str | None = None) -> dict:
             "wheelhouse/install_workbench.py", "wheelhouse/verify_wheelhouse.py",
             "wheelhouse/wheelhouse.json", "wheelhouse/requirements.lock",
         } <= set(declared)
-        or any(path.startswith(("axiom/", "clients/")) for path in declared)
+        or any(path.startswith("clients/") for path in declared)
+        or len([path for path in declared if path.startswith("axiom/")]) != 1
+        or not isinstance(manifest.get("engine_archive"), str)
+        or manifest.get("engine_archive") not in declared
+        or not str(manifest.get("engine_archive", "")).startswith("axiom/workbench-axiom-engine-")
+        or not str(manifest.get("engine_archive", "")).endswith(".zip")
     ):
-        raise BundleError("Supersymmetry client bundle has missing or excluded files")
+        raise BundleError("Supersymmetry client bundle needs one verified Axiom engine and no IDE clients")
     actual = set()
     for path in root.rglob("*"):
         relative = path.relative_to(root).as_posix()

@@ -1156,8 +1156,23 @@ class CoreClient:
             raise CoreClientError("unsupported Java inventory")
         return record
 
+    async def installed_axiom_engine(self) -> Mapping[str, Any]:
+        """Ask Core for an installed, receipt-verified Axiom engine archive."""
+        record = await self.json_record(
+            "installed", "axiom-engine", "--json", allowed_exit=(0, 1)
+        )
+        if (not isinstance(record, dict)
+                or record.get("format") != "workbench-installed-axiom-engine-v1"
+                or record.get("state") not in {"verified", "unavailable"}):
+            raise CoreClientError("Core returned an unsupported installed engine record")
+        if record["state"] == "verified":
+            selected = record.get("archive_path")
+            if not isinstance(selected, str) or not Path(selected).is_absolute():
+                raise CoreClientError("Core returned an invalid Axiom engine path")
+        return record
+
     async def command_review(
-        self, catalog: Mapping[str, Any], action: Mapping[str, Any], values: Mapping[str, Any]
+        self, catalog: Mapping[str, Any], action: Mapping[str, Any], values: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         arguments = self._bound_command(catalog, action, values)
         record = await self.json_record(*arguments, "--review-json")
@@ -1187,6 +1202,8 @@ class CoreClient:
         action: Mapping[str, Any],
         values: Mapping[str, Any],
         review: Mapping[str, Any],
+        *,
+        console: str = "plain",
     ) -> CommandOutput:
         if review.get("risk") != "read-only" or action.get("risk") != "read-only":
             raise CoreClientError("this prototype launches read-only catalog actions")
@@ -1194,6 +1211,8 @@ class CoreClient:
         if not isinstance(digest, str) or not _DIGEST.fullmatch(digest):
             raise CoreClientError("the selected review has no valid digest")
         arguments = self._bound_command(catalog, action, values)
+        if console not in {"plain", "jsonl"}:
+            raise CoreClientError("unsupported Workbench result presentation")
         return await self.call(
             *arguments,
             "--expect-review-digest",
@@ -1201,10 +1220,77 @@ class CoreClient:
             "--execute",
             "--no-retain",
             "--console",
-            "plain",
+            console,
+            *(("--view", "all") if console == "jsonl" else ()),
             timeout=120,
             allowed_exit=tuple(range(0, 256)),
         )
+
+    async def import_reviewed_atlas_snapshot(
+        self,
+        catalog: Mapping[str, Any],
+        action: Mapping[str, Any],
+        values: Mapping[str, Any],
+        review: Mapping[str, Any],
+    ) -> CommandOutput:
+        """Execute only Atlas's explicitly reviewed retained-snapshot import."""
+        if (action.get("command_id") != "atlas.observations-import-snapshot"
+                or action.get("risk") != "mutating"
+                or action.get("preview") != "inert-only"
+                or review.get("risk") != "mutating"):
+            raise CoreClientError("this is not an Atlas snapshot import review")
+        digest = review.get("review_digest")
+        if not isinstance(digest, str) or not _DIGEST.fullmatch(digest):
+            raise CoreClientError("the selected import review has no valid digest")
+        arguments = self._bound_command(catalog, action, values)
+        return await self.call(
+            *arguments,
+            "--expect-review-digest", digest,
+            "--execute", "--no-retain", "--console", "jsonl", "--view", "all",
+            timeout=3600,
+            allowed_exit=tuple(range(0, 256)),
+        )
+
+    async def developer_context_select(self, pack: str) -> Mapping[str, Any]:
+        """Select saved pack bytes through Core's existing developer context."""
+        record = await self.json_record(
+            "context", "select", pack,
+            "--pack-profile", "supersymmetry",
+            "--platform-profile", "cleanroom",
+            "--variant", "cleanroom-provisional",
+            timeout=120,
+        )
+        if (not isinstance(record, dict)
+                or not isinstance(record.get("session_id"), str)
+                or re.fullmatch(r"work-session-v2-[0-9a-f]{32}", record["session_id"]) is None):
+            raise CoreClientError("Core did not return a developer session")
+        return record
+
+    async def developer_materials_action(
+        self, session_id: str, action: str, *options: str,
+    ) -> Mapping[str, Any]:
+        """Run a native-check owner action bound to a Core developer session."""
+        if re.fullmatch(r"work-session-v2-[0-9a-f]{32}", session_id) is None:
+            raise CoreClientError("invalid developer session")
+        if action not in {"setup-status", "setup", "run", "history", "show", "diagnostics"}:
+            raise CoreClientError("unsupported native-check action")
+        timeout = 3600 if action in {"setup", "run"} else 120
+        record = await self.json_record(
+            "context", "run", session_id, "--", "checks", "materials", action,
+            *options,
+            timeout=timeout,
+            terminate_wait_seconds=90,
+            allowed_exit=(0, 1, 2, 3, 4),
+        )
+        if (isinstance(record, dict) and record.get("state") == "unavailable"
+                and isinstance(record.get("reason"), str)):
+            raise CoreClientError(record["reason"][:1200])
+        if (not isinstance(record, dict)
+                or record.get("format") != "workbench-developer-action-v1"
+                or not isinstance(record.get("result"), dict)
+                or not isinstance(record.get("exit_code"), int)):
+            raise CoreClientError("Core returned an unsupported native-check result")
+        return record
 
     @staticmethod
     def _bound_command(

@@ -18,7 +18,7 @@ From a development checkout with pip and the development dependencies:
 python tools/build_native_distribution.py --output .workbench/build/core
 python tools/build_native_distribution.py --suite --output .workbench/build/suite
 python tools/build_native_distribution.py --suite --with-tui --output .workbench/build/linux-install-suite
-python tools/build_native_distribution.py --component workbench-core --component workbench-shell --component workbench-profile-supersymmetry --component workbench-tui --output .workbench/build/linux-supersymmetry-client
+python tools/build_native_distribution.py --component workbench-atlas --component workbench-axiom --component workbench-core --component workbench-shell --component workbench-profile-supersymmetry --component workbench-tui --output .workbench/build/linux-supersymmetry-client
 python tools/install_workbench.py .workbench/build/core --destination /absolute/new/workbench-env
 ```
 
@@ -53,7 +53,7 @@ portable/native bundled-interpreter artifact families are supported.
 The release-specific hook binds one assembled archive digest. The full Suite
 edition includes its wheelhouse, Axiom engine ZIP, both IDE clients, guide and
 an exhaustive file manifest. The Supersymmetry client edition has a smaller
-exact native closure and omits the independent engine and IDE artifacts. Both
-editions retain the same byte, target, source and no-clobber checks; each has
+exact native closure and the verified Axiom engine ZIP, without IDE artifacts.
+Both editions retain the same byte, target, source and no-clobber checks; each has
 its own bundle format. The composer publishes its verified archive and
 descriptor through Core as one exact tree. See [the release procedure](../RELEASING.md#prepare-the-one-command-linux-bundle).

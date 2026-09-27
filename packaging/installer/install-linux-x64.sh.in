@@ -98,6 +98,8 @@ already_installed() {
         && "$destination/bin/workbench" version --json >/dev/null 2>&1; then
         printf 'Workbench %s is already installed.\nRun: %s/bin/workbench setup --check\n' \
             "$RELEASE_TAG" "$destination"
+        printf 'Axiom engine ZIP: %s\n' \
+            "$retained_bundle"/axiom/workbench-axiom-engine-*.zip
         return 0
     fi
     fail "an incomplete or different installation is retained at $destination; inspect its receipt before retrying"
@@ -191,8 +193,9 @@ PY
         printf 'Next: open %s/bin/workbench-tui for guided Supersymmetry setup.\n' "$destination"
     else
         printf 'IDE clients: %s/bundles/%s/clients\n' "$install_root" "$RELEASE_TAG"
-        printf 'Axiom engine archive: %s/bundles/%s/axiom\n' "$install_root" "$RELEASE_TAG"
     fi
+    printf 'Axiom engine ZIP: %s\n' \
+        "$install_root/bundles/$RELEASE_TAG"/axiom/workbench-axiom-engine-*.zip
     printf 'No shell profile or existing installation was changed.\n'
 }
 

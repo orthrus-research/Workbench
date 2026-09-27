@@ -96,8 +96,6 @@ class InstallBundleTests(unittest.TestCase):
             (wheelhouse / name).write_bytes((ROOT / name).read_bytes())
         guide = self.inputs / "GETTING-STARTED.md"
         guide.write_text("# Install Workbench\n", encoding="utf-8")
-        if edition == bundle.CLIENT_EDITION:
-            return {"wheelhouse": wheelhouse, "guide": guide}
         engine = self.inputs / artifact_filename(ROOT, "workbench-axiom-engine.distribution")
         with io.BytesIO() as memory:
             with zipfile.ZipFile(memory, "w") as jar:
@@ -116,6 +114,8 @@ class InstallBundleTests(unittest.TestCase):
             }))
             if unsafe_engine:
                 archive.writestr("../escape", "bad")
+        if edition == bundle.CLIENT_EDITION:
+            return {"wheelhouse": wheelhouse, "engine_zip": engine, "guide": guide}
         vscode = self.inputs / artifact_filename(ROOT, "workbench-vscode.vsix")
         intellij = self.inputs / artifact_filename(ROOT, "workbench-intellij-community.plugin-zip")
         for path in (vscode, intellij):
@@ -206,7 +206,10 @@ class InstallBundleTests(unittest.TestCase):
             set(manifest["native_versions"]),
         )
         paths = {row["path"] for row in manifest["files"]}
-        self.assertFalse(any(path.startswith(("axiom/", "clients/")) for path in paths))
+        self.assertIn("workbench-atlas", manifest["native_versions"])
+        self.assertIn("workbench-axiom", manifest["native_versions"])
+        self.assertEqual({manifest["engine_archive"]}, {path for path in paths if path.startswith("axiom/")})
+        self.assertFalse(any(path.startswith("clients/") for path in paths))
         rendered = hook.render(
             self.root / "client" / "workbench-linux-x64-py314-install.json",
             self.root / "client-hook" / "workbench-install-linux-x64.sh",
@@ -214,6 +217,7 @@ class InstallBundleTests(unittest.TestCase):
         )
         script = Path(rendered["hook"]).read_text()
         self.assertIn("BUNDLE_EDITION='supersymmetry-client'", script)
+        self.assertIn("Axiom engine ZIP:", script)
         self.assertNotIn("@BUNDLE_EDITION@", script)
         wrong_descriptor = {**descriptor, "format": bundle.DESCRIPTOR_FORMAT}
         wrong_descriptor.pop("edition")
@@ -283,10 +287,15 @@ class InstallBundleTests(unittest.TestCase):
 
     def test_supersymmetry_client_rejects_extras_and_missing_tui(self) -> None:
         inputs = self._inputs(edition=bundle.CLIENT_EDITION)
-        with self.assertRaisesRegex(bundle.BundleError, "excludes engine and IDE"):
+        with self.assertRaisesRegex(bundle.BundleError, "excludes IDE"):
             self._assemble(
-                {**inputs, "engine_zip": self.inputs / "unused.zip"},
+                {**inputs, "vscode_vsix": self.inputs / "unused.vsix"},
                 self.root / "extra-artifact", edition=bundle.CLIENT_EDITION,
+            )
+        with self.assertRaisesRegex(bundle.BundleError, "requires an Axiom engine"):
+            self._assemble(
+                {**inputs, "engine_zip": None},
+                self.root / "missing-engine", edition=bundle.CLIENT_EDITION,
             )
         manifest_path = inputs["wheelhouse"] / "wheelhouse.json"
         manifest = json.loads(manifest_path.read_text())
@@ -316,6 +325,11 @@ class InstallBundleTests(unittest.TestCase):
         inputs = self._inputs(unsafe_engine=True)
         with self.assertRaisesRegex(bundle.BundleError, "unsafe archive path"):
             self._assemble(inputs, self.root / "unsafe")
+
+    def test_supersymmetry_client_refuses_unsafe_engine(self) -> None:
+        inputs = self._inputs(edition=bundle.CLIENT_EDITION, unsafe_engine=True)
+        with self.assertRaisesRegex(bundle.BundleError, "unsafe archive path"):
+            self._assemble(inputs, self.root / "unsafe-client", edition=bundle.CLIENT_EDITION)
 
     def test_missing_tui_is_rejected(self) -> None:
         inputs = self._inputs(tui=False)
