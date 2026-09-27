@@ -69,6 +69,22 @@ class _PreparedWorkspace:
         # Preparation and native admission both reopen the fixed runtime child.
         return check_storage.ordinary(self._attempt_path() / "runtime", directory=True)
 
+    def materialize_inputs(
+        self, *, runtime_root: Path, runtime_files: list[dict],
+        java_home: Path, java_files: list[dict],
+        source_files: dict[str, bytes], source_rows: list[dict],
+        source_roots: list[str], runtime_exclude: list[str] | tuple[str, ...] = (),
+        cancelled: Callable[[], bool] = lambda: False,
+    ) -> dict:
+        # Input locations and root policy belong to the caller; the verified
+        # attempt fixes both retained destinations inside Core materialize.
+        return capture_workspace.materialize(
+            self._attempt_path(), runtime_root=runtime_root, runtime_files=runtime_files,
+            java_home=java_home, java_files=java_files, source_files=source_files,
+            source_rows=source_rows, source_roots=source_roots,
+            runtime_exclude=runtime_exclude, cancelled=cancelled,
+        )
+
     def create_from_build(self, relative: str, artifact: dict) -> dict:
         # The selected builder writes a single artifact in this attempt's
         # observer-build directory. Compare directory identity rather than
@@ -114,6 +130,9 @@ class _PreparedWorkspace:
 
     def inventory(self, *, cancelled: Callable[[], bool] = lambda: False) -> list[dict]:
         return capture_workspace.inventory(self._root(), cancelled=cancelled)
+
+    def java_inventory(self, *, cancelled: Callable[[], bool] = lambda: False) -> list[dict]:
+        return capture_workspace.inventory(self._attempt_path() / "java", cancelled=cancelled)
 
 
 class CoreCaptureWorkspaces:

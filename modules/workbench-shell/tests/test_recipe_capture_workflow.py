@@ -845,6 +845,37 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             self.prepare(request)
         self.native.assert_not_called()
 
+    def test_partial_bound_materialization_retains_failed_attempt_and_blocks_replay(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        original_copy = check_storage.copy_manifest
+
+        def interrupt_selected_runtime_copy(source, destination, rows, **kwargs):
+            if source == self.runtime:
+                original_copy(source, destination, rows[:1], **kwargs)
+                raise check_storage.CheckStorageError('synthetic partial selected runtime copy')
+            return original_copy(source, destination, rows, **kwargs)
+
+        with patch.object(check_storage, 'copy_manifest', side_effect=interrupt_selected_runtime_copy):
+            with self.assertRaisesRegex(check_storage.CheckStorageError,
+                                        'synthetic partial selected runtime copy'):
+                self.prepare(request)
+        first = request['runtime_files'][0]
+        self.assertEqual((self.runtime / first['path']).read_bytes(),
+                         (attempt / 'runtime' / first['path']).read_bytes())
+        self.assertFalse((attempt / 'java').exists())
+        self.assertTrue((attempt / 'prepare-started.json').is_file())
+        self.assertFalse((attempt / 'prepared.json').exists())
+        failure = capture.show(self.state, request['attempt_id'])
+        self.assertEqual(('failed', 'prepare', False),
+                         (failure['state'], failure['stage'], failure['native_admitted']))
+        with self.assertRaisesRegex(ValueError, 'already attempted'):
+            self.prepare(request)
+        with self.assertRaisesRegex(ValueError, 'preparation failed'):
+            capture.run(self.state, request['attempt_id'], 'no-prepared-id',
+                        accept_eula=True, cancelled=self.cancelled)
+        self.native.assert_not_called()
+
     def test_preparation_failure_v1_bytes_and_historical_core_readback(self):
         request = self.plan()
         attempt = self.attempt(request)
@@ -1134,23 +1165,44 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
     def test_prepared_observer_override_and_pre_run_inventory_use_bound_core_workspace(self):
         request = self.plan()
         inventories = []
+        java_inventories = []
+        materializations = []
         original_inventory = _PreparedWorkspace.inventory
+        original_java_inventory = _PreparedWorkspace.java_inventory
+        original_materialize = _PreparedWorkspace.materialize_inputs
 
         def observe_inventory(workspace, *, cancelled):
             rows = original_inventory(workspace, cancelled=cancelled)
             inventories.append((workspace._root(), rows))
             return rows
 
+        def observe_java_inventory(workspace, *, cancelled):
+            rows = original_java_inventory(workspace, cancelled=cancelled)
+            java_inventories.append((workspace._attempt_path() / 'java', rows))
+            return rows
+
+        def observe_materialize(workspace, **kwargs):
+            materializations.append((workspace._attempt_path(), kwargs))
+            return original_materialize(workspace, **kwargs)
+
         with (patch.object(capture, 'capture_prepared_workspace',
                            wraps=capture.capture_prepared_workspace) as selected,
-              patch.object(_PreparedWorkspace, 'inventory', observe_inventory)):
+              patch.object(_PreparedWorkspace, 'inventory', observe_inventory),
+              patch.object(_PreparedWorkspace, 'java_inventory', observe_java_inventory),
+              patch.object(_PreparedWorkspace, 'materialize_inputs', observe_materialize)):
             prepared = self.prepare(request)
             result = self.run_capture(prepared)
         attempt = self.attempt(prepared)
         self.assertEqual(2, selected.call_count)
         self.assertTrue(all(call.args[0].path == attempt for call in selected.call_args_list))
+        self.assertEqual(1, len(materializations))
+        self.assertEqual(attempt, materializations[0][0])
+        self.assertEqual(self.runtime, materializations[0][1]['runtime_root'])
+        self.assertEqual(self.java, materializations[0][1]['java_home'])
+        self.assertTrue(callable(materializations[0][1]['cancelled']))
         self.assertEqual(2, len(inventories))
         self.assertEqual([(attempt / 'runtime', prepared['runtime_files'])] * 2, inventories)
+        self.assertEqual([(attempt / 'java', prepared['java_files'])] * 3, java_inventories)
         artifact = prepared['observer_build']['artifact']
         observer = attempt / 'runtime/mods/fixture-observer.jar'
         self.assertEqual((artifact['size'], artifact['sha256']),
@@ -1159,6 +1211,30 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                        'sha256': artifact['sha256'], 'mode': 0o644}, prepared['runtime_files'])
         self.assertEqual(prepared, json.loads((attempt / 'prepared.json').read_bytes()))
         self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_prelaunch_java_inventory_drift_blocks_native_execution(self):
+        prepared = self.prepare()
+        attempt = self.attempt(prepared)
+        java_file = attempt / 'java/bin' / ('java.exe' if os.name == 'nt' else 'java')
+        original_inventory = _PreparedWorkspace.java_inventory
+        calls = 0
+
+        def change_before_prelaunch_check(workspace, *, cancelled):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                java_file.write_bytes(b'changed after execution copy')
+            return original_inventory(workspace, cancelled=cancelled)
+
+        with patch.object(_PreparedWorkspace, 'java_inventory', change_before_prelaunch_check):
+            with self.assertRaisesRegex(ValueError, 'execution Java changed before launch'):
+                self.run_capture(prepared)
+        self.assertEqual(2, calls)
+        self.assertTrue((attempt / 'run-started.json').is_file())
+        self.assertEqual('failed', capture.show(self.state, prepared['attempt_id'])['state'])
+        with self.assertRaisesRegex(ValueError, 'already attempted'):
+            self.run_capture(prepared)
+        self.native.assert_not_called()
 
     def test_prepared_observer_override_faults_retain_v1_disposition_and_block_native_run(self):
         original_link = core_capture_workspace.os.link

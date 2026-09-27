@@ -121,6 +121,79 @@ class CaptureWorkspacePortTests(unittest.TestCase):
         self.assertFalse((self.execution / "two.txt").exists())
         self.assertEqual(b"second file\n", (runtime / "two.txt").read_bytes())
 
+    def test_prepared_materialization_matches_v1_and_java_reader_reopens_fixed_tree(self) -> None:
+        selected_runtime = self.root / "selected runtime é"
+        selected_java = self.root / "selected java é"
+        (selected_runtime / "groovy").mkdir(parents=True)
+        (selected_runtime / "groovy/stale.groovy").write_bytes(b"stale")
+        (selected_runtime / "runtime.jar").write_bytes(b"reviewed runtime")
+        (selected_java / "bin").mkdir(parents=True)
+        (selected_java / "bin/java").write_bytes(b"reviewed java")
+        source_files = {"groovy/recipe.groovy": b"saved recipe\r\n",
+                        "README.md": b"outside selected roots"}
+        source_rows = [
+            {"path": name, "mode": 0o100644, "size": len(raw),
+             "sha256": sha256(raw).hexdigest()}
+            for name, raw in sorted(source_files.items())
+        ]
+        arguments = dict(
+            runtime_root=selected_runtime,
+            runtime_files=capture_workspace.inventory(selected_runtime, exclude=("groovy",)),
+            java_home=selected_java,
+            java_files=capture_workspace.inventory(selected_java),
+            source_files=source_files, source_rows=source_rows,
+            source_roots=["groovy"], runtime_exclude=["groovy"],
+        )
+        direct_attempt = self.root / "historical direct attempt"
+        direct_attempt.mkdir()
+        historical = capture_workspace.materialize(direct_attempt, **arguments)
+        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST)):
+            prepared = port.capture_prepared_workspace(self.reference)
+            retained = prepared.materialize_inputs(**arguments)
+            self.assertEqual(arguments["java_files"], prepared.java_inventory())
+            self.assertEqual(historical["runtime_files"], retained["runtime_files"])
+            self.assertEqual(historical["java_files"], retained["java_files"])
+        self.assertEqual(str(self.reference.path / "runtime"), retained["runtime"])
+        self.assertEqual(str(self.reference.path / "java"), retained["java_home"])
+        self.assertFalse((self.reference.path / "runtime/groovy/stale.groovy").exists())
+        self.assertFalse((self.reference.path / "runtime/README.md").exists())
+        for row in retained["runtime_files"]:
+            relative = row["path"]
+            self.assertEqual((direct_attempt / "runtime" / relative).read_bytes(),
+                             (self.reference.path / "runtime" / relative).read_bytes())
+        for row in retained["java_files"]:
+            relative = row["path"]
+            self.assertEqual((direct_attempt / "java" / relative).read_bytes(),
+                             (self.reference.path / "java" / relative).read_bytes())
+        reopened_attempts = self._attempts("workbench-shell")
+        with (managed_attempts_scope(reopened_attempts), patch.object(port, "_host", HOST)):
+            reopened = port.capture_prepared_workspace(reopened_attempts.open(
+                "recipe-capture-v1", "recipe-capture", self.reference.attempt_id,
+            ))
+            self.assertEqual(retained["java_files"], reopened.java_inventory())
+            (self.reference.path / "java/bin/java").write_bytes(b"changed java")
+            self.assertNotEqual(retained["java_files"], reopened.java_inventory())
+
+    def test_materialization_and_java_reader_refuse_foreign_attempt_before_io(self) -> None:
+        foreign_attempts = self._attempts("other-owner")
+        foreign = foreign_attempts.allocate("recipe-capture-v1", "recipe-capture")
+        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST),
+              patch.object(capture_workspace, "materialize") as materialized,
+              patch.object(capture_workspace, "inventory") as inventoried):
+            for reference in (foreign, replace(self.reference, path=foreign.path)):
+                with self.subTest(reference=reference):
+                    with self.assertRaises(ManagedAttemptError):
+                        port.capture_prepared_workspace(reference).materialize_inputs(
+                            runtime_root=self.root, runtime_files=[], java_home=self.root,
+                            java_files=[], source_files={}, source_rows=[], source_roots=["groovy"],
+                        )
+                    with self.assertRaises(ManagedAttemptError):
+                        port.capture_prepared_workspace(reference).java_inventory()
+            materialized.assert_not_called()
+            inventoried.assert_not_called()
+        self.assertFalse((foreign.path / "runtime").exists())
+        self.assertFalse((foreign.path / "java").exists())
+
     def test_prepared_runtime_preserves_historical_inventory_and_create_only_observer(self) -> None:
         runtime = self.reference.path / "runtime"
         (runtime / "mods").mkdir(parents=True)

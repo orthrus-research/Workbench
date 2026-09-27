@@ -530,8 +530,9 @@ def prepare(root, identity, confirm, *, cancelled):
                                     byte_limit=_WITNESS_BYTE_LIMIT)
             _write_transition_marker(attempt, 'prepare-started.json',
                                      {'request_id': request['id']})
-            retained = workspace_storage.materialize(
-                attempt, runtime_root=Path(request['runtime']), runtime_files=request['runtime_files'],
+            prepared_workspace = capture_prepared_workspace(reference)
+            retained = prepared_workspace.materialize_inputs(
+                runtime_root=Path(request['runtime']), runtime_files=request['runtime_files'],
                 java_home=Path(request['java_home']), java_files=request['java_files'],
                 source_files=_source(attempt, request), source_rows=request['candidate']['files'],
                 source_roots=request['descriptor']['source_roots'], runtime_exclude=request['runtime_exclusions'],
@@ -547,10 +548,9 @@ def prepare(root, identity, confirm, *, cancelled):
             classpath = owner.observer_classpath(execution_root / 'runtime', retained['runtime_files'], request['artifact_paths'])
             build = owner.build_observer(execution_root / 'java', classpath, execution_root / 'observer-build', cancelled=cancel)
             cancel.check()
-            prepared_workspace = capture_prepared_workspace(reference)
             prepared_workspace.create_from_build(request['descriptor']['observer_path'], build['artifact'])
             runtime_files = prepared_workspace.inventory(cancelled=cancel.is_set)
-            if workspace_storage.inventory(java_home, cancelled=cancel.is_set) != retained['java_files']:
+            if prepared_workspace.java_inventory(cancelled=cancel.is_set) != retained['java_files']:
                 raise ValueError('retained Java changed during observer compilation')
             _current(attempt, request)
             prepared = storage.seal('recipe-capture-prepared',
@@ -618,9 +618,10 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
         execution_root = java_execution_path(attempt)
         if str(execution_root) != prepared['execution_root']:
             raise ValueError('prepared Java execution path changed; make a new plan')
-        if capture_prepared_workspace(reference).inventory(cancelled=cancel.is_set) != prepared['runtime_files']:
+        prepared_workspace = capture_prepared_workspace(reference)
+        if prepared_workspace.inventory(cancelled=cancel.is_set) != prepared['runtime_files']:
             raise ValueError('prepared runtime changed')
-        if workspace_storage.inventory(attempt / 'java', cancelled=cancel.is_set) != prepared['java_files']:
+        if prepared_workspace.java_inventory(cancelled=cancel.is_set) != prepared['java_files']:
             raise ValueError('prepared Java changed')
         _write_transition_marker(attempt, 'run-started.json',
                                  {'request_id': request['id'], 'prepared_id': prepared['id'],
@@ -665,7 +666,7 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
             cancel.check()
             if execution_workspace.inventory(cancelled=cancel.is_set) != execution_files:
                 raise ValueError('execution runtime changed before launch')
-            if workspace_storage.inventory(attempt / 'java', cancelled=cancel.is_set) != prepared['java_files']:
+            if prepared_workspace.java_inventory(cancelled=cancel.is_set) != prepared['java_files']:
                 raise ValueError('execution Java changed before launch')
             stage = 'native-execution'
             process = capture_process(launch['argv'], directory=attempt / 'process', binding=launch['id'], cwd=execution_root / 'execution',

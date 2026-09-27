@@ -27,9 +27,19 @@ class CaptureExecutionWorkspace(Protocol):
 
 
 class CapturePreparedWorkspace(Protocol):
+    def materialize_inputs(
+        self, *, runtime_root: Path, runtime_files: list[dict],
+        java_home: Path, java_files: list[dict],
+        source_files: dict[str, bytes], source_rows: list[dict],
+        source_roots: list[str], runtime_exclude: list[str] | tuple[str, ...] = (),
+        cancelled: Callable[[], bool] = lambda: False,
+    ) -> dict: ...
+
     def create_from_build(self, relative: str, artifact: dict) -> dict: ...
 
     def inventory(self, *, cancelled: Callable[[], bool] = lambda: False) -> list[dict]: ...
+
+    def java_inventory(self, *, cancelled: Callable[[], bool] = lambda: False) -> list[dict]: ...
 
 
 class CaptureWorkspaces(Protocol):
