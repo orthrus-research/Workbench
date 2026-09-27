@@ -10,6 +10,7 @@ from workbench_api.host_filesystem import (
     read_bounded_single_link_bytes,
 )
 from workbench_api.processes import ProcessError, execute_process
+from workbench_api.source_transactions import SourceImage, open_source_transaction
 
 import base64
 import difflib
@@ -313,13 +314,13 @@ def _apply_sealed_operations(
             )
         before_digest = operation.get("before_sha256")
         if kind == "update":
-            current_digest = sha256(target.read_bytes()).hexdigest()
+            before = target.read_bytes()
+            current_digest = sha256(before).hexdigest()
             if not isinstance(before_digest, str) or current_digest != before_digest:
                 _fail(
                     "sealed Blueprint update baseline differs: "
                     f"{relative.as_posix()}"
                 )
-        temporary_name: str | None = None
         try:
             if kind == "create":
                 with target.open("xb") as output:
@@ -329,24 +330,21 @@ def _apply_sealed_operations(
                 target.chmod(0o644)
             else:
                 mode = target.stat().st_mode & 0o777
-                with tempfile.NamedTemporaryFile(
-                    mode="wb",
-                    dir=target.parent,
-                    prefix=f".{target.name}.",
-                    delete=False,
-                ) as output:
-                    temporary_name = output.name
-                    os.fchmod(output.fileno(), mode)
-                    output.write(content)
-                    output.flush()
-                    os.fsync(output.fileno())
-                os.replace(temporary_name, target)
-                temporary_name = None
+                binding = "blueprint-stage-output:" + sha256(_canonical_bytes({
+                    "path": relative.as_posix(), "content_sha256": digest,
+                })).hexdigest()
+                transaction = open_source_transaction(workspace, binding=binding)
+                try:
+                    staged = transaction.prepare(
+                        relative.as_posix(),
+                        before=SourceImage("file", before, mode=mode),
+                        after=SourceImage("file", content, mode=mode),
+                    )
+                    transaction.commit(staged)
+                finally:
+                    transaction.cleanup()
         except OSError as exc:
             _fail(f"cannot stage Blueprint output {relative}: {exc}")
-        finally:
-            if temporary_name is not None:
-                Path(temporary_name).unlink(missing_ok=True)
         outputs.append({
             "operation": kind,
             "path": relative.as_posix(),

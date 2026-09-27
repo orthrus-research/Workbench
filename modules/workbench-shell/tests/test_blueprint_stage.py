@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import redirect_stdout
+import base64
 import io
 import json
 from hashlib import sha256
@@ -43,6 +44,7 @@ from workbench_api import ExecutionContext  # noqa: E402
 from workbench_shell import commands  # noqa: E402
 from workbench_core.host_services import install_local_host_services  # noqa: E402
 import workbench_api.processes as process_port  # noqa: E402
+from workbench_api.source_transactions import source_transactions_scope  # noqa: E402
 import workbench_shell.blueprint_stage as stage_module  # noqa: E402
 
 
@@ -267,6 +269,33 @@ class BlueprintStageTest(unittest.TestCase):
             self.assertEqual(value, _load_json(legacy))
             with self.assertRaisesRegex(BlueprintStageError, "already exists"):
                 _write_json(path, value)
+
+    def test_sealed_update_uses_core_source_custody_and_preserves_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            target = workspace / "example.groovy"
+            before, after = b"old source\n", b"new source\n"
+            target.write_bytes(before)
+            target.chmod(0o755)
+            sealed = {"operations": [{
+                "operation": "update", "path": target.name,
+                "before_sha256": sha256(before).hexdigest(),
+                "content_sha256": sha256(after).hexdigest(),
+                "content_base64": base64.b64encode(after).decode("ascii"),
+            }]}
+
+            with source_transactions_scope(None):
+                with self.assertRaisesRegex(
+                    BlueprintStageError, "protected source edits require Workbench Core",
+                ):
+                    stage_module._apply_sealed_operations(workspace, sealed)
+            self.assertEqual(before, target.read_bytes())
+
+            outputs = stage_module._apply_sealed_operations(workspace, sealed)
+            self.assertEqual(after, target.read_bytes())
+            self.assertEqual(0o755, target.stat().st_mode & 0o777)
+            self.assertEqual(sha256(after).hexdigest(), outputs[0]["sha256"])
 
     def test_user_session_root_is_direct_and_passed_through_core_context(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
