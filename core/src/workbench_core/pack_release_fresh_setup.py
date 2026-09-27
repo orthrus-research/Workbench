@@ -307,6 +307,14 @@ class OfficialFreshReleaseService:
         except Exception as exc:
             raise CurseForgeAccessUnavailable("Workbench CurseForge access is unavailable") from exc
 
+    def provider_status(self) -> dict[str, Any]:
+        """Check provider configuration without requiring a prepared release ZIP."""
+        try:
+            self._provider_key()
+        except CurseForgeAccessUnavailable as exc:
+            return {"status": "unavailable", "reason": str(exc)}
+        return {"status": "configured", "reason": None}
+
     def _context(self) -> tuple[
         dict[str, Any], Path, dict[str, Any], tuple[tuple[int, int], ...], Path, Path,
     ]:

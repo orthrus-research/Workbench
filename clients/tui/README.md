@@ -83,7 +83,11 @@ invoking Core's import. A conflicting destination blocks the bulk import and
 is shown for manual review; the client never chooses which record to replace.
 Core retains the earlier files and checks the records again before copying.
 
-Home also offers **Choose workspace profile and Java** for registered named
+Home starts on **Set up Supersymmetry**, which collects a pack source, workspace,
+Java choice and Prism location for installation. **Set up developer environment**
+handles an existing Workbench project configuration separately.
+
+Home also offers **Choose workspace and Java** for registered named
 workspaces. Textual reads and saves these local choices through Core's
 `settings workspace` JSON interface with a revision check. Java choices are
 the recommended managed Java 25 for Cleanroom, an optional managed Java 8
@@ -120,7 +124,7 @@ Refresh can retry a check. An unavailable GitHub response does not block local
 use. The published client archive is a CurseForge distribution;
 developers can still explicitly choose a source branch for their own work.
 The archive by itself does not establish a runnable Cleanroom fixture.
-Home's **View or prepare Supersymmetry pack** action reads the saved choice
+Home's **View published pack archive** action reads the saved choice
 offline and asks before Core downloads an unprepared selection. It can prepare
 the pinned default or a deliberately retained older release without changing
 the selected version. If the retained archive changes, Textual shows a review
@@ -160,7 +164,9 @@ file and must be supplied again on import without managed acquisition.
   Prism instance ZIP or an existing Prism data folder. The tree includes
   hidden folders, supports arrows, Space to expand, Backspace for the parent,
   and Ctrl+G to jump to an absolute folder. In WSL, Windows drives can be
-  reached under `/mnt`. A new Prism folder can still be typed directly.
+  reached under `/mnt`. A new Prism folder can still be typed directly. When
+  Workbench's official file access is unavailable, setup starts with the ZIP
+  route and explains how to check files saved from an earlier official run.
 - **Modules:** Tabs, tables, and a detail panel compare installed module and
   profile records. Highlighting a row reveals its capabilities or resources;
   missing or unavailable components retain their reported reason.

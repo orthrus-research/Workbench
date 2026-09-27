@@ -66,6 +66,19 @@ class PackInstanceCliTests(unittest.TestCase):
         )
         return imported
 
+    def test_provider_preflight_needs_no_release_zip(self) -> None:
+        with patch.dict(os.environ):
+            os.environ.pop("WORKBENCH_CURSEFORGE_API_KEY", None)
+            missing = self._call("fresh-provider-status")
+        self.assertEqual("fresh-provider-status", missing["action"])
+        self.assertEqual("unavailable", missing["provider"]["status"])
+        self.assertIn("not configured", missing["provider"]["reason"])
+        with patch.dict(os.environ, {"WORKBENCH_CURSEFORGE_API_KEY": "synthetic-app-key"}):
+            configured = self._call("fresh-provider-status")
+        self.assertEqual({"status": "configured", "reason": None},
+                         configured["provider"])
+        self.assertFalse((self.state / "artifacts").exists())
+
     def test_review_import_select_and_reopen_without_original_zip(self) -> None:
         initial = self._call("choice-show")
         self.assertEqual("none", initial["source_state"])

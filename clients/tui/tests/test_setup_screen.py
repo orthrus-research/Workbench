@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock
 
 from textual.widgets import Button, Input, OptionList, Select, Static
 
-from workbench_tui.app import ReviewModal, SetupScreen, WorkbenchApp
+from workbench_tui.app import PackInstanceScreen, ReviewModal, SetupScreen, WorkbenchApp
 from workbench_tui.core_client import CoreClient, CoreClientError
 from workbench_tui.keyboard_form import ChoicePicker
 
@@ -57,6 +57,9 @@ def fake_core(workspace: str, *, blockers: list[str] | None = None) -> Mock:
         }
     )
     core.java_inventory = AsyncMock(return_value={"format": "workbench-java-inventory-v1"})
+    core.pack_instance_fresh_provider_status = AsyncMock(return_value={
+        "provider": {"status": "configured", "reason": None},
+    })
     return core
 
 
@@ -68,14 +71,30 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.05)
         self.fail("Textual did not reach the expected state")
 
-    async def test_home_actions_are_keyboard_ready_without_tab(self) -> None:
-        app = WorkbenchApp(fake_core("/home/test/workspace"))
+    async def test_home_starts_on_supersymmetry_without_tab(self) -> None:
+        core = fake_core("/home/test/workspace")
+        core.pack_instance_choice_show = AsyncMock(return_value={
+            "choice": {"source_plan_id": None, "launcher_root": None,
+                       "workspace_name": None}, "source_state": "none",
+        })
+        core.workspace_choices = AsyncMock(return_value={"default": None, "entries": []})
+        core.pack_instance_install_status = AsyncMock(return_value={"installations": []})
+        app = WorkbenchApp(core)
         async with app.run_test(size=(110, 38)) as pilot:
             await self._settle(pilot, lambda: app.view.setup is not None
+                               and app.view.catalog is not None
                                and isinstance(app.focused, OptionList)
-                               and app.focused.id == "home-actions")
+                               and app.focused.id == "home-actions"
+                               and app.focused.highlighted == 0)
+            await pilot.pause(0.1)
+            self.assertEqual(0, app.focused.highlighted)
+            self.assertEqual("pack-instance", app.focused.get_option_at_index(0).id)
+            self.assertIn("install it in Prism", app.query_one("#home-subtitle", Static).content)
+            await pilot.press("down")
+            self.assertIn("developer workspace", app.query_one("#home-subtitle", Static).content)
+            await pilot.press("up")
             await pilot.press("enter")
-            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen))
+            await self._settle(pilot, lambda: isinstance(app.screen, PackInstanceScreen))
 
     async def test_arrows_and_enter_edit_then_return_to_navigation(self) -> None:
         core = fake_core("/home/test/workspace")
@@ -103,6 +122,44 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual("/home/test/changed", workspace.value)
             self.assertIsNone(app.focused)
 
+    async def test_clean_setup_starts_with_a_runnable_workspace_choice(self) -> None:
+        app = WorkbenchApp(fake_core("/home/test/workspace"))
+        async with app.run_test(size=(100, 30)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.open_setup()
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                               and bool(app.screen.query("#setup-mode"))
+                               and app.screen.query_one("#setup-mode", Select).has_class("keyboard-selected"))
+            screen = app.screen
+            self.assertEqual("review", screen.query_one("#setup-mode", Select).value)
+            self.assertFalse(screen.query_one("#setup-profile", Input).display)
+            self.assertFalse(screen.query_one("#setup-state-root", Input).display)
+            self.assertLess(screen.query_one("#setup-plan", Button).region.y, 30)
+            screen.query_one("#setup-more", Button).press()
+            await pilot.pause()
+            self.assertTrue(screen.query_one("#setup-state-root", Input).display)
+            screen.query_one("#setup-mode", Select).value = "full"
+            await pilot.pause()
+            self.assertTrue(screen.query_one("#setup-profile", Input).display)
+
+    async def test_explicit_profile_path_starts_in_developer_setup(self) -> None:
+        app = WorkbenchApp(
+            fake_core("/home/test/workspace"),
+            initial_profile_config="/home/test/workbench.toml",
+        )
+        async with app.run_test(size=(100, 30)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.open_setup()
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                               and bool(app.screen.query("#setup-mode")))
+            screen = app.screen
+            self.assertEqual("full", screen.query_one("#setup-mode", Select).value)
+            self.assertTrue(screen.query_one("#setup-profile", Input).display)
+            self.assertEqual(
+                "/home/test/workbench.toml",
+                screen.query_one("#setup-profile", Input).value,
+            )
+
     async def test_enter_opens_keyboard_choice_and_returns_to_navigation(self) -> None:
         core = fake_core("/home/test/workspace")
         app = WorkbenchApp(core)
@@ -117,7 +174,7 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
             await self._settle(pilot, lambda: isinstance(app.screen, ChoicePicker))
             await pilot.press("down", "enter")
             await self._settle(pilot, lambda: app.screen is screen)
-            self.assertEqual("review", screen.query_one("#setup-mode", Select).value)
+            self.assertEqual("full", screen.query_one("#setup-mode", Select).value)
             self.assertIsNone(app.focused)
             self.assertTrue(screen.query_one("#setup-mode", Select).has_class("keyboard-selected"))
 
@@ -127,7 +184,9 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
             await self._settle(pilot, lambda: app.view.setup is not None)
             app.open_setup()
             await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
-                               and bool(app.screen.query("#setup-workspace")))
+                               and bool(app.screen.query("#setup-mode"))
+                               and app.screen.query_one("#setup-mode", Select).has_class(
+                                   "keyboard-selected"))
             field = app.screen.query_one("#setup-workspace", Input)
             field.value = ""
             field.focus()
@@ -176,6 +235,9 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
                                and app.screen.detected_java.get("installed-0") == "/usr/lib/jvm/jdk-25")
             screen = app.screen
             core.java_inventory.assert_awaited_with()
+            screen.query_one("#setup-mode", Select).value = "full"
+            screen.query_one("#setup-more", Button).press()
+            await pilot.pause()
             self.assertFalse(screen.query_one("#setup-java-candidates", Select).disabled)
             self.assertIn("Core checks", str(screen.query_one("#setup-java-hint", Static).render()))
             screen.query_one("#setup-profile", Input).value = "/home/test/workbench.toml"
@@ -204,6 +266,9 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
                     await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
                                        and core.java_inventory.await_count == 1)
                     screen = app.screen
+                    screen.query_one("#setup-mode", Select).value = "full"
+                    screen.query_one("#setup-more", Button).press()
+                    await pilot.pause()
                     await self._settle(pilot, lambda: "JDKs" in str(
                         screen.query_one("#setup-java-hint", Static).render()
                     ))

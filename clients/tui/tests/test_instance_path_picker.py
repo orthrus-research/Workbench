@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from textual.widgets import Button, Input
+from textual.widgets import Button, Input, Select
 
 from test_setup_screen import fake_core
 from workbench_tui.app import (
@@ -45,6 +45,8 @@ class InstancePathPickerTests(unittest.IsolatedAsyncioTestCase):
                 screen = self._screen(app)
                 await self._settle(pilot, lambda: app.screen is screen
                                    and bool(screen.query("#pack-zip-path")))
+                screen.query_one("#pack-source-mode", Select).value = "zip"
+                await pilot.pause()
                 screen.query_one("#pack-zip-path", Input).value = str(root)
                 screen.query_one("#pack-zip-browse", Button).press()
                 await self._settle(pilot, lambda: isinstance(app.screen, InstancePathPicker))
@@ -52,8 +54,13 @@ class InstancePathPickerTests(unittest.IsolatedAsyncioTestCase):
                 tree = picker.query_one("#instance-path-tree", _InstancePathTree)
                 await self._settle(pilot, lambda: len(tree.root.children) == 1)
                 self.assertEqual(archive, tree.root.children[0].data.path)
+                self.assertTrue(picker.query_one("#instance-path-choose", Button).disabled)
                 tree.focus()
-                await pilot.press("down", "enter")
+                await pilot.press("down")
+                await self._settle(pilot, lambda: not picker.query_one(
+                    "#instance-path-choose", Button,
+                ).disabled)
+                await pilot.press("enter")
                 await self._settle(pilot, lambda: app.screen is screen
                                    and bool(screen.query("#pack-prism-root")))
                 self.assertEqual(str(archive), screen.query_one("#pack-zip-path", Input).value)
@@ -112,6 +119,8 @@ class InstancePathPickerTests(unittest.IsolatedAsyncioTestCase):
                 screen = self._screen(app)
                 await self._settle(pilot, lambda: app.screen is screen
                                    and bool(screen.query("#pack-zip-path")))
+                screen.query_one("#pack-source-mode", Select).value = "zip"
+                await pilot.pause()
                 screen.query_one("#pack-zip-path", Input).value = str(root)
                 screen.query_one("#pack-zip-browse", Button).press()
                 await self._settle(pilot, lambda: isinstance(app.screen, InstancePathPicker))
@@ -139,6 +148,8 @@ class InstancePathPickerTests(unittest.IsolatedAsyncioTestCase):
                 screen = self._screen(app)
                 await self._settle(pilot, lambda: app.screen is screen
                                    and bool(screen.query("#pack-zip-path")))
+                screen.query_one("#pack-source-mode", Select).value = "zip"
+                await pilot.pause()
                 screen.query_one("#pack-zip-path", Input).value = str(root)
                 screen.query_one("#pack-zip-browse", Button).press()
                 await self._settle(pilot, lambda: isinstance(app.screen, InstancePathPicker))

@@ -112,6 +112,9 @@ def _fresh(action: str, *, state_root: Path, config_home: Path,
            optional_mode: str, project_id: int | None, file_id: int | None,
            override_plan_id: str | None) -> dict:
     service = _fresh_service(state_root, config_home, optional_mode)
+    if action == "fresh-provider-status":
+        return {"schema": "workbench.pack-instance.v1", "action": action,
+                "provider": service.provider_status()}
     if action == "fresh-status":
         detail = service.status()
     elif action == "fresh-overrides":
@@ -400,7 +403,8 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
     parser = argparse.ArgumentParser(prog="workbench pack instance")
     parser.add_argument("action", choices=("choice-show", "choice-select", "zip-plan",
                                            "zip-import", "zip-reopen", "zip-stage-plan",
-                                           "zip-stage-apply", "zip-stage-reopen", "fresh-status",
+                                           "zip-stage-apply", "zip-stage-reopen",
+                                           "fresh-provider-status", "fresh-status",
                                            "fresh-overrides", "fresh-file", "fresh-publish",
                                            "fresh-policy-status", "fresh-policy-plan",
                                            "fresh-policy-apply", "fresh-policy-reopen",

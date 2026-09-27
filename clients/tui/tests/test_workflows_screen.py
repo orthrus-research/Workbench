@@ -160,6 +160,62 @@ class WorkflowInteractionTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             self.assertNotIsInstance(app.screen, WorkflowsScreen)
 
+    async def test_narrow_action_list_is_compact_and_keyboard_opens_document(self) -> None:
+        core = catalog_core()
+        core.catalog.return_value["commands"].extend({
+            "command_id": f"read-{index:02d}",
+            "title": "Inspect a long developer workflow title " + str(index),
+            "summary": "Describe the selected workflow in its details",
+            "suite_id": "developer-features",
+            "authority": "Developer Features",
+            "risk": "read-only",
+            "preview": "none",
+            "availability": "available",
+            "options": [],
+            "document": None,
+        } for index in range(12))
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(58, 24)) as pilot:
+            await self._settle(pilot, lambda: app.view.catalog is not None)
+            app.open_workflows()
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkflowsScreen)
+                               and bool(app.screen.query("#workflow-list")))
+            screen = app.screen
+            listing = screen.query_one("#workflow-list", OptionList)
+            detail = screen.query_one("#workflow-detail-panel")
+            brief = screen.query_one("#workflow-brief")
+            self.assertEqual(len(listing.options), 14)
+            self.assertTrue(all("\n" not in option.prompt.plain for option in listing.options))
+            self.assertGreaterEqual(listing.region.height, 8)
+            self.assertLessEqual(detail.region.height, 7)
+            self.assertLess(screen.query_one("#workflow-run", Button).region.bottom, 23)
+            self.assertIn("Available", str(brief.render()))
+            self.assertIn("read only", str(brief.render()))
+            await pilot.press("down", "enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
+            core.open_document.assert_awaited_once()
+
+    async def test_search_filters_compact_actions_and_enter_opens_result(self) -> None:
+        core = catalog_core()
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(58, 24)) as pilot:
+            await self._settle(pilot, lambda: app.view.catalog is not None)
+            app.open_workflows()
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkflowsScreen)
+                               and bool(app.screen.query("#workflow-list")))
+            screen = app.screen
+            await pilot.press("/")
+            search = screen.query_one("#workflow-search", Input)
+            self.assertTrue(search.has_focus)
+            search.value = "guide"
+            await pilot.pause()
+            listing = screen.query_one("#workflow-list", OptionList)
+            self.assertEqual(len(listing.options), 1)
+            self.assertEqual(screen.selected["command_id"], "manuals.overview")
+            await pilot.press("enter", "enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
+            core.open_document.assert_awaited_once()
+
 
 class CatalogAdmissionTests(unittest.TestCase):
     def test_unsupported_catalog_entries_are_not_offered_to_run(self) -> None:

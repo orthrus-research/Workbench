@@ -73,6 +73,25 @@ class OfficialFreshReleaseServiceTests(unittest.TestCase):
                 other.acquire_file(10, 100)
             acquire.assert_not_called()
 
+    def test_provider_preflight_needs_no_prepared_release(self) -> None:
+        with patch.object(self.saved, "inputs", side_effect=AssertionError(
+                "provider preflight must not open the release")):
+            self.assertEqual(
+                {"status": "unavailable",
+                 "reason": "Workbench CurseForge access is not configured"},
+                self.service.provider_status(),
+            )
+            configured = fresh.OfficialFreshReleaseService(
+                self.saved, authority_path=self.fixture.root / "authority.json",
+                layout_policy_path=self.fixture.layout_policy,
+                resourcepack_policy_path=self.fixture.rp_policy,
+                credential_provider=lambda: "synthetic-app-key",
+            )
+            self.assertEqual(
+                {"status": "configured", "reason": None},
+                configured.provider_status(),
+            )
+
     def test_injected_provider_is_only_passed_to_exact_file_acquisition(self) -> None:
         service = fresh.OfficialFreshReleaseService(
             self.saved, authority_path=self.fixture.root / "authority.json",

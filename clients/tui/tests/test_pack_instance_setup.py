@@ -41,11 +41,15 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(110, 40)) as pilot:
             app.push_screen(PackInstanceScreen(choice, workspaces))
             await self._settle(pilot, lambda: isinstance(app.screen, PackInstanceScreen)
-                               and bool(app.screen.query("#pack-fresh-optional"))
-                               and app.screen.query_one("#pack-fresh-optional").has_class(
+                               and bool(app.screen.query("#pack-source-mode"))
+                               and app.screen.query_one("#pack-source-mode").has_class(
                                    "keyboard-selected"))
             screen = app.screen
             self.assertIsNone(app.focused)
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, ChoicePicker))
+            await pilot.press("down", "enter")
+            await self._settle(pilot, lambda: app.screen is screen)
             await pilot.press("down", "enter")
             zip_path = screen.query_one("#pack-zip-path", Input)
             self.assertIs(app.focused, zip_path)
@@ -69,7 +73,7 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
                                and app.screen.query_one("#choice-workspace", Select).has_class(
                                    "keyboard-selected"))
             screen = app.screen
-            await pilot.press("down", "down", "down", "enter")
+            await pilot.press("down", "down", "enter")
             await self._settle(pilot, lambda: isinstance(app.screen, ChoicePicker))
             await pilot.press("down", "enter")
             await self._settle(pilot, lambda: app.screen is screen)
@@ -164,7 +168,11 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
             await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen))
             java = app.screen
             self.assertEqual("dev", java.selected_name)
+            await self._settle(pilot, lambda: "No other system JDKs" in str(
+                java.query_one("#choice-java-hint", Static).render()
+            ))
             java.query_one("#choice-java-mode", Select).value = "managed-8"
+            await pilot.pause()
             java.query_one("#choice-save", Button).press()
             await self._settle(pilot, lambda: core.save_workspace_choice.await_count == 1)
             core.save_workspace_choice.assert_awaited_once_with(
@@ -243,19 +251,27 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
             await self._settle(pilot, lambda: isinstance(app.screen, PackInstanceScreen))
             screen = app.screen
             self.assertTrue(screen.query_one("#pack-instance-install", Button).disabled)
+            screen.query_one("#pack-source-mode", Select).value = "zip"
+            await pilot.pause()
             screen.query_one("#pack-zip-path", Input).value = "/home/test/susy.zip"
             screen.query_one("#pack-prism-root", Input).value = saved["launcher_root"]
             screen.query_one("#pack-zip-import", Button).press()
             await self._settle(pilot, lambda: isinstance(app.screen, ReviewModal)
                                and bool(app.screen.query("#review-confirm")))
             core.pack_instance_zip_import.assert_not_awaited()
-            self.assertIn("Change Java choice", app.screen.body)
+            self.assertIn("choose Java", app.screen.body)
             await pilot.pause(0.05)
             await pilot.click("#review-confirm")
             await self._settle(pilot, lambda: not screen.query_one(
                 "#pack-instance-install", Button,
             ).disabled)
             core.pack_instance_choice_select.assert_awaited_once()
+            screen.query_one("#pack-source-mode", Select).value = "official"
+            await pilot.pause()
+            self.assertFalse(screen.query_one("#pack-instance-install", Button).display)
+            screen.query_one("#pack-source-mode", Select).value = "zip"
+            await pilot.pause()
+            self.assertTrue(screen.query_one("#pack-instance-install", Button).display)
             screen.query_one("#pack-instance-install", Button).press()
             await self._settle(pilot, lambda: isinstance(app.screen, ReviewModal)
                                and bool(app.screen.query("#review-confirm")))
@@ -284,6 +300,9 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_missing_workbench_provider_keeps_zip_route_available(self) -> None:
         core = fake_core("/home/test/workspace")
+        core.pack_instance_fresh_provider_status = AsyncMock(return_value={
+            "provider": {"status": "unavailable", "reason": "not configured"},
+        })
         core.pack_instance_install_status = AsyncMock(return_value={"installations": []})
         core.pack_release_check = AsyncMock(return_value={
             "schema": "workbench.pack-release.v1", "action": "check",
@@ -315,14 +334,75 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(110, 40)) as pilot:
             await self._settle(pilot, lambda: app.view.version is not None)
             app.open_pack_instance()
-            await self._settle(pilot, lambda: isinstance(app.screen, PackInstanceScreen))
+            await self._settle(pilot, lambda: isinstance(app.screen, PackInstanceScreen)
+                               and app.screen.provider_checked)
             screen = app.screen
-            screen.query_one("#pack-fresh-download", Button).press()
-            await self._settle(pilot, lambda: "CurseForge provider access" in str(
+            self.assertEqual("zip", screen.query_one("#pack-source-mode", Select).value)
+            self.assertIn("Official download is unavailable", str(
                 screen.query_one("#pack-instance-status", Static).content,
             ))
             core.pack_instance_fresh_overrides.assert_not_awaited()
             self.assertFalse(screen.query_one("#pack-zip-import", Button).disabled)
+
+    async def test_saved_official_files_can_finish_without_provider_access(self) -> None:
+        core = fake_core("/home/test/workspace")
+        core.pack_instance_fresh_provider_status = AsyncMock(return_value={
+            "provider": {"status": "unavailable", "reason": "not configured"},
+        })
+        core.pack_instance_choice_show = AsyncMock(return_value={
+            "choice": {"record_id": RECORD_ID, "source_plan_id": None,
+                       "launcher_root": None, "workspace_name": None},
+            "source_state": "none",
+        })
+        core.workspace_choices = AsyncMock(return_value={
+            "default": "dev", "entries": [{"name": "dev", "path": "/home/test/workspace"}],
+        })
+        core.pack_instance_install_status = AsyncMock(return_value={"installations": []})
+        core.pack_release_show = AsyncMock(return_value={
+            "artifact_state": "verified", "selected": {"version": "0.1.16.16"},
+        })
+        core.pack_instance_fresh_policy_status = AsyncMock(return_value={
+            "policy": {"status": "ready"},
+        })
+        core.pack_instance_fresh_status = AsyncMock(return_value={
+            "fresh": {"status": "pending", "provider_state": "unavailable",
+                      "ready_file_count": 193, "selected_file_count": 193,
+                      "release_version": "0.1.16.16", "files": []},
+        })
+        core.pack_instance_fresh_overrides = AsyncMock(return_value={
+            "fresh": {"override_plan_id": "saved-overrides"},
+        })
+        core.pack_instance_fresh_publish = AsyncMock(return_value={
+            "fresh": {"composition_result": {"plan_id": SOURCE_ID}},
+        })
+        core.pack_instance_choice_select = AsyncMock(return_value={
+            "choice": {"record_id": "saved", "source_plan_id": SOURCE_ID,
+                       "source_kind": "published-release",
+                       "launcher_root": "/home/test/.local/share/PrismLauncher",
+                       "workspace_name": "dev"},
+            "source_state": "retained",
+        })
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(100, 30)) as pilot:
+            app.open_pack_instance()
+            await self._settle(pilot, lambda: isinstance(app.screen, PackInstanceScreen)
+                               and app.screen.provider_checked)
+            screen = app.screen
+            self.assertEqual("zip", screen.query_one("#pack-source-mode", Select).value)
+            screen.query_one("#pack-source-mode", Select).value = "official"
+            await pilot.pause()
+            self.assertFalse(screen.query_one("#pack-fresh-download", Button).disabled)
+            screen.query_one("#pack-fresh-download", Button).press()
+            await self._settle(pilot, lambda: isinstance(app.screen, ReviewModal))
+            self.assertIn("cannot download missing game files", app.screen.body)
+            await pilot.click("#review-confirm")
+            await self._settle(pilot, lambda: isinstance(app.screen, ReviewModal)
+                               and "saved game files" in app.screen.heading)
+            await pilot.click("#review-confirm")
+            await self._settle(pilot, lambda: screen.choice["choice"]["source_plan_id"] == SOURCE_ID)
+            self.assertTrue(screen.query_one("#pack-instance-install", Button).display)
+            core.pack_release_prepare.assert_not_awaited()
+            core.pack_instance_fresh_file.assert_not_awaited()
 
     async def test_wsl_windows_zip_is_copied_before_import_review(self) -> None:
         source_archive = "/mnt/c/Users/test/Downloads/susy.zip"
@@ -368,6 +448,8 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
             app.open_pack_instance()
             await self._settle(pilot, lambda: isinstance(app.screen, PackInstanceScreen))
             screen = app.screen
+            screen.query_one("#pack-source-mode", Select).value = "zip"
+            await pilot.pause()
             screen.query_one("#pack-zip-path", Input).value = source_archive
             screen.query_one("#pack-prism-root", Input).value = "/home/test/PrismLauncher"
             screen.query_one("#pack-zip-import", Button).press()

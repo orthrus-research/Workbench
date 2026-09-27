@@ -19,6 +19,24 @@ class PackInstanceCoreClientTests(unittest.IsolatedAsyncioTestCase):
         self.client = CoreClient(("unused-workbench",))
         self.client.json_record = AsyncMock()  # type: ignore[method-assign]
 
+    async def test_provider_preflight_validates_core_status(self) -> None:
+        self.client.json_record.return_value = {  # type: ignore[attr-defined]
+            "schema": "workbench.pack-instance.v1", "action": "fresh-provider-status",
+            "provider": {"status": "unavailable", "reason": "access is not configured"},
+        }
+        result = await self.client.pack_instance_fresh_provider_status()
+        self.assertEqual("unavailable", result["provider"]["status"])
+        self.client.json_record.assert_awaited_once_with(  # type: ignore[attr-defined]
+            "pack", "instance", "fresh-provider-status", "--profile", "supersymmetry",
+            "--json", timeout=15,
+        )
+        self.client.json_record.return_value = {  # type: ignore[attr-defined]
+            "schema": "workbench.pack-instance.v1", "action": "fresh-provider-status",
+            "provider": {"status": "available", "reason": None},
+        }
+        with self.assertRaises(CoreClientError):
+            await self.client.pack_instance_fresh_provider_status()
+
     async def test_policy_plan_and_apply_bind_exact_pairs_and_plan(self) -> None:
         self.client.json_record.side_effect = [  # type: ignore[attr-defined]
             {"schema": "workbench.pack-instance.v1", "action": "fresh-policy-plan",

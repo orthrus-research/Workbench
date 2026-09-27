@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import sys
 from typing import Any, Iterable, Mapping
+from urllib.parse import unquote, urlparse
 
 from rich.text import Text
 from textual import work
@@ -34,10 +35,10 @@ from textual.widgets import (
     Static,
     TabbedContent,
     TabPane,
+    Tree,
 )
 from textual.widgets.option_list import Option
 
-from .brand import COMPACT_MARK, MARK
 from .core_client import CoreClient, CoreClientError, SetupInputs, CommandOutput
 from .keyboard_form import KeyboardFormScreen
 from .preferences import (
@@ -80,26 +81,17 @@ def _catalog_editable_fields(action: Mapping[str, Any]) -> list[dict[str, Any]]:
             and not (field.get("key") == "json" and field.get("flags") == ["--json"])]
 
 
-def _supports_block_logo() -> bool:
-    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
-    try:
-        "▀▄█".encode(encoding)
-    except (LookupError, UnicodeEncodeError):
-        return False
-    return True
-
-
 _WORKBENCH_THEME = Theme(
     name="workbench-dark",
-    primary="#ffffff",
-    secondary="#707070",
-    accent="#ffffff",
-    foreground="#eeeeee",
-    background="#090909",
-    surface="#171717",
-    panel="#242424",
+    primary="#f2f2f2",
+    secondary="#777777",
+    accent="#f2f2f2",
+    foreground="#e8e8e8",
+    background="#080808",
+    surface="#101010",
+    panel="#191919",
     warning="#dedede",
-    error="#ffffff",
+    error="#f2f2f2",
     success="#c4c4c4",
     dark=True,
     variables={"foreground-muted": "#adadad", "footer-key-foreground": "#ffffff"},
@@ -133,6 +125,11 @@ def _line(label: str, value: object, *, style: str = "") -> Text:
     text.append(f"{label:<15}", style="bold dim")
     text.append(str(value), style=style)
     return text
+
+
+def _workspace_option_label(name: str, path: str) -> str:
+    folder = Path(path).name or path
+    return f"{name} · {folder}" if folder != name else name
 
 
 def _detected_jdk_options(
@@ -485,12 +482,22 @@ class InstancePathPicker(ModalScreen[Path | None]):
                         id="instance-path-location")
             yield Static("", id="instance-path-status")
             with Horizontal(classes="button-row"):
-                yield Button("Use highlighted path", id="instance-path-choose")
+                yield Button("Use highlighted ZIP" if self.choose_zip else "Use this folder",
+                             id="instance-path-choose", disabled=self.choose_zip)
                 yield Button("Cancel", id="instance-path-cancel")
         yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#instance-path-tree", _InstancePathTree).focus()
+
+    def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
+        if event.control.id != "instance-path-tree":
+            return
+        node = event.node
+        path = node.data.path if node.data is not None else None
+        valid = bool(path and (path.is_file() and path.suffix.casefold() == ".zip"
+                              if self.choose_zip else path.is_dir()))
+        self.query_one("#instance-path-choose", Button).disabled = not valid
 
     def _choose_path(self, path: Path) -> None:
         if self.choose_zip:
@@ -570,12 +577,12 @@ class PackInstanceScreen(KeyboardFormScreen):
     KEYBOARD_CANCEL = "pack-instance-back"
 
     KEYBOARD_FIELDS = (
-        "pack-fresh-optional", "pack-zip-path", "pack-zip-browse",
-        "pack-prism-root", "pack-prism-browse", "pack-workspace",
-        "pack-workspace-register", "pack-java-choice", "pack-installed-choice",
-        "pack-fresh-download", "pack-zip-import", "pack-instance-install",
+        "pack-source-mode", "pack-fresh-optional", "pack-zip-path", "pack-zip-browse",
+        "pack-workspace", "pack-workspace-register", "pack-java-choice",
+        "pack-prism-root", "pack-prism-browse", "pack-installed-choice",
+        "pack-fresh-download", "pack-zip-import", "pack-instance-back", "pack-instance-install",
         "pack-instance-save-location", "pack-instance-show",
-        "pack-instance-launch", "pack-instance-back",
+        "pack-instance-launch",
     )
 
     def __init__(self, choice: Mapping[str, Any], workspaces: Mapping[str, Any],
@@ -587,6 +594,12 @@ class PackInstanceScreen(KeyboardFormScreen):
         self.installations = installations or []
         self.installed_error = installed_error
         self.busy = False
+        self.source_mode = (
+            "zip" if choice["choice"].get("source_kind") == "user-prism-zip" else "official"
+        )
+        self.provider_unavailable = True
+        self.provider_checked = False
+        self.provider_problem = ""
         self.install_plan_id: str | None = (
             str(self.installations[0]["plan_id"]) if self.installations else None
         )
@@ -606,41 +619,46 @@ class PackInstanceScreen(KeyboardFormScreen):
             preferred = names[0] if names else ""
         launcher = selected.get("launcher_root") or str(Path.home() / ".local/share/PrismLauncher")
         yield Header(icon="W")
-        with VerticalScroll():
+        with VerticalScroll(id="pack-scroll"):
             yield Static("Set up Supersymmetry", classes="screen-heading")
             yield Static(
-                "Workbench will download the published pack when its provider is available. "
-                "You can also import a complete Prism instance ZIP as one source. "
-                "Core retains its gameplay files and prepares a new Linux Prism instance.",
+                "Choose a pack source, a workspace, and a Prism folder. "
+                "Workbench will then prepare and install a separate instance.",
                 classes="screen-intro",
             )
             yield Static(
                 "↑/↓ Move  ·  Enter Edit/Save  ·  Esc Cancel/Back",
                 classes="keyboard-hint",
             )
+            yield Static("1  PACK SOURCE", classes="field-label")
+            yield Select([
+                ("Download the published release", "official"),
+                ("Import a complete Prism instance ZIP", "zip"),
+            ], value=self.source_mode, allow_blank=False, id="pack-source-mode")
+            yield Static("Checking official download availability…", id="pack-source-note")
             yield Checkbox("Include the pack's optional mod", value=True,
                            id="pack-fresh-optional")
-            yield Static("Complete Prism instance ZIP", classes="field-label")
-            with Horizontal(classes="instance-path-row"):
+            yield Static("Complete Prism instance ZIP", classes="field-label", id="pack-zip-label")
+            with Horizontal(classes="instance-path-row", id="pack-zip-row"):
                 yield Input(placeholder="/absolute/path/to/Supersymmetry-instance.zip",
                             id="pack-zip-path")
                 yield Button("Browse ZIPs", id="pack-zip-browse")
-            yield Static("Prism launcher data folder", classes="field-label")
+            yield Static("2  WORKSPACE AND JAVA", classes="field-label")
+            yield Select([(_workspace_option_label(row["name"], row["path"]), row["name"])
+                          for row in entries]
+                         or [("Add a workspace to continue", "")],
+                         value=preferred, allow_blank=False, id="pack-workspace")
+            yield Button("Add workspace", id="pack-workspace-register")
+            yield Button("Choose Java", id="pack-java-choice",
+                         disabled=not bool(names))
+            yield Static(
+                "Managed Java 25 is the Cleanroom default. You can choose Java 8 or your own path.",
+                id="pack-java-note",
+            )
+            yield Static("3  PRISM LOCATION", classes="field-label")
             with Horizontal(classes="instance-path-row"):
                 yield Input(value=launcher, id="pack-prism-root")
                 yield Button("Browse folders", id="pack-prism-browse")
-            yield Static("Workspace and Java choice", classes="field-label")
-            yield Select([(f"{row['name']} · {row['path']}", row["name"]) for row in entries]
-                         or [("Add a workspace below to continue", "")],
-                         value=preferred, allow_blank=False, id="pack-workspace")
-            yield Button("Add workspace", id="pack-workspace-register")
-            yield Button("Change Java choice", id="pack-java-choice",
-                         disabled=not bool(names))
-            yield Static(
-                "Java 25 is the Cleanroom default. Choose managed Java 8 or your "
-                "own Java path for an imported instance that needs another runtime.",
-                classes="screen-intro",
-            )
             if self.installations:
                 yield Static("Installed instances", classes="field-label")
                 yield Select([
@@ -649,35 +667,110 @@ class PackInstanceScreen(KeyboardFormScreen):
                     for row in self.installations
                 ], value=self.install_plan_id, allow_blank=False,
                     id="pack-installed-choice")
-            with Horizontal(classes="button-row"):
-                yield Button("Download official release", id="pack-fresh-download",
-                             variant="primary", disabled=not bool(names))
-                yield Button("Review and import ZIP", id="pack-zip-import",
-                             disabled=not bool(names))
-                yield Button("Prepare and install selected source", id="pack-instance-install",
-                             disabled=not bool(selected.get("source_plan_id") and
-                                               self.choice.get("source_state") == "retained"))
-                yield Button("Save instance location", id="pack-instance-save-location",
-                             disabled=not bool(selected.get("source_plan_id") and
-                                               self.choice.get("source_state") == "retained"))
-                yield Button("Open in Prism", id="pack-instance-show",
-                             disabled=self.install_plan_id is None)
-                yield Button("Launch game", id="pack-instance-launch",
-                             disabled=self.install_plan_id is None)
-                yield Button("Back", id="pack-instance-back")
-            current = selected.get("source_plan_id")
-            state = self.choice.get("source_state")
+        current = selected.get("source_plan_id")
+        state = self.choice.get("source_state")
+        source_label = (
+            "complete Prism instance ZIP" if selected.get("source_kind") == "user-prism-zip"
+            else "published release"
+        )
+        with Vertical(id="pack-action-panel"):
             yield Static(
-                (f"Saved source: {current}\nCore state: {state}" if current else
-                 "No complete instance source is selected yet.")
+                (f"Saved source: {source_label}. Ready for installation."
+                 if current and state == "retained" else
+                 "Choose a pack source and workspace to continue.")
                 + (f"\nInstalled instances could not be checked: {self.installed_error}"
                    if self.installed_error else ""),
                 id="pack-instance-status",
             )
+            with Horizontal(classes="button-row", id="pack-source-actions"):
+                yield Button("Download game files", id="pack-fresh-download",
+                             variant="primary", disabled=not bool(names))
+                yield Button("Import complete ZIP", id="pack-zip-import",
+                             disabled=not bool(names))
+                yield Button("Back", id="pack-instance-back")
+            with Horizontal(classes="button-row", id="pack-ready-actions"):
+                yield Button("Install in Prism", id="pack-instance-install",
+                             disabled=not bool(selected.get("source_plan_id") and
+                                               self.choice.get("source_state") == "retained"))
+                yield Button("Save new Prism location", id="pack-instance-save-location",
+                             disabled=not bool(selected.get("source_plan_id") and
+                                               self.choice.get("source_state") == "retained"))
+            with Horizontal(classes="button-row", id="pack-installed-actions"):
+                yield Button("Open in Prism", id="pack-instance-show",
+                             disabled=self.install_plan_id is None)
+                yield Button("Launch game", id="pack-instance-launch",
+                             disabled=self.install_plan_id is None)
         yield Footer()
 
     def on_mount(self) -> None:
+        self._update_source_mode()
         self.start_keyboard_navigation()
+        self.check_official_availability()
+
+    def _update_source_mode(self) -> None:
+        official = self.query_one("#pack-source-mode", Select).value != "zip"
+        for field in ("#pack-zip-label", "#pack-zip-row", "#pack-zip-path", "#pack-zip-browse"):
+            self.query_one(field).display = not official
+        self.query_one("#pack-fresh-optional", Checkbox).display = official
+        self.query_one("#pack-fresh-download", Button).display = official
+        self.query_one("#pack-zip-import", Button).display = not official
+        has_workspace = bool([row for row in self.workspaces.get("entries", [])
+                              if isinstance(row, dict) and isinstance(row.get("name"), str)])
+        self.query_one("#pack-fresh-download", Button).disabled = (
+            not has_workspace or not self.provider_checked or self.busy
+        )
+        self.query_one("#pack-fresh-download", Button).label = (
+            "Check saved official files" if self.provider_unavailable else "Download game files"
+        )
+        self.query_one("#pack-zip-import", Button).disabled = not has_workspace or self.busy
+        saved = self.choice["choice"]
+        saved_mode = "zip" if saved.get("source_kind") == "user-prism-zip" else "official"
+        retained = bool(saved.get("source_plan_id")
+                        and self.choice.get("source_state") == "retained"
+                        and saved_mode == ("official" if official else "zip"))
+        for field in ("#pack-instance-install", "#pack-instance-save-location"):
+            self.query_one(field, Button).display = retained
+        self.query_one("#pack-ready-actions", Horizontal).display = retained
+        installed = self.install_plan_id is not None
+        for field in ("#pack-instance-show", "#pack-instance-launch"):
+            self.query_one(field, Button).display = installed
+        self.query_one("#pack-installed-actions", Horizontal).display = installed
+        if official:
+            note = (
+                "Official download is waiting for Workbench's CurseForge access. "
+                "Press Enter on Pack source to choose a complete Prism ZIP, or check saved files."
+                if self.provider_unavailable else
+                "Workbench's file provider is configured. Review the release to try the download."
+            ) if self.provider_checked else "Checking official download access…"
+        else:
+            note = (
+                "Official download needs Workbench access. Import a complete Prism ZIP, "
+                "or switch back to check saved files."
+                if self.provider_checked and self.provider_unavailable else
+                "Choose a complete Prism instance ZIP with its game files."
+            )
+        if self.provider_problem and official:
+            note = f"Could not check download access: {self.provider_problem}. You can check saved files."
+        if saved.get("source_plan_id") and self.choice.get("source_state") == "retained" and not retained:
+            note += " A source from the other route is saved; switch back to install it."
+        self.query_one("#pack-source-note", Static).update(note)
+
+    @work(exclusive=True, group="pack-provider-preflight")
+    async def check_official_availability(self) -> None:
+        try:
+            checked = await self.core.pack_instance_fresh_provider_status()
+            provider = checked["provider"]
+            self.provider_unavailable = provider["status"] != "configured"
+        except (CoreClientError, TimeoutError) as exc:
+            self.provider_unavailable = True
+            self.provider_problem = str(exc)
+        self.provider_checked = True
+        if self.provider_unavailable and not self.choice["choice"].get("source_plan_id"):
+            self.query_one("#pack-source-mode", Select).value = "zip"
+            self.query_one("#pack-instance-status", Static).update(
+                "Official download is unavailable. Choose a complete Prism ZIP to continue."
+            )
+        self._update_source_mode()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "pack-instance-back":
@@ -722,7 +815,9 @@ class PackInstanceScreen(KeyboardFormScreen):
             self.query_one(f"#{input_id}", Input).value = str(selected)
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        if event.select.id == "pack-installed-choice" and isinstance(event.value, str):
+        if event.select.id == "pack-source-mode":
+            self._update_source_mode()
+        elif event.select.id == "pack-installed-choice" and isinstance(event.value, str):
             self.install_plan_id = event.value
 
     def on_screen_resume(self, event: events.ScreenResume) -> None:
@@ -754,14 +849,14 @@ class PackInstanceScreen(KeyboardFormScreen):
         names = [row["name"] for row in entries]
         self.workspaces = record
         selector = self.query_one("#pack-workspace", Select)
-        selector.set_options([(f"{row['name']} · {row['path']}", row["name"])
+        selector.set_options([(_workspace_option_label(row["name"], row["path"]), row["name"])
                               for row in entries]
                              or [("Add a workspace below to continue", "")])
         selector.value = (current if current in names else
                           record.get("default") if record.get("default") in names else
                           names[0] if names else "")
-        for button in ("#pack-fresh-download", "#pack-zip-import", "#pack-java-choice"):
-            self.query_one(button, Button).disabled = not bool(names)
+        self.query_one("#pack-java-choice", Button).disabled = not bool(names)
+        self._update_source_mode()
         status.update("Workspace and Java choices refreshed. Continue setup with the selected workspace.")
 
     @work(exclusive=True, group="pack-workspace-register")
@@ -776,13 +871,12 @@ class PackInstanceScreen(KeyboardFormScreen):
         name, record = selected
         self.workspaces = record
         self.query_one("#pack-workspace", Select).set_options([
-            (f"{row['name']} · {row['path']}", row["name"])
+            (_workspace_option_label(row["name"], row["path"]), row["name"])
             for row in record["entries"]
         ])
         self.query_one("#pack-workspace", Select).value = name
-        self.query_one("#pack-fresh-download", Button).disabled = False
-        self.query_one("#pack-zip-import", Button).disabled = False
         self.query_one("#pack-java-choice", Button).disabled = False
+        self._update_source_mode()
         self.query_one("#pack-instance-status", Static).update(
             (f"Workspace {name} is saved. Choose Save instance location to use it "
              "with the retained source." if self.choice.get("source_state") == "retained"
@@ -871,8 +965,8 @@ class PackInstanceScreen(KeyboardFormScreen):
             plan = reviewed["source"]
             platform = _source_platform_summary(plan.get("source_platform"))
             forge_java_guidance = (
-                "\nThis ZIP declares Forge. Before installation, choose Change Java "
-                "choice to select managed Java 8 or your own Java path if the "
+                "\nThis ZIP declares Forge. Before installation, choose Java "
+                "to select managed Java 8 or your own Java path if the "
                 "pack requires it.\n"
                 if isinstance(plan.get("source_platform"), Mapping)
                 and plan["source_platform"].get("kind") == "forge" else ""
@@ -908,6 +1002,7 @@ class PackInstanceScreen(KeyboardFormScreen):
             self.query_one("#pack-instance-show", Button).disabled = True
             self.query_one("#pack-instance-launch", Button).disabled = True
             self.query_one("#pack-instance-install", Button).disabled = False
+            self._update_source_mode()
             status.update(
                 f"Retained {imported['source']['file_count']} files. "
                 "Your source and setup choices are saved."
@@ -916,11 +1011,11 @@ class PackInstanceScreen(KeyboardFormScreen):
             status.update(str(exc))
         finally:
             self.busy = False
-            self.query_one("#pack-zip-import", Button).disabled = False
+            self._update_source_mode()
 
     @work(exclusive=True, group="pack-instance-fresh")
     async def download_official(self) -> None:
-        if self.busy:
+        if self.busy or not self.provider_checked:
             return
         launcher = self.query_one("#pack-prism-root", Input).value.strip()
         workspace = self.query_one("#pack-workspace", Select).value
@@ -935,6 +1030,23 @@ class PackInstanceScreen(KeyboardFormScreen):
             "#pack-fresh-optional", Checkbox,
         ).value else "omit")
         try:
+            provider = (await self.core.pack_instance_fresh_provider_status())["provider"]
+            if provider["status"] != "configured":
+                self.provider_unavailable = True
+                self._update_source_mode()
+                approved = await self.app.push_screen_wait(ReviewModal(
+                    "Check saved official files?",
+                    "Workbench cannot download missing game files until its CurseForge "
+                    "access is configured. If all files were saved earlier, setup can "
+                    "still finish offline. Continuing may also offer to download the "
+                    "published pack archive; that archive alone cannot install the game. "
+                    "You can instead import a complete Prism instance ZIP.",
+                    confirm_label="Check saved files",
+                ))
+                if not approved:
+                    status.update("Official download needs Workbench provider access. "
+                                  "Choose a complete Prism ZIP to install now.")
+                    return
             release = await self.core.pack_release_show()
             selected = release["selected"]
             if release["artifact_state"] != "verified":
@@ -1019,14 +1131,18 @@ class PackInstanceScreen(KeyboardFormScreen):
                 return
             total = progress["selected_file_count"]
             ready = progress["ready_file_count"]
+            remaining = total - ready
             approved = await self.app.push_screen_wait(ReviewModal(
-                f"Download {total - ready} selected game files?",
+                (f"Use {ready} saved game files?" if remaining == 0 else
+                 f"Download {remaining} selected game files?"),
                 f"Published pack: {progress['release_version']}\n"
                 f"Already retained: {ready}/{total}\n"
                 f"Optional mod: {'included' if optional_mode == 'default' else 'omitted'}\n\n"
-                "Core will download each authorized file, verify it, and retain progress "
-                "so setup can resume after interruption.",
-                confirm_label="Download and retain",
+                + ("Core will verify and compose the saved files into a source for installation."
+                 if remaining == 0 else
+                 "Core will download each authorized file, verify it, and retain progress "
+                 "so setup can resume after interruption."),
+                confirm_label="Use saved files" if remaining == 0 else "Download and retain",
             ))
             if not approved:
                 return
@@ -1056,16 +1172,17 @@ class PackInstanceScreen(KeyboardFormScreen):
             self.query_one("#pack-instance-show", Button).disabled = True
             self.query_one("#pack-instance-launch", Button).disabled = True
             self.query_one("#pack-instance-install", Button).disabled = False
+            self._update_source_mode()
             status.update(
                 f"Published release {progress['release_version']} is ready: "
                 f"{ready} selected game files. The source and setup choices are saved. "
-                "Choose Prepare and install selected source."
+                "Choose Install in Prism."
             )
         except (CoreClientError, TimeoutError) as exc:
             status.update(str(exc))
         finally:
             self.busy = False
-            self.query_one("#pack-fresh-download", Button).disabled = False
+            self._update_source_mode()
 
     @work(exclusive=True, group="pack-instance-install")
     async def install_selected(self) -> None:
@@ -1075,6 +1192,10 @@ class PackInstanceScreen(KeyboardFormScreen):
         status = self.query_one("#pack-instance-status", Static)
         if not selected.get("source_plan_id") or self.choice.get("source_state") != "retained":
             status.update("Select a retained Supersymmetry source before installation.")
+            return
+        selected_mode = "zip" if selected.get("source_kind") == "user-prism-zip" else "official"
+        if self.query_one("#pack-source-mode", Select).value != selected_mode:
+            status.update("Choose the saved pack source before installing it.")
             return
         if (self.query_one("#pack-prism-root", Input).value.strip() != selected.get("launcher_root")
                 or self.query_one("#pack-workspace", Select).value != selected.get("workspace_name")):
@@ -1117,7 +1238,7 @@ class PackInstanceScreen(KeyboardFormScreen):
                     status.update(
                         "Interrupted Prism folder files were retained at "
                         + recovered["prism_root"]["retained_stage_path"]
-                        + ". Choose Prepare and install again to start over."
+                        + ". Choose Install in Prism again to start over."
                     )
                     return
                 root_plan = (await self.core.pack_instance_root_plan())["prism_root"]
@@ -1147,7 +1268,7 @@ class PackInstanceScreen(KeyboardFormScreen):
                         status.update(
                             "Interrupted instance files were retained at "
                             + result["retained_stage_path"]
-                            + ". Choose Prepare and install again to start over."
+                            + ". Choose Install in Prism again to start over."
                         )
                     else:
                         self._show_installed(result, status)
@@ -1163,7 +1284,7 @@ class PackInstanceScreen(KeyboardFormScreen):
             java_warning = (
                 "\nThis imported ZIP declares Forge and Java 25 is selected. "
                 "Check the pack's Java requirement. To use Java 8 or your own "
-                "path, cancel and choose Change Java choice.\n"
+                "path, cancel and choose Java.\n"
                 if forge_java_25 else ""
             )
             approved = await self.app.push_screen_wait(ReviewModal(
@@ -1198,6 +1319,7 @@ class PackInstanceScreen(KeyboardFormScreen):
         self.install_plan_id = str(result["plan_id"])
         self.query_one("#pack-instance-show", Button).disabled = False
         self.query_one("#pack-instance-launch", Button).disabled = False
+        self._update_source_mode()
         status.update(
             f"Installed: {result['instance_path']}\n"
             "Use Open in Prism to sign in, then Launch game. Runtime compatibility "
@@ -1368,8 +1490,9 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
     KEYBOARD_CANCEL = "choice-back"
 
     KEYBOARD_FIELDS = (
-        "choice-workspace", "choice-register", "choice-profile", "choice-java-mode", "choice-java",
-        "choice-bind-source-lock", "choice-bind-managed-tools", "choice-save", "choice-export",
+        "choice-workspace", "choice-register", "choice-java-mode", "choice-java",
+        "choice-save", "choice-workspace-more", "choice-profile", "choice-share-more",
+        "choice-bind-source-lock", "choice-bind-managed-tools", "choice-export",
         "choice-import", "choice-back",
     )
 
@@ -1381,58 +1504,65 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
                               record.get("default") or next(iter(self.entries), ""))
         self.busy = False
         self.detected_java: dict[str, str] = {}
+        self.show_share_options = False
+        self.show_workspace_options = False
 
     @property
     def core(self) -> CoreClient:
         return self.app.core  # type: ignore[attr-defined]
 
     def compose(self) -> ComposeResult:
-        options = [(f"{name} · {row['path']}", name) for name, row in self.entries.items()]
+        options = [(_workspace_option_label(name, row["path"]), name)
+                   for name, row in self.entries.items()]
         if not options:
             options = [("No named workspace is registered", "")]
         yield Header(icon="W")
         with VerticalScroll():
             yield Static("Workspace choices", classes="screen-heading")
             yield Static(
-                "Choose Java for this workspace. Workbench recommends managed Java 25 "
-                "for Cleanroom. Installed JDKs appear below when found; you can also "
-                "enter a path without a version check.",
+                "Choose Java for this workspace. Cleanroom recommends managed Java 25. "
+                "You can use another installed JDK or enter your own path.",
                 classes="screen-intro",
             )
             yield Static("↑/↓ Move  ·  Enter Edit/Save  ·  Esc Cancel/Back", classes="keyboard-hint")
             yield Static("Named workspace", classes="field-label")
             yield Select(options, value=self.selected_name, allow_blank=False, id="choice-workspace")
             yield Button("Add workspace", id="choice-register")
-            yield Static("Workbench configuration · blank clears", classes="field-label")
-            yield Input(placeholder="/path/to/workbench.toml", id="choice-profile")
             yield Static("Java selection", classes="field-label")
             yield Select([
-                ("Use Java recommended by this configuration", "default"),
+                ("Managed Java recommended for this workspace", "default"),
                 ("Use managed Java 8", "managed-8"),
                 ("Enter my own Java path", "path"),
             ], value="default", allow_blank=False, id="choice-java-mode")
             yield Static("Looking for installed JDKs…", id="choice-java-hint")
-            yield Static("Java home · entered or detected", classes="field-label")
+            yield Static("Your Java folder", classes="field-label", id="choice-java-label")
             yield Input(placeholder="/path/to/jdk", id="choice-java")
+            yield Button("Use recommended Java", id="choice-save", variant="primary",
+                         disabled=not bool(self.entries))
+            yield Static("", id="choice-status")
+            yield Button("More workspace settings", id="choice-workspace-more")
+            yield Static("Existing Workbench configuration · optional", classes="field-label",
+                         id="choice-profile-label")
+            yield Input(placeholder="/path/to/workbench.toml", id="choice-profile")
+            yield Button("Sharing options", id="choice-share-more")
             yield Checkbox(
-                "Bind the selected pack source lock in the exported share",
+                "Include the exact pack version in a shared setup",
                 id="choice-bind-source-lock",
             )
             yield Checkbox(
-                "Bind Core's exact managed-tool policy and source lock",
+                "Include exact Workbench tool versions in a shared setup",
                 id="choice-bind-managed-tools",
             )
             with Horizontal(classes="button-row"):
-                yield Button("Use recommended Java", id="choice-save", variant="primary",
-                             disabled=not bool(self.entries))
                 yield Button("Export environment", id="choice-export",
                              disabled=not bool(self.entries))
                 yield Button("Import environment", id="choice-import")
                 yield Button("Back", id="choice-back")
-            yield Static("", id="choice-status")
         yield Footer()
 
     def on_mount(self) -> None:
+        self._update_share_options()
+        self._update_workspace_options()
         self._show_selected()
         self.find_java()
         self.start_keyboard_navigation()
@@ -1441,12 +1571,28 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
         value = self.query_one("#choice-java-mode", Select).value
         return value if isinstance(value, str) else "default"
 
+    def _update_share_options(self) -> None:
+        for field in ("#choice-bind-source-lock", "#choice-bind-managed-tools"):
+            self.query_one(field, Checkbox).display = self.show_share_options
+        self.query_one("#choice-share-more", Button).label = (
+            "Hide sharing options" if self.show_share_options else "Sharing options"
+        )
+
+    def _update_workspace_options(self) -> None:
+        for field in ("#choice-profile-label", "#choice-profile"):
+            self.query_one(field).display = self.show_workspace_options
+        self.query_one("#choice-workspace-more", Button).label = (
+            "Hide workspace settings" if self.show_workspace_options else "More workspace settings"
+        )
+
     def _refresh_java_controls(self) -> None:
         mode = self._java_mode()
         self.query_one("#choice-workspace", Select).disabled = self.busy
         self.query_one("#choice-java-mode", Select).disabled = self.busy
         self.query_one("#choice-profile", Input).disabled = self.busy
         self.query_one("#choice-java", Input).disabled = self.busy or mode != "path"
+        for field in ("#choice-java-label", "#choice-java"):
+            self.query_one(field).display = mode == "path"
         label = (
             "Use recommended Java" if mode == "default"
             else "Use managed Java 8" if mode == "managed-8"
@@ -1462,14 +1608,17 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
             )
             return
         self.query_one("#choice-profile", Input).value = row.get("profile_config") or ""
+        self.show_workspace_options = bool(row.get("profile_config"))
+        self._update_workspace_options()
         self.query_one("#choice-java", Input).value = row.get("java_home") or ""
         mode = "managed-8" if row.get("managed_java_feature") == 8 else "path" if row.get("java_home") else "default"
         self.query_one("#choice-java-mode", Select).value = mode
         self._refresh_java_controls()
         self.query_one("#choice-status", Static).update(
             "Saved Java path is used as supplied." if mode == "path" else
-            "Java 8 is selected. Continue to prepare it." if mode == "managed-8" else
-            "This configuration's recommended Java is selected. Continue to prepare it."
+            "Managed Java 8 is selected. Press Use managed Java 8 to prepare it."
+            if mode == "managed-8" else
+            "Recommended managed Java is selected. Press Use recommended Java to prepare it."
         )
 
     def on_select_changed(self, event: Select.Changed) -> None:
@@ -1494,6 +1643,12 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
             self.save_choices()
         elif event.button.id == "choice-export":
             self.export_environment()
+        elif event.button.id == "choice-share-more":
+            self.show_share_options = not self.show_share_options
+            self._update_share_options()
+        elif event.button.id == "choice-workspace-more":
+            self.show_workspace_options = not self.show_workspace_options
+            self._update_workspace_options()
         elif event.button.id == "choice-import":
             self.app.push_screen(EnvironmentImportScreen())
 
@@ -1511,7 +1666,7 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
         self.entries = {row["name"]: row for row in record["entries"]}
         self.selected_name = name
         self.query_one("#choice-workspace", Select).set_options([
-            (f"{row['name']} · {row['path']}", row["name"])
+            (_workspace_option_label(row["name"], row["path"]), row["name"])
             for row in record["entries"]
         ])
         self.query_one("#choice-workspace", Select).value = name
@@ -1535,7 +1690,7 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
             inventory = await inventory_method()
             detected, found_options = _detected_jdk_options(inventory)
             options = [
-                ("Use Java recommended by this configuration", "default"),
+                ("Managed Java recommended for this workspace", "default"),
                 ("Use managed Java 8", "managed-8"),
             ]
             options.extend(found_options)
@@ -1550,7 +1705,7 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
                 f"Found {len(detected)} installed JDKs. Choose one as supplied "
                 "or use the recommended managed Java."
                 if detected else
-                "No installed JDKs found. Choose recommended managed Java, optional Java 8, "
+                "No other system JDKs found. Managed Java 25 and 8 are available, "
                 "or enter your own path."
             )
         except (CoreClientError, TimeoutError) as exc:
@@ -1609,10 +1764,17 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
                 name, expected_record_id=self.record["record_id"],
             )
             receipt = result["receipt"]
+            java_location = Path(unquote(urlparse(
+                str(receipt["target"]["java_home_uri"]),
+            ).path)).name or "local runtime"
             self.query_one("#choice-status", Static).update(
-                f"Java {receipt['policy']['feature_version']} is ready. "
+                f"Java {receipt['policy']['feature_version']} is ready for {name}. "
                 f"Workbench {'reused its existing copy' if result['outcome'] == 'reused' else 'acquired a copy'} "
-                f"at {receipt['target']['java_home_uri']}."
+                f"in its runtime library ({java_location})."
+            )
+            self.query_one("#choice-java-hint", Static).update(
+                f"Managed Java {receipt['policy']['feature_version']} is ready. "
+                "You can keep this choice or select another Java runtime."
             )
         except (CoreClientError, TimeoutError) as exc:
             detail = str(exc)
@@ -1991,7 +2153,7 @@ class SetupScreen(KeyboardFormScreen):
 
     KEYBOARD_FIELDS = (
         "setup-mode", "setup-workspace", "setup-workspace-browse",
-        "setup-profile", "setup-profile-browse", "setup-state-root",
+        "setup-profile", "setup-profile-browse", "setup-more", "setup-state-root",
         "setup-java-candidates", "setup-java", "setup-git", "setup-check",
         "setup-plan", "setup-apply", "setup-workflows", "setup-back",
     )
@@ -2010,6 +2172,7 @@ class SetupScreen(KeyboardFormScreen):
         self.plan_options: tuple[str, ...] = ()
         self.busy = False
         self.detected_java: dict[str, str] = {}
+        self.show_extra_paths = False
 
     @property
     def core(self) -> CoreClient:
@@ -2019,27 +2182,27 @@ class SetupScreen(KeyboardFormScreen):
         saved = self.view.setup.get("selection", {}) if self.view.setup else {}
         if not isinstance(saved, dict):
             saved = {}
-        has_profile = bool(saved.get("profile_config"))
-        modes = [("Full developer · workspace + profile", "full")]
-        if not has_profile:
-            modes.append(("Review-only · source and evidence", "review"))
+        has_saved_profile = bool(saved.get("profile_config"))
+        has_profile = has_saved_profile or bool(self.initial_profile_config)
+        modes = [("Explore with a workspace · no config needed", "review")]
+        modes.append(("Use an existing developer configuration", "full"))
         if self.view.setup and self.view.setup.get("configured"):
             modes.append(("Repair saved setup", "repair"))
-        default_mode = "repair" if has_profile else "full"
+        default_mode = "repair" if has_saved_profile else "full" if has_profile else "review"
         yield Header(icon="W")
         with VerticalScroll(id="setup-scroll"):
             yield Static("Set up Workbench", classes="screen-heading")
             yield Static(
-                "Choose a workspace and, for development, an existing Workbench "
-                "configuration. Core checks the selection and owns every change. "
-                "Repair keeps saved values when a field is blank; review the resulting selection.",
+                "New here? Choose a workspace to explore source and workflows. "
+                "For development, connect an existing workbench.toml. "
+                "Review the plan before Workbench saves your choice.",
                 classes="screen-intro",
             )
             yield Static(
                 "↑/↓ Move  ·  Enter Edit/Save  ·  Esc Cancel/Back",
                 classes="keyboard-hint",
             )
-            yield Static("Setup journey", classes="field-label")
+            yield Static("What do you want to set up?", classes="field-label")
             yield Select(modes, value=default_mode, allow_blank=False, id="setup-mode")
             yield Static("Workspace", classes="field-label")
             with Horizontal(classes="path-row"):
@@ -2050,8 +2213,8 @@ class SetupScreen(KeyboardFormScreen):
                 )
                 if _HAS_PICKER:
                     yield Button("Browse", id="setup-workspace-browse")
-            yield Static("Workbench configuration · required for Full developer", classes="field-label")
-            with Horizontal(classes="path-row"):
+            yield Static("Existing workbench.toml", classes="field-label", id="setup-profile-label")
+            with Horizontal(classes="path-row", id="setup-profile-row"):
                 yield Input(
                     value=str(saved.get("profile_config") or self.initial_profile_config),
                     placeholder="/path/to/workbench.toml",
@@ -2059,9 +2222,10 @@ class SetupScreen(KeyboardFormScreen):
                 )
                 if _HAS_PICKER:
                     yield Button("Browse", id="setup-profile-browse")
-            yield Static("Runtime state root · optional", classes="field-label")
+            yield Button("Show optional paths", id="setup-more")
+            yield Static("Runtime state root · optional", classes="field-label", id="setup-state-label")
             yield Input(value=str(saved.get("state_root") or ""), id="setup-state-root")
-            yield Static("Installed Java · optional", classes="field-label")
+            yield Static("Installed Java · optional", classes="field-label", id="setup-java-candidates-label")
             yield Select(
                 [("Looking for installed JDKs…", "none")], value="none",
                 allow_blank=False, disabled=True, id="setup-java-candidates",
@@ -2071,9 +2235,9 @@ class SetupScreen(KeyboardFormScreen):
                 "path against the profile during setup.",
                 id="setup-java-hint",
             )
-            yield Static("Java home · optional", classes="field-label")
+            yield Static("Java home · optional", classes="field-label", id="setup-java-label")
             yield Input(value=str(saved.get("java_home") or ""), id="setup-java")
-            yield Static("Git executable · optional", classes="field-label")
+            yield Static("Git executable · optional", classes="field-label", id="setup-git-label")
             yield Input(value=str(saved.get("git_executable") or ""), id="setup-git")
             with Horizontal(classes="button-row"):
                 yield Button("Check selection", id="setup-check")
@@ -2082,7 +2246,7 @@ class SetupScreen(KeyboardFormScreen):
             with Horizontal(classes="button-row"):
                 yield Button("Browse workflows", id="setup-workflows")
                 yield Button("Back", id="setup-back")
-            yield Static("Choose a journey, then review a Core plan.", id="setup-status")
+            yield Static("Choose a setup type and workspace, then review the plan.", id="setup-status")
             yield DataTable(id="setup-dependencies", cursor_type="row")
             yield Static("", id="setup-plan-detail")
         yield Footer()
@@ -2091,6 +2255,7 @@ class SetupScreen(KeyboardFormScreen):
         self.query_one("#setup-dependencies", DataTable).add_columns(
             "Dependency", "State", "Detail / repair"
         )
+        self.query_one("#setup-plan-detail", Static).display = False
         self._update_mode()
         if self.view.setup:
             self._show_dependencies(self.view.setup)
@@ -2100,11 +2265,24 @@ class SetupScreen(KeyboardFormScreen):
     def _update_mode(self) -> None:
         mode = self.query_one("#setup-mode", Select).value
         disabled = mode == "review"
+        for field in ("#setup-profile-label", "#setup-profile-row", "#setup-profile"):
+            self.query_one(field).display = not disabled
         self.query_one("#setup-profile", Input).disabled = disabled
         self.query_one("#setup-java", Input).disabled = disabled
         self.query_one("#setup-java-candidates", Select).disabled = disabled or not self.detected_java
+        for field in ("#setup-java-candidates-label", "#setup-java-candidates",
+                      "#setup-java-hint", "#setup-java-label", "#setup-java"):
+            self.query_one(field).display = not disabled and self.show_extra_paths
+        for field in ("#setup-state-label", "#setup-state-root",
+                      "#setup-git-label", "#setup-git"):
+            self.query_one(field).display = self.show_extra_paths
+        self.query_one("#setup-more", Button).label = (
+            "Hide optional paths" if self.show_extra_paths else "Show optional paths"
+        )
         if _HAS_PICKER:
-            self.query_one("#setup-profile-browse", Button).disabled = disabled or self.busy
+            browse = self.query_one("#setup-profile-browse", Button)
+            browse.display = not disabled
+            browse.disabled = disabled or self.busy
 
     def _inputs(self) -> SetupInputs:
         mode = self.query_one("#setup-mode", Select).value
@@ -2125,7 +2303,9 @@ class SetupScreen(KeyboardFormScreen):
         self.plan = None
         self.plan_options = ()
         self.query_one("#setup-apply", Button).disabled = True
-        self.query_one("#setup-plan-detail", Static).update("")
+        detail = self.query_one("#setup-plan-detail", Static)
+        detail.update("")
+        detail.display = False
 
     def _selection_matches(self, options: tuple[str, ...]) -> bool:
         try:
@@ -2184,7 +2364,9 @@ class SetupScreen(KeyboardFormScreen):
                     lines.append(f"  Destination: {item['destination']}")
         if plan.get("blockers"):
             lines.extend(("", "Blockers: " + ", ".join(map(str, plan["blockers"]))))
-        self.query_one("#setup-plan-detail", Static).update(Text("\n".join(lines)))
+        detail = self.query_one("#setup-plan-detail", Static)
+        detail.update(Text("\n".join(lines)))
+        detail.display = True
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id and event.input.id.startswith("setup-"):
@@ -2219,6 +2401,9 @@ class SetupScreen(KeyboardFormScreen):
             if not self.busy:
                 self.app.pop_screen()
                 self.app.open_workflows()  # type: ignore[attr-defined]
+        elif event.button.id == "setup-more":
+            self.show_extra_paths = not self.show_extra_paths
+            self._update_mode()
         elif event.button.id == "setup-workspace-browse":
             self.pick_path("workspace")
         elif event.button.id == "setup-profile-browse":
@@ -2586,6 +2771,7 @@ class WorkflowsScreen(Screen[None]):
             yield OptionList(id="workflow-list")
             with Vertical(id="workflow-detail-panel"):
                 yield Static("Select a workflow", id="workflow-detail")
+                yield Static("Select an action", id="workflow-brief")
                 with Horizontal(classes="button-row"):
                     yield Button("Run action", id="workflow-run", disabled=True)
                     yield Button("Back", id="workflow-back")
@@ -2628,16 +2814,19 @@ class WorkflowsScreen(Screen[None]):
             ).casefold()
             if all(word in haystack for word in words):
                 matches.append(action)
-        options = [
-            Option(
-                Text(
-                    f"{item.get('title', '?')}  ·  {item.get('suite_id', '?')}\n"
-                    f"{item.get('summary', '')}",
-                ),
+        options = []
+        for item in matches[:200]:
+            suite = str(item.get("suite_id", "?"))
+            if len(suite) > 21:
+                suite = suite[:20] + "…"
+            title = str(item.get("title", "?"))
+            title_width = 48 - len(suite) - 5
+            if len(title) > title_width:
+                title = title[:title_width - 1] + "…"
+            options.append(Option(
+                Text(f"{title}  ·  {suite}", no_wrap=True),
                 id=str(item.get("command_id")),
-            )
-            for item in matches[:200]
-        ]
+            ))
         listing = self.query_one("#workflow-list", OptionList)
         listing.set_options(options)
         self.selected = None
@@ -2650,6 +2839,7 @@ class WorkflowsScreen(Screen[None]):
         else:
             message = "Highlight an action, then press Enter to open it."
         self.query_one("#workflow-detail", Static).update(Text(message))
+        self.query_one("#workflow-brief", Static).update(Text(message))
         if options:
             listing.highlighted = 0
             self._select(options[0].id)
@@ -2662,7 +2852,21 @@ class WorkflowsScreen(Screen[None]):
         action = self.selected
         if not action:
             self.query_one("#workflow-run", Button).disabled = True
+            self.query_one("#workflow-brief", Static).update("Select an action")
             return
+        brief = Text()
+        brief.append(str(action.get("title", command_id)), style="bold")
+        brief.append("\n")
+        brief.append(
+            f"{str(action.get('availability', 'available')).capitalize()}"
+            f" · {str(action.get('suite_id', '?'))}"
+            f" · {str(action.get('risk', '?')).replace('-', ' ')}",
+            style="dim",
+        )
+        summary = str(action.get("summary") or "")
+        if summary:
+            brief.append("\n" + summary)
+        self.query_one("#workflow-brief", Static).update(brief)
         detail = Text()
         detail.append(str(action.get("title", command_id)), style="bold")
         detail.append("\n\n" + str(action.get("summary") or ""))
@@ -2783,6 +2987,19 @@ class HomeScreen(Screen[None]):
         self.app._present_pending_pack_release()  # type: ignore[attr-defined]
 
 
+_HOME_ACTION_HELP = {
+    "pack-instance": "Choose a pack source and install it in Prism.",
+    "setup": "Configure an existing developer workspace.",
+    "workspace-choices": "Save a workspace and prepare its Java runtime.",
+    "pack-release": "View or verify the published archive. Game files are installed separately.",
+    "workflows": "Run available Workbench actions.",
+    "modules": "Inspect installed Workbench modules.",
+    "home": "Open details for the selected workspace.",
+    "migrate": "Import settings from an earlier Workbench install.",
+    "refresh": "Check Core and available actions again.",
+}
+
+
 class WorkbenchApp(App[None]):
     CSS_PATH = "workbench.tcss"
     TITLE = "Workbench"
@@ -2808,7 +3025,6 @@ class WorkbenchApp(App[None]):
     ) -> None:
         super().__init__()
         self.register_theme(_WORKBENCH_THEME)
-        self._block_logo_supported = _supports_block_logo()
         self.preferences = preferences or TuiPreferences()
         self.preference_path = preference_path
         self._unavailable_saved_theme = self.get_theme(self.preferences.theme) is None
@@ -2825,34 +3041,32 @@ class WorkbenchApp(App[None]):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=self.preferences.show_clock, icon="W", id="home-header")
         with VerticalScroll(id="home-scroll"):
-            with Horizontal(id="brand-banner"):
-                yield Static(Text("\n".join(MARK), no_wrap=True), id="brand-logo")
-                with Vertical(id="brand-copy"):
-                    yield Static("WORKBENCH", id="hero")
-                    yield Static("Local development console", id="tagline")
-                    yield Static(
-                        "SET UP  ·  EXPLORE MODULES  ·  RUN WORKFLOWS",
-                        id="brand-steps",
-                    )
+            with Vertical(id="home-welcome"):
+                yield Static("Welcome to Workbench", id="home-title")
+                yield Static(
+                    _HOME_ACTION_HELP["pack-instance"],
+                    id="home-subtitle",
+                )
             with Horizontal(id="home-panels"):
+                with Vertical(id="actions-panel"):
+                    yield Static("START HERE", classes="panel-title")
+                    yield Static("↑/↓ Choose  ·  Enter Open", id="home-keyboard-hint")
+                    yield OptionList(
+                        Option("Set up Supersymmetry", id="pack-instance", disabled=True),
+                        Option("Set up developer environment", id="setup", disabled=True),
+                        Option("Choose workspace and Java", id="workspace-choices", disabled=True),
+                        Option("View published pack archive", id="pack-release", disabled=True),
+                        Option("Browse and run workflows", id="workflows", disabled=True),
+                        Option("Explore installed modules", id="modules", disabled=True),
+                        Option("Open workspace summary", id="home", disabled=True),
+                        Option("Import earlier settings", id="migrate", disabled=True),
+                        Option("Refresh status", id="refresh"),
+                        id="home-actions",
+                    )
                 with Vertical(id="environment-panel"):
                     yield Static("CURRENT ENVIRONMENT", classes="panel-title")
                     yield Static("Connecting to Core…", id="environment-summary")
                     yield Static("", id="environment-dependencies")
-                with Vertical(id="actions-panel"):
-                    yield Static("START HERE", classes="panel-title")
-                    yield OptionList(
-                        Option("Set up or repair environment", id="setup", disabled=True),
-                        Option("Choose workspace profile and Java", id="workspace-choices", disabled=True),
-                        Option("View or prepare Supersymmetry pack", id="pack-release", disabled=True),
-                        Option("Set up Supersymmetry instance", id="pack-instance", disabled=True),
-                        Option("Explore installed modules", id="modules", disabled=True),
-                        Option("Browse and run workflows", id="workflows", disabled=True),
-                        Option("Open Workspace Home", id="home", disabled=True),
-                        Option("Import earlier configuration", id="migrate", disabled=True),
-                        Option("Refresh environment", id="refresh"),
-                        id="home-actions",
-                    )
             yield Static("", id="home-note")
         yield Footer()
 
@@ -2871,23 +3085,9 @@ class WorkbenchApp(App[None]):
         if not self.screen_stack:
             return
         home = self.screen_stack[0]
-        logos = home.query("#brand-logo")
-        if not logos:
+        if not home.query("#home-panels"):
             return
-        compact = self.size.height < 30 or self.size.width < 90
-        plain = not self._block_logo_supported or self.size.width < 58
-        narrow = self.size.width < 64
-        home.set_class(compact, "compact-brand")
-        home.set_class(plain, "plain-brand")
-        home.set_class(narrow, "narrow-brand")
-        logos.first().update(Text("\n".join(COMPACT_MARK if compact else MARK), no_wrap=True))
-        panels = home.query_one("#home-panels", Horizontal)
-        environment = home.query_one("#environment-panel", Vertical)
-        actions = home.query_one("#actions-panel", Vertical)
-        first = actions if narrow else environment
-        second = environment if narrow else actions
-        if panels.children[0] is not first:
-            panels.move_child(first, before=second)
+        home.set_class(self.size.width < 64, "narrow-brand")
 
     def _remember_theme(self, theme: Theme) -> None:
         if theme.name == self.preferences.theme or (
@@ -3217,41 +3417,46 @@ class WorkbenchApp(App[None]):
                 actions.enable_option(option_id)
             else:
                 actions.disable_option(option_id)
-        if not self._home_initial_choice_selected and view.setup is not None:
+        if (not self._home_initial_choice_selected and view.version is not None
+                and not view.catalog_loading):
             self._home_initial_choice_selected = True
+            actions.highlighted = 0
             self.call_after_refresh(lambda: setattr(actions, "highlighted", 0))
         overview = Text()
         overview.append_text(_line("Core", (view.version or {}).get("version", "unavailable")))
         setup = view.setup or {}
+        review_only = bool(setup.get("configured")
+                           and not setup.get("selection", {}).get("profile_config"))
         overview.append("\n")
-        setup_status = setup.get("state") or (
-            "unavailable" if any(row.startswith("setup:") for row in view.problems) else "loading…"
+        setup_status = (
+            "Saved" if review_only
+            else "Saved · " + str(setup.get("state") or "unknown") if setup.get("configured")
+            else "Not saved" if view.setup
+            else "unavailable" if any(row.startswith("setup:") for row in view.problems)
+            else "loading…"
         )
         overview.append_text(_line("Setup", setup_status))
+        if setup.get("configured"):
+            overview.append("\n")
+            journey = (
+                "Developer" if setup.get("selection", {}).get("profile_config")
+                else "Review-only"
+            )
+            overview.append_text(_line("Setup mode", journey))
         overview.append("\n")
-        journey = (
-            "Full developer" if setup.get("selection", {}).get("profile_config")
-            else "Review-only / unselected" if view.setup else "unknown"
+        workspace_display = (
+            Path(view.workspace).name or view.workspace if view.workspace else "not selected"
         )
-        overview.append_text(_line("Journey", journey))
-        overview.append("\n")
-        workspace_source = (
-            view.environment.get("workspace", {}).get("source", "")
-            if view.environment else ""
-        )
-        workspace_display = view.workspace or "not selected"
-        if workspace_source:
-            workspace_display += f" ({workspace_source})"
         overview.append_text(_line("Workspace", workspace_display))
         overview.append("\n")
         modules_status = (
-            f"{sum(row.get('state') == 'available' for row in view.modules)} available / {len(view.modules)} installed"
+            f"{sum(row.get('state') == 'available' for row in view.modules)}/{len(view.modules)} available"
             if view.modules_loaded else "unavailable" if any(row.startswith("modules:") for row in view.problems) else "loading…"
         )
         overview.append_text(_line("Modules", modules_status))
         overview.append("\n")
         profiles_status = (
-            f"{sum(row.get('state') == 'available' for row in view.profiles)} available / {len(view.profiles)} installed"
+            f"{sum(row.get('state') == 'available' for row in view.profiles)}/{len(view.profiles)} available"
             if view.profiles_loaded else "unavailable" if any(row.startswith("profiles:") for row in view.problems) else "loading…"
         )
         overview.append_text(_line("Profiles", profiles_status))
@@ -3262,7 +3467,7 @@ class WorkbenchApp(App[None]):
         )
         catalog_status = (
             "loading catalog…" if view.catalog_loading
-            else f"{runnable_count} actions you can open here" if view.catalog is not None
+            else f"{runnable_count} available" if view.catalog is not None
             else "unavailable"
         )
         overview.append_text(_line("Workflows", catalog_status))
@@ -3270,12 +3475,26 @@ class WorkbenchApp(App[None]):
 
         dependencies = Text()
         blockers = setup.get("blockers", [])
-        if blockers:
-            dependencies.append("\nNEEDS ATTENTION\n", style="bold underline")
+        if review_only:
+            dependencies.append("\nReview mode is ready.", style="dim")
+        elif blockers:
+            dependencies.append("\nDEVELOPER SETUP CHECK\n", style="bold underline")
+            dependency_rows = {
+                row.get("id"): row for row in setup.get("dependencies", [])
+                if isinstance(row, dict)
+            }
             for item in blockers:
-                dependencies.append("• " + str(item) + "\n", style="bold")
-        elif view.setup:
+                row = dependency_rows.get(item, {})
+                label = row.get("label") or item
+                detail = row.get("detail") or row.get("repair")
+                dependencies.append(
+                    f"• {label}: {detail}\n" if detail else f"• {label}\n",
+                    style="bold",
+                )
+        elif view.setup and setup.get("configured"):
             dependencies.append("\nNo setup blockers reported.", style="dim")
+        elif view.setup:
+            dependencies.append("\nNo setup has been saved yet.", style="dim")
         else:
             dependencies.append("\nWaiting for setup status.", style="dim")
         home.query_one("#environment-dependencies", Static).update(dependencies)
@@ -3288,8 +3507,8 @@ class WorkbenchApp(App[None]):
                 f"Workspace Home: {workspace.get('display_name') or view.workspace} · "
                 f"{status.get('state', '?')}"
             )
-        elif view.workspace:
-            note.append("Workspace Home will appear after the selected workspace exists.")
+        elif view.workspace and not Path(view.workspace).is_dir():
+            note.append("The selected workspace folder does not exist yet.")
         if view.problems:
             note.append("\n" + "\n".join(view.problems), style="bold underline")
         home.query_one("#home-note", Static).update(note)
@@ -3324,6 +3543,13 @@ class WorkbenchApp(App[None]):
             self.action_refresh_environment()
         elif action == "migrate":
             self.open_config_migration()
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if event.option_list.id == "home-actions" and event.option_id in _HOME_ACTION_HELP:
+            if self.screen_stack and self.screen_stack[0].query("#home-subtitle"):
+                self.screen_stack[0].query_one("#home-subtitle", Static).update(
+                    _HOME_ACTION_HELP[event.option_id]
+                )
 
 
 def _core_command(arguments: argparse.Namespace) -> tuple[str, ...]:

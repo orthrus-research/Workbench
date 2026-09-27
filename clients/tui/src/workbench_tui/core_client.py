@@ -383,6 +383,15 @@ class CoreClient:
                     or not isinstance(policy.get("policy_plan_id"), str)
                     or _PACK_POLICY_PLAN_ID.fullmatch(policy["policy_plan_id"]) is None):
                 raise CoreClientError("Core did not retain the reviewed release policy")
+        elif action == "fresh-provider-status":
+            provider = record.get("provider")
+            if (not isinstance(provider, dict)
+                    or provider.get("status") not in {"configured", "unavailable"}
+                    or (provider["status"] == "unavailable" and
+                        not isinstance(provider.get("reason"), str))
+                    or (provider["status"] == "configured" and
+                        provider.get("reason") is not None)):
+                raise CoreClientError("Core returned an incomplete official download status")
         elif action.startswith("fresh-"):
             fresh = record.get("fresh")
             if (not isinstance(fresh, dict)
@@ -580,6 +589,13 @@ class CoreClient:
         if result["policy"]["policy_plan_id"] != plan_id:
             raise CoreClientError("Core retained a different release policy")
         return result
+
+    async def pack_instance_fresh_provider_status(self) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "fresh-provider-status", "--profile", "supersymmetry",
+            "--json", timeout=15,
+        )
+        return self._pack_instance_record(record, "fresh-provider-status")
 
     async def pack_instance_fresh_status(self, optional_mode: str) -> Mapping[str, Any]:
         record = await self.json_record(
