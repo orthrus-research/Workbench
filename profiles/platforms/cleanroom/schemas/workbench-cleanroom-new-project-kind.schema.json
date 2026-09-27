@@ -49,7 +49,7 @@
                   "const": "BLUEPRINTS-FRESH-PROJECT-CONSTRUCTION-V2"
                 },
                 "construction_owner_id": {
-                  "const": "workbench-cleanroom-mod-construction-owner:sha256:9880c764803e2786b32febb07e7fdc739aadf27fd3835ecdc861831ba8c81be0"
+                  "const": "workbench-cleanroom-mod-construction-owner:sha256:ba780710d18cb668a569f848e0b45ec2ce59a1b75ef152f8092cb2fc09d8b17c"
                 },
                 "construction_owner_ref": {
                   "allOf": [
@@ -66,7 +66,7 @@
                           "const": "sha256:d7bf003ea570c221045c30d7b4f508fbbdb98e12b206287a0a44c5ae7335325a"
                         },
                         "sha256": {
-                          "const": "sha256:f618a9f90e553b1c9254158d44caab98eee9b7c34393f4b025909dca15546038"
+                          "const": "sha256:4af5d0be7a60bebf312020e821c93daf779ee4a774fde2177680b07d4358ee1f"
                         }
                       },
                       "required": ["path", "schema_path", "schema_sha256", "sha256"]

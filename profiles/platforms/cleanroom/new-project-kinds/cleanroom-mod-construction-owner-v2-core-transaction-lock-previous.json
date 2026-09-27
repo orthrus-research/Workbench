@@ -3,7 +3,7 @@
     "adapter_set_contract_id": "BLUEPRINTS-ADAPTER-SET-V1",
     "hook_id": "cleanroom-generic-mod-fixture-render-v2",
     "source_path": "profiles/platforms/cleanroom/src/workbench_cleanroom_new_project/construction.py",
-    "source_sha256": "sha256:496243a77cadac10c347c6e168b13bd76dc6f19c82d5e0c352eaf1bd34dc62d0",
+    "source_sha256": "sha256:d9e52b427b15b27420c8a3c5a18c2f403ce630180fadb55702f3dd2b6df7b36d",
     "symbol": "cleanroom_mod_adapter_set"
   },
   "authority_boundary": {
@@ -16,7 +16,7 @@
   "blueprints_mechanics_refs": [
     {
       "path": "modules/blueprints/src/workbench_blueprints/application_transaction.py",
-      "sha256": "sha256:ed192a40eb356af7364bacb5af1e05da7f4c7fd0cc206495907c041a5ee5f295"
+      "sha256": "sha256:20f01be4c4b7cbbe864b3c34612e1426370d94c896f1d62351bfbd4eb75e8287"
     },
     {
       "path": "modules/blueprints/src/workbench_blueprints/fresh_project.py",
@@ -44,7 +44,7 @@
     }
   },
   "format": "workbench-cleanroom-mod-construction-owner-v2",
-  "id": "workbench-cleanroom-mod-construction-owner:sha256:ba780710d18cb668a569f848e0b45ec2ce59a1b75ef152f8092cb2fc09d8b17c",
+  "id": "workbench-cleanroom-mod-construction-owner:sha256:9880c764803e2786b32febb07e7fdc739aadf27fd3835ecdc861831ba8c81be0",
   "kind_id": "workbench-new-project-kind:cleanroom-mod",
   "limitations": [
     "This constructor writes only the exact 19-file generic Cleanroom fixture projection to an absent, empty-directory, or clean unborn Git target.",

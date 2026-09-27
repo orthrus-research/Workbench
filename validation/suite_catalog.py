@@ -323,6 +323,7 @@ PYTHON_TEST_SUITES: tuple[PythonTestSuite, ...] = (
         "Active Cleanroom profile imports, diagnostics, and exact regressions.",
         (
             "profiles/platforms/cleanroom/src",
+            "modules/blueprints/src",
             "modules/project-intelligence/src",
             "modules/crucible/src",
         ),

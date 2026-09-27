@@ -47,6 +47,7 @@ BOOTSTRAP_CORE_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-o
 M2_LOCK_CORE_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-m2-lock.json"
 FRESH_GIT_PREVIOUS_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-fresh-git-previous.json"
 GIT_INIT_PREVIOUS_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-git-init-previous.json"
+TRANSACTION_LOCK_PREVIOUS_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-transaction-lock-previous.json"
 KIND = PROFILE / "new-project-kinds/cleanroom-mod.json"
 
 
@@ -781,6 +782,44 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             self.assertEqual("restored", recovered["state"])
             self.assertFalse(target.exists())
 
+    def test_previous_transaction_lock_owner_reopens_and_retains_unknown_stage(self) -> None:
+        self.assertEqual(
+            construction.TRANSACTION_LOCK_PREVIOUS_OWNER_SHA256,
+            sha256(TRANSACTION_LOCK_PREVIOUS_OWNER.read_bytes()).hexdigest(),
+        )
+        package = tomllib.loads((PROFILE / "pyproject.toml").read_text(encoding="utf-8"))
+        resources = package["tool"]["setuptools"]["package-data"][
+            "workbench_resources.profiles.platforms.cleanroom"
+        ]
+        self.assertIn(
+            "new-project-kinds/cleanroom-mod-construction-owner-v2-core-transaction-lock-previous.json",
+            resources,
+        )
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh-project"
+            state_root = root / "state"
+            plan = self._previous_core_plan(
+                target, owner_id=construction.TRANSACTION_LOCK_PREVIOUS_OWNER_ID,
+            )
+            with self.assertRaisesRegex(ValueError, "owner binding changed"):
+                construction.validate_cleanroom_mod_plan(ROOT, plan)
+            self.assertEqual(plan, construction.validate_cleanroom_mod_plan(
+                ROOT, plan, allow_historical_owner=True,
+            ))
+            fresh_project.prepare_fresh_target(
+                target, plan["target_observation"], state_root, plan_id=plan["id"],
+            )
+            with self.assertRaisesRegex(
+                ValueError, "Core Git initialization.*retained",
+            ):
+                construction.recover_cleanroom_mod_construction(
+                    ROOT, plan, state_root,
+                )
+            self.assertTrue((target / ".git").exists())
+            self.assertTrue((state_root / "fresh-bootstrap-v2.json").exists())
+            self.assertTrue((state_root / "git-init-attempts").is_dir())
+
     def test_historical_owner_plan_recovers_interrupted_v2_source_journal(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             root = Path(temporary)
@@ -870,7 +909,7 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
                 ],
                 capture_output=True, text=True, check=False,
             )
-            self.assertEqual(2, result.returncode)
+            self.assertEqual(2, result.returncode, result.stderr)
             self.assertIn("Core custody", result.stderr)
             self.assertFalse(target.exists())
 
