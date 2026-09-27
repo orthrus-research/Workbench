@@ -128,7 +128,7 @@ def create_run_paths(
         reports = root / "reports"
         logs = root / "logs"
         for path in (reports, logs):
-            path.mkdir()
+            path.mkdir(mode=0o700)
         if allocated_temporary is None:
             temporary.mkdir(parents=True, mode=0o700, exist_ok=False)
             temporary.chmod(0o700)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from hashlib import sha256
 from io import StringIO
 import json
 import os
@@ -28,11 +29,81 @@ from run_python_suite import (  # noqa: E402
     TimingResult,
 )
 from orchestration import OrchestrationFailure, load_suite_report, load_test_inventory
+from core_run_custody import allocate_validation_run, publish_validation_run_record
+from orchestration import create_run_paths
+from workbench_api.working_allocations import WorkingAllocationError
+from workbench_api.host_filesystem import DurableRecordError
 from suite_measurement import PhaseClock, measure_tests
 from suite_catalog import PythonTestSuite  # noqa: E402
 
 
 class PythonSuiteIsolationTests(unittest.TestCase):
+    def test_core_run_records_reopen_exact_allocation_and_cas_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(root / "config")}):
+                _, first = allocate_validation_run(root, "first")
+                paths = create_run_paths(
+                    root / ".workbench/validation/runs", "first",
+                    allocated_root=first.path,
+                )
+                self.assertEqual(0, paths.reports.stat().st_mode & 0o077)
+                inventory = paths.report_for("validation").with_suffix(".inventory.json")
+                raw = b'{"format":"inventory"}\n'
+                with self.assertRaisesRegex(ValueError, "selected Core validation run"):
+                    publish_validation_run_record(
+                        root, "other", first.allocation_id, "validation", "inventory",
+                        raw, selected_path=inventory,
+                    )
+                self.assertFalse(inventory.exists())
+                other = root / ".workbench/validation/runs/other/reports/validation.inventory.json"
+                with self.assertRaisesRegex(ValueError, "selected Core run"):
+                    publish_validation_run_record(
+                        root, "first", first.allocation_id, "validation", "inventory",
+                        raw, selected_path=other,
+                    )
+                self.assertFalse(other.exists())
+                with self.assertRaises(WorkingAllocationError):
+                    publish_validation_run_record(
+                        root, "first", first.allocation_id, "validation", "inventory",
+                        raw, selected_path=inventory,
+                        configuration_home=root / "foreign-config",
+                    )
+                self.assertFalse(inventory.exists())
+                stage = inventory.parent / ".validation.inventory.json.interrupted.tmp"
+                stage.write_bytes(raw)
+                with self.assertRaisesRegex(OSError, "interrupted Core suite record stage"):
+                    publish_validation_run_record(
+                        root, "first", first.allocation_id, "validation", "inventory",
+                        raw, selected_path=inventory,
+                    )
+                self.assertFalse(inventory.exists())
+                stage.unlink()
+                publish_validation_run_record(
+                    root, "first", first.allocation_id, "validation", "inventory",
+                    raw, selected_path=inventory,
+                )
+                self.assertEqual(raw, inventory.read_bytes())
+                with self.assertRaisesRegex(DurableRecordError, "already exists"):
+                    publish_validation_run_record(
+                        root, "first", first.allocation_id, "validation", "inventory",
+                        raw, selected_path=inventory,
+                    )
+                report = paths.report_for("validation")
+                child = b'{"state":"passed"}\n'
+                publish_validation_run_record(
+                    root, "first", first.allocation_id, "validation", "report",
+                    child, selected_path=report,
+                )
+                report.write_bytes(b'{"state":"changed"}\n')
+                with self.assertRaisesRegex(DurableRecordError, "changed after review"):
+                    publish_validation_run_record(
+                        root, "first", first.allocation_id, "validation", "report",
+                        b'{"state":"passed","wall":1}\n', selected_path=report,
+                        expected_sha256="sha256:" + sha256(child).hexdigest(),
+                    )
+                self.assertEqual(b'{"state":"changed"}\n', report.read_bytes())
+
     def test_fixture_inventory_reports_exact_not_run_cases_without_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             report = Path(temporary) / "native-not-run.json"

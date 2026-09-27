@@ -22,6 +22,11 @@ if TYPE_CHECKING:
 
 _SUITE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _MAX_CI_PLAN = 4 * 1024 * 1024
+_RUN_RECORD_SUFFIX = {
+    "inventory": ".inventory.json",
+    "admission": ".admitted.json",
+    "report": ".json",
+}
 
 
 def _source_core() -> None:
@@ -58,6 +63,74 @@ def allocate_validation_run(root: Path, run_id: str):
         "python-suite-run", run_id, requested_path=runs / run_id,
     )
     return host, allocation
+
+
+def publish_validation_run_record(
+    root: Path, run_id: str, allocation_id: str, suite_name: str,
+    kind: str, payload: bytes, *, selected_path: Path,
+    expected_sha256: str | None = None,
+    configuration_home: Path | None = None,
+) -> Path:
+    """Publish or compare-and-replace one V1 suite record in its Core run.
+
+    The child and scheduler independently reopen the same allocation before
+    writing. A create-once stage left by an interruption blocks fresh writes;
+    the caller must choose a new run rather than infer what the old stage meant.
+    """
+
+    if (
+        type(run_id) is not str or _SUITE_NAME.fullmatch(run_id) is None
+        or run_id in {".", ".."}
+        or type(suite_name) is not str or _SUITE_NAME.fullmatch(suite_name) is None
+        or suite_name in {".", ".."}
+        or kind not in _RUN_RECORD_SUFFIX or type(payload) is not bytes
+        or (expected_sha256 is not None and kind != "report")
+    ):
+        raise ValueError("validation run record selection is invalid")
+    _source_core()
+    from workbench_core.host_filesystem import (
+        count_interrupted_create_once_stages, publish_create_once_bytes,
+        read_private_single_link_bytes, replace_private_bytes,
+    )
+    from workbench_core.user_config_home import default_user_config_home
+    from workbench_core.working_allocations import CoreWorkingAllocations
+
+    selected_root = Path(root).resolve(strict=True)
+    selected_home = default_user_config_home() if configuration_home is None else Path(configuration_home)
+    if not selected_home.is_absolute() or ".." in selected_home.parts:
+        raise ValueError("Core validation configuration home must be an absolute stable path")
+    runs = selected_root / ".workbench/validation/runs"
+    host = CoreWorkingAllocations(
+        workspace=selected_root,
+        configuration_home=selected_home,
+        locations={"evidence": runs},
+        location_sources={"evidence": "repository-validation"},
+        owner_id="validation",
+    )
+    allocation = host.open(allocation_id)
+    run_root = runs / run_id
+    if (
+        allocation.family != "python-suite-run"
+        or allocation.label != run_id
+        or allocation.path != run_root
+    ):
+        raise ValueError("suite record does not belong to the selected Core validation run")
+    target = run_root / "reports" / f"{suite_name}{_RUN_RECORD_SUFFIX[kind]}"
+    if Path(os.path.abspath(selected_path)) != target:
+        raise ValueError("suite record path differs from the selected Core run")
+    if expected_sha256 is None:
+        if count_interrupted_create_once_stages(target):
+            raise OSError("interrupted Core suite record stage requires review")
+        publish_create_once_bytes(target, payload, byte_limit=len(payload))
+    else:
+        prior_size = target.lstat().st_size
+        replace_private_bytes(
+            target, payload, byte_limit=max(len(payload), prior_size),
+            expected_sha256=expected_sha256,
+        )
+    if read_private_single_link_bytes(target, byte_limit=len(payload)) != payload:
+        raise OSError("Core suite record changed after publication")
+    return target
 
 
 def allocate_validation_scratch(

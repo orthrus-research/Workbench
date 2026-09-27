@@ -185,9 +185,12 @@ def _write_report(
     collected_ids: tuple[str, ...] | None = None,
     phases: PhaseClock | None = None,
     state: str | None = None,
+    core_allocation_id: str | None = None,
+    core_configuration_home: Path | None = None,
 ) -> Path:
     target = report if report is not None else REPORT_ROOT / f"{name}.json"
-    target.parent.mkdir(parents=True, exist_ok=True)
+    if core_allocation_id is None:
+        target.parent.mkdir(parents=True, exist_ok=True)
     rows = list(result.timings)
     if collected_ids is not None:
         recorded = {row["test"] for row in rows}
@@ -216,8 +219,19 @@ def _write_report(
         "collected_ids": list(collected_ids) if collected_ids is not None else sorted(row["test"] for row in rows),
     }
     document["inventory_digest"] = inventory_digest(document["collected_ids"])
-    _write_json(target, document)
+    if core_allocation_id is None:
+        _write_json(target, document)
+    else:
+        from core_run_custody import publish_validation_run_record
+        publish_validation_run_record(
+            ROOT, run_id, core_allocation_id, name, "report", _json_bytes(document),
+            selected_path=target, configuration_home=core_configuration_home,
+        )
     return target
+
+
+def _json_bytes(document: dict) -> bytes:
+    return (json.dumps(document, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
 def _write_json(target: Path, document: dict) -> None:
@@ -238,14 +252,18 @@ def _write_json(target: Path, document: dict) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _write_inventory(name: str, test_ids: tuple[str, ...], report: Path, *, run_id: str, source_fingerprint: str) -> Path:
+def _write_inventory(
+    name: str, test_ids: tuple[str, ...], report: Path, *,
+    run_id: str, source_fingerprint: str, core_allocation_id: str | None = None,
+    core_configuration_home: Path | None = None,
+) -> Path:
     """Seal the collection before invoking tests, separate from terminal rows."""
     if len(set(test_ids)) != len(test_ids):
         raise ValueError("suite collection repeats a test ID")
     target = report.with_suffix(".inventory.json")
     if target.exists() or target.is_symlink():
         raise ValueError(f"refusing to replace a previously admitted inventory: {target}")
-    _write_json(target, {
+    document = {
         "format": "workbench-python-test-inventory-v1",
         "suite": name,
         "authority": SUITES_BY_NAME[name].authority,
@@ -253,7 +271,15 @@ def _write_inventory(name: str, test_ids: tuple[str, ...], report: Path, *, run_
         "source_fingerprint": source_fingerprint,
         "test_ids": sorted(test_ids),
         "inventory_digest": inventory_digest(test_ids),
-    })
+    }
+    if core_allocation_id is None:
+        _write_json(target, document)
+    else:
+        from core_run_custody import publish_validation_run_record
+        publish_validation_run_record(
+            ROOT, run_id, core_allocation_id, name, "inventory", _json_bytes(document),
+            selected_path=target, configuration_home=core_configuration_home,
+        )
     return target
 
 
@@ -306,6 +332,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("suite", choices=tuple(SUITES_BY_NAME))
     parser.add_argument("--admission-file", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--core-allocation-id", help=argparse.SUPPRESS)
+    parser.add_argument("--core-configuration-home", type=Path, help=argparse.SUPPRESS)
     parser.add_argument(
         "--collect-only",
         action="store_true",
@@ -334,6 +362,10 @@ def main() -> int:
     args = parser.parse_args()
     if (args.run_id is None) != (args.source_fingerprint is None):
         parser.error("--run-id and --source-fingerprint must be provided together")
+    if args.core_allocation_id is not None and (args.collect_only or args.admission_file is None):
+        parser.error("Core allocation requires an admitted executing suite")
+    if (args.core_allocation_id is None) != (args.core_configuration_home is None):
+        parser.error("Core allocation and configuration home must be supplied together")
     if not args.collect_only and args.run_id is None:
         parser.error(
             "--run-id and --source-fingerprint are required when executing a suite"
@@ -390,7 +422,9 @@ def main() -> int:
     target = args.report if args.report is not None else REPORT_ROOT.parent / "runs" / args.run_id / "reports" / f"{selected.name}.json"
     assert args.run_id is not None and args.source_fingerprint is not None
     _write_inventory(selected.name, collected_ids, target,
-                     run_id=args.run_id, source_fingerprint=args.source_fingerprint)
+                     run_id=args.run_id, source_fingerprint=args.source_fingerprint,
+                     core_allocation_id=args.core_allocation_id,
+                     core_configuration_home=args.core_configuration_home)
     if args.admission_file is not None:
         _await_admission(args.admission_file, test_ids=collected_ids,
                          run_id=args.run_id, source_fingerprint=args.source_fingerprint)
@@ -425,6 +459,8 @@ def main() -> int:
         collected_ids=collected_ids,
         phases=phases,
         state="interrupted" if interrupted else None,
+        core_allocation_id=args.core_allocation_id,
+        core_configuration_home=args.core_configuration_home,
     )
     slow = sorted(
         (

@@ -7,6 +7,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 import math
 import os
@@ -36,7 +37,7 @@ from orchestration import (
 )
 from core_run_custody import (
     allocate_validation_run, allocate_validation_scratch,
-    publish_validation_timing,
+    publish_validation_run_record, publish_validation_timing,
 )
 from suite_measurement import environment_provenance, inventory_digest
 from suite_catalog import (
@@ -80,6 +81,8 @@ class _SuiteRequest:
     log_path: Path
     temporary_root: Path
     command: tuple[str, ...]
+    core_allocation_id: str | None = None
+    core_configuration_home: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -155,7 +158,11 @@ def _suite_requests(
     *,
     paths: ValidationRunPaths,
     source_fingerprint: str,
+    core_allocation_id: str | None = None,
+    core_configuration_home: Path | None = None,
 ) -> list[_SuiteRequest]:
+    if (core_allocation_id is None) != (core_configuration_home is None):
+        raise ValueError("Core suite allocation and configuration home must be selected together")
     environment = environment_provenance(ROOT)
     estimates = {suite.name: _timing_estimate(suite, source_fingerprint, environment) for suite in suites}
     ranked = sorted(
@@ -187,6 +194,10 @@ def _suite_requests(
             source_fingerprint,
             "--admission-file",
             str(report_path.with_suffix(".admitted.json")),
+        ) + (
+            ("--core-allocation-id", core_allocation_id,
+             "--core-configuration-home", str(core_configuration_home))
+            if core_allocation_id and core_configuration_home is not None else ()
         )
         requests.append(
             _SuiteRequest(
@@ -202,6 +213,8 @@ def _suite_requests(
                 log_path=log_path,
                 temporary_root=temporary_root,
                 command=command,
+                core_allocation_id=core_allocation_id,
+                core_configuration_home=core_configuration_home,
             )
         )
     return requests
@@ -333,11 +346,22 @@ def _run_suite_process(
                             expected_run_id=run_id, expected_source_fingerprint=source_fingerprint,
                             expected_authority=request.suite.authority,
                         )
-                        _atomic_write_json(request.report_path.with_suffix(".admitted.json"), {
+                        admission = {
                             "format": "workbench-python-test-admission-v1", "run_id": run_id,
                             "source_fingerprint": source_fingerprint, "test_ids": sorted(admitted_ids),
                             "inventory_digest": inventory_digest(admitted_ids),
-                        })
+                        }
+                        admission_path = request.report_path.with_suffix(".admitted.json")
+                        if request.core_allocation_id is None:
+                            _atomic_write_json(admission_path, admission)
+                        else:
+                            publish_validation_run_record(
+                                ROOT, run_id, request.core_allocation_id,
+                                request.suite.name, "admission",
+                                (json.dumps(admission, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+                                selected_path=admission_path,
+                                configuration_home=request.core_configuration_home,
+                            )
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         raise subprocess.TimeoutExpired(request.command, request.suite.timeout_seconds)
@@ -619,6 +643,8 @@ def _run_python_suites_at_paths(
     scratch: tuple[Any, tuple[Any, Any]],
     launch_state: dict[str, bool],
     selection_plan: dict | None = None,
+    core_allocation_id: str | None = None,
+    core_configuration_home: Path | None = None,
 ) -> ValidationRunPaths:
     """Run the selected suites within a Core-reserved retained directory."""
 
@@ -632,6 +658,8 @@ def _run_python_suites_at_paths(
         suites,
         paths=run_paths,
         source_fingerprint=source_fingerprint,
+        core_allocation_id=core_allocation_id,
+        core_configuration_home=core_configuration_home,
     )
     request_by_name = {request.suite.name: request for request in requests}
     pending = list(requests)
@@ -776,7 +804,18 @@ def _run_python_suites_at_paths(
                     # Preserve the measured process cost in the diagnostic cache.
                     raw = dict(report.document)
                     raw["process_wall_seconds"] = process_result.outcome.elapsed_seconds
-                    _atomic_write_json(request.report_path, raw)
+                    if request.core_allocation_id is None:
+                        _atomic_write_json(request.report_path, raw)
+                    else:
+                        child_bytes = (json.dumps(report.document, indent=2, sort_keys=True) + "\n").encode("utf-8")
+                        publish_validation_run_record(
+                            ROOT, run_paths.run_id, request.core_allocation_id,
+                            request.suite.name, "report",
+                            (json.dumps(raw, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+                            selected_path=request.report_path,
+                            expected_sha256="sha256:" + sha256(child_bytes).hexdigest(),
+                            configuration_home=request.core_configuration_home,
+                        )
                     report = replace(report, document=raw)
                     stage.update(state="passed", outcomes={
                         value: sum(row.outcome == value for row in report.tests)
@@ -940,6 +979,8 @@ def run_python_suites(
                     scratch=scratch,
                     launch_state=launch_state,
                     selection_plan=selection_plan,
+                    core_allocation_id=allocation.allocation_id,
+                    core_configuration_home=host.catalog.resources.configuration_home,
                 )
         except BaseException as error:
             if scratch is not None and not launch_state["admitted"]:

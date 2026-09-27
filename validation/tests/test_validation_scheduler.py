@@ -43,6 +43,30 @@ class ParallelValidationSchedulerTests(unittest.TestCase):
         rows = WorkingAllocationCatalog(self.configuration_home).inventory_rows(workspace=root)
         return next(row for row in rows if row["label"] == run_id)
 
+    def test_suite_child_keeps_isolated_config_home(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths = create_run_paths(root / "runs", "isolated-child")
+            suite = self._suite("alpha")
+            with patch.object(scheduler, "ROOT", root):
+                request = scheduler._suite_requests(
+                    (suite,), paths=paths, source_fingerprint="source:one",
+                )[0]
+                request = replace(request, command=(
+                    sys.executable, "-c",
+                    "import os; print(os.environ['WORKBENCH_CONFIG_HOME'])",
+                ))
+                result = scheduler._run_suite_process(
+                    request, process_registry={}, process_lock=threading.Lock(),
+                    interruption_event=threading.Event(),
+                )
+            self.assertEqual(0, result.outcome.returncode)
+            self.assertEqual(
+                str(request.temporary_root / "environment/config"),
+                request.log_path.read_text(encoding="utf-8").strip(),
+            )
+            self.assertNotEqual(self.configuration_home, request.temporary_root / "environment/config")
+
     def test_fresh_core_run_preserves_historical_tree_and_secures_parent(self) -> None:
         from core_run_custody import allocate_validation_run
 
@@ -147,6 +171,8 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
 
     @staticmethod
     def _write_success_report(request: scheduler._SuiteRequest) -> None:
+        from core_run_custody import publish_validation_run_record
+
         request.report_path.parent.mkdir(parents=True, exist_ok=True)
         request.log_path.parent.mkdir(parents=True, exist_ok=True)
         request.log_path.write_text("fake suite passed\n", encoding="utf-8")
@@ -155,14 +181,15 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
         source_fingerprint = arguments[
             arguments.index("--source-fingerprint") + 1
         ]
-        request.report_path.with_suffix(".inventory.json").write_text(json.dumps({
+        inventory = request.report_path.with_suffix(".inventory.json")
+        inventory_bytes = (json.dumps({
             "format": "workbench-python-test-inventory-v1", "suite": request.suite.name,
             "authority": request.suite.authority, "run_id": run_id,
             "source_fingerprint": source_fingerprint,
             "test_ids": [f"{request.suite.name}.Tests.test_case"],
             "inventory_digest": inventory_digest([f"{request.suite.name}.Tests.test_case"]),
-        }))
-        request.report_path.write_text(
+        }, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        report_bytes = (
             json.dumps(
                 {
                     "format": "workbench-python-test-timing-v3",
@@ -184,11 +211,22 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                             "seconds": 0.05,
                         }
                     ],
-                }
+                }, indent=2, sort_keys=True,
             )
-            + "\n",
-            encoding="utf-8",
-        )
+            + "\n"
+        ).encode("utf-8")
+        if request.core_allocation_id is None:
+            inventory.write_bytes(inventory_bytes)
+            request.report_path.write_bytes(report_bytes)
+        else:
+            for kind, target, payload in (
+                ("inventory", inventory, inventory_bytes),
+                ("report", request.report_path, report_bytes),
+            ):
+                publish_validation_run_record(
+                    scheduler.ROOT, run_id, request.core_allocation_id,
+                    request.suite.name, kind, payload, selected_path=target,
+                )
 
     def test_two_workers_overlap_and_publish_complete_run(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
