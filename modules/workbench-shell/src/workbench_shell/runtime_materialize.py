@@ -104,9 +104,9 @@ def _packwiz_tree_host(workspace: Path):
 def _retain_v2_dependencies(
     tree_host, *, receipt: Mapping[str, Any], receipt_bytes: bytes,
     staged_source: Path, source_scratch: TemporaryScratchReference,
-    refresh_log: Path, installer_log: Path,
+    refresh_log: Path, installer_log: Path, bootstrap_receipt_path: Path,
 ) -> str:
-    """Preserve the exact tool logs and immutable V2 input identity evidence."""
+    """Preserve exact logs, bootstrap receipt, and V2 input identity evidence."""
 
     if staged_source != source_scratch.path / "source":
         raise PackwizMaterializationError("Packwiz V2 source scratch binding changed")
@@ -127,9 +127,21 @@ def _retain_v2_dependencies(
                 "size": size,
             }
             log_references.append(reference.resource_id)
+        bootstrap = receipt["bootstrap_source"]
+        if bootstrap["receipt_uri"] != bootstrap_receipt_path.as_uri():
+            raise PackwizMaterializationError(
+                "Packwiz V2 bootstrap receipt path changed before retention"
+            )
+        bootstrap_reference = tree_host.retain_file_reference(
+            "evidence", "packwiz-v2-cleanroom-bootstrap-receipt.json",
+            bootstrap_receipt_path,
+            sha256=bootstrap["receipt_sha256"],
+            size=bootstrap["receipt_size"],
+            domain_id=str(receipt["materialization_id"]) + ":bootstrap",
+        )
         witness = {
-            "format": "workbench-packwiz-v2-dependencies-v2",
-            "schema_version": 2,
+            "format": "workbench-packwiz-v2-dependencies-v3",
+            "schema_version": 3,
             "materialization_id": receipt["materialization_id"],
             "receipt_sha256": sha256(receipt_bytes).hexdigest(),
             "source_scratch_uri": staged_source.as_uri(),
@@ -137,6 +149,12 @@ def _retain_v2_dependencies(
             "source_snapshot": receipt["source_snapshot"],
             "refreshed_pack": receipt["refreshed_pack"],
             "bootstrap_source": receipt["bootstrap_source"],
+            "bootstrap_receipt": {
+                "historical_uri": bootstrap_receipt_path.as_uri(),
+                "resource_id": bootstrap_reference.resource_id,
+                "sha256": bootstrap["receipt_sha256"],
+                "size": bootstrap["receipt_size"],
+            },
             "tools": receipt["tools"],
             "payload": receipt["payload"],
             "logs": log_rows,
@@ -144,7 +162,7 @@ def _retain_v2_dependencies(
         reference = tree_host.retain_bytes_reference(
             "evidence", "packwiz-v2-dependencies.json",
             _canonical_bytes(witness) + b"\n",
-            references=tuple(log_references),
+            references=tuple((*log_references, bootstrap_reference.resource_id)),
             domain_id=str(receipt["materialization_id"]),
         )
     except (ManagedTreeError, OSError, ValueError) as exc:
@@ -2139,6 +2157,7 @@ def materialize_packwiz_workspace_v2(
                     source_scratch=staging,
                     refresh_log=refresh_log,
                     installer_log=installer_log,
+                    bootstrap_receipt_path=bootstrap_receipt_path,
                 )
 
                 def validate_staged_tree(root: Path) -> None:

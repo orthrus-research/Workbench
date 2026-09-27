@@ -637,7 +637,7 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
             self.assertEqual(2, len(trees[0]["references"]))
             witness = json.loads(catalog.read_bytes(trees[0]["references"][0]))
             self.assertEqual(
-                "workbench-packwiz-v2-dependencies-v2", witness["format"],
+                "workbench-packwiz-v2-dependencies-v3", witness["format"],
             )
             self.assertEqual(receipt["materialization_id"], witness["materialization_id"])
             self.assertEqual(
@@ -661,6 +661,19 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                     row["sha256"],
                     sha256(catalog.read_bytes(row["resource_id"])).hexdigest(),
                 )
+            bootstrap = witness["bootstrap_receipt"]
+            self.assertEqual(
+                receipt["bootstrap_source"]["receipt_uri"],
+                bootstrap["historical_uri"],
+            )
+            self.assertEqual(
+                _local_path(bootstrap["historical_uri"]).read_bytes(),
+                catalog.read_bytes(bootstrap["resource_id"]),
+            )
+            self.assertEqual(
+                receipt["bootstrap_source"]["receipt_sha256"],
+                bootstrap["sha256"],
+            )
             self.assertNotEqual(target, bootstrap_fixture)
             self.assertTrue(
                 target.is_relative_to(
@@ -779,6 +792,28 @@ class RuntimeMaterializeV2Test(unittest.TestCase):
                 row for row in inventory["resources"] if row["resource_id"] == refresh_id
             )
             Path(retained["path"]).write_bytes(b"changed retained log\n")
+
+            with self.assertRaisesRegex(
+                PackwizMaterializationError,
+                "earlier Core Packwiz V2 result requires review",
+            ):
+                _materialize(case)
+
+    def test_changed_retained_bootstrap_receipt_blocks_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            case = _case(Path(temporary))
+            _materialize(case)
+            catalog = ResourceCatalog(Path(case["root"]) / "config")
+            inventory = catalog.inventory(workspace=Path(case["workspace"]))
+            witness = json.loads(
+                catalog.read_bytes(inventory["trees"][0]["references"][0])
+            )
+            bootstrap_id = witness["bootstrap_receipt"]["resource_id"]
+            retained = next(
+                row for row in inventory["resources"]
+                if row["resource_id"] == bootstrap_id
+            )
+            Path(retained["path"]).write_bytes(b"changed retained bootstrap receipt\n")
 
             with self.assertRaisesRegex(
                 PackwizMaterializationError,
