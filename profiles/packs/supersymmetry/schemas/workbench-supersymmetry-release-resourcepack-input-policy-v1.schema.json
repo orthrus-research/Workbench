@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Supersymmetry selected release resource-pack placement policy V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile", "input_plan_format", "input_plan_id", "version", "manifest_sha256", "external_file_count", "allowed_extensions", "max_file_bytes", "max_total_bytes", "placements"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-release-resourcepack-input-policy-v1"},
+    "schema_version": {"const": 1},
+    "profile": {"const": "supersymmetry"},
+    "input_plan_format": {"const": "workbench-pack-release-input-plan-v1"},
+    "input_plan_id": {"type": "string", "pattern": "^workbench-pack-release-input-plan:sha256:[0-9a-f]{64}$"},
+    "version": {"const": "0.1.16.16"},
+    "manifest_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "external_file_count": {"const": 193},
+    "allowed_extensions": {"const": [".zip"]},
+    "max_file_bytes": {"type": "integer", "minimum": 1, "maximum": 536870912},
+    "max_total_bytes": {"type": "integer", "minimum": 1, "maximum": 1610612736},
+    "placements": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["project_id", "file_id", "required", "destination_root"],
+        "properties": {
+          "project_id": {"type": "integer", "minimum": 1},
+          "file_id": {"type": "integer", "minimum": 1},
+          "required": {"const": true},
+          "destination_root": {"const": "resourcepacks"}
+        }
+      }
+    }
+  }
+}

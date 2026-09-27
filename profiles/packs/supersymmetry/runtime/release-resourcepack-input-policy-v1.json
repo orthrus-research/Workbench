@@ -1,0 +1,18 @@
+{
+  "format": "workbench-supersymmetry-release-resourcepack-input-policy-v1",
+  "schema_version": 1,
+  "profile": "supersymmetry",
+  "input_plan_format": "workbench-pack-release-input-plan-v1",
+  "input_plan_id": "workbench-pack-release-input-plan:sha256:8c188e58c33556c6dae0a5d7de8a069054bc0f45d3bccb6607adca9850673f0f",
+  "version": "0.1.16.16",
+  "manifest_sha256": "sha256:a4d67c7961e281c6ba9ecfffa58c9de2d14f3a424c9498537166dd6687b04d7d",
+  "external_file_count": 193,
+  "allowed_extensions": [".zip"],
+  "max_file_bytes": 536870912,
+  "max_total_bytes": 1610612736,
+  "placements": [
+    {"project_id": 851152, "file_id": 6655846, "required": true, "destination_root": "resourcepacks"},
+    {"project_id": 885673, "file_id": 6280168, "required": true, "destination_root": "resourcepacks"},
+    {"project_id": 1290857, "file_id": 6927766, "required": true, "destination_root": "resourcepacks"}
+  ]
+}

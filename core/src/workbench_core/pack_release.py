@@ -696,6 +696,111 @@ class PackReleaseService:
                 "action": "prism-reopen", "status": "reopened", "reason": None,
                 "prism_import_result": result}
 
+    def prism_resourcepack_inputs(self, source_root: Path, policy_path: Path) -> dict[str, Any]:
+        """Review the selected release's pack-owned resource-pack placements."""
+
+        from .pack_release_prism_resourcepacks import plan_prism_resourcepacks
+
+        first = self.inputs()
+        if first["status"] != "planned":
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-inputs", "status": first["status"],
+                    "reason": "selected pack release inputs are unavailable",
+                    "resourcepack_plan": None}
+        try:
+            plan = plan_prism_resourcepacks(
+                first["input_plan"], source_root=source_root,
+                archive_path=Path(first["selected"]["artifact_path"]),
+                policy_path=policy_path, state_root=self.state_root,
+                config_home=self.choice_path.parent,
+            )
+        except (DurableRecordError, DurableResourceError, OSError, ValueError):
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-inputs", "status": "unavailable",
+                    "reason": "Prism resource packs or Core custody did not pass review",
+                    "resourcepack_plan": None}
+        current = self.inputs()
+        if (current["status"] != "planned"
+                or current["input_plan"]["plan_id"] != first["input_plan"]["plan_id"]
+                or current["selected"] != first["selected"]):
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-inputs", "status": "stale",
+                    "reason": "selected pack release changed during resource-pack review",
+                    "resourcepack_plan": None}
+        return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                "action": "prism-resourcepack-inputs", "status": "planned", "reason": None,
+                "resourcepack_plan": plan}
+
+    def import_prism_resourcepacks(self, source_root: Path, policy_path: Path, *,
+                                   expected_plan_id: str) -> dict[str, Any]:
+        """Retain resource-pack bytes in their own Core tree without installing."""
+
+        from .pack_release_prism_resourcepacks import apply_prism_resourcepacks
+
+        first = self.inputs()
+        if first["status"] != "planned":
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-import", "status": first["status"],
+                    "reason": "selected pack release inputs are unavailable",
+                    "resourcepack_result": None}
+        try:
+            result = apply_prism_resourcepacks(
+                first["input_plan"], source_root=source_root,
+                archive_path=Path(first["selected"]["artifact_path"]),
+                policy_path=policy_path, state_root=self.state_root,
+                config_home=self.choice_path.parent, expected_plan_id=expected_plan_id,
+            )
+        except (DurableRecordError, DurableResourceError, OSError, ValueError):
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-import", "status": "unavailable",
+                    "reason": "Prism resource packs or Core custody did not pass review",
+                    "resourcepack_result": None}
+        current = self.inputs()
+        if (current["status"] != "planned"
+                or current["input_plan"]["plan_id"] != first["input_plan"]["plan_id"]
+                or current["selected"] != first["selected"]):
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-import", "status": "stale",
+                    "reason": "selected pack release changed during resource-pack import",
+                    "resourcepack_result": result}
+        return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                "action": "prism-resourcepack-import", "status": "retained", "reason": None,
+                "resourcepack_result": result}
+
+    def reopen_prism_resourcepacks(self, policy_path: Path, *, expected_plan_id: str) -> dict[str, Any]:
+        """Read back retained resource packs without the former Prism source."""
+
+        from .pack_release_prism_resourcepacks import reopen_prism_resourcepacks
+
+        first = self.inputs()
+        if first["status"] != "planned":
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-reopen", "status": first["status"],
+                    "reason": "selected pack release inputs are unavailable",
+                    "resourcepack_result": None}
+        try:
+            result = reopen_prism_resourcepacks(
+                first["input_plan"], expected_plan_id=expected_plan_id,
+                policy_path=policy_path, state_root=self.state_root,
+                config_home=self.choice_path.parent,
+            )
+        except (DurableRecordError, DurableResourceError, OSError, ValueError):
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-reopen", "status": "unavailable",
+                    "reason": "retained resource-pack Core tree did not pass readback",
+                    "resourcepack_result": None}
+        current = self.inputs()
+        if (current["status"] != "planned"
+                or current["input_plan"]["plan_id"] != first["input_plan"]["plan_id"]
+                or current["selected"] != first["selected"]):
+            return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                    "action": "prism-resourcepack-reopen", "status": "stale",
+                    "reason": "selected pack release changed during resource-pack readback",
+                    "resourcepack_result": None}
+        return {"schema": "workbench.pack-release.prism-resourcepacks.v1",
+                "action": "prism-resourcepack-reopen", "status": "reopened", "reason": None,
+                "resourcepack_result": result}
+
     def check(self) -> dict[str, Any]:
         choice = self._read_choice()
         try:
@@ -825,16 +930,19 @@ class PackReleaseService:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="workbench pack release")
-    parser.add_argument("action", choices=("show", "check", "accept", "ignore", "prepare", "inputs", "local-inputs", "prism-inputs", "prism-import", "prism-reopen"))
+    resourcepack_actions = {"prism-resourcepack-inputs", "prism-resourcepack-import", "prism-resourcepack-reopen"}
+    resourcepack_source_actions = {"prism-resourcepack-inputs", "prism-resourcepack-import"}
+    parser.add_argument("action", choices=("show", "check", "accept", "ignore", "prepare", "inputs", "local-inputs", "prism-inputs", "prism-import", "prism-reopen", *sorted(resourcepack_actions)))
     parser.add_argument("--profile", required=True, choices=(PROFILE,))
     parser.add_argument("--expected-release-id")
     parser.add_argument("--sources", type=Path)
     parser.add_argument("--mods-root", type=Path)
+    parser.add_argument("--resourcepacks-root", type=Path)
     parser.add_argument("--expected-plan-id")
     parser.add_argument("--include-optional", action="append", default=[], metavar="PROJECT:FILE")
     parser.add_argument("--json", action="store_true")
     selected = parser.parse_args(argv)
-    if selected.action in {"show", "check", "inputs", "local-inputs", "prism-inputs", "prism-import", "prism-reopen"} and selected.expected_release_id is not None:
+    if selected.action in {"show", "check", "inputs", "local-inputs", "prism-inputs", "prism-import", "prism-reopen", *resourcepack_actions} and selected.expected_release_id is not None:
         parser.error("this action does not accept an expected release ID")
     if selected.action in {"accept", "ignore", "prepare"} and selected.expected_release_id is None:
         parser.error("accept, ignore, and prepare require --expected-release-id")
@@ -846,10 +954,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("Prism actions require --mods-root")
     if selected.action not in {"prism-inputs", "prism-import"} and selected.mods_root is not None:
         parser.error("--mods-root is only accepted by Prism actions")
-    if selected.action in {"prism-import", "prism-reopen"} and selected.expected_plan_id is None:
-        parser.error("prism-import and prism-reopen require --expected-plan-id")
-    if selected.action not in {"prism-import", "prism-reopen"} and selected.expected_plan_id is not None:
-        parser.error("--expected-plan-id is only accepted by prism-import and prism-reopen")
+    if selected.action in resourcepack_source_actions and selected.resourcepacks_root is None:
+        parser.error("resource-pack source actions require --resourcepacks-root")
+    if selected.action not in resourcepack_source_actions and selected.resourcepacks_root is not None:
+        parser.error("--resourcepacks-root is only accepted by resource-pack source actions")
+    if selected.action in {"prism-import", "prism-reopen", "prism-resourcepack-import", "prism-resourcepack-reopen"} and selected.expected_plan_id is None:
+        parser.error("Prism import and reopen actions require --expected-plan-id")
+    if selected.action not in {"prism-import", "prism-reopen", "prism-resourcepack-import", "prism-resourcepack-reopen"} and selected.expected_plan_id is not None:
+        parser.error("--expected-plan-id is only accepted by Prism import and reopen actions")
     if selected.action not in {"prism-inputs", "prism-import"} and selected.include_optional:
         parser.error("--include-optional is only accepted by Prism actions")
     optional_selected: tuple[tuple[int, int], ...] = ()
@@ -873,6 +985,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         policies = profile_resources("release-local-input-policy")
         if PROFILE not in policies:
             raise ValueError("Supersymmetry local input policy profile is unavailable")
+    if selected.action in resourcepack_actions:
+        resourcepack_policies = profile_resources("release-resourcepack-input-policy")
+        if PROFILE not in resourcepack_policies:
+            raise ValueError("Supersymmetry resource-pack input policy profile is unavailable")
     result = (service.show() if selected.action == "show" else
               service.check() if selected.action == "check" else
               service.inputs() if selected.action == "inputs" else
@@ -881,6 +997,10 @@ def main(argv: Sequence[str] | None = None) -> int:
               service.import_prism_inputs(selected.mods_root, policies[PROFILE], expected_plan_id=selected.expected_plan_id,
                                           optional_selected=optional_selected) if selected.action == "prism-import" else
               service.reopen_prism_inputs(policies[PROFILE], expected_plan_id=selected.expected_plan_id) if selected.action == "prism-reopen" else
+              service.prism_resourcepack_inputs(selected.resourcepacks_root, resourcepack_policies[PROFILE]) if selected.action == "prism-resourcepack-inputs" else
+              service.import_prism_resourcepacks(selected.resourcepacks_root, resourcepack_policies[PROFILE],
+                                                 expected_plan_id=selected.expected_plan_id) if selected.action == "prism-resourcepack-import" else
+              service.reopen_prism_resourcepacks(resourcepack_policies[PROFILE], expected_plan_id=selected.expected_plan_id) if selected.action == "prism-resourcepack-reopen" else
               service.accept(selected.expected_release_id) if selected.action == "accept" else
               service.ignore(selected.expected_release_id) if selected.action == "ignore" else
               service.prepare(selected.expected_release_id))
@@ -904,6 +1024,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         if detail is not None:
             print(f"  Local files: {detail['retained_file_count']}")
             print(f"  Required or selected files unresolved: {len(detail['unresolved'])}")
+            print("  CurseForge file identity: unproven by local sidecar")
+            print("  Installation: not installed")
+    elif selected.action in resourcepack_actions:
+        print(f"Supersymmetry Prism resource packs: {result['status'].replace('_', ' ')}")
+        if result["reason"]:
+            print(f"  Reason: {result['reason']}")
+        detail = result.get("resourcepack_plan") or result.get("resourcepack_result")
+        if detail is not None:
+            label = "Matched" if selected.action == "prism-resourcepack-inputs" else "Retained"
+            print(f"  {label} resource packs: {detail['retained_file_count']}")
+            print(f"  Required resource packs unresolved: {len(detail['unresolved'])}")
             print("  CurseForge file identity: unproven by local sidecar")
             print("  Installation: not installed")
     else:

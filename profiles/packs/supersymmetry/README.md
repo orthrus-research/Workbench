@@ -95,6 +95,28 @@ uses its stable runtime state root as the shared pack-byte workspace identity;
 these bytes are independent of a developer project checkout and are bound to
 the selected release and pack policy by the retained plan ID.
 
+The selected 0.1.16.16 client manifest also declares three required file IDs
+that the [pack-owned placement policy](runtime/release-resourcepack-input-policy-v1.json)
+classifies as resource packs under that input plan:
+ShaderTech `851152/6655846`, Black Mesa Transit System `885673/6280168`, and
+SuperSymmetry Refreshed `1290857/6927766`. The manifest lists IDs but does not
+state their installation directories, so Core uses this version-bound profile
+policy and reads the corresponding Prism `minecraft/resourcepacks/` directory.
+
+```sh
+workbench pack release prism-resourcepack-inputs --profile supersymmetry --resourcepacks-root /absolute/Prism/instance/minecraft/resourcepacks --json
+workbench pack release prism-resourcepack-import --profile supersymmetry --resourcepacks-root /absolute/Prism/instance/minecraft/resourcepacks --expected-plan-id 'workbench-pack-release-prism-resourcepack-plan:sha256:<digest>' --json
+workbench pack release prism-resourcepack-reopen --profile supersymmetry --expected-plan-id 'workbench-pack-release-prism-resourcepack-plan:sha256:<digest>' --json
+```
+
+Use the reviewed plan ID for import and later readback. Core rechecks each
+sidecar and ZIP, retains the ZIPs beneath `resourcepacks/` in a distinct private
+Linux tree, and records each size and SHA-256 without source paths in the plan
+or result. A read-only WSL 9p directory remains an unqualified source
+observation. Its local sidecars and hashes do not establish CurseForge file-ID
+provenance, and this candidate import does not install the resource packs or
+qualify the released client.
+
 ## Contents
 
 - `source-locks/`: exact upstream source and binary provenance.

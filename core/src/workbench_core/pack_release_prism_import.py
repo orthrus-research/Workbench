@@ -222,6 +222,8 @@ def review_prism_import(input_plan: Mapping[str, Any], *, source_root: Path,
             or type(input_plan.get("external_files")) is not list
             or not isinstance(source_root, Path)):
         raise ValueError("Prism import lacks the selected release input plan")
+    if source_root.name != policy["destination_root"]:
+        raise ValueError("Prism mod source must be the instance mods directory")
     source_filesystem_state = _source_filesystem(source_root)
     rows = _rows(input_plan, source_root, policy, optional_selected)
     override_names = _override_mod_names(

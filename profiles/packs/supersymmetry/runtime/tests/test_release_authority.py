@@ -75,6 +75,27 @@ class ReleaseAuthorityTests(unittest.TestCase):
         self.assertIn("runtime/release-local-input-policy-v1.json", bundled)
         self.assertIn("schemas/workbench-supersymmetry-release-local-input-policy-v1.schema.json", bundled)
 
+    def test_resourcepack_placement_is_exact_selected_release_and_packaged(self) -> None:
+        owner = profile()
+        policy_path = owner.resource("release-resourcepack-input-policy")
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        schema = json.loads(
+            (owner.root / "schemas/workbench-supersymmetry-release-resourcepack-input-policy-v1.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(policy)
+        self.assertEqual("0.1.16.16", policy["version"])
+        self.assertEqual("workbench-pack-release-input-plan:sha256:8c188e58c33556c6dae0a5d7de8a069054bc0f45d3bccb6607adca9850673f0f", policy["input_plan_id"])
+        self.assertEqual("sha256:a4d67c7961e281c6ba9ecfffa58c9de2d14f3a424c9498537166dd6687b04d7d", policy["manifest_sha256"])
+        self.assertEqual({(851152, 6655846), (885673, 6280168), (1290857, 6927766)},
+                         {(row["project_id"], row["file_id"]) for row in policy["placements"]})
+        self.assertTrue(all(row["destination_root"] == "resourcepacks" and row["required"] is True
+                            for row in policy["placements"]))
+        bundled = tomllib.loads((owner.root / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]["workbench_resources.profiles.packs.supersymmetry"]
+        self.assertIn("runtime/release-resourcepack-input-policy-v1.json", bundled)
+        self.assertIn("schemas/workbench-supersymmetry-release-resourcepack-input-policy-v1.schema.json", bundled)
+
 
 if __name__ == "__main__":
     unittest.main()

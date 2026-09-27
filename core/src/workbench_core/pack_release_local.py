@@ -165,15 +165,19 @@ def _hash_held(path: Path, *, size: int, digest: str) -> tuple[int, int]:
         return opened.st_dev, opened.st_ino
 
 
-def _override_mod_names(archive_path: Path, *, size: int, digest: str) -> set[str]:
+def _override_destination_names(archive_path: Path, *, size: int, digest: str,
+                                destination_root: str) -> set[str]:
+    if destination_root not in {"mods", "resourcepacks"}:
+        raise ValueError("unsupported release input destination")
+    prefix = f"overrides/{destination_root}/"
     with _held_file(archive_path, expected_size=size) as (descriptor, _):
         with os.fdopen(os.dup(descriptor), "rb") as stream:
             try:
                 with ZipFile(stream) as archive:
-                    names = {name.removeprefix("overrides/mods/").split("/", 1)[0].casefold()
+                    names = {name.removeprefix(prefix).split("/", 1)[0].casefold()
                              for name in archive.namelist()
-                             if name.startswith("overrides/mods/")
-                             and name.removeprefix("overrides/mods/")}
+                             if name.startswith(prefix)
+                             and name.removeprefix(prefix)}
             except BadZipFile as exc:
                 raise ValueError("selected client archive changed during local review") from exc
         os.lseek(descriptor, 0, os.SEEK_SET)
@@ -187,6 +191,12 @@ def _override_mod_names(archive_path: Path, *, size: int, digest: str) -> set[st
         if count != size or "sha256:" + observed.hexdigest() != digest:
             raise ValueError("selected client archive changed during local review")
         return names
+
+
+def _override_mod_names(archive_path: Path, *, size: int, digest: str) -> set[str]:
+    return _override_destination_names(
+        archive_path, size=size, digest=digest, destination_root="mods",
+    )
 
 
 def review_local_inputs(
