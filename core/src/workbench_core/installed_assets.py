@@ -70,12 +70,33 @@ def _verified_axiom_engine(installation: Path) -> tuple[Path, str, int, str]:
     manifest = _record(bundle / "BUNDLE-MANIFEST.json")
     if (manifest.get("format") not in _BUNDLE_FORMATS
             or manifest.get("state") != "assembled"
-            or manifest.get("release_tag") != tag
-            or manifest.get("wheelhouse_manifest_sha256") != installed.get("wheelhouse_manifest_sha256")):
+            or manifest.get("release_tag") != tag):
         raise InstalledAssetError("the retained bundle differs from the installed release")
     files = manifest.get("files")
     if not isinstance(files, list):
         raise InstalledAssetError("the retained bundle has no file inventory")
+    wheelhouse_path = bundle / "wheelhouse/wheelhouse.json"
+    if not _regular(wheelhouse_path) or wheelhouse_path.stat().st_size > 1024 * 1024:
+        raise InstalledAssetError("the retained wheelhouse manifest is missing or unsafe")
+    try:
+        wheelhouse_raw = wheelhouse_path.read_bytes()
+        wheelhouse_record = json.loads(wheelhouse_raw)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise InstalledAssetError("the retained wheelhouse manifest is unreadable") from exc
+    if not isinstance(wheelhouse_record, dict):
+        raise InstalledAssetError("the retained wheelhouse manifest is invalid")
+    raw_digest = sha256(wheelhouse_raw).hexdigest()
+    wheelhouse_entries = [row for row in files if isinstance(row, dict)
+                          and row.get("path") == "wheelhouse/wheelhouse.json"]
+    installed_digest = sha256(json.dumps(
+        wheelhouse_record, sort_keys=True, separators=(",", ":")
+    ).encode()).hexdigest()
+    if (len(wheelhouse_entries) != 1
+            or wheelhouse_entries[0].get("size") != len(wheelhouse_raw)
+            or wheelhouse_entries[0].get("sha256") != raw_digest
+            or manifest.get("wheelhouse_manifest_sha256") != raw_digest
+            or installed.get("wheelhouse_manifest_sha256") != installed_digest):
+        raise InstalledAssetError("the retained bundle differs from the installed release")
     engines = [row for row in files if isinstance(row, dict)
                and isinstance(row.get("path"), str) and _ENGINE.fullmatch(row["path"])]
     if len(engines) != 1:

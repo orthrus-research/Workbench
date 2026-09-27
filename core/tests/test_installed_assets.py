@@ -29,7 +29,15 @@ class InstalledAxiomEngineTests(unittest.TestCase):
         with zipfile.ZipFile(self.archive, "w") as output:
             output.writestr("engine.txt", "fixture")
         self.digest = sha256(self.archive.read_bytes()).hexdigest()
-        self.wheelhouse_digest = "a" * 64
+        wheelhouse = self.bundle / "wheelhouse" / "wheelhouse.json"
+        wheelhouse.parent.mkdir()
+        wheelhouse_record = {"format": "workbench-native-wheelhouse-v1", "wheels": []}
+        wheelhouse.write_text(json.dumps(wheelhouse_record, indent=2))
+        self.wheelhouse_digest = sha256(wheelhouse.read_bytes()).hexdigest()
+        self.installed_digest = sha256(json.dumps(
+            wheelhouse_record, sort_keys=True, separators=(",", ":")
+        ).encode()).hexdigest()
+        self.assertNotEqual(self.wheelhouse_digest, self.installed_digest)
         (self.install / "workbench-hook.json").write_text(json.dumps({
             "format": "workbench-hook-install-v1", "state": "installed",
             "release_tag": "test-v1", "archive_sha256": "b" * 64,
@@ -37,15 +45,19 @@ class InstalledAxiomEngineTests(unittest.TestCase):
         }))
         (self.install / "workbench-install.json").write_text(json.dumps({
             "format": "workbench-native-install-v1", "state": "installed",
-            "wheelhouse_manifest_sha256": self.wheelhouse_digest,
+            "wheelhouse_manifest_sha256": self.installed_digest,
         }))
         self.manifest = {
             "format": "workbench-install-bundle-v2", "edition": "supersymmetry-client",
             "state": "assembled", "release_tag": "test-v1",
             "wheelhouse_manifest_sha256": self.wheelhouse_digest,
             "engine_archive": "axiom/" + self.archive.name,
-            "files": [{"path": "axiom/" + self.archive.name,
-                       "size": self.archive.stat().st_size, "sha256": self.digest}],
+            "files": [
+                {"path": "wheelhouse/wheelhouse.json", "size": wheelhouse.stat().st_size,
+                 "sha256": self.wheelhouse_digest},
+                {"path": "axiom/" + self.archive.name,
+                 "size": self.archive.stat().st_size, "sha256": self.digest},
+            ],
         }
         self._write_manifest()
 
@@ -77,6 +89,18 @@ class InstalledAxiomEngineTests(unittest.TestCase):
         self._write_manifest()
         self.assertEqual("unavailable", resolve_axiom_engine_source(installation=self.install)["state"])
 
+    def test_wheelhouse_bytes_and_installed_identity_must_match(self) -> None:
+        wheelhouse = self.bundle / "wheelhouse" / "wheelhouse.json"
+        original = wheelhouse.read_bytes()
+        wheelhouse.write_bytes(original + b" ")
+        self.assertEqual("unavailable", resolve_axiom_engine_source(installation=self.install)["state"])
+        wheelhouse.write_bytes(original)
+        receipt = self.install / "workbench-install.json"
+        record = json.loads(receipt.read_text())
+        record["wheelhouse_manifest_sha256"] = self.wheelhouse_digest
+        receipt.write_text(json.dumps(record))
+        self.assertEqual("unavailable", resolve_axiom_engine_source(installation=self.install)["state"])
+
     def test_link_and_unsafe_manifest_path_are_rejected(self) -> None:
         other = self.root / "other.zip"
         self.archive.rename(other)
@@ -84,7 +108,7 @@ class InstalledAxiomEngineTests(unittest.TestCase):
         self.assertEqual("unavailable", resolve_axiom_engine_source(installation=self.install)["state"])
         self.archive.unlink()
         other.rename(self.archive)
-        self.manifest["files"][0]["path"] = "axiom/../outside.zip"
+        self.manifest["files"][1]["path"] = "axiom/../outside.zip"
         self._write_manifest()
         self.assertEqual("unavailable", resolve_axiom_engine_source(installation=self.install)["state"])
 
