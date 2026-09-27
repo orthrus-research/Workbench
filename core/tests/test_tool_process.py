@@ -20,6 +20,33 @@ class NativeToolProcessTests(unittest.TestCase):
         result = self.execute("import sys; sys.stdout.buffer.write(sys.stdin.buffer.read()); sys.stderr.write('note'); sys.exit(3)")
         self.assertEqual((3, b"hello", b"note"), (result.exit_code, result.stdout, result.stderr))
 
+    def test_merged_pipe_preserves_interleaved_write_order_and_binary_bytes(self):
+        script = (
+            "import os,sys\n"
+            "os.write(1, b'out\\r\\n')\n"
+            "os.write(2, b'err\\r')\n"
+            "os.write(1, b'\\xff\\n')\n"
+            "sys.exit(7)\n"
+        )
+        result = tool_process.execute_merged(
+            [sys.executable, "-c", script], cwd=Path.cwd(), stdin=b"",
+            environment={}, cancelled=threading.Event(), timeout_seconds=2,
+            output_limit=1024,
+        )
+        self.assertEqual((7, b"out\r\nerr\r\xff\n"), (result.exit_code, result.output))
+
+    def test_merged_pipe_timeout_and_output_bound_fail_closed(self):
+        values = dict(cwd=Path.cwd(), stdin=b"", environment={},
+                      cancelled=threading.Event(), timeout_seconds=0.1,
+                      output_limit=1024)
+        with self.assertRaisesRegex(ProcessError, "timed out"):
+            tool_process.execute_merged([sys.executable, "-c", "import time; time.sleep(20)"], **values)
+        with self.assertRaisesRegex(ProcessError, "byte bound"):
+            tool_process.execute_merged(
+                [sys.executable, "-c", "import os; os.write(2, b'x' * 4096)"],
+                **{**values, "timeout_seconds": 2, "output_limit": 128},
+            )
+
     def test_no_ambient_credentials(self):
         from unittest.mock import patch
         with patch.dict(os.environ, {"AXIOM_TEST_SECRET": "not-in-child"}):

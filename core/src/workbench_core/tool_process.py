@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import time
 
-from workbench_api.processes import ProcessError, ProcessResult
+from workbench_api.processes import MergedProcessResult, ProcessError, ProcessResult
 from .render import Renderer
 from .runner import RunnerError, supervise_process
 from .sessions import EphemeralSession
@@ -53,6 +53,13 @@ def execute(argv, *, cwd, stdin, environment, cancelled, timeout_seconds, output
     return ProcessResult(code, bytes(session.output["stdout"]), bytes(session.output["stderr"]))
 
 
+def execute_merged(argv, *, cwd, stdin, environment, cancelled, timeout_seconds, output_limit):
+    session = _Capture(output_limit)
+    code = _run(argv, cwd=cwd, stdin=stdin, environment=environment, cancelled=cancelled,
+                timeout_seconds=timeout_seconds, session=session, merged_output=True)
+    return MergedProcessResult(code, bytes(session.output["stdout"]))
+
+
 def capture(argv, *, directory, binding, cwd, stdin, environment, cancelled, timeout_seconds, output_limit):
     _validate(argv, cancelled)
     session = process_capture.FileCapture(directory, binding, output_limit)
@@ -83,7 +90,8 @@ def _validate(argv, cancelled):
         raise ProcessError("native-tool executable must be an explicit absolute path")
 
 
-def _run(argv, *, cwd, stdin, environment, cancelled, timeout_seconds, session):
+def _run(argv, *, cwd, stdin, environment, cancelled, timeout_seconds, session,
+         merged_output=False):
     _validate(argv, cancelled)
     renderer = _Control(cancelled, timeout_seconds)
     # The random private directory holds only this request; Core removes it on
@@ -102,6 +110,7 @@ def _run(argv, *, cwd, stdin, environment, cancelled, timeout_seconds, session):
                 interrupt_grace_seconds=0.1, terminate_grace_seconds=1,
                 require_group_closure=True,
                 output_mode="raw",
+                merged_output=merged_output,
             )
         except RunnerError as exc:
             raise ProcessError(str(exc)) from exc

@@ -5,16 +5,17 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 import hashlib
+import io
 import ipaddress
 import math
 import os
 from pathlib import Path, PurePosixPath
 import stat
 import subprocess
-from typing import Any, Mapping, Sequence
-
+from typing import Any, Callable, Mapping, Sequence
 from urllib.parse import quote, urlsplit
 
+from workbench_api.processes import MergedProcessResult, ProcessError
 from workbench_project_intelligence.git_observation import GitObservationRunner
 
 from .analyzer import AnalysisContext, analyze_program
@@ -35,6 +36,7 @@ _MAX_CACHE_FILES = 250_000
 _MAX_CACHE_BYTES = 4 * 1024 * 1024 * 1024
 _MAX_RUNTIME_TOTAL_BYTES = 8 * 1024 * 1024 * 1024
 _MAX_RECEIPT_BYTES = 64 * 1024 * 1024
+JavaVersionRunner = Callable[[Path], MergedProcessResult]
 
 
 def build_language_service_result(
@@ -55,6 +57,7 @@ def build_language_service_result(
     java: Path | None = None,
     runtime_receipt: Path | None = None,
     git_observation_runner: GitObservationRunner | None = None,
+    java_version_runner: JavaVersionRunner | None = None,
 ) -> dict[str, Any]:
     if context.side != "client":
         raise PackProgramError(
@@ -98,6 +101,7 @@ def build_language_service_result(
         language_profile=language_profile,
         java=java,
         runtime_receipt=runtime_receipt,
+        java_version_runner=java_version_runner,
     )
     requested_host = (
         str(profile_value["server"]["default_host"]) if host is None else host
@@ -248,6 +252,7 @@ def inventory_language_runtime(
     language_profile: LoadedLanguageProfile,
     java: Path | None,
     runtime_receipt: Path | None,
+    java_version_runner: JavaVersionRunner | None = None,
 ) -> dict[str, Any]:
     runtime_root = _safe_directory(root, "language-service runtime root")
     profile = language_profile.value
@@ -301,7 +306,10 @@ def inventory_language_runtime(
     )
     cache_path = runtime_root.joinpath(*PurePosixPath(layout["cache_directory"]).parts)
     cache = _tree_summary(cache_path)
-    java_identity = _java_identity(java, int(bounds["max_runtime_artifact_bytes"]))
+    java_identity = _java_identity(
+        java, int(bounds["max_runtime_artifact_bytes"]),
+        version_runner=java_version_runner,
+    )
     receipt = _receipt_identity(runtime_receipt)
     identity_payload = {
         "run_config_sha256": run_config["sha256"],
@@ -607,30 +615,42 @@ def _tree_summary(path: Path) -> dict[str, Any]:
     }
 
 
-def _java_identity(path: Path | None, maximum: int) -> dict[str, Any]:
+def _java_identity(
+    path: Path | None, maximum: int, *,
+    version_runner: JavaVersionRunner | None = None,
+) -> dict[str, Any]:
     if path is None:
         return {"state": "not-supplied", "sha256": None, "size": None, "path": None, "version_output": None}
     requested = path.expanduser()
     identity = _hash_regular(requested, maximum=maximum)
     resolved = requested.resolve()
     try:
-        completed = subprocess.run(
-            [str(resolved), "-version"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=15,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        if version_runner is None:
+            completed = subprocess.run(
+                [str(resolved), "-version"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=15,
+                check=False,
+            )
+            returncode, output = completed.returncode, completed.stdout[:8192]
+        else:
+            merged = version_runner(resolved)
+            with io.TextIOWrapper(
+                io.BytesIO(merged.output), encoding="utf-8", errors="replace",
+                newline=None,
+            ) as decoded:
+                output = decoded.read()[:8192]
+            returncode = merged.exit_code
+    except (OSError, subprocess.TimeoutExpired, ProcessError) as exc:
         raise PackProgramError(f"cannot probe Java executable {resolved}: {exc}") from exc
-    output = completed.stdout[:8192]
-    if completed.returncode != 0:
+    if returncode != 0:
         raise PackProgramError(
-            f"Java version probe failed with exit {completed.returncode}: {output[:1024]}"
+            f"Java version probe failed with exit {returncode}: {output[:1024]}"
         )
     return {
         "state": "caller-supplied-exact-bytes",

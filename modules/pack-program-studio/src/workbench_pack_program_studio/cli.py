@@ -17,13 +17,15 @@ from tempfile import NamedTemporaryFile
 import threading
 from typing import Any, Callable, Mapping, Sequence, TextIO
 
-from workbench_api.processes import ProcessError, execute_process
+from workbench_api.processes import (
+    MergedProcessResult, ProcessError, execute_merged_process, execute_process,
+)
 from workbench_project_intelligence.git_observation import GitObservationRunner
 
 from .analyzer import AnalysisContext
 from .language_profile import resolve_language_profile
 from .language_render import render_language_result
-from .language_service import build_language_service_result
+from .language_service import JavaVersionRunner, build_language_service_result
 from .ide_bridge import proxy_descriptor_stdio
 from .managed_profile import resolve_managed_session_profile
 from .managed_render import render_session_event, render_session_receipt
@@ -387,6 +389,7 @@ def run(
     result_callback: Callable[[dict[str, Any]], None] | None = None,
     session_custody: WorkingAllocations | None = None,
     git_observation_runner: GitObservationRunner | None = None,
+    java_version_runner: JavaVersionRunner | None = None,
 ) -> int:
     """Run a command; session callers bind Core first (as `main` does)."""
 
@@ -466,6 +469,7 @@ def run(
                 java=args.java,
                 runtime_receipt=args.runtime_receipt,
                 git_observation_runner=git_observation_runner,
+                java_version_runner=java_version_runner,
             )
             rendered = render_language_result(value)
         else:
@@ -517,6 +521,7 @@ def run(
                         require_restartable_process_custody=(
                             args.require_restartable_process_custody
                         ),
+                        java_version_runner=java_version_runner,
                         stop_event=stop,
                         on_event=event_callback,
                     )
@@ -585,6 +590,20 @@ def main(
             core_git_observation_runner
             if arguments and arguments[0] in {"dev", "check"} else None
         ),
+        java_version_runner=(
+            core_java_version_runner
+            if arguments and arguments[0] in {"check", "session"} else None
+        ),
+    )
+
+
+def core_java_version_runner(path: Path) -> MergedProcessResult:
+    """Capture Java's historical combined version stream under Core."""
+
+    return execute_merged_process(
+        [str(path), "-version"], cwd=Path.cwd(), stdin=b"",
+        environment=os.environ, cancelled=threading.Event(),
+        timeout_seconds=15, output_limit=4 * 1024 * 1024,
     )
 
 

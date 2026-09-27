@@ -5,13 +5,16 @@ from copy import deepcopy
 import hashlib
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 import jsonschema
 
@@ -32,7 +35,10 @@ from workbench_pack_program_studio import (  # noqa: E402
     load_profile,
     validate_language_result,
 )
-from workbench_pack_program_studio.cli import run as cli_run  # noqa: E402
+from workbench_pack_program_studio.cli import (  # noqa: E402
+    core_java_version_runner, run as cli_run,
+)
+import workbench_pack_program_studio.language_service as language_service_module  # noqa: E402
 from workbench_pack_program_studio.language_model import (  # noqa: E402
     language_result_identity,
 )
@@ -199,6 +205,68 @@ class LanguageServiceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.pack_profile = load_profile(PACK_PROFILE)
+
+    def test_source_only_java_probe_keeps_historical_merged_text_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            java = Path(directory) / "java"
+            java.write_bytes(b"fixture executable")
+            with patch.object(
+                language_service_module.subprocess, "run",
+                return_value=subprocess.CompletedProcess((), 0, "version\n", None),
+            ) as run:
+                result = language_service_module._java_identity(java, 1024)
+        self.assertEqual("version\n", result["version_output"])
+        self.assertIs(run.call_args.kwargs["stderr"], subprocess.STDOUT)
+        self.assertEqual(15, run.call_args.kwargs["timeout"])
+        self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
+        self.assertEqual("replace", run.call_args.kwargs["errors"])
+
+    @unittest.skipUnless(os.name == "posix", "Core Java probe requires a POSIX test host")
+    def test_core_java_probe_matches_source_only_merged_version_output(self) -> None:
+        from workbench_core.host_services import install_local_host_services
+        with tempfile.TemporaryDirectory() as directory:
+            java = Path(directory) / "java"
+            java.write_text(
+                f"#!{sys.executable}\n"
+                "import os\n"
+                "os.write(1, b'out\\r\\n')\n"
+                "os.write(2, b'err\\r')\n"
+                "os.write(1, b'\\xff\\n')\n",
+                encoding="utf-8",
+            )
+            java.chmod(0o700)
+            historical = language_service_module._java_identity(java, 1024)
+            install_local_host_services()
+            supervised = language_service_module._java_identity(
+                java, 1024, version_runner=core_java_version_runner,
+            )
+        self.assertEqual(historical, supervised)
+        self.assertEqual("out\nerr\n\ufffd\n", supervised["version_output"])
+
+    def test_core_java_probe_refuses_incomplete_capture(self) -> None:
+        from workbench_api.processes import ProcessError
+        with tempfile.TemporaryDirectory() as directory:
+            java = Path(directory) / "java"
+            java.write_bytes(b"fixture executable")
+            with self.assertRaisesRegex(PackProgramError, "byte bound"):
+                language_service_module._java_identity(
+                    java, 1024,
+                    version_runner=lambda _path: (_ for _ in ()).throw(
+                        ProcessError("native-tool output exceeded its byte bound")
+                    ),
+                )
+
+    def test_core_java_probe_keeps_selected_deadline_and_byte_bound(self) -> None:
+        from workbench_api.processes import MergedProcessResult
+        with patch(
+            "workbench_pack_program_studio.cli.execute_merged_process",
+            return_value=MergedProcessResult(0, b"version\n"),
+        ) as execute:
+            result = core_java_version_runner(Path("/selected/java"))
+        self.assertEqual(b"version\n", result.output)
+        self.assertEqual(["/selected/java", "-version"], execute.call_args.args[0])
+        self.assertEqual(15, execute.call_args.kwargs["timeout_seconds"])
+        self.assertEqual(4 * 1024 * 1024, execute.call_args.kwargs["output_limit"])
 
     def _environment(self, directory: str, *, broken: bool = False) -> tuple[Path, Path, Path]:
         root = Path(directory)

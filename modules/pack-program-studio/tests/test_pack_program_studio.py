@@ -32,7 +32,7 @@ from workbench_pack_program_studio import (  # noqa: E402
     validate_report,
 )
 from workbench_pack_program_studio.cli import (  # noqa: E402
-    core_git_observation_runner, run as cli_run,
+    core_git_observation_runner, core_java_version_runner, run as cli_run,
 )
 import workbench_pack_program_studio.cli as cli_module  # noqa: E402
 import workbench_pack_program_studio.analyzer as analyzer_module  # noqa: E402
@@ -930,7 +930,19 @@ class PackProgramStudioTests(unittest.TestCase):
                     core_git_observation_runner,
                     run.call_args.kwargs["git_observation_runner"],
                 )
-        self.assertEqual(2, install.call_count)
+                if operation == "check":
+                    self.assertIs(
+                        core_java_version_runner,
+                        run.call_args.kwargs["java_version_runner"],
+                    )
+            self.assertEqual(
+                0, cli_module.main(["session"], root=ROOT, session_custody=object()),
+            )
+            self.assertIs(
+                core_java_version_runner,
+                run.call_args.kwargs["java_version_runner"],
+            )
+        self.assertEqual(3, install.call_count)
 
     @unittest.skipUnless(os.name == "posix", "Core Git probe requires a POSIX test host")
     def test_core_git_binding_matches_source_only_real_git(self) -> None:

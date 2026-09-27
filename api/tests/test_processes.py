@@ -40,6 +40,23 @@ class ProcessPortTests(unittest.TestCase):
             with self.assertRaisesRegex(processes.ProcessError, 'output reads'):
                 processes.open_process_output(None)
 
+    def test_merged_capture_requires_support_and_preserves_raw_result(self):
+        arguments = dict(cwd=Path.cwd(), stdin=b'', environment={'LANG': 'C'},
+                         cancelled=Event(), timeout_seconds=15, output_limit=4 * 1024 * 1024)
+        with patch.object(processes, '_host', None), self.assertRaises(processes.ProcessError):
+            processes.execute_merged_process(['/bin/true'], **arguments)
+        host = type('ByteOnlyHost', (), {'execute': lambda *args, **kwargs: None})()
+        with patch.object(processes, '_host', host):
+            with self.assertRaisesRegex(processes.ProcessError, 'merged capture'):
+                processes.execute_merged_process(['/bin/true'], **arguments)
+        expected = processes.MergedProcessResult(3, b'out\xfferr')
+        with patch.object(processes, '_host', Mock()) as merged:
+            merged.execute_merged.return_value = expected
+            self.assertIs(expected, processes.execute_merged_process(['/bin/true'], **arguments))
+            self.assertEqual(15, merged.execute_merged.call_args.kwargs['timeout_seconds'])
+            self.assertEqual(4 * 1024 * 1024, merged.execute_merged.call_args.kwargs['output_limit'])
+
+
     def test_file_capture_preserves_owner_binding_and_selected_policy(self):
         host = Mock()
         token = Event()

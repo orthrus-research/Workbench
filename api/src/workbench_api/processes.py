@@ -18,6 +18,14 @@ class ProcessResult:
 
 
 @dataclass(frozen=True)
+class MergedProcessResult:
+    """One OS pipe containing the child's stdout and stderr in write order."""
+
+    exit_code: int
+    output: bytes
+
+
+@dataclass(frozen=True)
 class ProcessOutput:
     """A Core-captured file; open through the host to verify its exact bytes."""
 
@@ -63,6 +71,12 @@ class ProcessHost(Protocol):
         timeout_seconds: float | None, output_limit: int | None,
     ) -> ProcessResult: ...
 
+    def execute_merged(
+        self, argv: Sequence[str], *, cwd: Path, stdin: bytes,
+        environment: Mapping[str, str], cancelled: Event,
+        timeout_seconds: float | None, output_limit: int | None,
+    ) -> MergedProcessResult: ...
+
     def capture(self, argv: Sequence[str], *, directory: Path, binding: str,
                 cwd: Path, stdin: bytes, environment: Mapping[str, str], cancelled: Event,
                 timeout_seconds: float | None, output_limit: int | None) -> CapturedProcessResult: ...
@@ -96,6 +110,23 @@ def execute_process(
 ) -> ProcessResult:
     _validate(stdin, cancelled, timeout_seconds, output_limit, input_limit)
     return _host.execute(
+        tuple(argv), cwd=cwd, stdin=stdin, environment=dict(environment),
+        cancelled=cancelled, timeout_seconds=timeout_seconds, output_limit=output_limit,
+    )
+
+
+def execute_merged_process(
+    argv: Sequence[str], *, cwd: Path, stdin: bytes,
+    environment: Mapping[str, str], cancelled: Event,
+    timeout_seconds: float | None = 40, output_limit: int | None = 1024 * 1024,
+    input_limit: int | None = 1024 * 1024,
+) -> MergedProcessResult:
+    """Capture raw stdout/stderr order through one Core-supervised OS pipe."""
+
+    _validate(stdin, cancelled, timeout_seconds, output_limit, input_limit)
+    if not callable(getattr(_host, "execute_merged", None)):
+        raise ProcessError("selected process host does not provide merged capture")
+    return _host.execute_merged(
         tuple(argv), cwd=cwd, stdin=stdin, environment=dict(environment),
         cancelled=cancelled, timeout_seconds=timeout_seconds, output_limit=output_limit,
     )

@@ -115,6 +115,7 @@ def supervise_process(
     max_record_bytes: int = 256 * 1024,
     require_group_closure: bool = False,
     output_mode: str = "console",
+    merged_output: bool = False,
 ) -> RunResult:
     """Supervise exact argv; raw mode captures bytes without console events.
 
@@ -128,6 +129,8 @@ def supervise_process(
             raise ValueError("unknown process output mode")
         if output_mode == "raw" and session.retained:
             raise ValueError("raw process output requires an ephemeral session")
+        if merged_output and (output_mode != "raw" or not capture_output):
+            raise ValueError("merged process output requires raw captured output")
         command = _validate_process_inputs(argv, cwd)
         gate_input = []
         if input_file is not None:
@@ -189,7 +192,8 @@ def supervise_process(
             env=child_environment,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE if capture_output else subprocess.DEVNULL,
-            stderr=subprocess.PIPE if capture_output else subprocess.DEVNULL,
+            stderr=(subprocess.STDOUT if merged_output else
+                    subprocess.PIPE if capture_output else subprocess.DEVNULL),
             bufsize=0,
             shell=False,
             start_new_session=os.name == "posix",
@@ -210,7 +214,8 @@ def supervise_process(
         finally:
             process.stdin.close()
         session.open_raw("stdout")
-        session.open_raw("stderr")
+        if not merged_output:
+            session.open_raw("stderr")
         sink.supervisor_stage("child-process", "started")
         for stream, pipe in (("stdout", process.stdout), ("stderr", process.stderr)):
             if pipe is None:

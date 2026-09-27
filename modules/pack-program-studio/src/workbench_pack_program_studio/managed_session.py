@@ -47,7 +47,7 @@ from workbench_api.working_allocations import (
 
 from .analyzer import AnalysisContext, analyze_program
 from .language_profile import LoadedLanguageProfile
-from .language_service import inventory_language_runtime
+from .language_service import JavaVersionRunner, inventory_language_runtime
 from .lsp import LspLimits, probe_language_server
 from .managed_model import (
     DESCRIPTOR_FORMAT,
@@ -501,6 +501,7 @@ def run_managed_language_session(
     connect_timeout: float,
     diagnostic_timeout: float,
     require_restartable_process_custody: bool = False,
+    java_version_runner: JavaVersionRunner | None = None,
     stop_event: threading.Event | None = None,
     on_event: Callable[[Mapping[str, Any]], None] | None = None,
     on_ready: Callable[[Mapping[str, Any]], None] | None = None,
@@ -550,6 +551,7 @@ def run_managed_language_session(
         language_profile=language_profile,
         java=binding.java_path,
         runtime_receipt=binding.receipt_path,
+        java_version_runner=java_version_runner,
     )
     workspace_root = Path(program["binding"]["groovy_root"]).resolve()
     workspace_uri = workspace_root.as_uri()
