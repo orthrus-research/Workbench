@@ -155,27 +155,56 @@ class ReleaseUpdateModal(ModalScreen[str]):
         super().__init__()
         candidate = check["candidate"]
         self.candidate = candidate
+        same_version = candidate["version"] == check["selected_version"]
+        self.heading = (
+            "Supersymmetry published archive changed" if same_version
+            else "Supersymmetry update available"
+        )
+        self.accept_label = "Use published archive" if same_version else "Version up"
+        self.ignore_label = "Ignore this publication" if same_version else "Ignore this release"
         size_mib = candidate["asset_size"] / (1024 * 1024)
+        if same_version:
+            selected = check.get("selected")
+            saved_digest = selected.get("asset_sha256") if isinstance(selected, Mapping) else None
+            published_digest = candidate.get("asset_sha256")
+            digest_detail = (
+                f"Saved SHA-256: {saved_digest}\nPublished SHA-256: {published_digest}\n"
+                if isinstance(saved_digest, str) and isinstance(published_digest, str)
+                else ""
+            )
+            explanation = (
+                "GitHub lists different client archive bytes under the same release tag.\n"
+                + digest_detail
+                + "\nUse published archive asks Core to verify and retain those exact bytes, "
+                "then saves them as your pack choice. Your current workspace files are "
+                "not changed. Ignore this publication keeps your saved choice and "
+                "suppresses only this exact published release identity."
+            )
+        else:
+            explanation = (
+                "Version up asks Core to verify and retain the release archive, then "
+                "saves it as your pack choice. Your current workspace files are not changed. "
+                "Ignore this release keeps your saved choice and suppresses only this "
+                "exact published release identity."
+            )
         self.body = (
             f"Saved pack: {check['selected_version']}\n"
             f"Latest published release: {candidate['version']}\n"
             f"Published: {candidate.get('published_at') or 'unknown'}\n"
             f"Client archive: {candidate['asset_name']} ({size_mib:.1f} MiB)\n"
             f"{candidate.get('release_url') or ''}\n\n"
-            "Version up asks Core to verify and retain the release archive, then "
-            "saves it as your pack choice. Your current workspace files are not changed. "
-            "Ignore this release keeps your saved choice and prompts again for a newer release."
+            f"{explanation}"
         )
 
     def compose(self) -> ComposeResult:
         with Vertical(id="review-dialog"):
-            yield Static("Supersymmetry update available", id="review-heading")
+            yield Static(self.heading, id="review-heading")
             with VerticalScroll(id="review-scroll"):
                 yield Static(Text(self.body), id="review-body")
             with Horizontal(classes="button-row"):
                 yield Button("Later", id="release-later")
-                yield Button("Ignore this release", id="release-ignore")
-                yield Button("Version up", id="release-accept", variant="primary")
+                yield Button(self.ignore_label, id="release-ignore")
+                yield Button(self.accept_label, id="release-accept", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss({
@@ -1656,7 +1685,7 @@ class WorkbenchApp(App[None]):
             if choice == "ignore":
                 result = await self.core.pack_release_ignore(release_id)
                 self.notify(
-                    f"Ignored Supersymmetry {result['candidate']['version']} until a newer release."
+                    f"Ignored Supersymmetry {result['candidate']['version']} until the published release changes."
                 )
                 return
             self.notify("Core is verifying and preparing the Supersymmetry release archive…")

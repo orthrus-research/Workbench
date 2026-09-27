@@ -6,7 +6,7 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock
 
-from textual.widgets import OptionList
+from textual.widgets import Button, OptionList
 
 from test_setup_screen import fake_core
 from workbench_tui.app import ReleaseUpdateModal, ResultScreen, ReviewModal, SetupScreen, WorkbenchApp
@@ -237,6 +237,40 @@ class PackReleaseInteractionTests(unittest.IsolatedAsyncioTestCase):
             core.pack_release_accept.assert_awaited_once_with(RELEASE_ID)
             core.pack_release_ignore.assert_not_awaited()
             self.assertIn("/stable/artifacts/sha256/abc", app.screen.output)
+
+    async def test_same_version_changed_archive_has_distinct_review_and_exact_ignore(self) -> None:
+        core = fake_core("/tmp/workbench-test-workspace")
+        check = {
+            **_check(),
+            "selected": {
+                "version": "0.1.16.16", "asset_sha256": "sha256:" + "1" * 64,
+            },
+            "candidate": {
+                **_candidate(), "version": "0.1.16.16", "tag": "0.1.16.16",
+                "asset_name": "supersymmetry-0.1.16.16.zip",
+                "asset_sha256": "sha256:" + "2" * 64,
+            },
+        }
+        core.pack_release_check = AsyncMock(return_value=check)
+        core.pack_release_accept = AsyncMock()
+        core.pack_release_ignore = AsyncMock(return_value={
+            **check, "action": "ignore", "status": "ignored",
+        })
+        app = WorkbenchApp(core)
+        async with app.run_test() as pilot:
+            await self._settle(pilot, lambda: isinstance(app.screen, ReleaseUpdateModal)
+                               and bool(app.screen.query("#release-accept")))
+            self.assertEqual("Supersymmetry published archive changed", app.screen.heading)
+            self.assertIn("same release tag", app.screen.body)
+            self.assertIn("Saved SHA-256: sha256:" + "1" * 64, app.screen.body)
+            self.assertIn("Published SHA-256: sha256:" + "2" * 64, app.screen.body)
+            self.assertEqual("Use published archive", str(app.screen.query_one("#release-accept", Button).label))
+            self.assertEqual("Ignore this publication", str(app.screen.query_one("#release-ignore", Button).label))
+            core.pack_release_ignore.assert_not_awaited()
+            await pilot.click("#release-ignore")
+            await self._settle(pilot, lambda: core.pack_release_ignore.await_count == 1)
+            core.pack_release_ignore.assert_awaited_once_with(RELEASE_ID)
+            core.pack_release_accept.assert_not_awaited()
 
     async def test_ignore_saves_only_offered_release_and_later_does_not_save(self) -> None:
         core = fake_core("/tmp/workbench-test-workspace")
