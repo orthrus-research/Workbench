@@ -311,6 +311,15 @@ historical results retain their original markers. Profile fixture execution,
 managed tool runtime materialization and a supported clean-root rebuild remain
 unresolved, so this plan is not an environment reconstruction result.
 
+`plan_environment_artifact_composition` can extend that read-only review with
+one separately admitted, owner-validated fixture JAR. It recomputes the exact
+package composition, reopens the artifact admission and its execution/resource
+chain, and requires the same V3 share, candidate, workspace and retained fixture
+result. It publishes no new resource and leaves every remaining input marker,
+including the combined fixture/tool marker, unchanged. A copied or absent
+profile-owned pack source lock, tool runtime materialization, escaped process
+descendants and a clean-root rebuild remain outside this evidence join.
+
 Cleanroom fixture artifact admission is a separate Core operation after a
 zero-exit supervised fixture attempt. The installed profile derives the sole
 remapped JAR path from retained locked inputs and checks the exact ZIP content.
