@@ -93,6 +93,13 @@ def _write_input_manifest(path, value):
     )
 
 
+def _write_run_input_record(attempt, name, value):
+    # These V1 launch inputs are written after the Core run marker. A failed
+    # publication leaves that attempt non-runnable while retaining its evidence.
+    publish_immutable_bytes(attempt / name, storage.canonical(value) + b'\n',
+                            byte_limit=_RECORD_BYTE_LIMIT)
+
+
 def _decode_unique_json(raw):
     def unique(pairs):
         result = {}
@@ -609,8 +616,8 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
                         'descriptor': request['descriptor'], 'observer_sources': request['observer_sources'],
                         'heap_mib': request['heap_mib'], 'timeout_seconds': None, 'output_limit': None,
                         'explicit_eula_acceptance': True}
-            storage.write_json(attempt / 'runtime-lock.json', dependency_lock)
-            storage.write_json(attempt / 'protocol.json', protocol)
+            _write_run_input_record(attempt, 'runtime-lock.json', dependency_lock)
+            _write_run_input_record(attempt, 'protocol.json', protocol)
             manifest = owner.build_capture_input(request['candidate'], deleted_paths=request['deleted_paths'],
                 platform=request['descriptor']['platform'], runtime_artifacts=request['descriptor']['runtime_artifacts'],
                 capture_id=identity, launch_id=identity + '-launch', candidate_lock_sha256=_digest(dependency_lock),
@@ -622,7 +629,7 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
                 observer_build=prepared['observer_build'], java=game_java, runtime_root=execution_root / 'execution',
                 input_manifest_path=execution_root / input_path.name, input_manifest_sha256=_file(input_path)['sha256'],
                 output=execution_root / 'capture', heap_mib=request['heap_mib'])
-            storage.write_json(attempt / 'launch.json', launch)
+            _write_run_input_record(attempt, 'launch.json', launch)
             _current(attempt, request)
             cancel.check()
             if workspace_storage.inventory(execution, cancelled=cancel.is_set) != execution_files:
@@ -710,12 +717,12 @@ def show(root, identity, *, cancelled=None):
                     or os.path.lexists(native_path(attempt / 'prepare-ready.json'))):
                 _verify_prepared_ready(attempt, request, prepared, prepared_raw,
                                        check_stages=False)
-            launch = storage.read_json(attempt / 'launch.json')
+            launch = _read_bounded_ordinary_json(attempt / 'launch.json')
             manifest = _read_bounded_ordinary_json(attempt / 'input-manifest.json')
             capture_manifest = storage.read_json(attempt / 'capture/manifest.json')
             if (prepared['id'] != result['prepared_id'] or launch['id'] != result['launch_id']
-                    or manifest['candidate_lock_sha256'] != _digest(storage.read_json(attempt / 'runtime-lock.json'))
-                    or manifest['adapter_profile_sha256'] != _digest(storage.read_json(attempt / 'protocol.json'))
+                    or manifest['candidate_lock_sha256'] != _digest(_read_bounded_ordinary_json(attempt / 'runtime-lock.json'))
+                    or manifest['adapter_profile_sha256'] != _digest(_read_bounded_ordinary_json(attempt / 'protocol.json'))
                     or manifest['capture_id'] != identity or manifest['launch_id'] != identity + '-launch'
                     or any(manifest[key] != capture_manifest[key] for key in
                            ('capture_id', 'launch_id', 'candidate_lock_sha256', 'adapter_profile_sha256'))
