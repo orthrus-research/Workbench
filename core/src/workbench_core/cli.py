@@ -80,6 +80,9 @@ def _dispatch(
         from workbench_api.resources import repository_root
         resources = root if (root / "core/pyproject.toml").is_file() else repository_root(__file__)
         return settings(arguments[1:], suite_root=resources)
+    if arguments[:2] == ["pack", "release"]:
+        from .pack_release import main as pack_release
+        return pack_release(arguments[2:])
     if arguments[:2] == ["environment", "resolve"]:
         return _dispatch_available(arguments, root, (), caller_environment=caller_environment)
     if arguments[:2] == ["storage", "resources"]:
@@ -160,7 +163,7 @@ def _dispatch_available(
     if not arguments or arguments[:1] in (["-h"], ["--help"]):
         from workbench_api.profiles import profiles
         admitted_profiles = {profile.id for profile in profiles()}
-        print("Workbench Core: setup, settings, repair, tooling, sandbox recover, environment status, environment resolve, storage, runtime, world, modules list, profiles list, version")
+        print("Workbench Core: setup, settings, repair, tooling, pack release, sandbox recover, environment status, environment resolve, storage, runtime, world, modules list, profiles list, version")
         for module in modules:
             if module.module:
                 for capability in module.module.capabilities:
