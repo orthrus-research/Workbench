@@ -17,6 +17,7 @@ from typing import Iterator
 
 from workbench_api.record_stores import (
     RecordStoreReference, SessionOwnerAllocationError, SessionOwnerReference,
+    SessionOwnerSetupIntent,
 )
 
 from .host_filesystem import (
@@ -32,6 +33,7 @@ _FORMAT = "workbench-session-owner-allocation-v1"
 _PREFIX = _FORMAT + ":sha256:"
 _MAX_RECORD = 8192
 _MAX_START_RESULT = 1024 * 1024
+_SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
 def _fail(code: str, message: str) -> None:
@@ -62,6 +64,18 @@ class _HeldSessionOwner:
         info = host.record_path.lstat()
         self.record_identity = info.st_dev, info.st_ino
         self.started_bound = host.started_path.exists() or host.started_path.is_symlink()
+        self.setup_raw: bytes | None = None
+        self.setup_identity: tuple[int, int] | None = None
+        self._remember_setup()
+
+    def _remember_setup(self) -> None:
+        if self.host.setup_path.exists() or self.host.setup_path.is_symlink():
+            self.setup_raw = self.host._read_setup(self.reference)[1]
+            info = self.host.setup_path.lstat()
+            self.setup_identity = info.st_dev, info.st_ino
+        else:
+            self.setup_raw = None
+            self.setup_identity = None
 
     def verify(self) -> SessionOwnerReference:
         reference, raw = self.host._read()
@@ -69,6 +83,28 @@ class _HeldSessionOwner:
         if (raw != self.raw or reference != self.reference
                 or (info.st_dev, info.st_ino) != self.record_identity):
             _fail("changed", "session owner allocation changed while its lease was held")
+        present = self.host.setup_path.exists() or self.host.setup_path.is_symlink()
+        if present != (self.setup_raw is not None):
+            _fail("changed", "session owner setup intent changed while its lease was held")
+        if present:
+            setup_raw = self.host._read_setup(reference)[1]
+            setup_info = self.host.setup_path.lstat()
+            if (setup_raw != self.setup_raw
+                    or (setup_info.st_dev, setup_info.st_ino) != self.setup_identity):
+                _fail("changed", "session owner setup intent changed while its lease was held")
+        return reference
+
+    def record_setup_intent(self, intent: SessionOwnerSetupIntent) -> SessionOwnerReference:
+        self.verify()
+        self.host._record_setup(self.reference, intent)
+        self._remember_setup()
+        return self.verify_setup_intent(intent)
+
+    def verify_setup_intent(self, intent: SessionOwnerSetupIntent) -> SessionOwnerReference:
+        reference = self.verify()
+        actual, _ = self.host._read_setup(reference)
+        if actual != intent:
+            _fail("changed", "session owner setup intent differs from this request")
         return reference
 
     def record_started(self, expected_start_result: bytes) -> SessionOwnerReference:
@@ -81,6 +117,15 @@ class _HeldSessionOwner:
         reference = self.verify()
         self.host._read_started(reference)
         return reference
+
+    def read_started_result(self) -> bytes:
+        reference = self.verify()
+        raw = self.host._read_started(reference)
+        if sorted(path.name for path in reference.path.iterdir()) != [
+            "core-owner-allocation-v1.json", "owner-state", "start-result-v1.json",
+        ]:
+            _fail("changed", "session owner has unexpected top-level members")
+        return raw
 
 
 class CoreSessionOwnerAllocations:
@@ -99,6 +144,7 @@ class CoreSessionOwnerAllocations:
         self.path = self.owners / session_id
         self.marker_path = self.path / "core-owner-allocation-v1.json"
         self.record_path = self.records / (session_id + ".json")
+        self.setup_path = self.records / (session_id + ".setup.json")
         self.started_path = self.records / (session_id + ".started.json")
 
     def _body(
@@ -160,18 +206,81 @@ class CoreSessionOwnerAllocations:
             workspace=self.store.workspace, owner_id=self.store.owner_id,
             session_id=self.session_id, path=self.path, state_root=state_root,
         )
+        if self.setup_path.exists() or self.setup_path.is_symlink():
+            self._read_setup(reference)
         if self.started_path.exists() or self.started_path.is_symlink():
             self._read_started(reference)
         return reference, raw
 
-    def _started_body(self, reference: SessionOwnerReference) -> dict:
+    def _setup_body(self, reference: SessionOwnerReference, intent: SessionOwnerSetupIntent) -> dict:
+        if type(intent) is not SessionOwnerSetupIntent:
+            _fail("policy", "session owner setup intent is invalid")
+        fields = (
+            intent.session_record_id, intent.session_record_uri,
+            intent.runtime_config_uri, intent.workspace_uri,
+        )
+        if any(type(value) is not str or not 1 <= len(value) <= 4096 for value in fields):
+            _fail("policy", "session owner setup identity is invalid")
+        digests = (
+            intent.session_record_sha256, intent.runtime_config_sha256,
+            intent.setup_request_sha256,
+        )
+        if any(type(value) is not str or _SHA256.fullmatch(value) is None for value in digests):
+            _fail("policy", "session owner setup digest is invalid")
+        return {
+            "format": _FORMAT + "-setup",
+            "allocation_id": reference.allocation_id,
+            "session_id": reference.session_id,
+            "session_record_id": intent.session_record_id,
+            "session_record_uri": intent.session_record_uri,
+            "session_record_sha256": intent.session_record_sha256,
+            "runtime_config_uri": intent.runtime_config_uri,
+            "runtime_config_sha256": intent.runtime_config_sha256,
+            "setup_request_sha256": intent.setup_request_sha256,
+            "workspace_uri": intent.workspace_uri,
+        }
+
+    def _read_setup(self, reference: SessionOwnerReference) -> tuple[SessionOwnerSetupIntent, bytes]:
+        if not (self.setup_path.exists() or self.setup_path.is_symlink()):
+            _fail("incomplete", "session owner has no retained setup intent")
+        raw = read_private_single_link_bytes(self.setup_path, byte_limit=_MAX_RECORD)
+        try:
+            row = json.loads(raw)
+            intent = SessionOwnerSetupIntent(
+                session_record_id=row["session_record_id"],
+                session_record_uri=row["session_record_uri"],
+                session_record_sha256=row["session_record_sha256"],
+                runtime_config_uri=row["runtime_config_uri"],
+                runtime_config_sha256=row["runtime_config_sha256"],
+                setup_request_sha256=row["setup_request_sha256"],
+                workspace_uri=row["workspace_uri"],
+            )
+        except (UnicodeError, ValueError, KeyError, TypeError) as exc:
+            raise SessionOwnerAllocationError("owner.record", "session owner setup intent is not one record") from exc
+        if type(row) is not dict or row != self._setup_body(reference, intent) or raw != _canonical(row):
+            _fail("changed", "session owner setup intent differs from its Core allocation")
+        return intent, raw
+
+    def _record_setup(self, reference: SessionOwnerReference, intent: SessionOwnerSetupIntent) -> None:
+        if (self.setup_path.exists() or self.setup_path.is_symlink()
+                or self.started_path.exists() or self.started_path.is_symlink()
+                or sorted(path.name for path in reference.path.iterdir())
+                != [self.marker_path.name]):
+            _fail("unclaimed", "session owner is not pristine before setup")
+        publish_immutable_bytes(
+            self.setup_path, _canonical(self._setup_body(reference, intent)),
+            byte_limit=_MAX_RECORD,
+        )
+        self._read_setup(reference)
+
+    def _started_body(self, reference: SessionOwnerReference) -> tuple[dict, bytes]:
         state = _directory_identity(reference.state_root)
         start = reference.path / "start-result-v1.json"
         raw = read_private_single_link_bytes(start, byte_limit=_MAX_START_RESULT)
         info = start.lstat()
         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
             _fail("unsafe", "session owner start result is not independent")
-        return {
+        body = {
             "format": _FORMAT + "-started",
             "allocation_id": reference.allocation_id,
             "state_device": state[0], "state_inode": state[1],
@@ -179,14 +288,29 @@ class CoreSessionOwnerAllocations:
             "start_size": len(raw), "start_sha256": sha256(raw).hexdigest(),
         }
 
-    def _read_started(self, reference: SessionOwnerReference) -> None:
+        if self.setup_path.exists() or self.setup_path.is_symlink():
+            _, setup = self._read_setup(reference)
+            setup_info = self.setup_path.lstat()
+            body.update({
+                "setup_device": setup_info.st_dev,
+                "setup_inode": setup_info.st_ino,
+                "setup_size": len(setup),
+                "setup_sha256": sha256(setup).hexdigest(),
+            })
+        return body, raw
+
+    def _read_started(self, reference: SessionOwnerReference) -> bytes:
+        if not (self.started_path.exists() or self.started_path.is_symlink()):
+            _fail("incomplete", "session owner has no Core start binding")
         raw = read_private_single_link_bytes(self.started_path, byte_limit=_MAX_RECORD)
         try:
             record = json.loads(raw)
         except (UnicodeError, ValueError) as exc:
             raise SessionOwnerAllocationError("owner.record", "session owner start binding is not JSON") from exc
-        if record != self._started_body(reference) or raw != _canonical(record):
+        expected, start_result = self._started_body(reference)
+        if record != expected or raw != _canonical(record):
             _fail("changed", "session owner state or start result changed after Core binding")
+        return start_result
 
     def _record_started(self, reference: SessionOwnerReference, expected_start_result: bytes) -> None:
         if type(expected_start_result) is not bytes or len(expected_start_result) > _MAX_START_RESULT:
@@ -197,7 +321,7 @@ class CoreSessionOwnerAllocations:
         if read_private_single_link_bytes(start, byte_limit=_MAX_START_RESULT) != expected_start_result:
             _fail("changed", "session owner start result differs from the admitted bytes")
         publish_immutable_bytes(
-            self.started_path, _canonical(self._started_body(reference)),
+            self.started_path, _canonical(self._started_body(reference)[0]),
             byte_limit=_MAX_RECORD,
         )
         self._read_started(reference)
@@ -214,6 +338,7 @@ class CoreSessionOwnerAllocations:
             if create:
                 if (self.path.exists() or self.path.is_symlink()
                         or self.record_path.exists() or self.record_path.is_symlink()
+                        or self.setup_path.exists() or self.setup_path.is_symlink()
                         or self.started_path.exists() or self.started_path.is_symlink()):
                     _fail("unclaimed", "session owner path or allocation already exists")
                 _private_directory(self.owners)

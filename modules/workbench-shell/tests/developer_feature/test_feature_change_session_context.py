@@ -319,13 +319,137 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
             (self._context_root / "selected-context-v1.json").exists()
         )
         before = allocation.read_bytes()
-        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "already exists"):
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "no Core start binding"):
             bind_material_fluid_recipe_session_context(
                 ROOT, record, self.runtime_config,
                 **self._request("Thermal Solvent Retry"),
             )
         self.assertEqual(before, allocation.read_bytes())
         self.assertTrue(owner.is_dir())
+
+    @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
+    def test_exit_after_started_binding_forward_completes_exact_setup(self) -> None:
+        record, created = self._session("started-retry")
+        session_id = str(created["session_id"])
+        request = self._request("Thermal Solvent Started Retry")
+        original = core_session_owner_allocations._HeldSessionOwner.record_started
+
+        def exit_after_started(held: object, raw: bytes) -> object:
+            result = original(held, raw)
+            os._exit(71)
+            return result
+
+        child = os.fork()
+        if child == 0:
+            with patch.object(core_session_owner_allocations._HeldSessionOwner, "record_started", exit_after_started):
+                bind_material_fluid_recipe_session_context(
+                    ROOT, record, self.runtime_config, **request,
+                )
+            os._exit(72)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(71, os.waitstatus_to_exitcode(status))
+        owner = self._context_root / "session-owners" / session_id
+        setup = self._context_root / "owner-allocations" / f"{session_id}.setup.json"
+        started = self._context_root / "owner-allocations" / f"{session_id}.started.json"
+        self.assertTrue(setup.is_file())
+        self.assertTrue(started.is_file())
+        self.assertFalse((self._context_root / "contexts" / session_id).exists())
+        before = {
+            path.relative_to(self._context_root): path.read_bytes()
+            for path in (*owner.rglob("*"), setup, started) if path.is_file()
+        }
+        with patch.object(feature_change_workspace, "start_material_fluid_recipe_change", side_effect=AssertionError("domain start repeated")):
+            context = bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config, **request,
+            )
+        self.assertEqual(session_id, context["session_id"])
+        self.assertEqual(before, {
+            path.relative_to(self._context_root): path.read_bytes()
+            for path in (*owner.rglob("*"), setup, started) if path.is_file()
+        })
+        self.assertEqual(context["context_id"], resolve_material_fluid_recipe_session_context(ROOT)[0]["context_id"])
+
+    def test_started_owner_refuses_changed_inputs_and_retains_bytes(self) -> None:
+        record, created = self._session("changed-started-retry")
+        session_id = str(created["session_id"])
+        request = self._request("Thermal Solvent Changed Started Retry")
+        with patch.object(self.tree_provider, "stage", side_effect=RuntimeError("stop after start")):
+            with self.assertRaisesRegex(RuntimeError, "stop after start"):
+                bind_material_fluid_recipe_session_context(
+                    ROOT, record, self.runtime_config, **request,
+                )
+        setup = self._context_root / "owner-allocations" / f"{session_id}.setup.json"
+        before = setup.read_bytes()
+        changed = dict(request)
+        changed["name"] = "Thermal Solvent Other Request"
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "setup intent differs"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config, **changed,
+            )
+        self.runtime_config.write_text(
+            self.runtime_config.read_text(encoding="utf-8").replace(
+                '"schema_version": 1', '"schema_version": 1, "note": "changed"',
+            ), encoding="utf-8",
+        )
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "setup intent differs"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config, **request,
+            )
+        self.assertEqual(before, setup.read_bytes())
+        self.assertFalse((self._context_root / "contexts" / session_id).exists())
+
+    def test_started_owner_refuses_changed_live_plan(self) -> None:
+        record, created = self._session("changed-plan-retry")
+        session_id = str(created["session_id"])
+        request = self._request("Thermal Solvent Changed Plan Retry")
+        with patch.object(self.tree_provider, "stage", side_effect=RuntimeError("stop after start")):
+            with self.assertRaisesRegex(RuntimeError, "stop after start"):
+                bind_material_fluid_recipe_session_context(
+                    ROOT, record, self.runtime_config, **request,
+                )
+        workspace = Path(json.loads(record.read_text(encoding="utf-8"))["workspace"]["canonical_root"])
+        dependency = workspace / "groovy/preInit/MaterialChanges.groovy"
+        dependency.write_bytes(dependency.read_bytes() + b"\n// changed after start\n")
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "plan differs"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config, **request,
+            )
+        self.assertFalse((self._context_root / "contexts" / session_id).exists())
+
+    def test_earlier_core_started_owner_reads_context_but_cannot_gain_retry(self) -> None:
+        def remove_new_setup_witness(session_id: str) -> None:
+            records = self._context_root / "owner-allocations"
+            started = records / f"{session_id}.started.json"
+            row = json.loads(started.read_text(encoding="utf-8"))
+            for key in ("setup_device", "setup_inode", "setup_size", "setup_sha256"):
+                row.pop(key)
+            started.write_bytes(
+                json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+                + b"\n"
+            )
+            (records / f"{session_id}.setup.json").unlink()
+
+        completed, created = self._bind("earliercorereadable")
+        remove_new_setup_witness(str(created["session_id"]))
+        self.assertEqual(
+            completed["context_id"],
+            resolve_material_fluid_recipe_session_context(ROOT)[0]["context_id"],
+        )
+
+        record, interrupted = self._session("earlier-core-incomplete")
+        request = self._request("Thermal Solvent Earlier Core")
+        with patch.object(self.tree_provider, "stage", side_effect=RuntimeError("stop after start")):
+            with self.assertRaisesRegex(RuntimeError, "stop after start"):
+                bind_material_fluid_recipe_session_context(
+                    ROOT, record, self.runtime_config, **request,
+                )
+        session_id = str(interrupted["session_id"])
+        remove_new_setup_witness(session_id)
+        with self.assertRaisesRegex(FeatureChangeWorkspaceError, "no retained setup intent"):
+            bind_material_fluid_recipe_session_context(
+                ROOT, record, self.runtime_config, **request,
+            )
+        self.assertFalse((self._context_root / "contexts" / session_id).exists())
 
     @unittest.skipUnless(hasattr(os, "fork"), "requires POSIX crash injection")
     def test_exit_after_owner_mkdir_retains_unclaimed_path_and_refuses_retry(self) -> None:
@@ -423,6 +547,7 @@ class FeatureChangeSessionContextTests(unittest.TestCase):
         # remains a retention/cleanup gate rather than adoption authority.
         (owner / "core-owner-allocation-v1.json").unlink()
         (self._context_root / "owner-allocations" / f"{session_id}.json").unlink()
+        (self._context_root / "owner-allocations" / f"{session_id}.setup.json").unlink()
         (self._context_root / "owner-allocations" / f"{session_id}.started.json").unlink()
         legacy = CoreManagedTrees(
             workspace=ROOT, configuration_home=self.root / "legacy-v1-config",

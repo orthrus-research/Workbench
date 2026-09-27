@@ -41,15 +41,32 @@ class SessionOwnerReference:
     state_root: Path
 
 
+@dataclass(frozen=True, slots=True)
+class SessionOwnerSetupIntent:
+    session_record_id: str
+    session_record_uri: str
+    session_record_sha256: str
+    runtime_config_uri: str
+    runtime_config_sha256: str
+    setup_request_sha256: str
+    workspace_uri: str
+
+
 class SessionOwnerAllocation(Protocol):
     @property
     def reference(self) -> SessionOwnerReference: ...
 
     def verify(self) -> SessionOwnerReference: ...
 
+    def record_setup_intent(self, intent: SessionOwnerSetupIntent) -> SessionOwnerReference: ...
+
+    def verify_setup_intent(self, intent: SessionOwnerSetupIntent) -> SessionOwnerReference: ...
+
     def record_started(self, expected_start_result: bytes) -> SessionOwnerReference: ...
 
     def verify_started(self) -> SessionOwnerReference: ...
+
+    def read_started_result(self) -> bytes: ...
 
 
 class RecordStores(Protocol):
@@ -145,6 +162,7 @@ __all__ = [
     "RecordStoreReference", "RecordStores", "record_store_scope",
     "open_record_store", "open_target_record_store", "record_store_host_bound",
     "SessionOwnerAllocation", "SessionOwnerAllocationError", "SessionOwnerReference",
+    "SessionOwnerSetupIntent",
     "session_owner_scope",
     "publish_review_artifact",
 ]

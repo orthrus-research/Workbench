@@ -12,7 +12,7 @@ from urllib.request import url2pathname
 
 from workbench_crucible.runtime_pair import FeatureRuntimePairPorts, PAIR_REQUEST_FORMAT, PAIR_RESULT_FORMAT
 import base64
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -49,7 +49,9 @@ from .developer_feature import (
 )
 from workbench_api.state_paths import default_product_spine_state_root
 from workbench_api.record_stores import (
-    SessionOwnerAllocationError, open_record_store, session_owner_scope,
+    SessionOwnerAllocation, SessionOwnerAllocationError, SessionOwnerSetupIntent,
+    open_record_store,
+    session_owner_scope,
 )
 from workbench_api.durable_resources import DurableResourceError
 from workbench_api.managed_trees import (
@@ -583,9 +585,11 @@ def _verify_session_owner(suite_root: Path | str, context: Mapping[str, Any]) ->
             # context and its start result have been validated. A Core
             # cataloged context requires its paired owner allocation.
             marker = expected / "core-owner-allocation-v1.json"
+            setup = _session_context_root(suite) / "owner-allocations" / f"{session_id}.setup.json"
             started = _session_context_root(suite) / "owner-allocations" / f"{session_id}.started.json"
             if (
                 not (marker.exists() or marker.is_symlink())
+                and not (setup.exists() or setup.is_symlink())
                 and not (started.exists() or started.is_symlink())
                 and _context_tree_reference(
                     _session_context_directory(suite, session_id), session_id,
@@ -602,14 +606,25 @@ def _verify_session_owner(suite_root: Path | str, context: Mapping[str, Any]) ->
 
 
 @contextmanager
-def _new_session_owner_scope(suite: Path, session_id: str):
+def _setup_session_owner_scope(suite: Path, session_id: str):
     try:
-        with session_owner_scope(
-            "feature-change-session-context-v1", suite, session_id,
-            create=True,
-        ) as held:
-            yield held
-    except (SessionOwnerAllocationError, DurableResourceError, OSError) as exc:
+        with ExitStack() as stack:
+            try:
+                held = stack.enter_context(session_owner_scope(
+                    "feature-change-session-context-v1", suite, session_id,
+                    create=False,
+                ))
+                created = False
+            except SessionOwnerAllocationError as exc:
+                if exc.code != "owner.unregistered":
+                    raise
+                held = stack.enter_context(session_owner_scope(
+                    "feature-change-session-context-v1", suite, session_id,
+                    create=True,
+                ))
+                created = True
+            yield held, created
+    except (SessionOwnerAllocationError, DurableResourceError, DurableRecordError, OSError) as exc:
         raise FeatureChangeWorkspaceError(
             f"feature change session owner requires Core review: {exc}"
         ) from exc
@@ -979,6 +994,46 @@ def _setup_request_sha256(request: Mapping[str, Any]) -> str:
     return "sha256:" + sha256(_canonical(dict(request))).hexdigest()
 
 
+def _reopen_started_setup(
+    held: SessionOwnerAllocation, suite: Path, workspace: Path,
+    request: Mapping[str, Any],
+) -> tuple[dict[str, Any], bytes]:
+    """Forward-complete only the same fully started, still planned change."""
+
+    raw = held.read_started_result()
+    try:
+        start = _validate_start_result(json.loads(raw.decode("utf-8")))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise FeatureChangeWorkspaceError(
+            "retained feature change start result is not JSON"
+        ) from exc
+    if (raw != _pretty_record_bytes(start)
+            or start["reused"] is not False
+            or start["lifecycle"] != "planned"):
+        _fail("retained feature change start result cannot be resumed")
+    state_root = held.reference.state_root
+    expected_record = (
+        state_root / "change-workspaces"
+        / start["change_id"].removeprefix(CHANGE_ID_PREFIX) / "change.json"
+    )
+    if _local_uri(start["record_uri"], "feature change start record") != expected_record:
+        _fail("retained feature change start record points outside its owner")
+    opened = open_feature_change(state_root, start["change_id"])
+    if (
+        opened["plan_id"] != start["plan_id"]
+        or opened["header"]["workspace_uri"] != workspace.as_uri()
+        or opened["lifecycle"] != "planned"
+        or len(opened["events"]) != 1
+        or opened["events"][0]["kind"] != "started"
+    ):
+        _fail("retained feature change moved beyond its initial start")
+    current_plan = build_material_fluid_recipe_plan(suite, workspace, **request)
+    validate_material_fluid_recipe_plan(current_plan)
+    if current_plan["id"] != start["plan_id"] or opened["plan"] != current_plan:
+        _fail("retained feature change plan differs from the current request")
+    return start, raw
+
+
 def _remove_incomplete_setup(path: Path, label: str) -> None:
     """Remove only a session-scoped setup path while its owner lock is held."""
 
@@ -1047,25 +1102,43 @@ def bind_material_fluid_recipe_session_context(
                 _remove_incomplete_setup(
                     stale, "stale feature change Work Session staging directory"
                 )
-            with _new_session_owner_scope(suite, session_id) as held:
+            intent = SessionOwnerSetupIntent(
+                session_record_id=session["session_record_id"],
+                session_record_uri=session_path.as_uri(),
+                session_record_sha256=session_sha256,
+                runtime_config_uri=runtime_path.as_uri(),
+                runtime_config_sha256=runtime_sha256,
+                setup_request_sha256=request_sha256,
+                workspace_uri=workspace.as_uri(),
+            )
+            with _setup_session_owner_scope(suite, session_id) as (held, created):
                 owner = held.reference
                 if owner.path != owner_directory or owner.workspace != suite:
                     _fail("feature change Core session owner chose another target")
                 state_root = owner.state_root
-                start = start_material_fluid_recipe_change(
-                    suite, workspace, state_root, **request
-                )
-                if (
-                    start.get("reused") is not False
-                    or start.get("lifecycle") != "planned"
-                ):
-                    _fail(
-                        "Work Session setup did not create one fresh planned change"
+                if created:
+                    held.record_setup_intent(intent)
+                    start = start_material_fluid_recipe_change(
+                        suite, workspace, state_root, **request
                     )
+                    if (
+                        start.get("reused") is not False
+                        or start.get("lifecycle") != "planned"
+                    ):
+                        _fail(
+                            "Work Session setup did not create one fresh planned change"
+                        )
+                    validated_start = _validate_start_result(start)
+                    start_raw = _pretty_record_bytes(validated_start)
+                    _write_immutable(owner_directory / "start-result-v1.json", validated_start)
+                    held.record_started(start_raw)
+                else:
+                    held.verify_setup_intent(intent)
+                    validated_start, start_raw = _reopen_started_setup(
+                        held, suite, workspace, request,
+                    )
+                    start = validated_start
                 start_path = owner_directory / "start-result-v1.json"
-                validated_start = _validate_start_result(start)
-                _write_immutable(start_path, validated_start)
-                held.record_started(_pretty_record_bytes(validated_start))
                 body = {
                     "change_id": start["change_id"],
                     "claims": {
@@ -1086,9 +1159,7 @@ def bind_material_fluid_recipe_session_context(
                     "session_record_sha256": session_sha256,
                     "session_record_uri": session_path.as_uri(),
                     "setup_request_sha256": request_sha256,
-                    "start_result_sha256": _sha256_file(
-                        start_path, "feature change start result"
-                    ),
+                    "start_result_sha256": "sha256:" + sha256(start_raw).hexdigest(),
                     "start_result_uri": start_path.as_uri(),
                     "state_root_uri": state_root.resolve(strict=True).as_uri(),
                     "workspace_uri": workspace.as_uri(),
@@ -1103,6 +1174,7 @@ def bind_material_fluid_recipe_session_context(
                     + ".json"
                 )
                 validated = validate_feature_change_session_context(context)
+                held.verify_setup_intent(intent)
                 held.verify_started()
                 try:
                     with tree_host.stage(
@@ -1128,6 +1200,7 @@ def bind_material_fluid_recipe_session_context(
                 ):
                     _fail("feature change context Core publication changed its destination")
                 context_path = context_directory / context_name
+                held.verify_setup_intent(intent)
                 held.verify_started()
         try:
             active, _state, _runtime = resolve_material_fluid_recipe_session_context(

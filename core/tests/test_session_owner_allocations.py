@@ -11,7 +11,8 @@ from unittest.mock import patch
 from workbench_api.durable_resources import DurableResourceError
 from workbench_api.host_filesystem import DurableRecordError
 from workbench_api.record_stores import (
-    SessionOwnerAllocationError, record_store_scope, session_owner_scope,
+    SessionOwnerAllocationError, SessionOwnerSetupIntent, record_store_scope,
+    session_owner_scope,
 )
 from workbench_core.storage.record_stores import CoreRecordStores
 
@@ -43,6 +44,18 @@ class SessionOwnerAllocationTests(unittest.TestCase):
     def _session(digit: str) -> str:
         return "work-session-v2-" + digit * 32
 
+    @staticmethod
+    def _intent(request_digest: str = "a") -> SessionOwnerSetupIntent:
+        return SessionOwnerSetupIntent(
+            session_record_id="session-record:test",
+            session_record_uri="file:///tmp/session.json",
+            session_record_sha256="sha256:" + "b" * 64,
+            runtime_config_uri="file:///tmp/runtime.json",
+            runtime_config_sha256="sha256:" + "c" * 64,
+            setup_request_sha256="sha256:" + request_digest * 64,
+            workspace_uri="file:///tmp/project",
+        )
+
     def _created(self, digit: str):
         session_id = self._session(digit)
         with session_owner_scope(FAMILY, self.workspace, session_id, create=True) as owner:
@@ -63,6 +76,58 @@ class SessionOwnerAllocationTests(unittest.TestCase):
             self.assertEqual(first, held.verify_started())
         with session_owner_scope(FAMILY, self.workspace, second.session_id, create=False) as held:
             self.assertEqual(second, held.verify_started())
+
+    def test_setup_intent_pins_started_readback_and_exact_request(self) -> None:
+        session_id = self._session("3")
+        intent = self._intent()
+        with session_owner_scope(FAMILY, self.workspace, session_id, create=True) as held:
+            held.record_setup_intent(intent)
+            reference = held.reference
+            reference.state_root.mkdir(mode=0o700)
+            start = reference.path / "start-result-v1.json"
+            start.write_bytes(b"{}\n")
+            start.chmod(0o600)
+            held.record_started(b"{}\n")
+        with session_owner_scope(FAMILY, self.workspace, session_id, create=False) as held:
+            self.assertEqual(reference, held.verify_setup_intent(intent))
+            self.assertEqual(b"{}\n", held.read_started_result())
+            with self.assertRaises(SessionOwnerAllocationError) as refusal:
+                held.verify_setup_intent(self._intent("d"))
+            self.assertEqual("owner.changed", refusal.exception.code)
+
+    def test_setup_replacement_and_partial_or_legacy_owner_remain_protected(self) -> None:
+        session_id = self._session("4")
+        intent = self._intent()
+        with session_owner_scope(FAMILY, self.workspace, session_id, create=True) as held:
+            held.record_setup_intent(intent)
+            reference = held.reference
+            reference.state_root.mkdir(mode=0o700)
+            start = reference.path / "start-result-v1.json"
+            start.write_bytes(b"{}\n")
+            start.chmod(0o600)
+            held.record_started(b"{}\n")
+        setup = self.provider.open(FAMILY, self.workspace).root / "owner-allocations" / f"{session_id}.setup.json"
+        displaced = setup.with_name(setup.name + ".old")
+        setup.rename(displaced)
+        setup.write_bytes(displaced.read_bytes())
+        setup.chmod(0o600)
+        with self.assertRaises(SessionOwnerAllocationError) as refusal:
+            with session_owner_scope(FAMILY, self.workspace, session_id, create=False):
+                pass
+        self.assertEqual("owner.changed", refusal.exception.code)
+        self.assertTrue(displaced.exists())
+
+        legacy = self._created("5")
+        with session_owner_scope(FAMILY, self.workspace, legacy.session_id, create=False) as held:
+            self.assertEqual(b"{}\n", held.read_started_result())
+            with self.assertRaises(SessionOwnerAllocationError) as refusal:
+                held.verify_setup_intent(intent)
+            self.assertEqual("owner.incomplete", refusal.exception.code)
+        with session_owner_scope(FAMILY, self.workspace, self._session("6"), create=True) as held:
+            held.reference.state_root.mkdir(mode=0o700)
+            with self.assertRaises(SessionOwnerAllocationError) as refusal:
+                held.record_setup_intent(intent)
+            self.assertEqual("owner.unclaimed", refusal.exception.code)
 
     def test_foreign_workspace_and_owner_fail_before_child_write(self) -> None:
         foreign = self.root / "foreign"
