@@ -322,27 +322,20 @@ def _apply_sealed_operations(
                     f"{relative.as_posix()}"
                 )
         try:
-            if kind == "create":
-                with target.open("xb") as output:
-                    output.write(content)
-                    output.flush()
-                    os.fsync(output.fileno())
-                target.chmod(0o644)
-            else:
-                mode = target.stat().st_mode & 0o777
-                binding = "blueprint-stage-output:" + sha256(_canonical_bytes({
-                    "path": relative.as_posix(), "content_sha256": digest,
-                })).hexdigest()
-                transaction = open_source_transaction(workspace, binding=binding)
-                try:
-                    staged = transaction.prepare(
-                        relative.as_posix(),
-                        before=SourceImage("file", before, mode=mode),
-                        after=SourceImage("file", content, mode=mode),
-                    )
-                    transaction.commit(staged)
-                finally:
-                    transaction.cleanup()
+            mode = 0o644 if kind == "create" else target.stat().st_mode & 0o777
+            binding = "blueprint-stage-output:" + sha256(_canonical_bytes({
+                "path": relative.as_posix(), "content_sha256": digest,
+            })).hexdigest()
+            transaction = open_source_transaction(workspace, binding=binding)
+            try:
+                staged = transaction.prepare(
+                    relative.as_posix(),
+                    before=None if kind == "create" else SourceImage("file", before, mode=mode),
+                    after=SourceImage("file", content, mode=mode),
+                )
+                transaction.commit(staged)
+            finally:
+                transaction.cleanup()
         except OSError as exc:
             _fail(f"cannot stage Blueprint output {relative}: {exc}")
         outputs.append({

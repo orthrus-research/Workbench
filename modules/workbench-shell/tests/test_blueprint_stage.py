@@ -297,6 +297,31 @@ class BlueprintStageTest(unittest.TestCase):
             self.assertEqual(0o755, target.stat().st_mode & 0o777)
             self.assertEqual(sha256(after).hexdigest(), outputs[0]["sha256"])
 
+    def test_sealed_create_requires_core_and_publishes_exclusively(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            target = workspace / "example.groovy"
+            content = b"new source\n"
+            sealed = {"operations": [{
+                "operation": "create", "path": target.name,
+                "before_sha256": None,
+                "content_sha256": sha256(content).hexdigest(),
+                "content_base64": base64.b64encode(content).decode("ascii"),
+            }]}
+
+            with source_transactions_scope(None):
+                with self.assertRaisesRegex(
+                    BlueprintStageError, "protected source edits require Workbench Core",
+                ):
+                    stage_module._apply_sealed_operations(workspace, sealed)
+            self.assertFalse(target.exists())
+
+            outputs = stage_module._apply_sealed_operations(workspace, sealed)
+            self.assertEqual(content, target.read_bytes())
+            self.assertEqual(0o644, target.stat().st_mode & 0o777)
+            self.assertEqual(sha256(content).hexdigest(), outputs[0]["sha256"])
+
     def test_user_session_root_is_direct_and_passed_through_core_context(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)

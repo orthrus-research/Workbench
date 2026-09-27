@@ -267,7 +267,19 @@ class _SourceTransaction:
             else:
                 identity = _identity(visible)
                 if after.kind == "file" and visible.st_nlink != 1:
-                    _fail("stage", "reopened source stage is not an independent file")
+                    # A create-once link may have reached the target just
+                    # before process death, leaving this exact two-link
+                    # stage. No other shared stage is safe to reopen.
+                    linked_create = False
+                    if attempted and before is None and visible.st_nlink == 2:
+                        try:
+                            linked = target.lstat()
+                        except FileNotFoundError:
+                            pass
+                        else:
+                            linked_create = _identity(linked) == identity
+                    if not linked_create:
+                        _fail("stage", "reopened source stage is not independent")
                 self._match(staged, after)
         reference = SourceStage(uuid4().hex, staged_relative)
         self._stages[reference.token] = {
@@ -324,7 +336,25 @@ class _SourceTransaction:
                 os.chmod(staged, mode, follow_symlinks=False)
                 entry["after"] = replace(entry["after"], mode=mode)
             self._match(staged, entry["after"])
-            os.replace(staged, target)
+            if entry["before"] is None:
+                # The absent precondition must remain true at the atomic
+                # publication step. os.replace would overwrite a competing
+                # creator after the earlier _match check.
+                try:
+                    if entry["after"].kind == "file":
+                        os.link(staged, target, follow_symlinks=False)
+                    else:
+                        os.symlink(os.fsdecode(entry["after"].data), target)
+                except FileExistsError as exc:
+                    raise SourceTransactionError(
+                        "stale", "protected source appeared during creation",
+                    ) from exc
+                # Keep the prepared source visible until the new directory
+                # entry is durable; an interrupted link can then be reopened.
+                fsync_directory(target.parent)
+                staged.unlink()
+            else:
+                os.replace(staged, target)
         entry["committed"] = True
         fsync_directory(target.parent)
         self._match(target, entry["after"])

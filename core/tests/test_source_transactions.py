@@ -7,6 +7,7 @@ from pathlib import Path
 import stat
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from workbench_api.source_transactions import (
     SourceImage, SourceTransactionError, open_source_transaction,
@@ -43,6 +44,49 @@ class SourceTransactionTests(unittest.TestCase):
             transaction.cleanup(remove_created_directories=True)
             self.assertFalse(target.exists())
             self.assertFalse(target.parent.exists())
+
+    def test_competing_create_after_precheck_is_not_overwritten(self) -> None:
+        target = self.root / "new.txt"
+        transaction = self.provider.open(self.root, binding="create-race")
+        stage = transaction.prepare(
+            target.name, before=None, after=SourceImage("file", b"ours", mode=0o644),
+        )
+        original_link = os.link
+
+        def competing_create(source, destination, *, follow_symlinks):
+            target.write_bytes(b"rival")
+            return original_link(source, destination, follow_symlinks=follow_symlinks)
+
+        with patch("workbench_core.source_transactions.os.link", side_effect=competing_create):
+            with self.assertRaises(SourceTransactionError) as stale:
+                transaction.commit(stage)
+        self.assertEqual("stale", stale.exception.code)
+        transaction.cleanup()
+        self.assertEqual(b"rival", target.read_bytes())
+
+    def test_interrupted_create_link_reopens_only_exact_two_link_stage(self) -> None:
+        token = "a" * 32
+        target = self.root / "new.txt"
+        transaction = self.provider.open(
+            self.root, binding="linked-create", staging_token=token,
+        )
+        stage = transaction.prepare(
+            target.name, before=None, after=SourceImage("file", b"ours", mode=0o644),
+        )
+        self.assertIsNotNone(stage.staged_relative)
+        staged = self.root / stage.staged_relative
+        os.link(staged, target)
+        reopened = self.provider.open(
+            self.root, binding="linked-create", staging_token=token,
+        )
+        attached = reopened.attach(
+            target.name, before=None, after=SourceImage("file", b"ours", mode=0o644),
+            staged_relative=stage.staged_relative, attempted=True,
+        )
+        self.assertEqual("after", reopened.classify(attached))
+        reopened.cleanup()
+        self.assertEqual(b"ours", target.read_bytes())
+        self.assertEqual(1, target.stat().st_nlink)
 
     def test_changed_baseline_between_prepare_and_commit_is_preserved(self) -> None:
         target = self.root / "existing.txt"
