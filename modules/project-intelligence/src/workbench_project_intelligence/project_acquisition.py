@@ -13,7 +13,9 @@ import re
 import stat
 import subprocess
 import sys
+import tempfile
 from typing import Any, TextIO
+from urllib.parse import urlsplit
 
 from workbench_api.source_checkouts import SourceCheckoutError, open_source_checkout
 
@@ -23,9 +25,13 @@ from .git_observation import GitObservationError, configured_git_executable
 PROFILE_FORMAT = "workbench-project-acquisition-profile-v1"
 PLAN_FORMAT = "workbench-project-acquisition-plan-v1"
 PLAN_FORMAT_V2 = "workbench-project-acquisition-plan-v2"
+PLAN_FORMAT_V3 = "workbench-project-acquisition-plan-v3"
 RECEIPT_FORMAT = "workbench-project-acquisition-receipt-v1"
+RECEIPT_FORMAT_V2 = "workbench-project-acquisition-receipt-v2"
 RESULT_FORMAT = "workbench-project-acquisition-result-v1"
 RESULT_FORMAT_V2 = "workbench-project-acquisition-result-v2"
+RESULT_FORMAT_V3 = "workbench-project-acquisition-result-v3"
+BRANCH_LIST_FORMAT = "workbench-project-branch-list-v1"
 SCHEMA_VERSION = 1
 MAX_PROFILE_BYTES = 256 * 1024
 _GIT_OBJECT = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
@@ -211,6 +217,72 @@ def _git_environment(environment: Mapping[str, str] | None) -> dict[str, str]:
     return values
 
 
+def _selected_git(executable: str | None, environment: Mapping[str, str] | None) -> str:
+    try:
+        selected = configured_git_executable(executable, environment=environment)
+    except GitObservationError as exc:
+        raise ProjectAcquisitionError(str(exc)) from exc
+    if selected is None:
+        raise ProjectAcquisitionError(
+            "Git is unavailable; run workbench setup and select a Git executable"
+        )
+    return selected
+
+
+def _github_repository(profile: Mapping[str, Any], repository_url: str | None) -> str:
+    """Keep an explicit fork on GitHub HTTPS and bind its exact canonical URL."""
+
+    if repository_url is None:
+        return str(profile["remote"]["url"])
+    if profile["remote"]["provider"] != "github" or type(repository_url) is not str:
+        raise ProjectAcquisitionError("a repository override needs a GitHub acquisition profile")
+    if any(ord(character) <= 32 or ord(character) == 127 for character in repository_url):
+        raise ProjectAcquisitionError("repository URL contains whitespace or controls")
+    try:
+        selected = urlsplit(repository_url)
+        has_credentials = selected.username is not None or selected.password is not None
+        has_port = selected.port is not None
+    except ValueError as exc:
+        raise ProjectAcquisitionError("repository URL is malformed") from exc
+    if (selected.scheme != "https" or selected.netloc != "github.com"
+            or selected.query or selected.fragment or has_credentials or has_port):
+        raise ProjectAcquisitionError("repository must be an HTTPS github.com owner/repository URL")
+    path = selected.path[:-1] if selected.path.endswith("/") else selected.path
+    parts = path.split("/")
+    if len(parts) != 3 or parts[0] != "":
+        raise ProjectAcquisitionError("repository must name one GitHub owner and repository")
+    owner, repository = parts[1], parts[2]
+    if repository.endswith(".git"):
+        repository = repository[:-4]
+    if (re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}", owner) is None
+            or owner.endswith("-")
+            or re.fullmatch(r"[A-Za-z0-9_.-]+", repository) is None
+            or repository in {".", ".."}):
+        raise ProjectAcquisitionError("repository must name one GitHub owner and repository")
+    return f"https://github.com/{owner}/{repository}.git"
+
+
+def _validated_branch(
+    branch_name: str, *, git_executable: str, environment: Mapping[str, str] | None,
+) -> str:
+    if type(branch_name) is not str or not branch_name:
+        raise ProjectAcquisitionError("branch name is invalid")
+    try:
+        branch_bytes = branch_name.encode("utf-8", "strict")
+    except UnicodeEncodeError as exc:
+        raise ProjectAcquisitionError("branch name is not valid UTF-8") from exc
+    if (len(branch_bytes) > 512 or branch_name.startswith("-")
+            or "\x00" in branch_name):
+        raise ProjectAcquisitionError("branch name is invalid")
+    checked = _run_git(
+        git_executable, ("check-ref-format", "--branch", branch_name),
+        environment=environment, timeout=10.0,
+    )
+    if checked.returncode:
+        raise ProjectAcquisitionError("branch name is not a valid Git branch")
+    return branch_name
+
+
 def _run_git(
     executable: str,
     arguments: Sequence[str],
@@ -276,6 +348,65 @@ def resolve_remote_commit(
     ):
         raise ProjectAcquisitionError("acquisition channel returned malformed identity")
     return fields[0]
+
+
+def list_remote_branches(
+    profile: Mapping[str, Any], *, repository_url: str | None = None,
+    git_executable: str | None = None, environment: Mapping[str, str] | None = None,
+    network_timeout: float = 120.0, limit: int = 200,
+) -> dict[str, Any]:
+    """List bounded upstream names for a picker; typed branches remain available."""
+
+    if type(limit) is not int or not 1 <= limit <= 500:
+        raise ProjectAcquisitionError("branch list limit must be between 1 and 500")
+    if type(network_timeout) not in {int, float} or not 0 < network_timeout <= 3600:
+        raise ProjectAcquisitionError("branch list timeout is invalid")
+    selected_git = _selected_git(git_executable, environment)
+    repository = _github_repository(profile, repository_url)
+    try:
+        with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+            completed = subprocess.run(
+                [selected_git, "ls-remote", "--heads", "--refs", repository],
+                check=False, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
+                timeout=network_timeout, env=_git_environment(environment),
+            )
+            stdout.seek(0)
+            stderr.seek(0)
+            raw = stdout.read(2 * 1024 * 1024 + 1)
+            detail = stderr.read(4096).decode("utf-8", "replace").strip()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ProjectAcquisitionError(
+            f"cannot list remote branches ({type(exc).__name__}); enter a branch name instead"
+        ) from exc
+    if completed.returncode:
+        raise ProjectAcquisitionError(
+            "cannot list remote branches"
+            + (f": {detail[:2000]}" if detail else f" (Git exit {completed.returncode})")
+        )
+    if len(raw) > 2 * 1024 * 1024:
+        raise ProjectAcquisitionError("remote branch list is too large; enter a branch name instead")
+    try:
+        lines = raw.decode("utf-8", "strict").splitlines()
+    except UnicodeDecodeError as exc:
+        raise ProjectAcquisitionError("remote branch list is not UTF-8") from exc
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for line in lines:
+        fields = line.split("\t", 1)
+        if (len(fields) != 2 or _GIT_OBJECT.fullmatch(fields[0]) is None
+                or not fields[1].startswith("refs/heads/")):
+            raise ProjectAcquisitionError("remote branch list returned malformed identities")
+        name = fields[1][len("refs/heads/"):]
+        if not name or name in seen:
+            raise ProjectAcquisitionError("remote branch list returned a repeated or empty name")
+        seen.add(name)
+        rows.append({"name": name, "commit": fields[0]})
+    rows.sort(key=lambda row: row["name"].casefold())
+    return {
+        "format": BRANCH_LIST_FORMAT, "schema_version": 1,
+        "project_id": profile["project_id"], "repository": repository,
+        "branches": rows[:limit], "truncated": len(rows) > limit,
+    }
 
 
 def build_acquisition_plan(
@@ -440,6 +571,77 @@ def build_acquisition_plan_v2(
     }
 
 
+def build_branch_acquisition_plan(
+    profile: Mapping[str, Any], *, branch_name: str,
+    destination: Path | str, repository_url: str | None = None,
+    source_only: bool = False, git_executable: str | None = None,
+    environment: Mapping[str, str] | None = None,
+    network_timeout: float = 120.0,
+) -> dict[str, Any]:
+    """Review one user-selected branch, including an explicit GitHub fork."""
+
+    if type(source_only) is not bool:
+        raise ProjectAcquisitionError("source-only choice must be true or false")
+    selected_git = _selected_git(git_executable, environment)
+    branch = _validated_branch(
+        branch_name, git_executable=selected_git, environment=environment,
+    )
+    repository = _github_repository(profile, repository_url)
+    target = Path(destination).expanduser()
+    if not target.is_absolute():
+        target = Path.cwd() / target
+    target = Path(os.path.abspath(os.fspath(target)))
+    if target.exists() or target.is_symlink():
+        raise ProjectAcquisitionError("acquisition destination must not already exist")
+    parent = target.parent
+    create_parent = not parent.exists()
+    ancestor = parent
+    while not ancestor.exists() and not ancestor.is_symlink():
+        if ancestor == ancestor.parent:
+            break
+        ancestor = ancestor.parent
+    if ancestor.is_symlink() or not ancestor.is_dir():
+        raise ProjectAcquisitionError(
+            "acquisition destination parent must descend from a regular directory"
+        )
+    if parent.exists() and (not parent.is_dir() or parent.is_symlink()):
+        raise ProjectAcquisitionError(
+            "acquisition destination parent must be a regular directory"
+        )
+    remote_ref = f"refs/heads/{branch}"
+    commit = resolve_remote_commit(
+        {"remote": {"url": repository}}, {"remote_ref": remote_ref},
+        git_executable=selected_git, environment=environment,
+        timeout=network_timeout,
+    )
+    identity = {
+        "profile_id": profile["profile_id"],
+        "profile_digest": _identity("workbench-project-acquisition-profile", profile),
+        "project_id": profile["project_id"],
+        "source_kind": "branch", "branch_name": branch,
+        "remote_url": repository, "remote_ref": remote_ref,
+        "resolved_commit": commit, "checkout_branch": branch,
+        "destination": str(target), "destination_parent": str(parent),
+        "destination_parent_action": "create" if create_parent else "reuse",
+        "git_executable": selected_git, "source_only": source_only,
+    }
+    effects = []
+    if create_parent:
+        effects.append("Create the missing destination parent directories after consent.")
+    effects.extend((
+        "Clone the selected branch into a fresh sibling staging directory.",
+        "Verify the resolved commit and inspect profile-required workspace paths.",
+        "Publish an acquisition receipt under Workbench state.",
+        "Atomically publish the verified checkout only after its receipt is durable.",
+    ))
+    return {
+        "format": PLAN_FORMAT_V3, "schema_version": 3,
+        "operation_class": "review-before-network-write",
+        "plan_id": _identity("workbench-project-acquisition-plan-v3", identity),
+        **identity, "effects": effects,
+    }
+
+
 def _create_missing_parent_directories(parent: Path) -> list[tuple[Path, int, int]]:
     """Create a reviewed parent chain and retain only identities we created."""
 
@@ -532,8 +734,20 @@ def apply_acquisition_plan(
 ) -> dict[str, Any]:
     """Acquire, verify, atomically publish, and retain one exact checkout."""
 
-    channel = _channel(profile, str(plan.get("channel_id")))
-    if plan.get("format") == PLAN_FORMAT_V2:
+    branch_plan = plan.get("format") == PLAN_FORMAT_V3
+    if branch_plan:
+        requested_repository = str(plan.get("remote_url"))
+        expected = build_branch_acquisition_plan(
+            profile, branch_name=str(plan.get("branch_name")),
+            destination=str(plan.get("destination")),
+            repository_url=(None if requested_repository == profile["remote"]["url"]
+                            else requested_repository),
+            source_only=plan.get("source_only"),
+            git_executable=str(plan.get("git_executable")),
+            environment=environment, network_timeout=network_timeout,
+        )
+    elif plan.get("format") == PLAN_FORMAT_V2:
+        channel = _channel(profile, str(plan.get("channel_id")))
         expected = build_acquisition_plan_v2(
             profile,
             channel_name=channel["id"],
@@ -543,6 +757,7 @@ def apply_acquisition_plan(
             network_timeout=network_timeout,
         )
     else:
+        channel = _channel(profile, str(plan.get("channel_id")))
         expected = build_acquisition_plan(
             profile,
             channel_name=channel["id"],
@@ -553,7 +768,7 @@ def apply_acquisition_plan(
         )
     if expected != dict(plan):
         raise ProjectAcquisitionError(
-            "acquisition plan changed; resolve and review the channel again"
+            "acquisition plan changed; resolve and review the source again"
         )
     destination = Path(plan["destination"])
     parent = destination.parent
@@ -561,7 +776,7 @@ def apply_acquisition_plan(
     published = False
     try:
         if (
-            plan.get("format") == PLAN_FORMAT_V2
+            plan.get("format") in {PLAN_FORMAT_V2, PLAN_FORMAT_V3}
             and plan.get("destination_parent_action") == "create"
         ):
             created_parents = _create_missing_parent_directories(parent)
@@ -575,18 +790,29 @@ def apply_acquisition_plan(
             remote_url=str(plan["remote_url"]),
             checkout_branch=str(plan["checkout_branch"]),
             expected_commit=str(plan["resolved_commit"]),
-            # V1/V2 plans have no reviewed tree lock. Core observes the tree,
+            # Developer acquisition plans have no reviewed tree lock. Core observes the tree,
             # but that observation does not upgrade these plans to W7 import.
             expected_tree=None,
             environment=_git_environment(environment),
             timeout_seconds=clone_timeout,
         ) as checkout:
-            required_paths = _verify_workspace(profile, checkout.staging_root)
+            profile_diagnostic: str | None = None
+            try:
+                required_paths = _verify_workspace(profile, checkout.staging_root)
+            except ProjectAcquisitionError as exc:
+                if not branch_plan or not plan["source_only"]:
+                    raise
+                required_paths = []
+                profile_diagnostic = str(exc)
             receipt_body = {
                 "profile_id": plan["profile_id"],
                 "profile_digest": plan["profile_digest"],
                 "project_id": plan["project_id"],
-                "channel_id": plan["channel_id"],
+                **({"source_kind": "branch", "branch_name": plan["branch_name"],
+                    "source_only": plan["source_only"],
+                    "profile_compatible": profile_diagnostic is None,
+                    "profile_diagnostic": profile_diagnostic} if branch_plan
+                   else {"channel_id": plan["channel_id"]}),
                 "remote_url": plan["remote_url"],
                 "remote_ref": plan["remote_ref"],
                 "resolved_commit": plan["resolved_commit"],
@@ -596,8 +822,8 @@ def apply_acquisition_plan(
                 "acquired_at": datetime.now(timezone.utc).isoformat(),
             }
             receipt = {
-                "format": RECEIPT_FORMAT,
-                "schema_version": SCHEMA_VERSION,
+                "format": RECEIPT_FORMAT_V2 if branch_plan else RECEIPT_FORMAT,
+                "schema_version": 2 if branch_plan else SCHEMA_VERSION,
                 "receipt_id": _identity(
                     "workbench-project-acquisition",
                     {key: value for key, value in receipt_body.items() if key != "acquired_at"},
@@ -620,8 +846,8 @@ def apply_acquisition_plan(
         published = True
         v2 = plan.get("format") == PLAN_FORMAT_V2
         result = {
-            "format": RESULT_FORMAT_V2 if v2 else RESULT_FORMAT,
-            "schema_version": 2 if v2 else SCHEMA_VERSION,
+            "format": RESULT_FORMAT_V3 if branch_plan else RESULT_FORMAT_V2 if v2 else RESULT_FORMAT,
+            "schema_version": 3 if branch_plan else 2 if v2 else SCHEMA_VERSION,
             "outcome": "acquired",
             "plan_id": plan["plan_id"],
             "destination": plan["destination"],
@@ -633,7 +859,16 @@ def apply_acquisition_plan(
                 ["workbench", "open", plan["destination"]],
             ],
         }
-        if v2:
+        if branch_plan:
+            result.update({
+                "source_kind": "branch", "branch_name": plan["branch_name"],
+                "remote_url": plan["remote_url"], "source_only": plan["source_only"],
+                "profile_compatible": profile_diagnostic is None,
+                "profile_diagnostic": profile_diagnostic,
+                "profile_compatibility_scope": "Profile-required paths only; runtime and pack installation are not assessed.",
+                "pack_readiness": "not-assessed",
+            })
+        if v2 or branch_plan:
             result["destination_parent"] = plan["destination_parent"]
             result["destination_parent_action"] = plan[
                 "destination_parent_action"
@@ -657,8 +892,16 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("project", help="declared project profile, such as supersymmetry")
-    parser.add_argument("--channel", help="profile channel or alias (default: profile current channel)")
-    parser.add_argument("--destination", type=Path, required=True)
+    selector = parser.add_mutually_exclusive_group()
+    selector.add_argument("--channel", help="profile channel or alias (default: profile current channel)")
+    selector.add_argument("--branch", help="exact GitHub branch name to acquire")
+    parser.add_argument("--repository", "--source", dest="repository",
+                        help="explicit HTTPS GitHub fork repository for --branch")
+    parser.add_argument("--source-only", action="store_true",
+                        help="retain source even when it lacks profile-required pack files")
+    parser.add_argument("--list-branches", action="store_true",
+                        help="list available branches; --destination is not required")
+    parser.add_argument("--destination", type=Path)
     parser.add_argument("--plan", action="store_true", help="resolve and print the exact plan only")
     parser.add_argument("--apply", metavar="PLAN_ID", help="apply one freshly resolved exact plan")
     parser.add_argument("--state-root", type=Path, help="external Workbench state for the retained receipt")
@@ -673,7 +916,10 @@ def _render_plan(plan: Mapping[str, Any]) -> str:
     return (
         "Workbench project acquisition plan\n"
         f"Project: {plan['project_id']}\n"
-        f"Channel: {plan['channel_id']} ({plan['remote_ref']})\n"
+        + (f"Branch: {plan['branch_name']} ({plan['remote_ref']})\n"
+           if plan.get("format") == PLAN_FORMAT_V3 else
+           f"Channel: {plan['channel_id']} ({plan['remote_ref']})\n")
+        + f"Repository: {plan['remote_url']}\n"
         f"Commit: {plan['resolved_commit']}\n"
         f"Destination: {plan['destination']}\n"
         f"Plan: {plan['plan_id']}\n"
@@ -714,14 +960,45 @@ def main(
                 + ", ".join(sorted(profiles))
             )
         profile = load_acquisition_profile(profile_path)
-        plan = build_acquisition_plan_v2(
-            profile,
-            channel_name=args.channel,
-            destination=args.destination,
-            git_executable=args.git_executable,
-            environment=environment,
-            network_timeout=args.network_timeout,
-        )
+        if args.list_branches:
+            if (args.destination is not None or args.branch is not None
+                    or args.channel is not None or args.source_only or args.plan
+                    or args.apply is not None):
+                raise ProjectAcquisitionError(
+                    "branch listing takes only the project, optional repository and Git choice"
+                )
+            listing = list_remote_branches(
+                profile, repository_url=args.repository,
+                git_executable=args.git_executable, environment=environment,
+                network_timeout=args.network_timeout,
+            )
+            stdout.write(
+                json.dumps(listing, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+                if args.json else "\n".join(row["name"] for row in listing["branches"]) + "\n"
+            )
+            return 0
+        if args.destination is None:
+            raise ProjectAcquisitionError("project acquisition needs --destination PATH")
+        if args.repository is not None and args.branch is None:
+            raise ProjectAcquisitionError("--repository needs --branch")
+        if args.source_only and args.branch is None:
+            raise ProjectAcquisitionError("--source-only needs --branch")
+        if args.branch is not None:
+            plan = build_branch_acquisition_plan(
+                profile, branch_name=args.branch, destination=args.destination,
+                repository_url=args.repository, source_only=args.source_only,
+                git_executable=args.git_executable, environment=environment,
+                network_timeout=args.network_timeout,
+            )
+        else:
+            plan = build_acquisition_plan_v2(
+                profile,
+                channel_name=args.channel,
+                destination=args.destination,
+                git_executable=args.git_executable,
+                environment=environment,
+                network_timeout=args.network_timeout,
+            )
         if args.plan:
             if args.apply is not None:
                 raise ProjectAcquisitionError("--plan and --apply are mutually exclusive")
@@ -777,16 +1054,22 @@ def main(
 
 
 __all__ = [
+    "BRANCH_LIST_FORMAT",
     "PLAN_FORMAT",
     "PLAN_FORMAT_V2",
+    "PLAN_FORMAT_V3",
     "PROFILE_FORMAT",
     "ProjectAcquisitionError",
     "RECEIPT_FORMAT",
+    "RECEIPT_FORMAT_V2",
     "RESULT_FORMAT",
     "RESULT_FORMAT_V2",
+    "RESULT_FORMAT_V3",
     "apply_acquisition_plan",
     "build_acquisition_plan",
     "build_acquisition_plan_v2",
+    "build_branch_acquisition_plan",
+    "list_remote_branches",
     "load_acquisition_profile",
     "main",
     "resolve_remote_commit",

@@ -36,6 +36,7 @@ _PRISM_ZIP_STAGE_PLAN_ID = re.compile(r"workbench-prism-zip-stage-plan:sha256:[0
 _ATLAS_GRAPH_SET_ID = re.compile(r"workbench-atlas-graph-set-v[23]:sha256:[0-9a-f]{64}\Z")
 _ATLAS_SESSION_PREFIX = "workbench-atlas-observation-session-"
 _ATLAS_SESSION_MAX_FRAME = 8 * 1024 * 1024
+_PROJECT_PLAN_ID = re.compile(r"workbench-project-acquisition-plan-v3:sha256:[0-9a-f]{64}\Z")
 
 
 class CoreClientError(RuntimeError):
@@ -1335,6 +1336,93 @@ class CoreClient:
         record = await self.json_record("open", workspace, "--json")
         if not isinstance(record, dict) or record.get("format") != "workbench-workspace-home-v2":
             raise CoreClientError("unsupported Workspace Home format")
+        return record
+
+    async def project_branches(self, repository: str | None = None) -> Mapping[str, Any]:
+        """Ask the project owner for GitHub branches; no checkout is written."""
+        arguments = ["project", "acquire", "supersymmetry", "--list-branches"]
+        if repository:
+            arguments.extend(("--repository", repository))
+        record = await self.json_record(*arguments, "--json", timeout=150)
+        if (not isinstance(record, dict)
+                or record.get("format") != "workbench-project-branch-list-v1"
+                or not isinstance(record.get("repository"), str)
+                or not isinstance(record.get("branches"), list)
+                or type(record.get("truncated")) is not bool
+                or any(not isinstance(row, dict)
+                       or not isinstance(row.get("name"), str)
+                       or not isinstance(row.get("commit"), str)
+                       or _GIT_ID.fullmatch(row["commit"]) is None
+                       for row in record["branches"])):
+            raise CoreClientError("Core returned an unsupported GitHub branch list")
+        return record
+
+    @staticmethod
+    def _project_arguments(
+        branch: str, destination: str, *, repository: str | None,
+        source_only: bool,
+    ) -> list[str]:
+        if not branch.strip() or not destination.strip() or not Path(destination).is_absolute():
+            raise CoreClientError("choose a branch and an absolute new checkout folder")
+        arguments = [
+            "project", "acquire", "supersymmetry", "--branch", branch,
+            "--destination", destination,
+        ]
+        if repository:
+            arguments.extend(("--repository", repository))
+        if source_only:
+            arguments.append("--source-only")
+        return arguments
+
+    async def project_acquire_plan(
+        self, branch: str, destination: str, *, repository: str | None = None,
+        source_only: bool = False,
+    ) -> Mapping[str, Any]:
+        arguments = self._project_arguments(
+            branch, destination, repository=repository, source_only=source_only,
+        )
+        record = await self.json_record(*arguments, "--plan", "--json", timeout=150)
+        if (not isinstance(record, dict)
+                or record.get("format") != "workbench-project-acquisition-plan-v3"
+                or not isinstance(record.get("plan_id"), str)
+                or _PROJECT_PLAN_ID.fullmatch(record["plan_id"]) is None
+                or record.get("source_kind") != "branch"
+                or record.get("branch_name") != branch
+                or record.get("destination") != destination
+                or record.get("source_only") is not source_only
+                or not isinstance(record.get("remote_url"), str)
+                or not isinstance(record.get("resolved_commit"), str)
+                or _GIT_ID.fullmatch(record["resolved_commit"]) is None):
+            raise CoreClientError("Core returned an incomplete branch acquisition plan")
+        return record
+
+    async def project_acquire_apply(
+        self, plan: Mapping[str, Any], branch: str, destination: str, *,
+        repository: str | None = None, source_only: bool = False,
+    ) -> Mapping[str, Any]:
+        plan_id = plan.get("plan_id")
+        if not isinstance(plan_id, str) or _PROJECT_PLAN_ID.fullmatch(plan_id) is None:
+            raise CoreClientError("review a current branch acquisition plan first")
+        arguments = self._project_arguments(
+            branch, destination, repository=repository, source_only=source_only,
+        )
+        record = await self.json_record(
+            *arguments, "--apply", plan_id, "--json", timeout=2400,
+        )
+        if (not isinstance(record, dict)
+                or record.get("format") != "workbench-project-acquisition-result-v3"
+                or record.get("plan_id") != plan_id
+                or record.get("destination") != destination
+                or record.get("resolved_commit") != plan.get("resolved_commit")
+                or record.get("remote_url") != plan.get("remote_url")
+                or record.get("branch_name") != branch
+                or record.get("source_kind") != "branch"
+                or record.get("source_only") is not source_only
+                or type(record.get("profile_compatible")) is not bool
+                or (record.get("profile_diagnostic") is not None
+                    and not isinstance(record.get("profile_diagnostic"), str))
+                or not isinstance(record.get("receipt_path"), str)):
+            raise CoreClientError("Core did not return the reviewed branch checkout")
         return record
 
     async def java_inventory(self, profile_config: str = "") -> Mapping[str, Any]:

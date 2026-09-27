@@ -584,6 +584,142 @@ class ProjectAcquisitionTests(unittest.TestCase):
         self.assertEqual("create", plan["destination_parent_action"])
         self.assertFalse(destination.parent.exists())
 
+    def test_branch_list_and_acquisition_accept_git_valid_feature_name(self) -> None:
+        branch = "feature/next+µ"
+        self._run(self.source, "branch", branch)
+        self._run(self.source, "push", str(self.remote), branch)
+        profile = project_acquisition.load_acquisition_profile(self.profile_path)
+        listing = project_acquisition.list_remote_branches(
+            profile, git_executable=self.git, environment=self.environment,
+        )
+        self.assertEqual(project_acquisition.BRANCH_LIST_FORMAT, listing["format"])
+        self.assertIn(
+            {"name": branch, "commit": self.commit}, listing["branches"],
+        )
+        target = self.root / "new" / "feature-checkout"
+        plan = project_acquisition.build_branch_acquisition_plan(
+            profile, branch_name=branch, destination=target,
+            git_executable=self.git, environment=self.environment,
+        )
+        self.assertEqual(project_acquisition.PLAN_FORMAT_V3, plan["format"])
+        self.assertEqual("refs/heads/" + branch, plan["remote_ref"])
+        self.assertEqual(self.commit, plan["resolved_commit"])
+        result = project_acquisition.apply_acquisition_plan(
+            profile, plan, state_root=self.root / "state",
+            environment=self.environment, clone_timeout=60,
+        )
+        self.assertEqual(project_acquisition.RESULT_FORMAT_V3, result["format"])
+        self.assertTrue(result["profile_compatible"])
+        self.assertFalse(result["source_only"])
+        self.assertEqual(self.commit, self._run(target, "rev-parse", "HEAD").stdout.strip())
+        receipt = json.loads(Path(result["receipt_path"]).read_text(encoding="utf-8"))
+        self.assertEqual(project_acquisition.RECEIPT_FORMAT_V2, receipt["format"])
+        self.assertEqual(branch, receipt["branch_name"])
+
+    def test_source_only_branch_retains_checkout_without_pack_shape(self) -> None:
+        branch = "feature/source-only"
+        self._run(self.source, "checkout", "-b", branch)
+        self._run(self.source, "rm", "pack.toml")
+        self._run(self.source, "commit", "--quiet", "-m", "remove pack file")
+        self._run(self.source, "push", str(self.remote), branch)
+        profile = project_acquisition.load_acquisition_profile(self.profile_path)
+        target = self.root / "source-only-checkout"
+        plan = project_acquisition.build_branch_acquisition_plan(
+            profile, branch_name=branch, destination=target, source_only=True,
+            git_executable=self.git, environment=self.environment,
+        )
+        result = project_acquisition.apply_acquisition_plan(
+            profile, plan, state_root=self.root / "state",
+            environment=self.environment, clone_timeout=60,
+        )
+        self.assertTrue(target.is_dir())
+        self.assertFalse(result["profile_compatible"])
+        self.assertIn("pack.toml", result["profile_diagnostic"])
+        self.assertEqual([], json.loads(Path(result["receipt_path"]).read_text())["required_paths"])
+        strict_target = self.root / "strict-checkout"
+        strict = project_acquisition.build_branch_acquisition_plan(
+            profile, branch_name=branch, destination=strict_target,
+            git_executable=self.git, environment=self.environment,
+        )
+        with self.assertRaisesRegex(project_acquisition.ProjectAcquisitionError, "pack.toml"):
+            project_acquisition.apply_acquisition_plan(
+                profile, strict, state_root=self.root / "state",
+                environment=self.environment, clone_timeout=60,
+            )
+        self.assertFalse(strict_target.exists())
+
+    def test_explicit_fork_url_is_https_github_and_bound_to_plan(self) -> None:
+        profile = {**self.profile, "remote": {
+            **self.profile["remote"], "provider": "github",
+            "url": "https://github.com/SymmetricDevs/Supersymmetry.git",
+        }}
+        with mock.patch.object(project_acquisition, "resolve_remote_commit", return_value=self.commit):
+            plan = project_acquisition.build_branch_acquisition_plan(
+                profile, branch_name="feature/next+1", destination=self.root / "fork",
+                repository_url="https://github.com/Developer/Supersymmetry/",
+                git_executable=self.git, environment=self.environment,
+            )
+        self.assertEqual(
+            "https://github.com/Developer/Supersymmetry.git", plan["remote_url"]
+        )
+        for unsafe in (
+            "http://github.com/Developer/Supersymmetry",
+            "https://github.com.evil.example/Developer/Supersymmetry",
+            "https://user@github.com/Developer/Supersymmetry",
+            "https://github.com/Developer/Supersymmetry?x=1",
+            "https://github.com:bad/Developer/Supersymmetry",
+        ):
+            with self.subTest(unsafe=unsafe), self.assertRaisesRegex(
+                project_acquisition.ProjectAcquisitionError, "repository"
+            ):
+                project_acquisition.build_branch_acquisition_plan(
+                    profile, branch_name="feature/next+1", destination=self.root / "fork",
+                    repository_url=unsafe, git_executable=self.git,
+                    environment=self.environment,
+                )
+
+    def test_branch_cli_list_plan_and_apply_rejects_moved_head(self) -> None:
+        branch = "feature/moving"
+        self._run(self.source, "branch", branch)
+        self._run(self.source, "push", str(self.remote), branch)
+        common = ["fixture", "--git-executable", self.git, "--json"]
+        output, error = io.StringIO(), io.StringIO()
+        status = project_acquisition.main(
+            [*common, "--list-branches"],
+            profiles={"fixture": self.profile_path},
+            default_state_root=self.root / "state", output=output, error=error,
+            environment=self.environment,
+        )
+        self.assertEqual(0, status, error.getvalue())
+        self.assertIn(branch, {row["name"] for row in json.loads(output.getvalue())["branches"]})
+        target = self.root / "moving-checkout"
+        output, error = io.StringIO(), io.StringIO()
+        selection = [*common, "--branch", branch, "--destination", str(target)]
+        status = project_acquisition.main(
+            [*selection, "--plan"],
+            profiles={"fixture": self.profile_path},
+            default_state_root=self.root / "state", output=output, error=error,
+            environment=self.environment,
+        )
+        self.assertEqual(0, status, error.getvalue())
+        plan = json.loads(output.getvalue())
+        self.assertEqual(project_acquisition.PLAN_FORMAT_V3, plan["format"])
+        self._run(self.source, "checkout", branch)
+        (self.source / "pack.toml").write_text("name = 'Moved'\n", encoding="utf-8")
+        self._run(self.source, "add", "pack.toml")
+        self._run(self.source, "commit", "--quiet", "-m", "move branch")
+        self._run(self.source, "push", str(self.remote), branch)
+        output, error = io.StringIO(), io.StringIO()
+        status = project_acquisition.main(
+            [*selection, "--apply", plan["plan_id"]],
+            profiles={"fixture": self.profile_path},
+            default_state_root=self.root / "state", output=output, error=error,
+            environment=self.environment,
+        )
+        self.assertEqual(2, status)
+        self.assertIn("review it again", error.getvalue())
+        self.assertFalse(target.exists())
+
     def test_existing_destination_and_ambiguous_alias_fail_closed(self) -> None:
         destination = self.root / "checkout"
         destination.mkdir()

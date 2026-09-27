@@ -93,6 +93,22 @@ pack is described separately by the pack-owned
 and must be selected through the release workflow; a branch checkout is an
 explicit developer source choice.
 
+To start from another upstream branch, list branches or type its exact Git name:
+
+```bash
+workbench project acquire supersymmetry --list-branches --json
+workbench project acquire supersymmetry --branch feature/my-work \
+  --destination /path/to/new-checkout --plan --json
+workbench project acquire supersymmetry --branch feature/my-work \
+  --destination /path/to/new-checkout --apply PLAN_ID --json
+```
+
+`--repository https://github.com/OWNER/REPO.git` selects an explicit GitHub
+fork. Acquisition always uses a fresh destination; a branch that moves after
+review needs a new plan. `--source-only` permits a branch without the pack's
+required files and reports that profile compatibility is unproven. An acquired
+checkout does not install or qualify a runnable pack.
+
 Acquisition Plan V1 remains verbatim for compatibility callers and still
 requires an existing regular destination parent. The public command uses the
 additive `workbench-project-acquisition-plan-v2`, which binds the exact parent

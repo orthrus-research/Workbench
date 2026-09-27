@@ -340,6 +340,91 @@ Screen.narrow-brand #actions-panel {
     margin-left: 1;
 }
 
+#project-source-scroll {
+    height: 1fr;
+    padding: 0 1;
+}
+
+#project-source-scroll > Input,
+#project-source-scroll > Select {
+    width: 100%;
+}
+
+.project-source-row {
+    height: 1;
+}
+
+.project-source-row Input {
+    width: 1fr;
+}
+
+.project-source-row Button {
+    margin-left: 1;
+}
+
+#project-source-actions {
+    height: auto;
+    border-top: solid $secondary;
+    padding: 0 1;
+}
+
+#project-source-scope {
+    height: 1;
+    padding: 0 1;
+    color: $description;
+}
+
+#project-source-status,
+#project-ready-boundary,
+#project-branch-note {
+    height: auto;
+    color: $description;
+}
+
+#project-source-actions .button-row {
+    height: 1;
+}
+
+#project-branch-dialog {
+    width: 80;
+    max-width: 96%;
+    height: 85%;
+    background: $background;
+    border: solid $secondary;
+    padding: 0 1;
+}
+
+#project-branch-heading {
+    height: 1;
+    text-style: bold;
+}
+
+#project-branch-search {
+    width: 100%;
+}
+
+#project-branch-list {
+    height: 1fr;
+}
+
+#project-ready-summary {
+    height: auto;
+    padding: 1;
+}
+
+#project-ready-boundary {
+    padding: 0 1 1 1;
+}
+
+#project-ready-actions {
+    height: auto;
+    min-height: 3;
+    max-height: 8;
+    margin: 0 1;
+    padding: 0 1;
+    border: none;
+}
+
 #pack-source-note,
 #pack-java-note {
     height: auto;

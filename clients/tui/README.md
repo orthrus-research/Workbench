@@ -93,6 +93,24 @@ Home starts on **Set up Supersymmetry**, which collects a pack source, workspace
 Java choice and Prism location for installation. **Set up developer environment**
 handles an existing Workbench project configuration separately.
 
+**Start from GitHub branch** acquires developer source separately from the
+published pack and Prism instance. Choose the official Supersymmetry repository
+or enter a GitHub fork URL, browse or type a branch, and choose a new checkout
+folder and workspace name. Textual asks Project Intelligence and Core to resolve
+the current commit, shows that exact commit and destination before acquisition,
+then saves the checkout as a named workspace. The current branch is rechecked
+when acquisition begins; if it moved, review a new preview. Branch listing may
+be unavailable or shortened, so typing a branch always remains possible. The
+developer source route permits a branch without the full pack layout;
+Textual reports whether the acquired tree has the Supersymmetry profile's required paths.
+Source-only registry review remains available when Groovy source is present;
+Axiom's pack-specific check is offered when the required paths are present.
+A developer checkout alone does not
+install or launch a game instance. The checkout remains available even if
+saving the optional workspace choice fails.
+In WSL, an active workspace under `/mnt/<drive>/` suggests a new checkout in
+the Linux home for better Git performance; the destination remains editable.
+
 Home also offers **Choose workspace and Java** for registered named
 workspaces. Textual reads and saves these local choices through Core's
 `settings workspace` JSON interface with a revision check. Java choices are

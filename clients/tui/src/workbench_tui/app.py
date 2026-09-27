@@ -8,6 +8,7 @@ from importlib.util import find_spec
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 from typing import Any, Iterable, Mapping
@@ -2863,6 +2864,456 @@ class AxiomJourneyScreen(KeyboardFormScreen):
             self._set_busy(False)
 
 
+class ProjectBranchPicker(ModalScreen[str | None]):
+    """Filter GitHub branch names without forcing the user into a mouse menu."""
+
+    def __init__(self, branches: list[Mapping[str, Any]], *, truncated: bool) -> None:
+        super().__init__()
+        self.branches = branches
+        self.truncated = truncated
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="project-branch-dialog"):
+            yield Static("Choose a GitHub branch", id="project-branch-heading")
+            yield Static("↑↓ Choose · Enter Use · / Search · Esc Back", classes="keyboard-hint")
+            yield Input(placeholder="Search branch names", id="project-branch-search")
+            yield OptionList(id="project-branch-list")
+            yield Static(
+                "List shortened. You can type any branch on the previous screen."
+                if self.truncated else "Type a branch on the previous screen if it is not listed.",
+                id="project-branch-note",
+            )
+
+    def on_mount(self) -> None:
+        self._filter("")
+        self.query_one("#project-branch-list", OptionList).focus()
+
+    def _filter(self, value: str) -> None:
+        listing = self.query_one("#project-branch-list", OptionList)
+        words = value.casefold().split()
+        matches = [row for row in self.branches
+                   if all(word in row["name"].casefold() for word in words)]
+        listing.set_options([
+            Option(f"{row['name']}  {row['commit'][:9]}", id=row["name"])
+            for row in matches[:200]
+        ])
+        if matches:
+            listing.highlighted = 0
+        self.query_one("#project-branch-note", Static).update(
+            f"{len(matches)} branch(es) shown."
+            + (" List shortened; manual entry remains available." if self.truncated else "")
+        )
+
+    def on_key(self, event: events.Key) -> None:
+        search = self.query_one("#project-branch-search", Input)
+        if event.key in {"slash", "/"} and not search.has_focus:
+            search.focus()
+            event.stop()
+        elif event.key == "escape" and search.has_focus:
+            self.query_one("#project-branch-list", OptionList).focus()
+            event.stop()
+        elif event.key == "escape":
+            self.dismiss(None)
+            event.stop()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "project-branch-search":
+            self._filter(event.value)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "project-branch-search":
+            self.query_one("#project-branch-list", OptionList).focus()
+            event.stop()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id == "project-branch-list" and event.option_id:
+            self.dismiss(event.option_id)
+
+
+def _source_suggestion(branch: str, workspace: str) -> tuple[str, str]:
+    slug = re.sub(r"[^a-z0-9]+", "-", branch.casefold()).strip("-")[:36] or "branch"
+    path = Path(workspace).expanduser() if workspace else Path.home() / "Workbench" / "Supersymmetry"
+    parts = path.parts
+    if (len(parts) >= 3 and parts[1] == "mnt" and len(parts[2]) == 1
+            and parts[2].isascii() and parts[2].isalpha()):
+        # A WSL user may browse /mnt/c, but a new Git checkout works better in
+        # the Linux home by default. The destination field remains editable.
+        path = Path.home() / "Workbench" / "Supersymmetry"
+    return str(path.parent / f"Supersymmetry-{slug}"), f"susy-{slug}"[:64]
+
+
+def _project_source_problem(exc: Exception) -> str:
+    detail = str(exc)
+    if "Git is unavailable" in detail or "select a Git executable" in detail:
+        return "Git was not found. From Home, open Set up developer environment and select Git."
+    if "moved" in detail and ("branch" in detail or "source" in detail):
+        return "That branch changed on GitHub. Preview it again to review the new commit."
+    if "destination" in detail and ("exist" in detail or "collision" in detail):
+        return "The new checkout folder is occupied. Choose another folder and preview again."
+    return detail
+
+
+class ProjectSourceReadyScreen(Screen[None]):
+    """Show the actual checkout and useful next actions after acquisition."""
+
+    SUB_TITLE = "Developer source ready"
+
+    def __init__(self, result: Mapping[str, Any], *, workspace_saved: bool,
+                 workspace_name: str, make_default: bool, save_problem: str = "",
+                 can_review: bool, can_axiom: bool) -> None:
+        super().__init__()
+        self.result = result
+        self.workspace_saved = workspace_saved
+        self.workspace_name = workspace_name
+        self.make_default = make_default
+        self.save_problem = save_problem
+        self.can_review = can_review
+        self.can_axiom = can_axiom
+        self.saving = False
+
+    def _summary(self) -> str:
+        destination = str(self.result["destination"])
+        return (
+            f"{self.result['branch_name']}  ·  {self.result['resolved_commit'][:12]}\n"
+            f"{destination}\n"
+            + ("Workspace saved and selected for this session."
+               if self.workspace_saved else
+               f"Checkout ready; workspace choice was not saved: {self.save_problem}")
+            + ("\nRequired Supersymmetry pack paths are present."
+               if self.result.get("profile_compatible") else
+               "\nSome required pack paths are absent. "
+               + str(self.result.get("profile_diagnostic") or "Some pack files are missing."))
+        )
+
+    def compose(self) -> ComposeResult:
+        destination = str(self.result["destination"])
+        yield Header(icon="W")
+        yield Static("Developer source ready", classes="screen-heading")
+        yield Static(self._summary(), id="project-ready-summary")
+        yield Static(
+            "Source checkout only. Published pack and Prism instance are unchanged.",
+            id="project-ready-boundary",
+        )
+        options = []
+        if not self.workspace_saved:
+            options.append(Option("Save workspace now", id="save"))
+        if self.can_review and (Path(destination) / "groovy").is_dir():
+            options.append(Option("Review registry IDs", id="review"))
+        if self.can_axiom and self.result.get("profile_compatible"):
+            options.append(Option("Check source with Axiom", id="axiom"))
+        options.extend((Option("Set up developer environment", id="setup"),
+                        Option("Return to Home", id="home")))
+        yield OptionList(*options, id="project-ready-actions")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#project-ready-actions", OptionList).focus()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "escape":
+            self._home()
+            event.stop()
+
+    def _home(self) -> None:
+        while len(self.app.screen_stack) > 1:
+            self.app.pop_screen()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id != "project-ready-actions":
+            return
+        destination = str(self.result["destination"])
+        if event.option_id == "save":
+            self.retry_save_workspace()
+        elif event.option_id == "review":
+            from .material_identity import MaterialIdentityScreen
+            self.app.push_screen(MaterialIdentityScreen(destination))
+        elif event.option_id == "axiom":
+            self.app.push_screen(AxiomJourneyScreen(self.app.view, initial_workspace=destination))
+        elif event.option_id == "setup":
+            self.app.push_screen(SetupScreen(self.app.view, initial_workspace=destination))
+        elif event.option_id == "home":
+            self._home()
+
+    @work(exclusive=True, group="project-ready-save")
+    async def retry_save_workspace(self) -> None:
+        if self.saving or self.workspace_saved:
+            return
+        self.saving = True
+        self.query_one("#project-ready-summary", Static).update(
+            "Saving workspace choice…\n" + str(self.result["destination"])
+        )
+        try:
+            choices = await self.app.core.workspace_choices()  # type: ignore[attr-defined]
+            existing = next((row for row in choices["entries"]
+                             if row["name"] == self.workspace_name), None)
+            if existing is not None:
+                if existing.get("path") != self.result["destination"]:
+                    raise CoreClientError("That workspace name now belongs to another folder.")
+            else:
+                await self.app.core.register_workspace(  # type: ignore[attr-defined]
+                    self.workspace_name, str(self.result["destination"]),
+                    make_default=self.make_default,
+                    expected_record_id=choices["record_id"],
+                )
+            self.workspace_saved = True
+            self.save_problem = ""
+            self.query_one("#project-ready-actions", OptionList).remove_option("save")
+            self.app.refresh_environment()  # type: ignore[attr-defined]
+        except (CoreClientError, TimeoutError) as exc:
+            self.save_problem = str(exc)
+        finally:
+            self.query_one("#project-ready-summary", Static).update(self._summary())
+            self.saving = False
+
+
+class ProjectSourceScreen(KeyboardFormScreen):
+    """Review and acquire one developer branch through Project Intelligence/Core."""
+
+    SUB_TITLE = "Start from GitHub branch"
+    KEYBOARD_CANCEL = "project-source-back"
+    KEYBOARD_FIELDS = (
+        "project-source-mode", "project-source-repository", "project-source-branch",
+        "project-source-browse-branches", "project-source-destination",
+        "project-source-browse-parent", "project-source-name",
+        "project-source-default",
+        "project-source-preview", "project-source-back",
+    )
+
+    def __init__(self, workspace: str, choices: Mapping[str, Any], *,
+                 can_review: bool, can_axiom: bool) -> None:
+        super().__init__()
+        self.workspace = workspace
+        self.choices = choices
+        self.can_review = can_review
+        self.can_axiom = can_axiom
+        self.busy = False
+        self.suggested_destination, self.suggested_name = _source_suggestion(
+            "master-ceu", workspace,
+        )
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        yield Header(icon="W")
+        yield Static("Start from GitHub branch", classes="screen-heading")
+        yield Static(
+            "Download a new source checkout. Your published pack and installed game stay as they are.",
+            classes="screen-intro",
+        )
+        yield Static("↑↓ Move · Enter Edit/Save · Esc Back", classes="keyboard-hint")
+        yield Static("DEVELOPER SOURCE · published pack and game unchanged",
+                     id="project-source-scope")
+        with VerticalScroll(id="project-source-scroll"):
+            yield Static("GitHub repository", classes="field-label")
+            yield Select([
+                ("Official · SymmetricDevs/Supersymmetry", "official"),
+                ("Another GitHub repository or fork", "fork"),
+            ], value="official", allow_blank=False, id="project-source-mode")
+            yield Input(placeholder="https://github.com/OWNER/REPO.git",
+                        id="project-source-repository")
+            yield Static("Branch", classes="field-label")
+            with Horizontal(classes="project-source-row"):
+                yield Input(value="master-ceu", id="project-source-branch")
+                yield Button("Find branches", id="project-source-browse-branches")
+            yield Static("New checkout folder", classes="field-label")
+            with Horizontal(classes="project-source-row"):
+                yield Input(value=self.suggested_destination, id="project-source-destination")
+                yield Button("Browse parent", id="project-source-browse-parent")
+            yield Static("Workspace name", classes="field-label")
+            yield Input(value=self.suggested_name, id="project-source-name")
+            yield Checkbox("Make this my default workspace",
+                           value=not bool(self.choices.get("default")), id="project-source-default")
+        with Vertical(id="project-source-actions"):
+            yield Static("Choose a branch and a new folder, then preview the exact commit.",
+                         id="project-source-status")
+            with Horizontal(classes="button-row"):
+                yield Button("Preview checkout", id="project-source-preview", variant="primary")
+                yield Button("Back", id="project-source-back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#project-source-repository", Input).display = False
+        self.start_keyboard_navigation()
+
+    def _status(self, message: str) -> None:
+        self.query_one("#project-source-status", Static).update(message)
+
+    def _set_busy(self, busy: bool) -> None:
+        self.busy = busy
+        for name in ("project-source-preview", "project-source-back",
+                     "project-source-browse-branches", "project-source-browse-parent"):
+            self.query_one(f"#{name}", Button).disabled = busy
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "project-source-mode":
+            self.query_one("#project-source-repository", Input).display = event.value == "fork"
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "project-source-branch":
+            suggested_destination, suggested_name = _source_suggestion(event.value, self.workspace)
+            destination = self.query_one("#project-source-destination", Input)
+            name = self.query_one("#project-source-name", Input)
+            if destination.value == self.suggested_destination:
+                destination.value = suggested_destination
+            if name.value == self.suggested_name:
+                name.value = suggested_name
+            self.suggested_destination, self.suggested_name = suggested_destination, suggested_name
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "project-source-back" and not self.busy:
+            self.app.pop_screen()
+        elif event.button.id == "project-source-browse-branches":
+            self.find_branches()
+        elif event.button.id == "project-source-browse-parent":
+            self.pick_parent()
+        elif event.button.id == "project-source-preview":
+            self.preview_checkout()
+
+    def _repository(self) -> str | None:
+        if self.query_one("#project-source-mode", Select).value != "fork":
+            return None
+        value = self.query_one("#project-source-repository", Input).value.strip()
+        if not value:
+            raise CoreClientError("Enter the GitHub HTTPS URL for this fork.")
+        return value
+
+    @work(exclusive=True, group="project-source-branch-list")
+    async def find_branches(self) -> None:
+        if self.busy:
+            return
+        try:
+            repository = self._repository()
+            self._set_busy(True)
+            self._status("Looking up GitHub branches…")
+            record = await self.core.project_branches(repository)
+            branches = record["branches"]
+            self._set_busy(False)
+            if not branches:
+                self._status("No branches were listed. Type a branch name to continue.")
+                return
+            selected = await self.app.push_screen_wait(ProjectBranchPicker(
+                branches, truncated=record["truncated"],
+            ))
+            if selected:
+                self.query_one("#project-source-branch", Input).value = selected
+                self._status(f"Selected {selected}. Preview to confirm its current commit.")
+        except (CoreClientError, TimeoutError) as exc:
+            self._status(f"Could not list branches: {_project_source_problem(exc)}. Type a branch name to continue.")
+        finally:
+            self._set_busy(False)
+
+    @work(exclusive=True, group="project-source-parent")
+    async def pick_parent(self) -> None:
+        if self.busy:
+            return
+        raw = self.query_one("#project-source-destination", Input).value.strip()
+        location = Path(raw).expanduser().parent if raw else Path.home()
+        if not location.is_dir():
+            location = Path.home()
+        chosen = await self.app.push_screen_wait(InstancePathPicker(
+            location, choose_zip=False, heading="Choose checkout parent folder",
+        ))
+        if chosen is not None:
+            leaf = Path(raw).name if raw else Path(self.suggested_destination).name
+            self.query_one("#project-source-destination", Input).value = str(chosen / leaf)
+            self._status("New checkout folder selected. Preview to review the branch.")
+
+    def _selection(self) -> tuple[str, str, str | None, str, bool, bool]:
+        branch = self.query_one("#project-source-branch", Input).value.strip()
+        name = self.query_one("#project-source-name", Input).value.strip()
+        raw_path = self.query_one("#project-source-destination", Input).value.strip()
+        if not branch:
+            raise CoreClientError("Choose or type a GitHub branch.")
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", name):
+            raise CoreClientError("Use a lowercase workspace name starting with a letter.")
+        if any(row.get("name") == name for row in self.choices.get("entries", [])):
+            raise CoreClientError("That workspace name is already saved. Choose another name.")
+        if not raw_path:
+            raise CoreClientError("Choose a new checkout folder.")
+        destination = Path(raw_path).expanduser()
+        if not destination.is_absolute():
+            raise CoreClientError("Use an absolute Linux checkout path. In WSL, drives are under /mnt.")
+        destination = Path(os.path.abspath(os.fspath(destination)))
+        if destination.exists() or destination.is_symlink():
+            raise CoreClientError("That folder already exists. Choose a new folder for this branch.")
+        self.query_one("#project-source-destination", Input).value = str(destination)
+        return (
+            branch, str(destination), self._repository(), name,
+            True,
+            self.query_one("#project-source-default", Checkbox).value,
+        )
+
+    @work(exclusive=True, group="project-source-acquisition")
+    async def preview_checkout(self) -> None:
+        if self.busy:
+            return
+        try:
+            branch, destination, repository, name, source_only, make_default = self._selection()
+        except CoreClientError as exc:
+            self._status(str(exc))
+            return
+        self._set_busy(True)
+        self._status("Checking the branch and preparing an exact preview…")
+        try:
+            plan = await self.core.project_acquire_plan(
+                branch, destination, repository=repository, source_only=source_only,
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            self._status(f"Could not preview branch: {_project_source_problem(exc)}")
+            self._set_busy(False)
+            return
+        self._set_busy(False)
+        body = (
+            f"Repository: {plan['remote_url']}\n"
+            f"Branch: {plan['branch_name']}\n"
+            f"Current commit: {plan['resolved_commit']}\n"
+            f"New folder: {plan['destination']}\n"
+            f"Saved workspace: {name}"
+            + (" (default)" if make_default else "")
+            + "\n\nWorkbench will download this branch into a new folder and save a workspace choice. "
+              "A branch can be acquired even if pack files are missing; Workbench will report that after download. "
+              "The published pack and installed Prism instance are unchanged."
+        )
+        approved = await self.app.push_screen_wait(ReviewModal(
+            "Get this developer source?", body, confirm_label="Get source",
+        ))
+        if not approved:
+            self._status("No checkout was downloaded.")
+            return
+        self._set_busy(True)
+        self._status("Downloading and checking the branch… please wait; this may take several minutes.")
+        try:
+            result = await self.core.project_acquire_apply(
+                plan, branch, destination, repository=repository, source_only=source_only,
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            self._status(f"Checkout did not complete: {_project_source_problem(exc)}")
+            self._set_busy(False)
+            return
+        self._status("Checkout ready. Saving your workspace choice…")
+        workspace_saved = False
+        save_problem = ""
+        try:
+            choices = await self.core.workspace_choices()
+            await self.core.register_workspace(
+                name, destination, make_default=make_default,
+                expected_record_id=choices["record_id"],
+            )
+            workspace_saved = True
+        except (CoreClientError, TimeoutError) as exc:
+            save_problem = str(exc)
+        self.app.initial_workspace = destination  # type: ignore[attr-defined]
+        self.app.refresh_environment()  # type: ignore[attr-defined]
+        self._set_busy(False)
+        self.app.push_screen(ProjectSourceReadyScreen(
+            result, workspace_saved=workspace_saved, workspace_name=name,
+            make_default=make_default, save_problem=save_problem,
+            can_review=self.can_review, can_axiom=self.can_axiom,
+        ))
+
+
 class WorkspaceRegisterScreen(KeyboardFormScreen):
     """Register one named workspace through Core's revisioned user choices."""
 
@@ -4298,6 +4749,19 @@ class WorkflowsScreen(Screen[None]):
                    if row.get("state") == "available"}
         profiles = {row.get("id") for row in self.view.profiles
                     if row.get("state") == "available"}
+        if "project-intelligence" in enabled and "supersymmetry" in profiles:
+            actions.append({
+                "command_id": "project.acquire-journey",
+                "title": "Start from GitHub branch",
+                "summary": "Download a selected Supersymmetry branch or fork into a new developer workspace.",
+                "suite_id": "project-intelligence",
+                "authority": "Project Intelligence through Core",
+                "risk": "guided",
+                "preview": "none",
+                "availability": "experimental",
+                "options": [],
+                "document": None,
+            })
         if "axiom" in enabled and {"supersymmetry", "cleanroom"} <= profiles:
             actions.append({
                 "command_id": "axiom.native-check-journey",
@@ -4440,6 +4904,7 @@ class WorkflowsScreen(Screen[None]):
         self.query_one("#workflow-run", Button).disabled = False
         self.query_one("#workflow-run", Button).label = (
             "Open document" if action.get("document") else
+            "Get source" if action.get("command_id") == "project.acquire-journey" else
             "Open check" if action.get("command_id") == "axiom.native-check-journey" else
             "Review IDs" if action.get("command_id") == "pack-program.material-identity-journey" else
             "Run action"
@@ -4447,6 +4912,7 @@ class WorkflowsScreen(Screen[None]):
 
     def _launchable(self, action: Mapping[str, Any]) -> bool:
         return (action.get("command_id") in {
+                    "project.acquire-journey",
                     "axiom.native-check-journey",
                     "pack-program.material-identity-journey",
                 }
@@ -4482,6 +4948,9 @@ class WorkflowsScreen(Screen[None]):
         action = self.selected
         catalog = self.view.catalog
         if not action or not catalog or not self._launchable(action):
+            return
+        if action.get("command_id") == "project.acquire-journey":
+            self.app.open_project_source()  # type: ignore[attr-defined]
             return
         if action.get("command_id") == "axiom.native-check-journey":
             self.app.open_axiom_check()  # type: ignore[attr-defined]
@@ -4567,6 +5036,7 @@ class HomeScreen(Screen[None]):
 _HOME_ACTION_HELP = {
     "pack-instance": "Choose a pack source and install it in Prism.",
     "setup": "Configure an existing developer workspace.",
+    "github-source": "Download a GitHub branch or fork into a new developer workspace.",
     "workspace-choices": "Save a workspace and prepare its Java runtime.",
     "pack-release": "View or verify the published archive. Game files are installed separately.",
     "workflows": "Run available Workbench actions.",
@@ -4638,6 +5108,7 @@ class WorkbenchApp(App[None]):
                     yield OptionList(
                         Option("Set up Supersymmetry", id="pack-instance", disabled=True),
                         Option("Set up developer environment", id="setup", disabled=True),
+                        Option("Start from GitHub branch", id="github-source", disabled=True),
                         Option("Choose workspace and Java", id="workspace-choices", disabled=True),
                         Option("View published pack archive", id="pack-release", disabled=True),
                         Option("Browse and run workflows", id="workflows", disabled=True),
@@ -4708,6 +5179,7 @@ class WorkbenchApp(App[None]):
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
         yield SystemCommand("Set up Workbench", "Open the setup wizard", self.open_setup)
+        yield SystemCommand("Start from GitHub branch", "Get a developer source checkout", self.open_project_source)
         yield SystemCommand("Workspace choices", "Choose a saved workspace profile and Java", self.open_workspace_choices)
         yield SystemCommand("Supersymmetry pack", "View or prepare the saved release", self.open_pack_release)
         yield SystemCommand("Set up Supersymmetry instance", "Choose an instance source and installation", self.open_pack_instance)
@@ -4732,6 +5204,27 @@ class WorkbenchApp(App[None]):
         self.push_screen(
             SetupScreen(self.view, self.initial_workspace, self.initial_profile_config)
         )
+
+    @work(exclusive=True, group="project-source-open")
+    async def open_project_source(self) -> None:
+        enabled = {row.get("id") for row in self.view.modules
+                   if row.get("state") == "available"}
+        profiles = {row.get("id") for row in self.view.profiles
+                    if row.get("state") == "available"}
+        if "project-intelligence" not in enabled or "supersymmetry" not in profiles:
+            self.notify("Install Project Intelligence and the Supersymmetry profile first.",
+                        severity="warning")
+            return
+        try:
+            choices = await self.core.workspace_choices()
+        except (CoreClientError, TimeoutError) as exc:
+            self.push_screen(ResultScreen("Workspace choices unavailable", str(exc)))
+            return
+        self.push_screen(ProjectSourceScreen(
+            self.view.workspace, choices,
+            can_review="pack-program-studio" in enabled,
+            can_axiom="axiom" in enabled and "cleanroom" in profiles,
+        ))
 
     @work(exclusive=True, group="workspace-choices")
     async def open_workspace_choices(self) -> None:
@@ -5015,6 +5508,11 @@ class WorkbenchApp(App[None]):
         actions = home.query_one("#home-actions", OptionList)
         for option_id, ready in (
             ("setup", view.setup is not None),
+            ("github-source", view.modules_loaded and view.profiles_loaded
+             and any(row.get("id") == "project-intelligence" and row.get("state") == "available"
+                     for row in view.modules)
+             and any(row.get("id") == "supersymmetry" and row.get("state") == "available"
+                     for row in view.profiles)),
             ("workspace-choices", view.version is not None),
             ("pack-release", view.version is not None),
             ("pack-instance", view.version is not None),
@@ -5135,6 +5633,8 @@ class WorkbenchApp(App[None]):
             self.open_setup()
         elif action == "workspace-choices":
             self.open_workspace_choices()
+        elif action == "github-source":
+            self.open_project_source()
         elif action == "pack-release":
             self.open_pack_release()
         elif action == "pack-instance":

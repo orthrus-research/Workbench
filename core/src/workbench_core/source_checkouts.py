@@ -30,7 +30,6 @@ from .host_filesystem import fsync_directory, secure_private_path
 
 
 _OBJECT = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
-_BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\Z")
 _RECEIPT = re.compile(r"workbench-project-acquisition:sha256:([0-9a-f]{64})\Z")
 
 
@@ -335,7 +334,8 @@ class CoreSourceCheckouts:
         if (
             type(git_executable) is not str or not git_executable
             or type(remote_url) is not str or not remote_url or remote_url.startswith("-")
-            or type(checkout_branch) is not str or _BRANCH.fullmatch(checkout_branch) is None
+            or type(checkout_branch) is not str or not checkout_branch
+            or checkout_branch.startswith("-") or "\x00" in checkout_branch
             or type(expected_commit) is not str or _OBJECT.fullmatch(expected_commit) is None
             or expected_tree is not None and (
                 type(expected_tree) is not str or _OBJECT.fullmatch(expected_tree) is None
@@ -346,6 +346,12 @@ class CoreSourceCheckouts:
             or type(timeout_seconds) not in {int, float} or not 0 < timeout_seconds <= 3600
         ):
             _fail("input", "acquisition clone input is invalid")
+        branch_status, _, _ = _run_git(
+            git_executable, ("check-ref-format", "--branch", checkout_branch),
+            environment=environment, timeout_seconds=10.0,
+        )
+        if branch_status:
+            _fail("input", "acquisition branch is not a valid Git branch name")
         _no_redirects(destination.parent)
         parent_identity = _identity(_directory(destination.parent))
         if destination.exists() or destination.is_symlink():
