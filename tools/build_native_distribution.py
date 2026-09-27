@@ -3,7 +3,7 @@
 import argparse
 import json
 from pathlib import Path
-from native_distribution import ROOT, _derive, build, publish_assembly, selected_components
+from native_distribution import ROOT, _build, _derive, publish_assembly, selected_components
 from validation_diagnostics import DiagnosticRun, default_directory
 
 
@@ -30,7 +30,7 @@ def main(argv=None):
                 else:
                     result, custody = publish_assembly(
                         args.output,
-                        lambda output: build(output, args.components, suite=args.suite,
+                        lambda output: _build(output, args.components, suite=args.suite,
                                              command_runner=lambda command: diagnostics.command(command, cwd=ROOT, timeout=1200)),
                     )
             diagnostics.document["metadata"].update(

@@ -235,7 +235,7 @@ def derive(
     return result
 
 
-def build(output: Path, components=None, *, suite=False, root=ROOT, command_runner=_run):
+def _build(output: Path, components=None, *, suite=False, root=ROOT, command_runner=_run):
     output = output.absolute()
     if output.exists() or output.is_symlink():
         raise DistributionError("build output must be a new directory")
@@ -289,6 +289,33 @@ def build(output: Path, components=None, *, suite=False, root=ROOT, command_runn
     except BaseException:
         # Deliberately retain partial artifacts for inspection. Never claim success.
         raise
+
+
+def build(
+    output: Path,
+    components=None,
+    *,
+    suite=False,
+    root=ROOT,
+    command_runner=_run,
+    configuration_home: Path | None = None,
+    default_output_root: Path | None = None,
+):
+    """Build through Core while retaining the V1 wheelhouse manifest return."""
+
+    output = Path(output).absolute()
+    if output.exists() or output.is_symlink():
+        raise DistributionError("build output must be a new directory")
+    result, _custody = publish_assembly(
+        output,
+        lambda staged: _build(
+            staged, components, suite=suite, root=root, command_runner=command_runner,
+        ),
+        root=root,
+        configuration_home=configuration_home,
+        default_output_root=default_output_root,
+    )
+    return result
 
 
 def verify(wheelhouse: Path):

@@ -198,6 +198,67 @@ class NativeReuseTests(unittest.TestCase):
                 json.loads(printed.getvalue()),
             )
 
+    def test_direct_native_build_uses_core_without_running_pip(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            output = base / "native-output"
+            forbidden_command = lambda _argv: self.fail("native process launched")
+            with patch.object(distribution, "_build", side_effect=lambda staged, *_args, **_kwargs: self.assembly(staged)) as producer:
+                manifest = distribution.build(
+                    output,
+                    command_runner=forbidden_command,
+                    configuration_home=base / "core-home",
+                )
+            self.assertEqual(manifest, distribution.verify(output))
+            self.assertNotEqual(output, producer.call_args.args[0])
+            self.assertEqual("payload", producer.call_args.args[0].name)
+            self.assertIs(producer.call_args.kwargs["command_runner"], forbidden_command)
+            from workbench_core.storage.registered import ResourceCatalog
+            catalog = ResourceCatalog(base / "core-home")
+            rows = catalog.inventory(workspace=ROOT)["trees"]
+            self.assertEqual(
+                [("native-build", str(output))],
+                [(row["owner_id"], row["path"]) for row in rows],
+            )
+            reference = catalog.trees.describe(rows[0]["tree_id"], workspace=ROOT)
+            self.assertEqual(
+                "workbench-native-wheelhouse-v1:sha256:"
+                + distribution._digest(output / "wheelhouse.json"),
+                reference.domain_id,
+            )
+
+    def test_native_build_cli_uses_one_core_stage_producer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            output, staged = base / "native-output", base / "stage"
+            manifest = {
+                "format": distribution.FORMAT, "source_sha256": "a" * 64,
+                "target": {}, "wheels": [],
+            }
+            reference = SimpleNamespace(tree_id="native-tree", path=output)
+
+            def publish(selected, produce):
+                self.assertEqual(output, selected)
+                self.assertEqual(manifest, produce(staged))
+                return manifest, reference
+
+            printed = io.StringIO()
+            with patch.object(cli, "publish_assembly", side_effect=publish), patch.object(
+                cli, "_build", return_value=manifest,
+            ) as producer, redirect_stdout(printed):
+                self.assertEqual(0, cli.main([
+                    "--output", str(output), "--diagnostics", str(base / "diagnostics"),
+                ]))
+            self.assertEqual(staged, producer.call_args.args[0])
+            self.assertIsNone(producer.call_args.args[1])
+            self.assertFalse(producer.call_args.kwargs["suite"])
+            self.assertTrue(callable(producer.call_args.kwargs["command_runner"]))
+            self.assertEqual(
+                {**manifest, "artifact_tree_id": reference.tree_id,
+                 "artifact_path": str(reference.path)},
+                json.loads(printed.getvalue()),
+            )
+
     def test_failed_native_build_retains_staging_without_publishing_output(self):
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
@@ -208,12 +269,9 @@ class NativeReuseTests(unittest.TestCase):
                 (staged / "partial.txt").write_text("unqualified bytes")
                 raise RuntimeError("build interrupted")
 
-            with self.assertRaisesRegex(RuntimeError, "interrupted"):
-                publish_build_tree(
-                    output, fail, lambda _path, _result: None,
-                    lambda _path, _result: "unreachable", owner_id="native-build",
-                    configuration_home=base / "core-home",
-                )
+            with patch.object(distribution, "_build", side_effect=lambda staged, *_args, **_kwargs: fail(staged)):
+                with self.assertRaisesRegex(RuntimeError, "interrupted"):
+                    distribution.build(output, configuration_home=base / "core-home")
             self.assertFalse(output.exists())
             self.assertEqual(
                 [b"unqualified bytes"],
