@@ -437,12 +437,22 @@ def main() -> int:
         return 0
 
     collected_ids = tuple(sorted(test.id() for test in _tests_in(discovered)))
-    target = args.report if args.report is not None else REPORT_ROOT.parent / "runs" / args.run_id / "reports" / f"{selected.name}.json"
+    core_allocation_id = args.core_allocation_id
+    core_configuration_home = args.core_configuration_home
+    if args.report is None and core_allocation_id is None:
+        from core_run_custody import allocate_standalone_suite_run
+
+        core_allocation_id, target, core_configuration_home = allocate_standalone_suite_run(
+            ROOT, args.run_id, selected.name,
+        )
+    else:
+        target = (args.report if args.report is not None else
+                  REPORT_ROOT.parent / "runs" / args.run_id / "reports" / f"{selected.name}.json")
     assert args.run_id is not None and args.source_fingerprint is not None
     _write_inventory(selected.name, collected_ids, target,
                      run_id=args.run_id, source_fingerprint=args.source_fingerprint,
-                     core_allocation_id=args.core_allocation_id,
-                     core_configuration_home=args.core_configuration_home)
+                     core_allocation_id=core_allocation_id,
+                     core_configuration_home=core_configuration_home)
     if args.admission_file is not None:
         _await_admission(args.admission_file, test_ids=collected_ids,
                          run_id=args.run_id, source_fingerprint=args.source_fingerprint)
@@ -477,8 +487,8 @@ def main() -> int:
         collected_ids=collected_ids,
         phases=phases,
         state="interrupted" if interrupted else None,
-        core_allocation_id=args.core_allocation_id,
-        core_configuration_home=args.core_configuration_home,
+        core_allocation_id=core_allocation_id,
+        core_configuration_home=core_configuration_home,
     )
     slow = sorted(
         (

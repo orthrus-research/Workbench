@@ -70,6 +70,29 @@ def allocate_validation_run(root: Path, run_id: str):
     return host, allocation
 
 
+def allocate_standalone_suite_run(
+    root: Path, run_id: str, suite_name: str,
+) -> tuple[str, Path, Path]:
+    """Reserve the default direct-suite report under a fresh Core run tree."""
+
+    from orchestration import create_run_paths
+
+    if (type(suite_name) is not str or _SUITE_NAME.fullmatch(suite_name) is None
+            or suite_name in {".", ".."}):
+        raise ValueError("validation suite name is not a portable run key")
+    selected_root = Path(root).resolve(strict=True)
+    host, allocation = allocate_validation_run(selected_root, run_id)
+    paths = create_run_paths(
+        selected_root / ".workbench/validation/runs", run_id,
+        allocated_root=allocation.path,
+    )
+    return (
+        allocation.allocation_id,
+        paths.report_for(suite_name),
+        host.catalog.resources.configuration_home,
+    )
+
+
 def _validation_run_allocation(
     root: Path, run_id: str, allocation_id: str,
     configuration_home: Path | None,

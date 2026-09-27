@@ -39,6 +39,48 @@ from suite_catalog import PythonTestSuite  # noqa: E402
 
 
 class PythonSuiteIsolationTests(unittest.TestCase):
+    def test_default_direct_run_uses_fresh_core_allocation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            config = Path(temporary) / "config"
+
+            class Sample(unittest.TestCase):
+                def test_pass(self) -> None:
+                    # Reopening the report must use the home selected before
+                    # the suite ran, even if test code changes the process env.
+                    os.environ["WORKBENCH_CONFIG_HOME"] = str(config / "changed")
+
+            def one_suite(_selected):
+                return unittest.TestSuite([Sample("test_pass")])
+
+            arguments = [
+                "run_python_suite.py", "validation", "--run-id", "direct-one",
+                "--source-fingerprint", "source:one",
+            ]
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(config)}), \
+                    patch("run_python_suite.ROOT", root), \
+                    patch("run_python_suite._configure_suite"), \
+                    patch("run_python_suite._discover_tests", side_effect=one_suite), \
+                    patch.object(sys, "argv", arguments), \
+                    patch("sys.stdout", new_callable=StringIO), \
+                    patch("sys.stderr", new_callable=StringIO):
+                self.assertEqual(0, suite_main())
+                reports = root / ".workbench/validation/runs/direct-one/reports"
+                inventory = reports / "validation.inventory.json"
+                result = reports / "validation.json"
+                self.assertTrue((reports.parent / ".workbench-allocation.json").is_file())
+                self.assertEqual("workbench-python-test-inventory-v1",
+                                 json.loads(inventory.read_bytes())["format"])
+                self.assertEqual("passed", json.loads(result.read_bytes())["state"])
+                self.assertEqual(0, inventory.stat().st_mode & 0o077)
+                self.assertEqual(0, result.stat().st_mode & 0o077)
+                prior = (inventory.read_bytes(), result.read_bytes())
+                os.environ["WORKBENCH_CONFIG_HOME"] = str(config)
+                with self.assertRaisesRegex(WorkingAllocationError, "already exists"):
+                    suite_main()
+                self.assertEqual(prior, (inventory.read_bytes(), result.read_bytes()))
+
     def test_core_run_records_reopen_exact_allocation_and_cas_report(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
