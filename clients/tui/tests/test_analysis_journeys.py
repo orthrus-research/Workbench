@@ -17,6 +17,7 @@ from workbench_tui.app import (
     AtlasSearchScreen, AxiomHistoryScreen, AxiomJourneyScreen, WorkspaceChoicesScreen,
     EnvironmentView, ReviewModal, SetupScreen, WorkbenchApp, _analysis_summary,
     _atlas_import_action, _atlas_match_name, _atlas_record, _axiom_import_source,
+    _observation_label,
 )
 from workbench_tui.core_client import CommandOutput, CoreClient, CoreClientError
 
@@ -36,6 +37,26 @@ def owner_output(command_id: str, record: dict) -> CommandOutput:
 
 
 class AnalysisResultTests(unittest.TestCase):
+    def test_observation_uses_record_key_without_dumping_raw_value(self) -> None:
+        node = {"id": "workbench-atlas-node-v2:example:" + "a" * 64,
+                "semantic_key": "a" * 64, "kind": "initialization-block-hardness",
+                "properties": {"record_key": "tardis:circuit_repair",
+                               "family": "block-hardness",
+                               "label": "net.tardis.mod.common.blocks.BlockComponentRepair",
+                               "raw_value": {"long": "internal value"}}}
+        self.assertEqual("tardis:circuit_repair", _observation_label(node))
+        self.assertEqual("tardis:circuit_repair", _observation_label(node, limit=30))
+        summary = _analysis_summary("atlas", {
+            "format": "workbench-atlas-observation-inspection-v1",
+            "context": {"root": "/graph"}, "selection": node,
+            "relationships": {"incoming": {"uses": 2}, "outgoing": {"contains": 1}},
+        })
+        self.assertIn("Observation: tardis:circuit_repair", summary)
+        self.assertIn("Incoming links: 2", summary)
+        self.assertNotIn("internal value", summary)
+        self.assertNotIn("a" * 64, summary)
+        self.assertIn("R Full record", summary)
+
     def test_axiom_to_atlas_uses_owner_attempt_and_admitted_catalog_action(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             attempt = Path(temporary) / "retained-check"
@@ -641,7 +662,7 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
                                  + " focus=" + repr(app.focused)
                                  + " selected=" + repr(search.selected))
                 await self._settle(pilot, lambda: isinstance(app.screen, AnalysisResultScreen))
-                self.assertIn("Selected: workbench:copper",
+                self.assertIn("Observation: workbench:copper",
                               _analysis_summary("atlas", app.screen.record))
                 self.assertEqual(4, session.request.await_count)
                 await pilot.press("escape")

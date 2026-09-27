@@ -1427,6 +1427,30 @@ def _evidence_note(record: Mapping[str, Any]) -> str:
     return "Evidence limits:\n" + "\n".join(lines) if lines else ""
 
 
+def _observation_label(node: Mapping[str, Any], *, limit: int | None = None) -> str:
+    """Prefer the owner's source-facing label over an internal graph hash."""
+    properties = node.get("properties")
+    properties = properties if isinstance(properties, dict) else {}
+    selected = ""
+    for candidate in (properties.get("record_key"), properties.get("label"),
+                      node.get("semantic_key")):
+        if not isinstance(candidate, str):
+            continue
+        value = " ".join(candidate.split())
+        if not value:
+            continue
+        if len(value) >= 48 and all(char in "0123456789abcdef" for char in value):
+            continue
+        selected = value
+        break
+    if not selected:
+        kind = str(properties.get("family") or node.get("kind") or "observation")
+        selected = kind.removeprefix("initialization-").replace("-", " ") + " observation"
+    if limit is not None and len(selected) > limit:
+        return selected[:limit - 1] + "…"
+    return selected
+
+
 def _analysis_summary(owner: str, record: Mapping[str, Any]) -> str:
     """A small, truthful reading surface; the complete owner record stays available."""
     lines: list[str] = []
@@ -1447,8 +1471,10 @@ def _analysis_summary(owner: str, record: Mapping[str, Any]) -> str:
             return "\n".join(lines)
         if str(record.get("format", "")).startswith("workbench-atlas-observation-"):
             context = record.get("context")
-            if isinstance(context, dict) and context.get("root"):
-                lines.append(f"Observation graph: {context['root']}")
+            selection = record.get("selection")
+            if isinstance(selection, dict):
+                lines.append(f"Observation: {_observation_label(selection)}")
+                lines.append(f"Kind: {selection.get('kind', '?')}")
             if isinstance(context, dict):
                 binding = context.get("evidence_binding")
                 if isinstance(binding, dict):
@@ -1456,14 +1482,26 @@ def _analysis_summary(owner: str, record: Mapping[str, Any]) -> str:
                                        ("coverage", "Capture coverage")):
                         if binding.get(key) is not None:
                             lines.append(f"{label}: {binding[key]}")
-            selection = record.get("selection")
+                if context.get("root"):
+                    lines.append(f"Observation graph: {context['root']}")
             if isinstance(selection, dict):
-                lines.append(f"Selected: {selection.get('semantic_key', selection.get('id', '?'))}")
-                lines.append(f"Kind: {selection.get('kind', '?')}")
-                if isinstance(selection.get("properties"), dict):
-                    lines.extend(("", "Recorded properties:",
-                                  json.dumps(selection["properties"], ensure_ascii=False,
-                                             indent=2, sort_keys=True)))
+                properties = selection.get("properties")
+                if isinstance(properties, dict):
+                    for key, label in (("record_key", "Record"), ("family", "Family"),
+                                       ("label", "Label"), ("json_pointer", "Source pointer")):
+                        value = properties.get(key)
+                        if isinstance(value, str) and value:
+                            lines.append(f"{label}: {value}")
+                    if "raw_value" in properties:
+                        lines.append("Captured raw value: open R Full record.")
+                relationships = record.get("relationships")
+                if isinstance(relationships, dict):
+                    for direction in ("incoming", "outgoing"):
+                        counts = relationships.get(direction)
+                        if isinstance(counts, dict):
+                            total = sum(value for value in counts.values()
+                                        if isinstance(value, int) and value >= 0)
+                            lines.append(f"{direction.capitalize()} links: {total}")
             if record.get("query") is not None:
                 lines.append(f"Search: {record['query']}")
             results = record.get("results")
@@ -1475,7 +1513,7 @@ def _analysis_summary(owner: str, record: Mapping[str, Any]) -> str:
                     node = row.get("node") if isinstance(row.get("node"), dict) else row
                     edge = row.get("edge") if isinstance(row.get("edge"), dict) else None
                     relation = f"{edge.get('relation', '?')} → " if edge else ""
-                    lines.append(f"• {relation}{node.get('semantic_key', node.get('id', '?'))}")
+                    lines.append(f"• {relation}{_observation_label(node)}")
             page = record.get("page")
             if isinstance(page, dict) and page.get("next_cursor"):
                 lines.append("More results exist; narrow the search or request another page.")
@@ -2171,10 +2209,10 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
         self.query_one("#atlas-observation-links", Button).disabled = not available
         evidence = selected.get("evidence")
         self.query_one("#atlas-observation-detail", Static).update(
-            f"{selected.get('semantic_key', selected.get('id', '?'))}\n"
-            f"Kind: {selected.get('kind', '?')}\n"
-            f"Recorded evidence: {len(evidence) if isinstance(evidence, list) else 'unknown'}\n\n"
-            "Enter to inspect this exact observation. Links shows recorded relationships."
+            f"{_observation_label(selected)}\n"
+            f"{selected.get('kind', '?')} · "
+            f"{len(evidence) if isinstance(evidence, list) else '?'} evidence refs\n"
+            "Enter Inspect · → Links"
         )
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
@@ -2223,7 +2261,7 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
             self.next_cursor = cursor if isinstance(cursor, str) and cursor else None
             listing = self.query_one("#atlas-observation-results", OptionList)
             listing.set_options([
-                Option(f"{row.get('semantic_key', row.get('id', '?'))}  ·  {row.get('kind', '?')}",
+                Option(_observation_label(row, limit=30),
                        id=str(index)) for index, row in enumerate(self.results)
             ])
             self.query_one("#atlas-observation-more", Button).disabled = not self.next_cursor

@@ -664,6 +664,35 @@ Screen.-narrow #workflow-detail-panel .button-row Button {
     margin-right: 1;
 }
 
+AtlasObservationSearchScreen.-narrow #workflow-body {
+    height: 1fr;
+}
+
+AtlasObservationSearchScreen.-narrow #atlas-observation-results {
+    width: 100%;
+    height: 1fr;
+    min-height: 3;
+}
+
+AtlasObservationSearchScreen.-narrow #workflow-detail-panel {
+    width: 100%;
+    height: 5;
+    min-height: 5;
+    max-height: 5;
+    padding: 0 1;
+}
+
+AtlasObservationSearchScreen.-narrow #atlas-observation-detail {
+    height: 2;
+    overflow-y: hidden;
+}
+
+AtlasObservationSearchScreen.-narrow #atlas-observation-back {
+    height: 1;
+    min-height: 1;
+    border: none;
+}
+
 ReviewModal.-narrow #review-dialog, ReleaseUpdateModal.-narrow #review-dialog,
 CatalogInputsScreen.-narrow #review-dialog, CatalogValueScreen.-narrow #review-dialog {
     width: 95%;
