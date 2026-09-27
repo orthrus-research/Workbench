@@ -9,6 +9,7 @@ from workbench_api.host_filesystem import (
     publish_create_once_bytes,
     read_bounded_single_link_bytes,
 )
+from workbench_api.processes import ProcessError, execute_process
 
 import base64
 import difflib
@@ -18,9 +19,9 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
-import subprocess
 import sys
 import tempfile
+from threading import Event
 from typing import Any, Mapping, NoReturn, Sequence
 from urllib.parse import urlparse
 
@@ -177,17 +178,18 @@ def _run_git(
 ) -> bytes:
     git = _git_executable()
     try:
-        completed = subprocess.run(
+        completed = execute_process(
             [git, "-C", str(root), *arguments],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=environment,
-            timeout=60,
+            cwd=root,
+            stdin=b"",
+            environment=dict(os.environ) if environment is None else environment,
+            cancelled=Event(),
+            timeout_seconds=60,
+            output_limit=4 * 1024 * 1024,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except (OSError, ProcessError) as exc:
         _fail(f"cannot prepare disposable Blueprint Git workspace: {exc}")
-    if completed.returncode:
+    if completed.exit_code:
         detail = completed.stderr.decode("utf-8", "replace").strip()
         _fail(
             f"Git {' '.join(arguments)} failed in Blueprint staging: "

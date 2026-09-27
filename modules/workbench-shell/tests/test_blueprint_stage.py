@@ -31,6 +31,7 @@ from workbench_shell.blueprint_stage import (  # noqa: E402
     BlueprintStageError,
     _load_json,
     _prepare_stage_parent,
+    _run_git,
     _write_json,
     plan_material_backed_fluid,
     stage_material_backed_fluid,
@@ -41,6 +42,8 @@ from workbench_shell.cli import main as shell_main  # noqa: E402
 from workbench_api import ExecutionContext  # noqa: E402
 from workbench_shell import commands  # noqa: E402
 from workbench_core.host_services import install_local_host_services  # noqa: E402
+import workbench_api.processes as process_port  # noqa: E402
+import workbench_shell.blueprint_stage as stage_module  # noqa: E402
 
 
 PACK_REVISION = "9d3aa7ae0294bf27f0b8acbb893d61da23a06972"
@@ -186,6 +189,69 @@ class BlueprintStageTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         install_local_host_services()
+
+    def test_real_git_runs_through_core_process_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _git(root, "init", "--quiet")
+            with patch.object(
+                stage_module, "execute_process", wraps=process_port.execute_process
+            ) as core_process:
+                observed = _run_git(root, ("rev-parse", "--is-inside-work-tree"))
+            self.assertEqual(b"true\n", observed)
+            command = core_process.call_args.args[0]
+            self.assertTrue(Path(command[0]).is_absolute())
+            self.assertEqual(("-C", str(root), "rev-parse", "--is-inside-work-tree"), tuple(command[1:]))
+            self.assertEqual(root, core_process.call_args.kwargs["cwd"])
+            self.assertEqual(b"", core_process.call_args.kwargs["stdin"])
+            self.assertEqual(60, core_process.call_args.kwargs["timeout_seconds"])
+            self.assertEqual(4 * 1024 * 1024, core_process.call_args.kwargs["output_limit"])
+
+    def test_git_refuses_an_unbound_core_process_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            with (
+                patch.object(stage_module, "_git_executable", return_value=sys.executable),
+                patch.object(process_port, "_host", None),
+            ):
+                with self.assertRaisesRegex(BlueprintStageError, "no process host is bound"):
+                    _run_git(Path(temporary), ("status",))
+
+    @unittest.skipUnless(os.name == "posix", "executable test fixture requires POSIX")
+    def test_git_nonzero_and_timeout_refuse_without_stage_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            script = root / "fixture-git"
+            script.write_text("#!/bin/sh\nprintf 'fixture Git failure' >&2\nexit 17\n", encoding="utf-8")
+            script.chmod(0o700)
+            with patch.object(stage_module, "_git_executable", return_value=str(script)):
+                with self.assertRaisesRegex(BlueprintStageError, "fixture Git failure"):
+                    _run_git(root, ("status",))
+
+            script.write_text("#!/bin/sh\nsleep 3\n", encoding="utf-8")
+
+            def short_timeout(*args, **kwargs):
+                self.assertEqual(60, kwargs["timeout_seconds"])
+                return process_port.execute_process(
+                    *args, **{**kwargs, "timeout_seconds": 0.2}
+                )
+
+            with (
+                patch.object(stage_module, "_git_executable", return_value=str(script)),
+                patch.object(stage_module, "execute_process", side_effect=short_timeout),
+            ):
+                with self.assertRaisesRegex(BlueprintStageError, "timed out"):
+                    _run_git(root, ("status",))
+
+    @unittest.skipUnless(os.name == "posix", "background child fixture requires POSIX")
+    def test_git_refuses_a_background_child_after_its_leader_exits(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            script = root / "fixture-git"
+            script.write_text("#!/bin/sh\nsleep 3 &\nexit 0\n", encoding="utf-8")
+            script.chmod(0o700)
+            with patch.object(stage_module, "_git_executable", return_value=str(script)):
+                with self.assertRaisesRegex(BlueprintStageError, "native-tool invocation cancelled"):
+                    _run_git(root, ("status",))
 
     def test_stage_receipt_uses_core_create_once_with_historical_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -381,6 +447,19 @@ class BlueprintStageTest(unittest.TestCase):
                 validate_retained_blueprint_stage(tampered_summary, reviewed)
             receipt_path = Path(target["receipt_uri"].removeprefix("file://"))
             original_receipt_bytes = receipt_path.read_bytes()
+            # Pre-Core V2 receipts used the same ordinary file and exact bytes.
+            receipt_path.unlink()
+            receipt_path.write_bytes(original_receipt_bytes)
+            historical_reuse = stage_material_backed_fluid(
+                SUITE_ROOT,
+                project,
+                name="Pilot Coolant",
+                color="0x425d73",
+                state_root=state,
+            )
+            self.assertEqual("reused", historical_reuse["outcome"])
+            self.assertEqual(receipt, historical_reuse["receipt"])
+            self.assertEqual(original_receipt_bytes, receipt_path.read_bytes())
             rebound = json.loads(original_receipt_bytes)
             rebound["source"]["snapshot"]["tree_sha256"] = "sha256:" + "f" * 64
             candidate_material = {
