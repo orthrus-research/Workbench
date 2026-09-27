@@ -44,6 +44,12 @@ class ParallelValidationSchedulerTests(unittest.TestCase):
         rows = WorkingAllocationCatalog(self.configuration_home).inventory_rows(workspace=root)
         return next(row for row in rows if row["label"] == run_id)
 
+    def _temporary_statuses(self, root: Path) -> dict[Path, str]:
+        from workbench_core.storage.registered import ResourceCatalog
+
+        rows = ResourceCatalog(self.configuration_home).inventory(workspace=root)["temporary_leases"]
+        return {Path(row["path"]): row["status"] for row in rows}
+
     def test_suite_child_keeps_isolated_config_home(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -521,6 +527,17 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 {"alpha", "beta"},
                 {row["name"] for row in manifest["completed_suites"]},
             )
+            self.assertEqual(
+                {
+                    paths.temporary: "retained-unproven",
+                    paths.root / "repository-tmp": "retained-unproven",
+                },
+                self._temporary_statuses(root),
+            )
+            self.assertEqual(
+                "completed",
+                json.loads((paths.temporary / ".workbench-temporary-retained.json").read_text())["outcome"],
+            )
             for suite in suites:
                 self.assertTrue(
                     (
@@ -609,16 +626,16 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 ["beta"],
                 [row["name"] for row in manifest["completed_suites"]],
             )
-            self.assertFalse(
-                (root / "external-temp/run-failure").exists(),
-                "failure must remove external run-owned suite scratch",
+            self.assertEqual(
+                {
+                    root / "external-temp/run-failure": "retained-unproven",
+                    root / ".workbench/validation/runs/run-failure/repository-tmp": "retained-unproven",
+                },
+                self._temporary_statuses(root),
             )
-            self.assertFalse(
-                (
-                    root
-                    / ".workbench/validation/runs/run-failure/repository-tmp"
-                ).exists(),
-                "failure must remove repository-scoped suite scratch",
+            self.assertEqual(
+                "failed",
+                json.loads((root / "external-temp/run-failure/.workbench-temporary-retained.json").read_text())["outcome"],
             )
 
     def test_keyboard_interrupt_terminates_owned_process_and_terminalizes_run(
@@ -697,9 +714,15 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 "validation interrupted by KeyboardInterrupt: operator cancelled",
                 manifest["failures"],
             )
-            self.assertFalse((root / "external-temp/run-interrupted").exists())
+            self.assertEqual(
+                {
+                    root / "external-temp/run-interrupted": "retained-unproven",
+                    root / ".workbench/validation/runs/run-interrupted/repository-tmp": "retained-unproven",
+                },
+                self._temporary_statuses(root),
+            )
 
-    def test_cleanup_failure_fails_closed_and_is_recorded(self) -> None:
+    def test_retention_failure_fails_closed_and_is_recorded(self) -> None:
         from workbench_core.temporary_leases import CoreTemporaryLeases
 
         with tempfile.TemporaryDirectory() as temporary:
@@ -730,13 +753,13 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 patch.object(scheduler, "_run_suite_process", side_effect=fake_run),
                 patch.object(
                     CoreTemporaryLeases,
-                    "_remove_owned_tree",
+                    "retain",
                     side_effect=OSError("busy"),
                 ),
             ):
                 with self.assertRaisesRegex(
                     scheduler.SuiteExecutionFailure,
-                    "could not remove isolated suite temporary storage: busy",
+                    "could not retain isolated suite temporary storage: busy",
                 ):
                     scheduler.run_python_suites(
                         tier="quick",
@@ -755,8 +778,15 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
             self.assertEqual("failed", manifest["state"])
             self.assertEqual("failed", self._registered_run(root, "run-cleanup")["status"])
             self.assertIn(
-                "could not remove isolated suite temporary storage: busy",
+                "could not retain isolated suite temporary storage: busy",
                 manifest["failures"],
+            )
+            self.assertEqual(
+                {
+                    root / "external-temp/run-cleanup": "active-or-abandoned",
+                    root / ".workbench/validation/runs/run-cleanup/repository-tmp": "active-or-abandoned",
+                },
+                self._temporary_statuses(root),
             )
 
     def test_setup_failure_before_launch_disposes_both_core_scratch_roots(self) -> None:
@@ -822,7 +852,127 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                     )
             self.assertTrue((root / "external-temp/run-descendant").is_dir())
             self.assertTrue((root / ".workbench/validation/runs/run-descendant/repository-tmp").is_dir())
+            self.assertEqual(
+                {"retained-unproven"}, set(self._temporary_statuses(root).values()),
+            )
             self.assertEqual("failed", self._registered_run(root, "run-descendant")["status"])
+
+    @unittest.skipUnless(os.name == "posix", "requires a detached POSIX child")
+    def test_out_of_group_child_cannot_trigger_scratch_disposal(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.py"
+            source.write_text("pass\n", encoding="utf-8")
+            fingerprint = fingerprint_paths(root, (source,))
+            suite = self._suite("alpha")
+            detached = None
+
+            def fake_run(request, **_kwargs):
+                nonlocal detached
+                request.temporary_root.mkdir(parents=True, exist_ok=True)
+                ready = request.temporary_root / "detached-ready"
+                detached = subprocess.Popen(
+                    [sys.executable, "-c",
+                     "import pathlib,sys,time; pathlib.Path(sys.argv[1]).write_text('active'); time.sleep(30)",
+                     str(ready)],
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                deadline = time.monotonic() + 5
+                while not ready.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(ready.exists())
+                self._write_success_report(request)
+                return scheduler._SuiteProcessResult(
+                    request,
+                    ProcessOutcome(request.suite.name, 0, 0.05, 900),
+                    admitted_test_ids=(f"{request.suite.name}.Tests.test_case",),
+                )
+
+            try:
+                with (
+                    patch.object(scheduler, "ROOT", root),
+                    patch.object(scheduler, "_validation_temporary_storage", return_value=root / "external-temp"),
+                    patch.object(scheduler, "suites_for_tier", return_value=(suite,)),
+                    patch.object(scheduler, "new_run_id", return_value="run-detached"),
+                    patch.object(scheduler, "_run_suite_process", side_effect=fake_run),
+                ):
+                    paths = scheduler.run_python_suites(
+                        tier="quick", selected=(), jobs=1,
+                        source_fingerprint=fingerprint,
+                        repository_files=lambda: [source],
+                    )
+                self.assertIsNotNone(detached)
+                self.assertIsNone(detached.poll())
+                self.assertEqual("passed", json.loads((paths.root / "run.json").read_text())["state"])
+                self.assertEqual(
+                    {
+                        paths.temporary: "retained-unproven",
+                        paths.root / "repository-tmp": "retained-unproven",
+                    },
+                    self._temporary_statuses(root),
+                )
+                self.assertEqual("active", (paths.temporary / "alpha/detached-ready").read_text())
+            finally:
+                if detached is not None:
+                    detached.kill()
+                    detached.wait(timeout=5)
+
+    def test_manifest_failure_after_retention_does_not_retain_twice(self) -> None:
+        from workbench_core.temporary_leases import CoreTemporaryLeases
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.py"
+            source.write_text("pass\n", encoding="utf-8")
+            fingerprint = fingerprint_paths(root, (source,))
+            suite = self._suite("alpha")
+            retained_ids: list[str] = []
+            original_retain = CoreTemporaryLeases.retain
+            original_manifest = scheduler._write_run_manifest
+
+            def fake_run(request, **_kwargs):
+                self._write_success_report(request)
+                return scheduler._SuiteProcessResult(
+                    request,
+                    ProcessOutcome(request.suite.name, 0, 0.05, 900),
+                    admitted_test_ids=(f"{request.suite.name}.Tests.test_case",),
+                )
+
+            def retain_once(host, reference, *, outcome):
+                retained_ids.append(reference.lease_id)
+                return original_retain(host, reference, outcome=outcome)
+
+            def fail_passed_manifest(*args, **kwargs):
+                if kwargs["state"] == "passed":
+                    raise OSError("final manifest unavailable")
+                return original_manifest(*args, **kwargs)
+
+            with (
+                patch.object(scheduler, "ROOT", root),
+                patch.object(scheduler, "_validation_temporary_storage", return_value=root / "external-temp"),
+                patch.object(scheduler, "suites_for_tier", return_value=(suite,)),
+                patch.object(scheduler, "new_run_id", return_value="run-finalization"),
+                patch.object(scheduler, "_run_suite_process", side_effect=fake_run),
+                patch.object(CoreTemporaryLeases, "retain", autospec=True, side_effect=retain_once),
+                patch.object(scheduler, "_write_run_manifest", side_effect=fail_passed_manifest),
+            ):
+                with self.assertRaisesRegex(OSError, "final manifest unavailable"):
+                    scheduler.run_python_suites(
+                        tier="quick", selected=(), jobs=1,
+                        source_fingerprint=fingerprint,
+                        repository_files=lambda: [source],
+                    )
+            self.assertEqual(2, len(retained_ids))
+            self.assertEqual(2, len(set(retained_ids)))
+            self.assertEqual(
+                {"retained-unproven"}, set(self._temporary_statuses(root).values()),
+            )
+            manifest = root / ".workbench/validation/runs/run-finalization/run.json"
+            self.assertEqual("failed", json.loads(manifest.read_text())["state"])
+            retained = root / "external-temp/run-finalization/.workbench-temporary-retained.json"
+            self.assertEqual("completed", json.loads(retained.read_text())["outcome"])
 
     def test_concurrent_validator_invocations_keep_run_evidence_isolated(
         self,
@@ -885,7 +1035,9 @@ for path, field in ((report, 'collected_ids'), (report.with_suffix('.inventory.j
                 self.assertEqual(path.run_id, manifest["run_id"])
                 report = json.loads(path.report_for("alpha").read_text())
                 self.assertEqual(path.run_id, report["run_id"])
-                self.assertFalse(path.temporary.exists())
+                self.assertEqual(
+                    "retained-unproven", self._temporary_statuses(root)[path.temporary],
+                )
 
             latest = json.loads(
                 (

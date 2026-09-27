@@ -452,11 +452,29 @@ def _publish_timing_report(document: dict, suite_name: str) -> None:
 def _cleanup_run_temporary(
     paths: ValidationRunPaths, *, scratch: tuple[Any, tuple[Any, Any]],
     drained: Callable[[], bool],
+    admitted: bool,
+    outcome: str,
+    retention_attempts: set[str],
 ) -> list[str]:
-    """Ask Core to dispose the two exact run scratch leases after drain."""
+    """Dispose unlaunched scratch; retain launched scratch until absence is proven."""
 
     failures: list[str] = []
     host, references = scratch
+    if admitted:
+        # The registry and POSIX process groups expose known survivors, but a
+        # child can detach into another group. Their absence never authorizes
+        # disposal of a scratch root that a launched suite could still use.
+        try:
+            known_processes_drained = drained() is True
+        except Exception as exc:
+            known_processes_drained = False
+            failures.append(f"could not check launched suite process drain: {exc}")
+        if not known_processes_drained:
+            failures.append("process tree is not confirmed drained")
+        retained_outcome = (
+            "completed" if outcome == "completed" and known_processes_drained
+            else "failed"
+        )
     targets = (
         (references[0], paths.temporary, "isolated suite temporary storage"),
         (references[1], paths.root / "repository-tmp", "repository-scoped suite temporary storage"),
@@ -465,10 +483,19 @@ def _cleanup_run_temporary(
         try:
             if reference.path != expected:
                 raise SuiteExecutionFailure("Core temporary lease path changed")
-            host.dispose(reference, drained=drained)
+            if admitted:
+                if reference.lease_id not in retention_attempts:
+                    # Record the attempt before the create-once write. If a
+                    # later manifest write fails, abnormal terminalization
+                    # must not retry an already published or uncertain marker.
+                    retention_attempts.add(reference.lease_id)
+                    host.retain(reference, outcome=retained_outcome)
+            else:
+                host.dispose(reference, drained=drained)
         except Exception as exc:
             detail = exc.__cause__ if exc.__cause__ is not None else exc
-            failures.append(f"could not remove {label}: {detail}")
+            action = "retain" if admitted else "remove"
+            failures.append(f"could not {action} {label}: {detail}")
     return failures
 
 
@@ -535,6 +562,8 @@ def _terminalize_abnormal_run(
     drained: Callable[[], bool],
     details: dict | None = None,
     writer: _CoreRunManifestWriter | None = None,
+    admitted: bool = False,
+    retention_attempts: set[str] | None = None,
 ) -> None:
     """Best-effort terminalization that preserves the original exception."""
 
@@ -549,7 +578,10 @@ def _terminalize_abnormal_run(
                 stage["reason"] = description
                 stage["completed_at"] = _utc_timestamp()
     failures.append(description + (f": {error}" if str(error) else ""))
-    failures.extend(_cleanup_run_temporary(paths, scratch=scratch, drained=drained))
+    failures.extend(_cleanup_run_temporary(
+        paths, scratch=scratch, drained=drained, admitted=admitted,
+        outcome="failed", retention_attempts=retention_attempts,
+    ))
     try:
         _write_run_manifest(
             paths,
@@ -589,8 +621,10 @@ def _finish_run(
     drained: Callable[[], bool],
     details: dict | None = None,
     writer: _CoreRunManifestWriter | None = None,
+    admitted: bool = False,
+    retention_attempts: set[str] | None = None,
 ) -> ValidationRunPaths:
-    """Verify, clean, and terminalize a normally drained validation run."""
+    """Verify, retain launched scratch, and terminalize a validation run."""
 
     if details:
         for stage in details["suite_states"].values():
@@ -624,7 +658,11 @@ def _finish_run(
             "Python suite validation ended without complete reports: "
             + ", ".join(missing)
         )
-    failures.extend(_cleanup_run_temporary(paths, scratch=scratch, drained=drained))
+    failures.extend(_cleanup_run_temporary(
+        paths, scratch=scratch, drained=drained, admitted=admitted,
+        outcome="completed" if not failures else "failed",
+        retention_attempts=retention_attempts,
+    ))
     if not failures:
         try:
             for suite in selected_suites:
@@ -722,6 +760,7 @@ def _run_python_suites_at_paths(
     process_lock = threading.Lock()
     interruption_event = threading.Event()
     launched_groups: set[int] = set()
+    retention_attempts: set[str] = set()
 
     def drained() -> bool:
         # POSIX groups catch descendants that keep the suite's process group.
@@ -922,6 +961,8 @@ def _run_python_suites_at_paths(
             drained=drained,
             details=details,
             writer=writer,
+            admitted=launch_state["admitted"],
+            retention_attempts=retention_attempts,
         )
         raise
     finally:
@@ -943,6 +984,8 @@ def _run_python_suites_at_paths(
             scratch=scratch,
             drained=drained,
             writer=writer,
+            admitted=launch_state["admitted"],
+            retention_attempts=retention_attempts,
         )
     except SuiteExecutionFailure:
         raise
@@ -961,6 +1004,8 @@ def _run_python_suites_at_paths(
             drained=drained,
             details=details,
             writer=writer,
+            admitted=launch_state["admitted"],
+            retention_attempts=retention_attempts,
         )
         raise
 

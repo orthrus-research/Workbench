@@ -130,6 +130,17 @@ compares terminal IDs with its retained admission, so a same-count replacement
 cannot hide missing coverage. Reports retain skipped/expected-failure reasons,
 subtest and fixture diagnostics, and explicit unrun cases after fixture errors.
 
+After a registered suite is admitted, Core retains its external and
+repository-scoped temporary roots as `retained-unproven`, even if the selected
+tests pass. A direct child or process group ending does not prove that a
+detached child has stopped using those roots. The roots can contain test
+configuration and caches, and repeated validation runs consume disk until a
+separately proven cleanup policy is available. A failure before any suite is
+admitted can dispose unused scratch. A passed suite result describes its test
+outcomes; it does not certify process-tree absence or scratch disposal. The
+scratch marker's `completed` outcome records that suite scratch use reached
+retention; later timing or run-manifest publication can still fail.
+
 Source CI retains its two native-fixture collections at the existing
 `.workbench/validation/native-fixtures-not-run.json` and
 `.workbench/validation/blueprints-native-fixtures-not-run.json` paths. Core
