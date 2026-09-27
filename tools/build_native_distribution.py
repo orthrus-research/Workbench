@@ -12,25 +12,30 @@ def main(argv=None):
     choice = parser.add_mutually_exclusive_group()
     choice.add_argument("--component", action="append", dest="components")
     choice.add_argument("--suite", action="store_true", help="assemble all native modules and profiles")
+    parser.add_argument("--with-tui", action="store_true", help="include the Textual client with --suite")
     parser.add_argument("--output", type=Path, help="new output directory; Core chooses one when omitted")
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--from-wheelhouse", type=Path, help="derive a verified offline closure without rebuilding wheels")
     parser.add_argument("--diagnostics", type=Path, help="new directory for bounded phase logs")
     args = parser.parse_args(argv)
+    if args.with_tui and not args.suite:
+        parser.error("--with-tui requires --suite")
     if args.plan:
-        result = selected_components(args.components, suite=args.suite)
+        result = selected_components(args.components, suite=args.suite, with_tui=args.with_tui)
     else:
         with DiagnosticRun(args.diagnostics or default_directory(ROOT, "native-build"), "native-build", ("assembly",)) as diagnostics:
             with diagnostics.phase("assembly"):
                 if args.from_wheelhouse:
                     result, custody = publish_assembly(
                         args.output,
-                        lambda output: _derive(args.from_wheelhouse, output, args.components, suite=args.suite),
+                        lambda output: _derive(args.from_wheelhouse, output, args.components,
+                                               suite=args.suite, with_tui=args.with_tui),
                     )
                 else:
                     result, custody = publish_assembly(
                         args.output,
                         lambda output: _build(output, args.components, suite=args.suite,
+                                             with_tui=args.with_tui,
                                              command_runner=lambda command: diagnostics.command(command, cwd=ROOT, timeout=1200)),
                     )
             diagnostics.document["metadata"].update(

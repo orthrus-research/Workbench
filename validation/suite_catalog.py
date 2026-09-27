@@ -130,6 +130,8 @@ VALIDATION_FAST_TEST_FILES = (
     "test_public_repository.py",
     "test_publication_readiness.py",
     "test_install_workbench.py",
+    "test_install_bundle.py",
+    "test_install_hook.py",
     "test_native_artifacts.py",
     "test_platform_matrix.py",
     "test_pixi_setup.py",

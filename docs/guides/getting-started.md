@@ -12,12 +12,40 @@ initialization checks.
 
 ## 1. Choose an installation
 
-Use Python 3.12–3.14 and a reviewed wheelhouse matching the Python minor
-version, operating system and architecture. Python is a prerequisite; it is
-not bundled. For Workspace Home and the command catalog, choose an assembly
-containing **Core and Workbench Shell**. Pack-specific workflows also need
-their explicit profile. A Core-only assembly provides environment, storage,
-runtime/world and package management.
+The September 23 Linux x64 preview uses the wheelhouse procedure below. For a
+newer qualified release that includes `workbench-install-linux-x64.sh`, use the
+exact tag and checksum from its release notes. Its terminal path is:
+
+```sh
+curl -fsSLo workbench-install-linux-x64.sh "https://github.com/orthrus-research/Workbench/releases/download/<TAG>/workbench-install-linux-x64.sh" && sh workbench-install-linux-x64.sh
+```
+
+The hook downloads a pinned Python 3.14 runtime and the exact release bundle,
+checks their SHA-256 hashes, then installs the release's selected native
+components and terminal client into a user-owned versioned environment. A
+full Suite bundle retains the matching Axiom engine and IDE clients; the
+Supersymmetry client bundle includes Core, Shell, the pack/platform profiles
+and their native dependencies. The hook does not select a pack, game context,
+Java runtime or IDE installation on your behalf. Its first command after
+installation is the printed `workbench setup --check` path. The hook targets
+Linux x64 with GNU libc 2.28 or newer, including a compatible WSL2 Linux
+environment. It needs HTTPS access, `curl`, `sha256sum`, `tar` and common POSIX
+shell tools; it needs no preinstalled Python, Pixi or source checkout. Download
+the script to a file first if you want to inspect it before executing it.
+
+The Supersymmetry client edition is still being completed and qualified. The
+Workbench hook alone does not install a runnable game instance. Fresh required
+pack-file acquisition needs Workbench's own CurseForge API key and a guided
+Textual install flow. A complete Prism instance ZIP selected in Textual is the
+interim import route; the published pack ZIP contains only external file IDs
+and overrides. ZIP import does not establish the fresh-acquisition release gate.
+
+For a direct wheelhouse installation, use Python 3.12–3.14 and a reviewed
+wheelhouse matching the Python minor, operating system and architecture. For
+Workspace Home and the command catalog, choose an assembly containing **Core
+and Workbench Shell**. Pack-specific workflows also need their explicit
+profile. A Core-only assembly provides environment, storage, runtime/world and
+package management.
 
 The installer is included in the wheelhouse. You do not need a Workbench source
 checkout or Pixi to install it. Install into a new destination; an existing
@@ -43,7 +71,19 @@ and managed state. Run these commands in the Linux shell, not PowerShell.
 Use the full executable path above, or add its directory to `PATH` yourself.
 The examples below use `workbench` on `PATH`.
 
-In VS Code, install the Workbench VSIX and run **Workbench: Configure Core
+Run `workbench-tui` for guided Supersymmetry setup. Choose **Set up
+Supersymmetry instance**, register a local workspace, and select the Java
+runtime in **Workspace choices**. Java 25 is the default; managed Java 8 or an
+explicit Java path can be selected for a different instance. The official
+release route downloads its selected files when Workbench's provider is
+available. For an existing setup, choose a complete Prism instance ZIP, then
+review the source, Linux Prism folder, and exact install destination. Open the
+installed instance in Prism to sign in before launching. On WSL2, put the
+Prism folder and Workbench state on the Linux filesystem; Textual can stage a
+ZIP from a Windows drive into Linux state after review.
+
+If you installed the full Suite edition or obtained the IDE clients separately,
+in VS Code install the Workbench VSIX and run **Workbench: Configure Core
 Executable**. In IntelliJ, install the Workbench plugin ZIP and choose
 **Tools → Workbench → Configure Core Executable**. Select the installed launcher,
 then open one local project. VS Code also requires workspace trust.

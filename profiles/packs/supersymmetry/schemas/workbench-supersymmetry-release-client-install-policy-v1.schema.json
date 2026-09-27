@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbench://schemas/supersymmetry/workbench-supersymmetry-release-client-install-policy-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile", "minecraft_version", "launcher", "platform_profile_id", "cleanroom_version", "cleanroom_client", "recommended_java_feature", "memory_mib", "accepted_source_limitations"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-release-client-install-policy-v1"},
+    "schema_version": {"const": 1},
+    "profile": {"const": "supersymmetry"},
+    "minecraft_version": {"const": "1.12.2"},
+    "launcher": {"const": "prism"},
+    "platform_profile_id": {"const": "workbench-platform:cleanroom:provisional"},
+    "cleanroom_version": {"const": "0.6.12-alpha"},
+    "cleanroom_client": {
+      "type": "object", "additionalProperties": false,
+      "required": ["size", "sha256"],
+      "properties": {
+        "size": {"const": 58132},
+        "sha256": {"const": "sha256:d6536796df0ce02e043f7cec59d344fca7c0dee00f013dd4d89a7a0db4c4cb32"}
+      }
+    },
+    "recommended_java_feature": {"const": 25},
+    "memory_mib": {"type": "integer", "minimum": 1024, "maximum": 131072},
+    "accepted_source_limitations": {
+      "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+      "items": {"enum": ["external-file-origin-unverified", "runtime-compatibility-unqualified"]}
+    }
+  }
+}

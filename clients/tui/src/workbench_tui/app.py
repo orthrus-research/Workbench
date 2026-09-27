@@ -148,6 +148,124 @@ class ReviewModal(ModalScreen[bool]):
         self.dismiss(event.button.id == "review-confirm")
 
 
+class ResourcepackMappingModal(ModalScreen[str | None]):
+    """Collect an explicit resource-pack mapping for a newer official release."""
+
+    def __init__(self, review: Mapping[str, Any], *, entered: str | None = None,
+                 problem: str | None = None) -> None:
+        super().__init__()
+        suggestions = review.get("suggestions", {})
+        pairs = suggestions.get("suggested", []) if isinstance(suggestions, Mapping) else []
+        suggested = ", ".join(
+            f"{row['project_id']}:{row['file_id']}" for row in pairs
+            if isinstance(row, Mapping)
+            and isinstance(row.get("project_id"), int)
+            and isinstance(row.get("file_id"), int)
+        )
+        self.suggested = suggested if entered is None else entered
+        self.problem = problem
+        required = review.get("required_external_files", [])
+        self.required = [
+            f"{row['project_id']}:{row['file_id']}" for row in required
+            if isinstance(row, Mapping)
+            and isinstance(row.get("project_id"), int)
+            and isinstance(row.get("file_id"), int)
+        ]
+        unresolved = suggestions.get("unresolved_project_ids", []) if isinstance(suggestions, Mapping) else []
+        self.unresolved = [str(item) for item in unresolved if isinstance(item, int)]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="review-dialog"):
+            yield Static("Review resource packs in this release", id="review-heading")
+            with VerticalScroll(id="review-scroll"):
+                yield Static(
+                    "Core recognized the previous release's resource-pack project IDs. "
+                    "Confirm or edit the project:file pairs to place in Prism's resourcepacks "
+                    "folder. Every other required file will be placed in mods.\n\n"
+                    + ("Previous resource-pack projects missing: " + ", ".join(self.unresolved)
+                       + "\n\n" if self.unresolved else "")
+                    + "Required IDs in this release:\n" + "\n".join(self.required),
+                    id="review-body",
+                )
+                yield Input(value=self.suggested, placeholder="project:file, project:file",
+                            id="pack-policy-pairs")
+                yield Static(self.problem or "Enter at least one pair from the required ID list.",
+                             id="pack-policy-error")
+            with Horizontal(classes="button-row"):
+                yield Button("Cancel", id="pack-policy-cancel")
+                yield Button("Review mapping", id="pack-policy-confirm", variant="warning")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "pack-policy-cancel":
+            self.dismiss(None)
+        elif event.button.id == "pack-policy-confirm":
+            self.dismiss(self.query_one("#pack-policy-pairs", Input).value.strip())
+
+
+def _reviewed_resourcepack_pairs(
+    entered: str, required_rows: list[Mapping[str, Any]],
+) -> tuple[tuple[int, int], ...]:
+    offered = {
+        (row["project_id"], row["file_id"]) for row in required_rows
+        if type(row.get("project_id")) is int and type(row.get("file_id")) is int
+    }
+    selected: set[tuple[int, int]] = set()
+    for field in entered.split(","):
+        parts = field.strip().split(":")
+        if len(parts) != 2 or not all(part.strip().isdecimal() for part in parts):
+            raise ValueError("Enter resource packs as project:file pairs separated by commas.")
+        pair = (int(parts[0]), int(parts[1]))
+        if pair not in offered:
+            raise ValueError(f"{pair[0]}:{pair[1]} is not a required file in this release.")
+        if pair in selected:
+            raise ValueError("Enter each resource-pack pair once.")
+        selected.add(pair)
+    if not selected:
+        raise ValueError("Select at least one required resource pack.")
+    return tuple(sorted(selected))
+
+
+def _source_platform_summary(platform: Any) -> str:
+    if not isinstance(platform, Mapping):
+        return ""
+    kind = platform.get("kind")
+    version = platform.get("component_version")
+    if not isinstance(kind, str) or not isinstance(version, str):
+        return ""
+    return f"{kind.title()} {version}"
+
+
+class InterruptedSetupModal(ModalScreen[str]):
+    """Offer both Core recovery routes for a retained interrupted stage."""
+
+    def __init__(self, heading: str, destination: str) -> None:
+        super().__init__()
+        self.heading = heading
+        self.destination = destination
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="review-dialog"):
+            yield Static(self.heading, id="review-heading")
+            with VerticalScroll(id="review-scroll"):
+                yield Static(
+                    f"Destination: {self.destination}\n\n"
+                    "Core found files from an interrupted setup. Resume checks those files "
+                    "and completes the operation when they match. Keep files and start over "
+                    "moves the interrupted stage aside so you can prepare a new attempt. "
+                    "The retained files remain in your local Workbench state.",
+                    id="review-body",
+                )
+            with Horizontal(classes="button-row"):
+                yield Button("Cancel", id="setup-recovery-cancel")
+                yield Button("Keep files and start over", id="setup-recovery-abandon")
+                yield Button("Resume setup", id="setup-recovery-reconcile", variant="warning")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        action = event.button.id.removeprefix("setup-recovery-")
+        if action in {"cancel", "abandon", "reconcile"}:
+            self.dismiss(action)
+
+
 class ReleaseUpdateModal(ModalScreen[str]):
     """Present Core's exact published pack release choice."""
 
@@ -214,6 +332,637 @@ class ReleaseUpdateModal(ModalScreen[str]):
         }[event.button.id])
 
 
+class PackInstanceScreen(Screen):
+    """Collect a complete Prism ZIP and install choices through Core."""
+
+    def __init__(self, choice: Mapping[str, Any], workspaces: Mapping[str, Any],
+                 installations: list[Mapping[str, Any]] | None = None,
+                 installed_error: str | None = None) -> None:
+        super().__init__()
+        self.choice = choice
+        self.workspaces = workspaces
+        self.installations = installations or []
+        self.installed_error = installed_error
+        self.busy = False
+        self.install_plan_id: str | None = (
+            str(self.installations[0]["plan_id"]) if self.installations else None
+        )
+        self._returning_from_java_choices = False
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        entries = [row for row in self.workspaces.get("entries", [])
+                   if isinstance(row, dict) and isinstance(row.get("name"), str)]
+        names = [row["name"] for row in entries]
+        selected = self.choice["choice"]
+        preferred = selected.get("workspace_name") or self.workspaces.get("default")
+        if preferred not in names:
+            preferred = names[0] if names else ""
+        launcher = selected.get("launcher_root") or str(Path.home() / ".local/share/PrismLauncher")
+        yield Header(icon="W")
+        with VerticalScroll():
+            yield Static("Set up Supersymmetry", classes="screen-heading")
+            yield Static(
+                "Workbench will download the published pack when its provider is available. "
+                "You can also import a complete Prism instance ZIP as one source. "
+                "Core retains its gameplay files and prepares a new Linux Prism instance.",
+                classes="screen-intro",
+            )
+            yield Checkbox("Include the pack's optional mod", value=True,
+                           id="pack-fresh-optional")
+            yield Static("Complete Prism instance ZIP", classes="field-label")
+            yield Input(placeholder="/absolute/path/to/Supersymmetry-instance.zip", id="pack-zip-path")
+            yield Static("Prism launcher data folder", classes="field-label")
+            yield Input(value=launcher, id="pack-prism-root")
+            yield Static("Workspace and Java choice", classes="field-label")
+            yield Select([(f"{row['name']} · {row['path']}", row["name"]) for row in entries]
+                         or [("Add a workspace below to continue", "")],
+                         value=preferred, allow_blank=False, id="pack-workspace")
+            yield Button("Add workspace", id="pack-workspace-register")
+            yield Button("Change Java choice", id="pack-java-choice",
+                         disabled=not bool(names))
+            yield Static(
+                "Java 25 is the Cleanroom default. Choose managed Java 8 or your "
+                "own Java path for an imported instance that needs another runtime.",
+                classes="screen-intro",
+            )
+            if self.installations:
+                yield Static("Installed instances", classes="field-label")
+                yield Select([
+                    (f"{row['instance_path']} · {row.get('java_selection_state') or 'Java choice unknown'}",
+                     row["plan_id"])
+                    for row in self.installations
+                ], value=self.install_plan_id, allow_blank=False,
+                    id="pack-installed-choice")
+            with Horizontal(classes="button-row"):
+                yield Button("Download official release", id="pack-fresh-download",
+                             variant="primary", disabled=not bool(names))
+                yield Button("Review and import ZIP", id="pack-zip-import",
+                             disabled=not bool(names))
+                yield Button("Prepare and install selected source", id="pack-instance-install",
+                             disabled=not bool(selected.get("source_plan_id") and
+                                               self.choice.get("source_state") == "retained"))
+                yield Button("Save instance location", id="pack-instance-save-location",
+                             disabled=not bool(selected.get("source_plan_id") and
+                                               self.choice.get("source_state") == "retained"))
+                yield Button("Open in Prism", id="pack-instance-show",
+                             disabled=self.install_plan_id is None)
+                yield Button("Launch game", id="pack-instance-launch",
+                             disabled=self.install_plan_id is None)
+                yield Button("Back", id="pack-instance-back")
+            current = selected.get("source_plan_id")
+            state = self.choice.get("source_state")
+            yield Static(
+                (f"Saved source: {current}\nCore state: {state}" if current else
+                 "No complete instance source is selected yet.")
+                + (f"\nInstalled instances could not be checked: {self.installed_error}"
+                   if self.installed_error else ""),
+                id="pack-instance-status",
+            )
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "pack-instance-back":
+            self.app.pop_screen()
+        elif event.button.id == "pack-workspace-register":
+            self.register_workspace()
+        elif event.button.id == "pack-java-choice":
+            self.open_java_choices()
+        elif event.button.id == "pack-zip-import":
+            self.import_zip()
+        elif event.button.id == "pack-fresh-download":
+            self.download_official()
+        elif event.button.id == "pack-instance-install":
+            self.install_selected()
+        elif event.button.id == "pack-instance-save-location":
+            self.save_location()
+        elif event.button.id in {"pack-instance-show", "pack-instance-launch"}:
+            self.launch_selected("show" if event.button.id == "pack-instance-show" else "launch")
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "pack-installed-choice" and isinstance(event.value, str):
+            self.install_plan_id = event.value
+
+    def on_screen_resume(self, event: events.ScreenResume) -> None:
+        if self._returning_from_java_choices:
+            self._returning_from_java_choices = False
+            self.refresh_workspace_choices()
+
+    def open_java_choices(self) -> None:
+        if self.busy:
+            return
+        workspace = self.query_one("#pack-workspace", Select).value
+        self._returning_from_java_choices = True
+        self.app.push_screen(WorkspaceChoicesScreen(
+            self.workspaces, selected_name=workspace if isinstance(workspace, str) else None,
+        ))
+
+    @work(exclusive=True, group="pack-workspace-refresh")
+    async def refresh_workspace_choices(self) -> None:
+        status = self.query_one("#pack-instance-status", Static)
+        try:
+            record = await self.core.workspace_choices()
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(f"Could not refresh workspace and Java choices: {exc}")
+            return
+        current = self.query_one("#pack-workspace", Select).value
+        entries = [row for row in record.get("entries", [])
+                   if isinstance(row, dict) and isinstance(row.get("name"), str)]
+        names = [row["name"] for row in entries]
+        self.workspaces = record
+        selector = self.query_one("#pack-workspace", Select)
+        selector.set_options([(f"{row['name']} · {row['path']}", row["name"])
+                              for row in entries]
+                             or [("Add a workspace below to continue", "")])
+        selector.value = (current if current in names else
+                          record.get("default") if record.get("default") in names else
+                          names[0] if names else "")
+        for button in ("#pack-fresh-download", "#pack-zip-import", "#pack-java-choice"):
+            self.query_one(button, Button).disabled = not bool(names)
+        status.update("Workspace and Java choices refreshed. Continue setup with the selected workspace.")
+
+    @work(exclusive=True, group="pack-workspace-register")
+    async def register_workspace(self) -> None:
+        if self.busy:
+            return
+        selected = await self.app.push_screen_wait(WorkspaceRegisterScreen(
+            self.workspaces, initial_path=self.app.initial_workspace,  # type: ignore[attr-defined]
+        ))
+        if selected is None:
+            return
+        name, record = selected
+        self.workspaces = record
+        self.query_one("#pack-workspace", Select).set_options([
+            (f"{row['name']} · {row['path']}", row["name"])
+            for row in record["entries"]
+        ])
+        self.query_one("#pack-workspace", Select).value = name
+        self.query_one("#pack-fresh-download", Button).disabled = False
+        self.query_one("#pack-zip-import", Button).disabled = False
+        self.query_one("#pack-java-choice", Button).disabled = False
+        self.query_one("#pack-instance-status", Static).update(
+            (f"Workspace {name} is saved. Choose Save instance location to use it "
+             "with the retained source." if self.choice.get("source_state") == "retained"
+             else f"Workspace {name} is saved. Select a pack source to continue.")
+        )
+
+    @work(exclusive=True, group="pack-instance-location")
+    async def save_location(self) -> None:
+        if self.busy or self.choice.get("source_state") != "retained":
+            return
+        selected = self.choice["choice"]
+        launcher = self.query_one("#pack-prism-root", Input).value.strip()
+        workspace = self.query_one("#pack-workspace", Select).value
+        status = self.query_one("#pack-instance-status", Static)
+        if (not launcher or not Path(launcher).is_absolute()
+                or not isinstance(workspace, str) or not workspace):
+            status.update("Choose an absolute Prism data folder and saved workspace.")
+            return
+        approved = await self.app.push_screen_wait(ReviewModal(
+            "Save this instance location?",
+            f"Source: {selected['source_plan_id']}\n"
+            f"Prism data folder: {launcher}\nWorkspace: {workspace}\n\n"
+            "Core will keep the selected source and update these saved choices.",
+            confirm_label="Save location",
+        ))
+        if not approved:
+            return
+        self.busy = True
+        try:
+            self.choice = await self.core.pack_instance_choice_select(
+                selected["source_plan_id"],
+                expected_record_id=selected["record_id"],
+                launcher_root=launcher, workspace_name=workspace,
+                source_kind=selected["source_kind"],
+            )
+            self.install_plan_id = None
+            self.query_one("#pack-instance-show", Button).disabled = True
+            self.query_one("#pack-instance-launch", Button).disabled = True
+            status.update("Prism folder and workspace saved for the retained source.")
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(str(exc))
+        finally:
+            self.busy = False
+
+    @work(exclusive=True, group="pack-instance-zip")
+    async def import_zip(self) -> None:
+        if self.busy:
+            return
+        archive = self.query_one("#pack-zip-path", Input).value.strip()
+        launcher = self.query_one("#pack-prism-root", Input).value.strip()
+        workspace = self.query_one("#pack-workspace", Select).value
+        status = self.query_one("#pack-instance-status", Static)
+        if (not archive or not Path(archive).is_absolute()
+                or not launcher or not Path(launcher).is_absolute()
+                or not isinstance(workspace, str) or not workspace):
+            status.update("Choose an absolute ZIP path, Prism data folder, and saved workspace.")
+            return
+        self.busy = True
+        self.query_one("#pack-zip-import", Button).disabled = True
+        try:
+            status.update("Core is checking where the Prism ZIP is stored…")
+            stage_record = await self.core.pack_instance_zip_stage_plan(archive)
+            stage = stage_record["stage"]
+            retained_archive = stage["archive_path"]
+            if stage["action"] == "copy":
+                approved = await self.app.push_screen_wait(ReviewModal(
+                    "Copy this ZIP into Linux Workbench state?",
+                    f"Source: {stage['source_path']}\n"
+                    f"Size: {stage['source_size'] / (1024 * 1024):.1f} MiB\n"
+                    f"SHA-256: {stage['source_sha256']}\n\n"
+                    "Core will retain the exact ZIP on the Linux filesystem so it can "
+                    "review and import files from a Windows drive safely. The source "
+                    "ZIP will remain in place.",
+                    confirm_label="Copy ZIP to Workbench",
+                ))
+                if not approved:
+                    status.update("ZIP transfer cancelled; the source ZIP was unchanged.")
+                    return
+                status.update("Core is retaining the ZIP on the Linux filesystem…")
+                staged = await self.core.pack_instance_zip_stage_apply(
+                    archive, stage["plan_id"],
+                )
+                retained_archive = staged["stage"]["archive_path"]
+            status.update("Core is reviewing the complete ZIP and its gameplay files…")
+            reviewed = await self.core.pack_instance_zip_plan(retained_archive)
+            plan = reviewed["source"]
+            platform = _source_platform_summary(plan.get("source_platform"))
+            forge_java_guidance = (
+                "\nThis ZIP declares Forge. Before installation, choose Change Java "
+                "choice to select managed Java 8 or your own Java path if the "
+                "pack requires it.\n"
+                if isinstance(plan.get("source_platform"), Mapping)
+                and plan["source_platform"].get("kind") == "forge" else ""
+            )
+            approved = await self.app.push_screen_wait(ReviewModal(
+                "Import this Prism instance?",
+                f"Source version: {plan.get('source_version') or 'user-provided'}\n"
+                + (f"Platform: {platform}\n" if platform else "")
+                + f"Gameplay files: {plan['file_count']}\n"
+                f"Total bytes: {plan.get('total_bytes', 'unknown')}\n"
+                f"Archive SHA-256: {plan.get('source_archive_sha256', 'unknown')}\n\n"
+                "Core will retain the exact gameplay files in Workbench state and save "
+                "this source, Prism folder, and workspace in your local preferences. "
+                "A new Prism instance will be installed separately with the ZIP's "
+                "platform and launcher settings. Its Java choice can be changed in Textual."
+                + forge_java_guidance,
+                confirm_label="Import complete ZIP",
+            ))
+            if not approved:
+                status.update("Import cancelled; the ZIP was not retained.")
+                return
+            status.update("Core is retaining the reviewed ZIP contents…")
+            imported = await self.core.pack_instance_zip_import(
+                retained_archive, plan["plan_id"],
+            )
+            chosen = await self.core.pack_instance_choice_select(
+                imported["source"]["plan_id"],
+                expected_record_id=self.choice["choice"]["record_id"],
+                launcher_root=launcher, workspace_name=workspace,
+            )
+            self.choice = chosen
+            self.install_plan_id = None
+            self.query_one("#pack-instance-show", Button).disabled = True
+            self.query_one("#pack-instance-launch", Button).disabled = True
+            self.query_one("#pack-instance-install", Button).disabled = False
+            status.update(
+                f"Retained {imported['source']['file_count']} files. "
+                "Your source and setup choices are saved."
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#pack-zip-import", Button).disabled = False
+
+    @work(exclusive=True, group="pack-instance-fresh")
+    async def download_official(self) -> None:
+        if self.busy:
+            return
+        launcher = self.query_one("#pack-prism-root", Input).value.strip()
+        workspace = self.query_one("#pack-workspace", Select).value
+        status = self.query_one("#pack-instance-status", Static)
+        if (not launcher or not Path(launcher).is_absolute()
+                or not isinstance(workspace, str) or not workspace):
+            status.update("Choose an absolute Prism data folder and saved workspace.")
+            return
+        self.busy = True
+        self.query_one("#pack-fresh-download", Button).disabled = True
+        optional_mode = ("default" if self.query_one(
+            "#pack-fresh-optional", Checkbox,
+        ).value else "omit")
+        try:
+            release = await self.core.pack_release_show()
+            selected = release["selected"]
+            if release["artifact_state"] != "verified":
+                approved = await self.app.push_screen_wait(ReviewModal(
+                    f"Prepare Supersymmetry {selected['version']}?",
+                    f"Core will download and verify the published release ZIP "
+                    f"({selected['asset_size'] / (1024 * 1024):.1f} MiB) "
+                    "before collecting its selected game files.",
+                    confirm_label="Prepare published release",
+                ))
+                if not approved:
+                    return
+                status.update("Core is preparing the published release…")
+                await self.core.pack_release_prepare(selected["release_id"])
+            policy_record = await self.core.pack_instance_fresh_policy_status()
+            policy = policy_record["policy"]
+            if policy["status"] == "unavailable":
+                status.update("Official release policy is unavailable: "
+                              + str(policy.get("reason") or "release source is not ready"))
+                return
+            if policy["status"] == "review_required":
+                entered: str | None = None
+                problem: str | None = None
+                while True:
+                    entered = await self.app.push_screen_wait(ResourcepackMappingModal(
+                        policy, entered=entered, problem=problem,
+                    ))
+                    if entered is None:
+                        status.update("Resource-pack review cancelled; no release policy was saved.")
+                        return
+                    try:
+                        resourcepack_pairs = _reviewed_resourcepack_pairs(
+                            entered, policy["required_external_files"],
+                        )
+                    except ValueError as exc:
+                        problem = str(exc)
+                        continue
+                    break
+                optional_pairs = tuple(sorted(
+                    (row["project_id"], row["file_id"])
+                    for row in policy["optional_external_files"]
+                ))
+                status.update("Core is reviewing the selected release layout…")
+                planned = await self.core.pack_instance_fresh_policy_plan(
+                    resourcepack_pairs, optional_pairs,
+                )
+                plan = planned["policy"]["policy_plan"]
+                placements = ", ".join(f"{project}:{file}" for project, file in resourcepack_pairs)
+                approved = await self.app.push_screen_wait(ReviewModal(
+                    "Save this release layout?",
+                    f"Published pack: {plan['version']}\n"
+                    f"Resource-pack IDs: {placements}\n"
+                    f"Optional files available: {len(optional_pairs)}\n"
+                    f"Override files: {plan['layout_policy']['override_file_count']}\n"
+                    f"Core action: {plan['action']}\n\n"
+                    "Core will retain this exact layout for the saved release. "
+                    "The pack files are downloaded only after the next review.",
+                    confirm_label="Save release layout",
+                ))
+                if not approved:
+                    status.update("Release layout review cancelled; no policy was saved.")
+                    return
+                await self.core.pack_instance_fresh_policy_apply(
+                    resourcepack_pairs, optional_pairs, plan["plan_id"],
+                )
+                policy_record = await self.core.pack_instance_fresh_policy_status()
+                if policy_record["policy"]["status"] != "ready":
+                    raise CoreClientError("Core could not reopen the reviewed release layout")
+            checked = await self.core.pack_instance_fresh_status(optional_mode)
+            progress = checked["fresh"]
+            if progress["status"] == "unavailable":
+                status.update("Official download is unavailable: "
+                              + str(progress.get("reason") or "release source is not ready"))
+                return
+            if (progress["provider_state"] != "available"
+                    and progress["ready_file_count"] != progress["selected_file_count"]):
+                status.update("Official download awaits Workbench's CurseForge provider access. "
+                              "You can import a complete Prism instance ZIP now.")
+                return
+            if progress["status"] == "invalid":
+                status.update("A retained release file changed. Core preserved it for review.")
+                return
+            total = progress["selected_file_count"]
+            ready = progress["ready_file_count"]
+            approved = await self.app.push_screen_wait(ReviewModal(
+                f"Download {total - ready} selected game files?",
+                f"Published pack: {progress['release_version']}\n"
+                f"Already retained: {ready}/{total}\n"
+                f"Optional mod: {'included' if optional_mode == 'default' else 'omitted'}\n\n"
+                "Core will download each authorized file, verify it, and retain progress "
+                "so setup can resume after interruption.",
+                confirm_label="Download and retain",
+            ))
+            if not approved:
+                return
+            status.update("Core is retaining the published pack overrides…")
+            overrides = await self.core.pack_instance_fresh_overrides(optional_mode)
+            override_plan_id = overrides["fresh"]["override_plan_id"]
+            for row in progress["files"]:
+                if row["status"] == "ready":
+                    continue
+                project_id, file_id = row["project_id"], row["file_id"]
+                status.update(f"Downloading selected game files: {ready}/{total}…")
+                await self.core.pack_instance_fresh_file(
+                    project_id, file_id, optional_mode,
+                )
+                ready += 1
+                status.update(f"Verified selected game files: {ready}/{total}.")
+            published = await self.core.pack_instance_fresh_publish(
+                override_plan_id, optional_mode,
+            )
+            source = published["fresh"]["composition_result"]
+            self.choice = await self.core.pack_instance_choice_select(
+                source["plan_id"], expected_record_id=self.choice["choice"]["record_id"],
+                launcher_root=launcher, workspace_name=workspace,
+                source_kind="published-release",
+            )
+            self.install_plan_id = None
+            self.query_one("#pack-instance-show", Button).disabled = True
+            self.query_one("#pack-instance-launch", Button).disabled = True
+            self.query_one("#pack-instance-install", Button).disabled = False
+            status.update(
+                f"Published release {progress['release_version']} is ready: "
+                f"{ready} selected game files. The source and setup choices are saved. "
+                "Choose Prepare and install selected source."
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#pack-fresh-download", Button).disabled = False
+
+    @work(exclusive=True, group="pack-instance-install")
+    async def install_selected(self) -> None:
+        if self.busy:
+            return
+        selected = self.choice["choice"]
+        status = self.query_one("#pack-instance-status", Static)
+        if not selected.get("source_plan_id") or self.choice.get("source_state") != "retained":
+            status.update("Select a retained Supersymmetry source before installation.")
+            return
+        if (self.query_one("#pack-prism-root", Input).value.strip() != selected.get("launcher_root")
+                or self.query_one("#pack-workspace", Select).value != selected.get("workspace_name")):
+            status.update("The Prism folder or workspace changed. Save them with a source import first.")
+            return
+        imported = selected.get("source_kind") == "user-prism-zip"
+        preparation = (
+            "Core will use the imported ZIP's platform and launcher files. It may "
+            "acquire the selected workspace Java before showing the exact Prism "
+            "destination for final review."
+            if imported else
+            "Core will use the published pack with Cleanroom. It may download "
+            "the selected Java runtime and pinned Cleanroom client template before "
+            "showing the exact Prism destination for final review."
+        )
+        approved = await self.app.push_screen_wait(ReviewModal(
+            "Prepare this instance?",
+            preparation,
+            confirm_label="Prepare installation",
+        ))
+        if not approved:
+            return
+        self.busy = True
+        self.query_one("#pack-instance-install", Button).disabled = True
+        try:
+            root_record = await self.core.pack_instance_root_plan()
+            root_plan = root_record["prism_root"]
+            if root_plan["action"] == "reconcile":
+                recovery = await self.app.push_screen_wait(InterruptedSetupModal(
+                    "Interrupted Prism folder setup",
+                    root_plan["launcher_root"],
+                ))
+                if recovery == "cancel":
+                    status.update("Prism folder recovery cancelled.")
+                    return
+                recovered = await self.core.pack_instance_root_recover(
+                    root_plan["plan_id"], recovery,
+                )
+                if recovery == "abandon":
+                    status.update(
+                        "Interrupted Prism folder files were retained at "
+                        + recovered["prism_root"]["retained_stage_path"]
+                        + ". Choose Prepare and install again to start over."
+                    )
+                    return
+                root_plan = (await self.core.pack_instance_root_plan())["prism_root"]
+            if root_plan["state"] != "ready":
+                status.update("Prism folder needs attention: "
+                              + ", ".join(root_plan.get("blockers", [])))
+                return
+            status.update("Core is preparing the selected Java and "
+                          + ("imported platform…" if imported else "Cleanroom client…"))
+            prepared = await self.core.pack_instance_install_prepare()
+            plan = prepared["installation"]
+            if plan.get("state") != "ready":
+                blockers = ", ".join(str(item) for item in plan.get("blockers", []))
+                if "interrupted-install-needs-reconcile" in plan.get("blockers", []):
+                    recovery = await self.app.push_screen_wait(InterruptedSetupModal(
+                        "Interrupted Supersymmetry installation",
+                        plan["instance_path"],
+                    ))
+                    if recovery == "cancel":
+                        status.update("Instance recovery cancelled.")
+                        return
+                    recovered = await self.core.pack_instance_install_recover(
+                        plan["plan_id"], recovery,
+                    )
+                    result = recovered["installation"]
+                    if recovery == "abandon":
+                        status.update(
+                            "Interrupted instance files were retained at "
+                            + result["retained_stage_path"]
+                            + ". Choose Prepare and install again to start over."
+                        )
+                    else:
+                        self._show_installed(result, status)
+                    return
+                status.update("Installation needs attention: " + (blockers or "Core could not prepare it."))
+                return
+            platform = plan.get("source_platform")
+            forge_java_25 = (
+                imported and isinstance(platform, Mapping)
+                and platform.get("kind") == "forge"
+                and plan.get("java_selected_feature") == 25
+            )
+            java_warning = (
+                "\nThis imported ZIP declares Forge and Java 25 is selected. "
+                "Check the pack's Java requirement. To use Java 8 or your own "
+                "path, cancel and choose Change Java choice.\n"
+                if forge_java_25 else ""
+            )
+            approved = await self.app.push_screen_wait(ReviewModal(
+                "Install Supersymmetry in Prism?",
+                f"Source: {plan.get('source_version') or 'complete imported instance'}\n"
+                + (f"Platform: {_source_platform_summary(plan.get('source_platform'))}\n"
+                   if _source_platform_summary(plan.get("source_platform")) else "")
+                + f"Destination: {plan['instance_path']}\n"
+                f"Java: {plan.get('java_selection_state') or 'unavailable'}"
+                + (f" (version {plan['java_selected_feature']})"
+                   if plan.get("java_selected_feature") is not None else "")
+                + f"\nPrism account: {plan.get('account_state', 'unknown')}\n\n"
+                + java_warning
+                + "Core will create a separate instance. Prism may ask you to sign in "
+                "before the first launch. Review Java compatibility for an imported "
+                "platform before continuing.",
+                confirm_label="Install instance",
+            ))
+            if not approved:
+                status.update("Prepared source retained; installation cancelled.")
+                return
+            status.update("Core is installing the reviewed instance…")
+            installed = await self.core.pack_instance_install_apply(plan["plan_id"])
+            self._show_installed(installed["installation"], status)
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#pack-instance-install", Button).disabled = False
+
+    def _show_installed(self, result: Mapping[str, Any], status: Static) -> None:
+        self.install_plan_id = str(result["plan_id"])
+        self.query_one("#pack-instance-show", Button).disabled = False
+        self.query_one("#pack-instance-launch", Button).disabled = False
+        status.update(
+            f"Installed: {result['instance_path']}\n"
+            "Use Open in Prism to sign in, then Launch game. Runtime compatibility "
+            "remains unconfirmed until an observed game launch."
+        )
+
+    @work(exclusive=True, group="pack-instance-launch")
+    async def launch_selected(self, mode: str) -> None:
+        if self.busy or self.install_plan_id is None:
+            return
+        status = self.query_one("#pack-instance-status", Static)
+        self.busy = True
+        self.query_one("#pack-instance-show", Button).disabled = True
+        self.query_one("#pack-instance-launch", Button).disabled = True
+        try:
+            planned = await self.core.pack_instance_launch_plan(self.install_plan_id, mode)
+            plan = planned["launch"]
+            approved = await self.app.push_screen_wait(ReviewModal(
+                "Open the installed instance in Prism?" if mode == "show" else
+                "Launch the installed Supersymmetry game?",
+                f"Instance: {plan['instance_path']}\n"
+                f"Launcher: Prism {plan['prism_version']}\n\n"
+                "Prism handles account sign-in. Core will supervise the launcher "
+                "and retain a lifecycle receipt.",
+                confirm_label="Open Prism" if mode == "show" else "Launch game",
+            ))
+            if not approved:
+                return
+            status.update("Core is starting Prism for the selected instance…")
+            result = await self.core.pack_instance_launch_run(
+                self.install_plan_id, plan["plan_id"], mode,
+            )
+            observed = result["launch"]
+            status.update(
+                f"Prism launcher: {observed.get('outcome', 'completed')}\n"
+                "A launcher exit does not confirm that Minecraft started."
+            )
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#pack-instance-show", Button).disabled = False
+            self.query_one("#pack-instance-launch", Button).disabled = False
+
+
 class ResultScreen(Screen[None]):
     def __init__(self, heading: str, output: str) -> None:
         super().__init__()
@@ -239,14 +988,92 @@ class ResultScreen(Screen[None]):
             self.app.pop_screen()
 
 
+class WorkspaceRegisterScreen(Screen[tuple[str, Mapping[str, Any]] | None]):
+    """Register one named workspace through Core's revisioned user choices."""
+
+    def __init__(self, record: Mapping[str, Any], *, initial_path: str = "") -> None:
+        super().__init__()
+        self.record = record
+        self.initial_path = initial_path
+        self.busy = False
+
+    @property
+    def core(self) -> CoreClient:
+        return self.app.core  # type: ignore[attr-defined]
+
+    def compose(self) -> ComposeResult:
+        yield Header(icon="W")
+        with VerticalScroll():
+            yield Static("Add a workspace", classes="screen-heading")
+            yield Static(
+                "Choose a short name and a Linux folder for your pack work. "
+                "Core saves this choice for later setup; registration does not change the folder.",
+                classes="screen-intro",
+            )
+            yield Static("Workspace name", classes="field-label")
+            yield Input(placeholder="susy-dev", id="workspace-register-name")
+            yield Static("Workspace folder", classes="field-label")
+            yield Input(value=self.initial_path, placeholder="~/Workbench/Supersymmetry",
+                        id="workspace-register-path")
+            yield Checkbox("Use as my default workspace",
+                           value=not bool(self.record.get("entries")),
+                           id="workspace-register-default")
+            with Horizontal(classes="button-row"):
+                yield Button("Save workspace", id="workspace-register-save", variant="primary")
+                yield Button("Cancel", id="workspace-register-cancel")
+            yield Static("", id="workspace-register-status")
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "workspace-register-cancel":
+            self.dismiss(None)
+        elif event.button.id == "workspace-register-save":
+            self.register()
+
+    @work(exclusive=True, group="workspace-register")
+    async def register(self) -> None:
+        if self.busy:
+            return
+        name = self.query_one("#workspace-register-name", Input).value.strip()
+        path = self.query_one("#workspace-register-path", Input).value.strip()
+        status = self.query_one("#workspace-register-status", Static)
+        if (not name or not name[0].islower() or not name[0].isascii()
+                or len(name) > 64 or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789_-"
+                                      for char in name)):
+            status.update("Use a lowercase name starting with a letter, such as susy-dev.")
+            return
+        if any(row.get("name") == name for row in self.record.get("entries", [])):
+            status.update("That workspace name is already saved. Choose another name.")
+            return
+        if not (Path(path).is_absolute() or path == "~" or path.startswith("~/")):
+            status.update("Enter an absolute Linux folder path or a path starting with ~/.")
+            return
+        self.busy = True
+        self.query_one("#workspace-register-save", Button).disabled = True
+        status.update("Core is saving this workspace choice…")
+        try:
+            saved = await self.core.register_workspace(
+                name, path,
+                make_default=self.query_one("#workspace-register-default", Checkbox).value,
+                expected_record_id=self.record["record_id"],
+            )
+            self.dismiss((name, saved))
+        except (CoreClientError, TimeoutError) as exc:
+            status.update(str(exc))
+        finally:
+            self.busy = False
+            self.query_one("#workspace-register-save", Button).disabled = False
+
+
 class WorkspaceChoicesScreen(Screen[None]):
     """Edit Core's local profile and Java candidates for one named workspace."""
 
-    def __init__(self, record: Mapping[str, Any]) -> None:
+    def __init__(self, record: Mapping[str, Any], *, selected_name: str | None = None) -> None:
         super().__init__()
         self.record = record
         self.entries = {row["name"]: row for row in record["entries"]}
-        self.selected_name = record.get("default") or next(iter(self.entries), "")
+        self.selected_name = (selected_name if selected_name in self.entries else
+                              record.get("default") or next(iter(self.entries), ""))
         self.busy = False
 
     @property
@@ -267,6 +1094,7 @@ class WorkspaceChoicesScreen(Screen[None]):
             )
             yield Static("Named workspace", classes="field-label")
             yield Select(options, value=self.selected_name, allow_blank=False, id="choice-workspace")
+            yield Button("Add workspace", id="choice-register")
             yield Static("Workbench configuration · blank clears", classes="field-label")
             yield Input(placeholder="/path/to/workbench.toml", id="choice-profile")
             yield Static("Java selection", classes="field-label")
@@ -308,7 +1136,7 @@ class WorkspaceChoicesScreen(Screen[None]):
         row = self.entries.get(self.selected_name)
         if row is None:
             self.query_one("#choice-status", Static).update(
-                "Register a workspace with 'workbench settings workspace add NAME PATH'."
+                "Add a workspace to save profile and Java choices."
             )
             return
         self.query_one("#choice-profile", Input).value = row.get("profile_config") or ""
@@ -335,6 +1163,8 @@ class WorkspaceChoicesScreen(Screen[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "choice-back":
             self.app.pop_screen()
+        elif event.button.id == "choice-register":
+            self.register_workspace()
         elif event.button.id == "choice-find-java":
             self.find_java()
         elif event.button.id == "choice-save":
@@ -345,6 +1175,29 @@ class WorkspaceChoicesScreen(Screen[None]):
             self.export_environment()
         elif event.button.id == "choice-import":
             self.app.push_screen(EnvironmentImportScreen())
+
+    @work(exclusive=True, group="choice-workspace-register")
+    async def register_workspace(self) -> None:
+        if self.busy:
+            return
+        selected = await self.app.push_screen_wait(WorkspaceRegisterScreen(
+            self.record, initial_path=self.app.initial_workspace,  # type: ignore[attr-defined]
+        ))
+        if selected is None:
+            return
+        name, record = selected
+        self.record = record
+        self.entries = {row["name"]: row for row in record["entries"]}
+        self.selected_name = name
+        self.query_one("#choice-workspace", Select).set_options([
+            (f"{row['name']} · {row['path']}", row["name"])
+            for row in record["entries"]
+        ])
+        self.query_one("#choice-workspace", Select).value = name
+        for button in ("#choice-save", "#choice-acquire", "#choice-export"):
+            self.query_one(button, Button).disabled = False
+        self._show_selected()
+        self.app.refresh_environment()  # type: ignore[attr-defined]
 
     @work(exclusive=True, group="workspace-java")
     async def find_java(self) -> None:
@@ -1377,6 +2230,7 @@ class WorkbenchApp(App[None]):
                         Option("Set up or repair environment", id="setup", disabled=True),
                         Option("Choose workspace profile and Java", id="workspace-choices", disabled=True),
                         Option("View or prepare Supersymmetry pack", id="pack-release", disabled=True),
+                        Option("Set up Supersymmetry instance", id="pack-instance", disabled=True),
                         Option("Explore installed modules", id="modules", disabled=True),
                         Option("Browse and run workflows", id="workflows", disabled=True),
                         Option("Open Workspace Home", id="home", disabled=True),
@@ -1455,6 +2309,7 @@ class WorkbenchApp(App[None]):
         yield SystemCommand("Set up Workbench", "Open the setup wizard", self.open_setup)
         yield SystemCommand("Workspace choices", "Choose a saved workspace profile and Java", self.open_workspace_choices)
         yield SystemCommand("Supersymmetry pack", "View or prepare the saved release", self.open_pack_release)
+        yield SystemCommand("Set up Supersymmetry instance", "Choose an instance source and installation", self.open_pack_instance)
         yield SystemCommand("Explore modules", "Show installed modules and profiles", self.open_modules)
         yield SystemCommand("Browse workflows", "Search the installed action catalog", self.open_workflows)
         yield SystemCommand(
@@ -1542,6 +2397,27 @@ class WorkbenchApp(App[None]):
             f"Saved release: {result['selected_version']}\n"
             f"Verified archive: {result['artifact_path']}\n\n"
             "Your workspace files were not changed.",
+        ))
+
+    @work(exclusive=True, group="pack-instance-open")
+    async def open_pack_instance(self) -> None:
+        if self.view.version is None:
+            self.notify("Waiting for Workbench Core", severity="warning")
+            return
+        try:
+            choice = await self.core.pack_instance_choice_show()
+            workspaces = await self.core.workspace_choices()
+        except (CoreClientError, TimeoutError) as exc:
+            self.push_screen(ResultScreen("Pack setup unavailable", str(exc)))
+            return
+        try:
+            installed = await self.core.pack_instance_install_status()
+            installed_error = None
+        except (CoreClientError, TimeoutError) as exc:
+            installed = {"installations": []}
+            installed_error = str(exc)
+        self.push_screen(PackInstanceScreen(
+            choice, workspaces, installed["installations"], installed_error,
         ))
 
     def open_modules(self) -> None:
@@ -1715,6 +2591,7 @@ class WorkbenchApp(App[None]):
             ("setup", view.setup is not None),
             ("workspace-choices", view.version is not None),
             ("pack-release", view.version is not None),
+            ("pack-instance", view.version is not None),
             ("modules", view.modules_loaded and view.profiles_loaded),
             ("workflows", view.catalog is not None),
             ("home", view.home is not None),
@@ -1805,6 +2682,8 @@ class WorkbenchApp(App[None]):
             self.open_workspace_choices()
         elif action == "pack-release":
             self.open_pack_release()
+        elif action == "pack-instance":
+            self.open_pack_instance()
         elif action == "modules":
             self.open_modules()
         elif action == "workflows":

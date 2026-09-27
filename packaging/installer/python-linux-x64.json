@@ -1,0 +1,13 @@
+{
+  "format": "workbench-python-bootstrap-v1",
+  "version": "3.14.7",
+  "runtime_id": "cpython-3.14.7+20260924",
+  "target": {
+    "python": "3.14",
+    "platform": "linux",
+    "machine": "x86_64"
+  },
+  "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260924/cpython-3.14.7%2B20260924-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+  "size": 36237838,
+  "sha256": "bd0d0568ccded07bbf1c87727230dc5dd0187e706a87da23c4de78388a229b78"
+}

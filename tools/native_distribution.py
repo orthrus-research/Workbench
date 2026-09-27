@@ -44,7 +44,9 @@ def _run(argv, *, cwd=None):
     subprocess.run([str(value) for value in argv], cwd=cwd, check=True)
 
 
-def selected_components(components=None, *, suite=False, root=ROOT):
+def selected_components(components=None, *, suite=False, with_tui=False, root=ROOT):
+    if with_tui and not suite:
+        raise DistributionError("--with-tui requires --suite")
     _, inventory = load_authority(root)
     native = {name: row for name, row in inventory.items() if row["kind"] in {"python", "python-client"}}
     # Python presentation clients are selected explicitly. `--suite` remains
@@ -53,6 +55,8 @@ def selected_components(components=None, *, suite=False, root=ROOT):
         (name for name, row in native.items() if row["kind"] == "python")
         if suite else components or ["workbench-core"]
     )
+    if with_tui:
+        requested.add("workbench-tui")
     if not requested or requested - native.keys():
         raise DistributionError("unknown or non-Python component selection: " + ", ".join(sorted(requested - native.keys())))
     selected = set(requested)
@@ -133,10 +137,12 @@ def _write_assembly(output, manifest, *, root):
         (output / name).write_bytes((root / name).read_bytes())
 
 
-def _derive(wheelhouse: Path, output: Path, components=None, *, suite=False, root=ROOT):
+def _derive(wheelhouse: Path, output: Path, components=None, *, suite=False, with_tui=False,
+            root=ROOT):
     """Select an offline dependency closure from exact already-built wheels."""
     manifest = current_assembly(wheelhouse, root=root)
-    requested, selected = selected_components(components, suite=suite, root=root)
+    requested, selected = selected_components(components, suite=suite, with_tui=with_tui,
+                                              root=root)
     expected_native = {row["id"]: row["version"] for row in selected}
     if any(manifest["native_versions"].get(name) != version for name, version in expected_native.items()):
         raise DistributionError("reused native versions differ from selected authorities")
@@ -216,6 +222,7 @@ def derive(
     components=None,
     *,
     suite=False,
+    with_tui=False,
     root=ROOT,
     configuration_home: Path | None = None,
     default_output_root: Path | None = None,
@@ -227,7 +234,8 @@ def derive(
         raise DistributionError("derived output must be a new directory")
     result, _custody = publish_assembly(
         output,
-        lambda staged: _derive(wheelhouse, staged, components, suite=suite, root=root),
+        lambda staged: _derive(wheelhouse, staged, components, suite=suite,
+                               with_tui=with_tui, root=root),
         root=root,
         configuration_home=configuration_home,
         default_output_root=default_output_root,
@@ -235,11 +243,13 @@ def derive(
     return result
 
 
-def _build(output: Path, components=None, *, suite=False, root=ROOT, command_runner=_run):
+def _build(output: Path, components=None, *, suite=False, with_tui=False, root=ROOT,
+           command_runner=_run):
     output = output.absolute()
     if output.exists() or output.is_symlink():
         raise DistributionError("build output must be a new directory")
-    requested, selected = selected_components(components, suite=suite, root=root)
+    requested, selected = selected_components(components, suite=suite, with_tui=with_tui,
+                                              root=root)
     output.mkdir(parents=True)
     wheels = output / "wheels"
     wheels.mkdir()
@@ -296,6 +306,7 @@ def build(
     components=None,
     *,
     suite=False,
+    with_tui=False,
     root=ROOT,
     command_runner=_run,
     configuration_home: Path | None = None,
@@ -309,7 +320,8 @@ def build(
     result, _custody = publish_assembly(
         output,
         lambda staged: _build(
-            staged, components, suite=suite, root=root, command_runner=command_runner,
+            staged, components, suite=suite, with_tui=with_tui, root=root,
+            command_runner=command_runner,
         ),
         root=root,
         configuration_home=configuration_home,

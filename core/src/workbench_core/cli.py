@@ -83,6 +83,9 @@ def _dispatch(
     if arguments[:2] == ["pack", "release"]:
         from .pack_release import main as pack_release
         return pack_release(arguments[2:])
+    if arguments[:2] == ["pack", "instance"]:
+        from .pack_instance_cli import main as pack_instance
+        return pack_instance(arguments[2:], suite_root=root)
     if arguments[:2] == ["environment", "resolve"]:
         return _dispatch_available(arguments, root, (), caller_environment=caller_environment)
     if arguments[:2] == ["storage", "resources"]:

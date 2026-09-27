@@ -10,6 +10,11 @@ checkouts, runtimes, worlds, captures, and generated indexes belong in the
 Core-selected user state location. Existing checkout-local `.workbench/`
 records remain available by explicit path.
 
+For first use, the Textual client offers a verified published release download
+or import of a complete Prism instance ZIP. The older per-file input review
+APIs below are evidence tools for developers; they are not the guided install
+route and do not complete a runnable instance.
+
 ## Profile targets
 
 [`profile.yaml`](profile.yaml) defines two distinct targets:
@@ -176,6 +181,18 @@ the complete payload, while `reconcile_release_client_composition` accepts only
 an interrupted, validated Core publication. This is byte custody for a
 selected layout. The result remains not installed, with external-file origin
 and runtime compatibility still unqualified.
+
+The [release client install policy](runtime/release-client-install-policy-v1.json)
+pins the Cleanroom 0.6.12-alpha Prism client archive for an official release
+composition and recommends Java 25. A complete user-provided Prism ZIP keeps
+its own launcher platform and settings when installed. Core uses the saved Java
+choice for either source, including a different managed feature or an unprobed
+user path, and publishes a separate stable instance under a private Linux
+Prism root on a supported native filesystem (including the WSL2 Linux filesystem).
+The install receipt retains the actual source kind, source version and source
+archive identity. An imported ZIP is labeled as user-provided even when its
+version matches a release. Installation does not establish a successful game
+launch or runtime compatibility; those require separate native evidence.
 
 ## Contents
 

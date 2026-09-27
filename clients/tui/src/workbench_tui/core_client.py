@@ -28,6 +28,10 @@ _WORKSPACE_FORMATS = {"workbench-user-workspaces-v1", "workbench-user-workspaces
 _PACK_RELEASE_SCHEMA = "workbench.pack-release.v1"
 _GITHUB_RELEASE_ID = re.compile(r"github-release:sha256:[0-9a-f]{64}\Z")
 _SAVED_RELEASE_ID = re.compile(r"(?:github|profile)-release:sha256:[0-9a-f]{64}\Z")
+_PACK_INSTANCE_PLAN_ID = re.compile(r"workbench-pack-release-client-composition-plan:sha256:[0-9a-f]{64}\Z")
+_PACK_INSTANCE_RECORD_ID = re.compile(r"workbench-pack-instance-choice:sha256:[0-9a-f]{64}\Z")
+_PACK_POLICY_PLAN_ID = re.compile(r"workbench-pack-release-derived-policies-plan:sha256:[0-9a-f]{64}\Z")
+_PRISM_ZIP_STAGE_PLAN_ID = re.compile(r"workbench-prism-zip-stage-plan:sha256:[0-9a-f]{64}\Z")
 
 
 class CoreClientError(RuntimeError):
@@ -121,6 +125,7 @@ class CoreClient:
         self,
         *arguments: str,
         timeout: float = 45,
+        terminate_wait_seconds: float = 5,
         allowed_exit: Sequence[int] = (0,),
         max_output: int = 8 * 1024 * 1024,
     ) -> CommandOutput:
@@ -164,7 +169,7 @@ class CoreClient:
                 except ProcessLookupError:
                     pass
                 try:
-                    await asyncio.wait_for(process.wait(), timeout=5)
+                    await asyncio.wait_for(process.wait(), timeout=terminate_wait_seconds)
                 except TimeoutError:
                     try:
                         process.kill()
@@ -194,10 +199,12 @@ class CoreClient:
         self,
         *arguments: str,
         timeout: float = 45,
+        terminate_wait_seconds: float = 5,
         allowed_exit: Sequence[int] = (0,),
     ) -> Any:
         output = await self.call(
-            *arguments, timeout=timeout, allowed_exit=allowed_exit
+            *arguments, timeout=timeout, terminate_wait_seconds=terminate_wait_seconds,
+            allowed_exit=allowed_exit,
         )
         try:
             return json.loads(output.stdout)
@@ -320,6 +327,420 @@ class CoreClient:
         return result
 
     @staticmethod
+    def _pack_instance_record(record: Any, action: str) -> Mapping[str, Any]:
+        if (not isinstance(record, dict)
+                or record.get("schema") != "workbench.pack-instance.v1"
+                or record.get("action") != action):
+            raise CoreClientError("Core returned an unsupported pack instance result")
+        if action.startswith("zip-stage-"):
+            stage = record.get("stage")
+            if (not isinstance(stage, dict)
+                    or not isinstance(stage.get("plan_id"), str)
+                    or _PRISM_ZIP_STAGE_PLAN_ID.fullmatch(stage["plan_id"]) is None
+                    or not isinstance(stage.get("archive_path"), str)
+                    or not Path(stage["archive_path"]).is_absolute()
+                    or not isinstance(stage.get("source_path"), str)
+                    or not Path(stage["source_path"]).is_absolute()
+                    or not isinstance(stage.get("source_sha256"), str)
+                    or re.fullmatch(r"sha256:[0-9a-f]{64}", stage["source_sha256"]) is None
+                    or type(stage.get("source_size")) is not int
+                    or stage["source_size"] <= 0):
+                raise CoreClientError("Core returned an incomplete Prism ZIP staging result")
+            if action == "zip-stage-plan" and stage.get("action") not in {"direct", "copy"}:
+                raise CoreClientError("Core returned an unsupported Prism ZIP staging plan")
+            if action == "zip-stage-apply" and stage.get("outcome") not in {
+                    "direct", "copied", "reused"}:
+                raise CoreClientError("Core did not retain the reviewed Prism ZIP")
+        elif action.startswith("zip-"):
+            source = record.get("source")
+            if (not isinstance(source, dict)
+                    or not isinstance(source.get("plan_id"), str)
+                    or _PACK_INSTANCE_PLAN_ID.fullmatch(source["plan_id"]) is None
+                    or source.get("source_kind") != "user-prism-zip"
+                    or type(source.get("file_count")) is not int
+                    or source["file_count"] <= 0):
+                raise CoreClientError("Core returned an incomplete ZIP source result")
+        elif action.startswith("fresh-policy-"):
+            policy = record.get("policy")
+            if (not isinstance(policy, dict)
+                    or policy.get("schema") != "workbench.pack-release.fresh-setup.v1"):
+                raise CoreClientError("Core returned an incomplete release policy result")
+            if action == "fresh-policy-status" and (
+                    policy.get("status") not in {"ready", "review_required", "unavailable"}
+                    or (policy.get("status") == "review_required" and (
+                        not isinstance(policy.get("required_external_files"), list)
+                        or not isinstance(policy.get("optional_external_files"), list)
+                        or not isinstance(policy.get("suggestions"), dict)))):
+                raise CoreClientError("Core returned an incomplete release policy review")
+            if action == "fresh-policy-plan" and (
+                    policy.get("status") != "planned"
+                    or not isinstance(policy.get("policy_plan"), dict)
+                    or not isinstance(policy["policy_plan"].get("plan_id"), str)
+                    or _PACK_POLICY_PLAN_ID.fullmatch(policy["policy_plan"]["plan_id"]) is None):
+                raise CoreClientError("Core returned an incomplete release policy plan")
+            if action == "fresh-policy-apply" and (
+                    policy.get("status") != "ready"
+                    or not isinstance(policy.get("policy_plan_id"), str)
+                    or _PACK_POLICY_PLAN_ID.fullmatch(policy["policy_plan_id"]) is None):
+                raise CoreClientError("Core did not retain the reviewed release policy")
+        elif action.startswith("fresh-"):
+            fresh = record.get("fresh")
+            if (not isinstance(fresh, dict)
+                    or fresh.get("schema") != "workbench.pack-release.fresh-setup.v1"):
+                raise CoreClientError("Core returned an incomplete fresh source result")
+            if action == "fresh-status" and (
+                    fresh.get("status") not in {"unavailable", "pending", "ready", "invalid"}
+                    or not isinstance(fresh.get("files"), list)
+                    or fresh.get("provider_state") not in {"available", "unavailable"}):
+                raise CoreClientError("Core returned an incomplete fresh source status")
+            if action == "fresh-publish":
+                composition = fresh.get("composition_result")
+                if (fresh.get("status") != "ready" or not isinstance(composition, dict)
+                        or not isinstance(composition.get("plan_id"), str)
+                        or _PACK_INSTANCE_PLAN_ID.fullmatch(composition["plan_id"]) is None):
+                    raise CoreClientError("Core did not publish a complete fresh source")
+        elif action.startswith("root-"):
+            root = record.get("prism_root")
+            if (not isinstance(root, dict)
+                    or not isinstance(root.get("plan_id"), str)
+                    or re.fullmatch(
+                        r"workbench-prism-data-root-plan:sha256:[0-9a-f]{64}",
+                        root["plan_id"],
+                    ) is None):
+                raise CoreClientError("Core returned an incomplete Prism folder review")
+            if action == "root-plan" and (
+                    root.get("action") not in {"initialize", "reuse", "reconcile", "blocked"}
+                    or root.get("state") not in {"ready", "blocked"}
+                    or not isinstance(root.get("blockers"), list)):
+                raise CoreClientError("Core returned an incomplete Prism folder plan")
+            if action in {"root-reconcile", "root-abandon"} and root.get("outcome") not in {
+                    "reconciled", "abandoned"}:
+                raise CoreClientError("Core did not report a Prism folder recovery outcome")
+        elif action == "install-status":
+            installations = record.get("installations")
+            if (not isinstance(installations, list)
+                    or record.get("count") != len(installations)
+                    or any(not isinstance(row, dict)
+                           or not isinstance(row.get("plan_id"), str)
+                           or re.fullmatch(
+                               r"workbench-pack-release-client-install-plan:sha256:[0-9a-f]{64}",
+                               row["plan_id"],
+                           ) is None
+                           or not isinstance(row.get("instance_path"), str)
+                           for row in installations)):
+                raise CoreClientError("Core returned an incomplete installed instance list")
+        elif action.startswith("install-"):
+            installation = record.get("installation")
+            if (not isinstance(installation, dict)
+                    or not isinstance(installation.get("plan_id"), str)
+                    or re.fullmatch(
+                        r"workbench-pack-release-client-install-plan:sha256:[0-9a-f]{64}",
+                        installation["plan_id"],
+                    ) is None
+                    or (action != "install-abandon" and (
+                        not isinstance(installation.get("instance_path"), str)
+                        or not Path(installation["instance_path"]).is_absolute()))
+                    or (action == "install-abandon" and (
+                        installation.get("outcome") != "abandoned"
+                        or not isinstance(installation.get("retained_stage_path"), str)))
+                    or not isinstance(record.get("source_plan_id"), str)
+                    or _PACK_INSTANCE_PLAN_ID.fullmatch(record["source_plan_id"]) is None):
+                raise CoreClientError("Core returned an incomplete instance installation")
+        elif action.startswith("launch-"):
+            launch = record.get("launch")
+            identity = (launch.get("plan_id" if action == "launch-plan" else "launch_plan_id")
+                        if isinstance(launch, dict) else None)
+            if (not isinstance(launch, dict)
+                    or not isinstance(identity, str)
+                    or re.fullmatch(
+                        r"workbench-pack-release-client-launch-plan:sha256:[0-9a-f]{64}",
+                        identity,
+                    ) is None
+                    or not isinstance(record.get("source_plan_id"), str)
+                    or _PACK_INSTANCE_PLAN_ID.fullmatch(record["source_plan_id"]) is None):
+                raise CoreClientError("Core returned an incomplete Prism launch")
+        else:
+            choice = record.get("choice")
+            if (not isinstance(choice, dict)
+                    or not isinstance(choice.get("record_id"), str)
+                    or _PACK_INSTANCE_RECORD_ID.fullmatch(choice["record_id"]) is None
+                    or choice.get("source_kind") not in {None, "user-prism-zip", "published-release"}
+                    or (choice.get("source_plan_id") is not None
+                        and (not isinstance(choice["source_plan_id"], str)
+                             or _PACK_INSTANCE_PLAN_ID.fullmatch(choice["source_plan_id"]) is None))):
+                raise CoreClientError("Core returned an incomplete pack instance choice")
+        return record
+
+    async def pack_instance_choice_show(self) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "choice-show", "--profile", "supersymmetry", "--json",
+            timeout=15,
+        )
+        return self._pack_instance_record(record, "choice-show")
+
+    async def pack_instance_zip_plan(self, archive: str) -> Mapping[str, Any]:
+        if not Path(archive).is_absolute():
+            raise CoreClientError("choose an absolute Prism ZIP path")
+        record = await self.json_record(
+            "pack", "instance", "zip-plan", "--profile", "supersymmetry",
+            "--archive", archive, "--json", timeout=600,
+        )
+        return self._pack_instance_record(record, "zip-plan")
+
+    async def pack_instance_zip_stage_plan(self, archive: str) -> Mapping[str, Any]:
+        if not Path(archive).is_absolute():
+            raise CoreClientError("choose an absolute Prism ZIP path")
+        record = await self.json_record(
+            "pack", "instance", "zip-stage-plan", "--profile", "supersymmetry",
+            "--archive", archive, "--json", timeout=600,
+        )
+        return self._pack_instance_record(record, "zip-stage-plan")
+
+    async def pack_instance_zip_stage_apply(
+        self, archive: str, plan_id: str,
+    ) -> Mapping[str, Any]:
+        if not Path(archive).is_absolute() or _PRISM_ZIP_STAGE_PLAN_ID.fullmatch(plan_id) is None:
+            raise CoreClientError("select an exact reviewed Prism ZIP transfer")
+        record = await self.json_record(
+            "pack", "instance", "zip-stage-apply", "--profile", "supersymmetry",
+            "--archive", archive, "--expected-plan-id", plan_id, "--json", timeout=3600,
+        )
+        result = self._pack_instance_record(record, "zip-stage-apply")
+        if result["stage"]["plan_id"] != plan_id:
+            raise CoreClientError("Core staged a different Prism ZIP")
+        return result
+
+    async def pack_instance_zip_import(self, archive: str, plan_id: str) -> Mapping[str, Any]:
+        if not Path(archive).is_absolute() or _PACK_INSTANCE_PLAN_ID.fullmatch(plan_id) is None:
+            raise CoreClientError("select an exact reviewed Prism ZIP")
+        record = await self.json_record(
+            "pack", "instance", "zip-import", "--profile", "supersymmetry",
+            "--archive", archive, "--expected-plan-id", plan_id, "--json", timeout=1800,
+        )
+        result = self._pack_instance_record(record, "zip-import")
+        if result["source"]["plan_id"] != plan_id:
+            raise CoreClientError("Core imported a different Prism ZIP")
+        return result
+
+    @staticmethod
+    def _fresh_optional_args(optional_mode: str) -> tuple[str, ...]:
+        if optional_mode not in {"default", "omit"}:
+            raise CoreClientError("choose whether to include the optional mod")
+        return ("--optional-mode", optional_mode)
+
+    @staticmethod
+    def _fresh_pair_args(
+        resourcepack_pairs: tuple[tuple[int, int], ...],
+        optional_pairs: tuple[tuple[int, int], ...],
+    ) -> tuple[str, ...]:
+        if not resourcepack_pairs:
+            raise CoreClientError("select at least one release resource pack")
+        arguments: list[str] = []
+        for flag, pairs in (("--resourcepack-pair", resourcepack_pairs),
+                            ("--optional-pair", optional_pairs)):
+            if len(set(pairs)) != len(pairs):
+                raise CoreClientError("select each release file once")
+            for project_id, file_id in pairs:
+                if (type(project_id) is not int or type(file_id) is not int
+                        or project_id <= 0 or file_id <= 0):
+                    raise CoreClientError("select exact release file IDs")
+                arguments.extend((flag, f"{project_id}:{file_id}"))
+        return tuple(arguments)
+
+    async def pack_instance_fresh_policy_status(self) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "fresh-policy-status", "--profile", "supersymmetry",
+            "--json", timeout=600,
+        )
+        return self._pack_instance_record(record, "fresh-policy-status")
+
+    async def pack_instance_fresh_policy_plan(
+        self, resourcepack_pairs: tuple[tuple[int, int], ...],
+        optional_pairs: tuple[tuple[int, int], ...],
+    ) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "fresh-policy-plan", "--profile", "supersymmetry",
+            *self._fresh_pair_args(resourcepack_pairs, optional_pairs),
+            "--json", timeout=1200,
+        )
+        return self._pack_instance_record(record, "fresh-policy-plan")
+
+    async def pack_instance_fresh_policy_apply(
+        self, resourcepack_pairs: tuple[tuple[int, int], ...],
+        optional_pairs: tuple[tuple[int, int], ...], plan_id: str,
+    ) -> Mapping[str, Any]:
+        if _PACK_POLICY_PLAN_ID.fullmatch(plan_id) is None:
+            raise CoreClientError("select the exact reviewed release policy")
+        record = await self.json_record(
+            "pack", "instance", "fresh-policy-apply", "--profile", "supersymmetry",
+            *self._fresh_pair_args(resourcepack_pairs, optional_pairs),
+            "--expected-policy-plan-id", plan_id, "--json", timeout=1200,
+        )
+        result = self._pack_instance_record(record, "fresh-policy-apply")
+        if result["policy"]["policy_plan_id"] != plan_id:
+            raise CoreClientError("Core retained a different release policy")
+        return result
+
+    async def pack_instance_fresh_status(self, optional_mode: str) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "fresh-status", "--profile", "supersymmetry",
+            *self._fresh_optional_args(optional_mode), "--json", timeout=600,
+        )
+        return self._pack_instance_record(record, "fresh-status")
+
+    async def pack_instance_fresh_overrides(self, optional_mode: str) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "fresh-overrides", "--profile", "supersymmetry",
+            *self._fresh_optional_args(optional_mode), "--json", timeout=1200,
+        )
+        return self._pack_instance_record(record, "fresh-overrides")
+
+    async def pack_instance_fresh_file(
+        self, project_id: int, file_id: int, optional_mode: str,
+    ) -> Mapping[str, Any]:
+        if (type(project_id) is not int or project_id <= 0
+                or type(file_id) is not int or file_id <= 0):
+            raise CoreClientError("choose an exact file offered by Core")
+        record = await self.json_record(
+            "pack", "instance", "fresh-file", "--profile", "supersymmetry",
+            "--project-id", str(project_id), "--file-id", str(file_id),
+            *self._fresh_optional_args(optional_mode), "--json", timeout=1800,
+        )
+        result = self._pack_instance_record(record, "fresh-file")
+        if (result["fresh"].get("project_id") != project_id
+                or result["fresh"].get("file_id") != file_id):
+            raise CoreClientError("Core acquired another release file")
+        return result
+
+    async def pack_instance_fresh_publish(
+        self, override_plan_id: str, optional_mode: str,
+    ) -> Mapping[str, Any]:
+        if not override_plan_id.startswith("workbench-pack-release-override-custody-plan:sha256:"):
+            raise CoreClientError("select exact retained official overrides")
+        record = await self.json_record(
+            "pack", "instance", "fresh-publish", "--profile", "supersymmetry",
+            "--override-plan-id", override_plan_id,
+            *self._fresh_optional_args(optional_mode), "--json", timeout=1800,
+        )
+        return self._pack_instance_record(record, "fresh-publish")
+
+    async def pack_instance_install_prepare(self) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "install-prepare", "--profile", "supersymmetry",
+            "--json", timeout=3600,
+        )
+        return self._pack_instance_record(record, "install-prepare")
+
+    async def pack_instance_root_plan(self) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "root-plan", "--profile", "supersymmetry",
+            "--json", timeout=30,
+        )
+        return self._pack_instance_record(record, "root-plan")
+
+    async def pack_instance_root_recover(
+        self, plan_id: str, action: str,
+    ) -> Mapping[str, Any]:
+        if action not in {"reconcile", "abandon"} or re.fullmatch(
+            r"workbench-prism-data-root-plan:sha256:[0-9a-f]{64}", plan_id,
+        ) is None:
+            raise CoreClientError("select the exact interrupted Prism folder")
+        record = await self.json_record(
+            "pack", "instance", "root-" + action, "--profile", "supersymmetry",
+            "--expected-root-plan-id", plan_id, "--json", timeout=600,
+        )
+        result = self._pack_instance_record(record, "root-" + action)
+        if result["prism_root"]["plan_id"] != plan_id:
+            raise CoreClientError("Core recovered another Prism folder plan")
+        return result
+
+    async def pack_instance_install_status(self) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "instance", "install-status", "--profile", "supersymmetry",
+            "--json", timeout=600,
+        )
+        return self._pack_instance_record(record, "install-status")
+
+    async def pack_instance_install_apply(self, plan_id: str) -> Mapping[str, Any]:
+        if re.fullmatch(
+            r"workbench-pack-release-client-install-plan:sha256:[0-9a-f]{64}", plan_id,
+        ) is None:
+            raise CoreClientError("select the exact reviewed instance installation")
+        record = await self.json_record(
+            "pack", "instance", "install-apply", "--profile", "supersymmetry",
+            "--expected-install-plan-id", plan_id, "--json", timeout=3600,
+        )
+        result = self._pack_instance_record(record, "install-apply")
+        if result["installation"]["plan_id"] != plan_id:
+            raise CoreClientError("Core installed another instance plan")
+        return result
+
+    async def pack_instance_install_recover(
+        self, plan_id: str, action: str,
+    ) -> Mapping[str, Any]:
+        if action not in {"reconcile", "abandon"} or re.fullmatch(
+            r"workbench-pack-release-client-install-plan:sha256:[0-9a-f]{64}", plan_id,
+        ) is None:
+            raise CoreClientError("select the exact interrupted instance installation")
+        record = await self.json_record(
+            "pack", "instance", "install-" + action, "--profile", "supersymmetry",
+            "--expected-install-plan-id", plan_id, "--json", timeout=600,
+        )
+        result = self._pack_instance_record(record, "install-" + action)
+        if result["installation"]["plan_id"] != plan_id:
+            raise CoreClientError("Core recovered another instance plan")
+        return result
+
+    async def pack_instance_launch_plan(self, install_plan_id: str, mode: str) -> Mapping[str, Any]:
+        if mode not in {"show", "launch"}:
+            raise CoreClientError("choose a Prism action")
+        record = await self.json_record(
+            "pack", "instance", "launch-plan", "--profile", "supersymmetry",
+            "--expected-install-plan-id", install_plan_id, "--launch-mode", mode,
+            "--json", timeout=30,
+        )
+        return self._pack_instance_record(record, "launch-plan")
+
+    async def pack_instance_launch_run(
+        self, install_plan_id: str, launch_plan_id: str, mode: str,
+    ) -> Mapping[str, Any]:
+        if mode not in {"show", "launch"}:
+            raise CoreClientError("choose a Prism action")
+        record = await self.json_record(
+            "pack", "instance", "launch-run", "--profile", "supersymmetry",
+            "--expected-install-plan-id", install_plan_id,
+            "--expected-launch-plan-id", launch_plan_id, "--launch-mode", mode,
+            "--json", timeout=86400, terminate_wait_seconds=90,
+        )
+        result = self._pack_instance_record(record, "launch-run")
+        if result["launch"]["launch_plan_id"] != launch_plan_id:
+            raise CoreClientError("Core launched another Prism plan")
+        return result
+
+    async def pack_instance_choice_select(
+        self, plan_id: str, *, expected_record_id: str,
+        launcher_root: str, workspace_name: str,
+        source_kind: str = "user-prism-zip",
+    ) -> Mapping[str, Any]:
+        if (_PACK_INSTANCE_PLAN_ID.fullmatch(plan_id) is None
+                or _PACK_INSTANCE_RECORD_ID.fullmatch(expected_record_id) is None
+                or not Path(launcher_root).is_absolute() or not workspace_name
+                or source_kind not in {"user-prism-zip", "published-release"}):
+            raise CoreClientError("select a retained source, launcher root, and workspace")
+        record = await self.json_record(
+            "pack", "instance", "choice-select", "--profile", "supersymmetry",
+            "--source-plan-id", plan_id, "--launcher-root", launcher_root,
+            "--source-kind", source_kind,
+            "--workspace-name", workspace_name,
+            "--expected-record-id", expected_record_id, "--json", timeout=30,
+        )
+        result = self._pack_instance_record(record, "choice-select")
+        if (result["choice"].get("source_plan_id") != plan_id
+                or result["choice"].get("source_kind") != source_kind):
+            raise CoreClientError("Core saved a different instance source")
+        return result
+
+    @staticmethod
     def _workspace_record(record: Any) -> Mapping[str, Any]:
         if (
             not isinstance(record, dict)
@@ -351,6 +772,27 @@ class CoreClient:
         return self._workspace_record(await self.json_record(
             "settings", "workspace", "list", "--json"
         ))
+
+    async def register_workspace(
+        self, name: str, path: str, *, make_default: bool,
+        expected_record_id: str,
+    ) -> Mapping[str, Any]:
+        if (re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", name) is None
+                or not path or "\x00" in path
+                or not (Path(path).is_absolute() or path == "~"
+                                    or path.startswith("~/"))
+                or not expected_record_id):
+            raise CoreClientError("choose a workspace name, Linux folder, and current revision")
+        arguments = ["settings", "workspace", "add", name, path]
+        if make_default:
+            arguments.append("--default")
+        arguments.extend(("--expected-record-id", expected_record_id, "--json"))
+        result = self._workspace_record(await self.json_record(*arguments))
+        selected = next((row for row in result["entries"] if row["name"] == name), None)
+        if (selected is None or selected["path"] != path
+                or (make_default and result.get("default") != name)):
+            raise CoreClientError("Core saved a different workspace")
+        return result
 
     async def save_workspace_choice(
         self, name: str, *, profile_config: str | None,

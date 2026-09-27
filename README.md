@@ -11,6 +11,9 @@ explicit native checks for Minecraft 1.12.2 development.
 **Current download:** [Linux x64 preview for Python 3.14](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-2026-09-23).
 Its release notes list exact components, supported contexts, and qualification.
 CleanroomMC and Supersymmetry are the first platform and pack integrations.
+The [next Linux bundle plan](RELEASING.md#prepare-the-one-command-linux-bundle)
+adds a release-specific terminal installer that obtains Python and installs the
+reviewed wheel assembly. That hook is not part of the current preview.
 
 ## What would you like to do?
 

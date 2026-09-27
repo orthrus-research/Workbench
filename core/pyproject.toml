@@ -25,6 +25,6 @@ packages = ["workbench_core", "workbench_core.service", "workbench_core.storage"
 "workbench_resources.core" = "."
 
 [tool.setuptools.package-data]
-"workbench_core" = ["schemas/*.json", "data/*.b64"]
+"workbench_core" = ["schemas/*.json", "data/*.b64", "data/*.toml"]
 "workbench_core.storage" = ["schemas/*.json"]
 "workbench_resources.core" = ["pyproject.toml", "src/workbench_core/*.py", "src/workbench_core/service/*.py", "src/workbench_core/storage/*.py"]

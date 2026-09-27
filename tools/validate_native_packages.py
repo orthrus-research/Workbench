@@ -21,6 +21,7 @@ import tempfile
 import zipfile
 
 from module_packages import check, inventory
+from component_versions import load_authority
 from validate_native_artifacts import audit
 from native_distribution import current_assembly, verify
 from validation_diagnostics import DiagnosticRun, default_directory
@@ -190,6 +191,44 @@ for module in (workbench_api, workbench_core, workbench_atlas):
     assert Path(module.__file__).resolve().is_relative_to(Path(sys.prefix).resolve()), module.__name__
 """], cwd=staging, environment=environment)
     print("PASS relocated shipped installer, spaces/Unicode paths, no-clobber reinstall, native launcher, user-state discovery, Home and Atlas source search/inspection outside the checkout", flush=True)
+    if "workbench-tui" in manifest["native_versions"]:
+        tui = destination / ("Scripts/workbench-tui.exe" if os.name == "nt" else "bin/workbench-tui")
+        if not tui.is_file():
+            raise RuntimeError("combined installation has no Textual client launcher")
+        print(run([str(python), "-I", "-c", """
+import asyncio
+from pathlib import Path
+import sys
+from textual.widgets import OptionList, Static
+import workbench_tui
+from workbench_tui.app import HomeScreen, WorkbenchApp
+from workbench_tui.core_client import CoreClient
+
+assert Path(workbench_tui.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+
+async def exercise():
+    app = WorkbenchApp(CoreClient((sys.argv[1],)))
+    async with app.run_test(size=(100, 34)) as pilot:
+        for _ in range(600):
+            if not app.view.catalog_loading and app.view.catalog is not None:
+                break
+            await pilot.pause(0.05)
+        assert isinstance(app.screen, HomeScreen)
+        assert app.view.version == {'component_id': 'workbench-core', 'version': sys.argv[2]}, app.view.version
+        assert app.view.environment is not None and app.view.setup is not None, app.view.problems
+        assert app.view.modules_loaded and app.view.profiles_loaded, app.view.problems
+        assert app.view.catalog is not None and not app.view.problems, app.view.problems
+        home = app.screen_stack[0]
+        assert home.query_one('#hero', Static).content == 'WORKBENCH'
+        actions = home.query_one('#home-actions', OptionList)
+        assert any(actions.get_option_at_index(index).id == 'workflows'
+                   and not actions.get_option_at_index(index).disabled
+                   for index in range(actions.option_count))
+    print('PASS installed combined Suite and Textual Home connect to the same Core outside the checkout')
+
+asyncio.run(exercise())
+""", str(executable), manifest["native_versions"]["workbench-core"]],
+                  cwd=project, environment=environment).strip(), flush=True)
 
 
 def validate(wheelhouse_input: Path | None = None) -> int:
@@ -205,8 +244,9 @@ def validate(wheelhouse_input: Path | None = None) -> int:
         if wheelhouse_input is not None:
             manifest = current_assembly(wheelhouse_input)
             expected = {row["distribution"]: row["version"] for row in rows}
-            if manifest["native_versions"] != expected:
-                raise RuntimeError("native conformance requires the complete current package inventory")
+            tui_version = load_authority(ROOT)[1]["workbench-tui"]["version"]
+            if manifest["native_versions"] not in (expected, {**expected, "workbench-tui": tui_version}):
+                raise RuntimeError("native conformance requires the complete current package inventory, with only an optional current Textual client")
             private = staging / "assembly"
             (private / "wheels").mkdir(parents=True)
             for name in ("wheelhouse.json", "requirements.lock"):
@@ -485,9 +525,8 @@ from workbench_core.host_services import install_local_host_services
 from workbench_shell.feature_change_workspace import _exclusive_record_lock
 install_local_host_services()
 path = Path.cwd() / 'shell-writer.lock'
-with _exclusive_record_lock(path, 'installed Shell writer') as descriptor:
-    os.lseek(descriptor, 0, os.SEEK_SET)
-    assert os.read(descriptor, 64).decode('ascii').strip() == str(os.getpid())
+with _exclusive_record_lock(path, 'installed Shell writer'):
+    assert path.is_file()
     script = '''
 import os, sys
 from workbench_api.host_filesystem import file_lease

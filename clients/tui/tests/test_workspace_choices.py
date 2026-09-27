@@ -7,7 +7,10 @@ from unittest.mock import AsyncMock, Mock
 
 from textual.widgets import Button, Checkbox, Input, Select
 
-from workbench_tui.app import WorkbenchApp, WorkspaceChoicesScreen, EnvironmentImportScreen
+from workbench_tui.app import (
+    WorkbenchApp, WorkspaceChoicesScreen, WorkspaceRegisterScreen,
+    EnvironmentImportScreen,
+)
 from workbench_tui.core_client import CoreClient, CoreClientError
 
 
@@ -73,6 +76,24 @@ def _core() -> Mock:
 
 
 class WorkspaceChoiceClientTests(IsolatedAsyncioTestCase):
+    async def test_client_registers_workspace_with_exact_revision(self) -> None:
+        client = CoreClient(("workbench",))
+        registered = _record(revision="after")
+        registered["entries"].append({
+            "name": "gamma", "path": "/home/user/gamma", "workspace_id": "gamma-id",
+            "profile_config": None, "java_home": None,
+        })
+        registered["default"] = "gamma"
+        client.json_record = AsyncMock(return_value=registered)
+        self.assertEqual(registered, await client.register_workspace(
+            "gamma", "/home/user/gamma", make_default=True,
+            expected_record_id="before",
+        ))
+        client.json_record.assert_awaited_with(
+            "settings", "workspace", "add", "gamma", "/home/user/gamma",
+            "--default", "--expected-record-id", "before", "--json",
+        )
+
     async def test_client_passes_reviewed_revision_and_clear_choice(self) -> None:
         client = CoreClient(("workbench",))
         client.json_record = AsyncMock(return_value=_record(revision="after"))
@@ -282,6 +303,38 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
                 return
             await pilot.pause(0.05)
         self.fail("Textual did not reach the expected state")
+
+    async def test_empty_choices_can_register_a_workspace_in_textual(self) -> None:
+        core = _core()
+        empty = {"format": "workbench-user-workspaces-v2", "schema_version": 2,
+                 "record_id": "before", "default": None, "entries": []}
+        saved = {"format": "workbench-user-workspaces-v2", "schema_version": 2,
+                 "record_id": "after", "default": "susy-dev", "entries": [
+                     {"name": "susy-dev", "path": "/home/user/Supersymmetry",
+                      "workspace_id": "workspace-id", "profile_config": None,
+                      "java_home": None},
+                 ]}
+        core.workspace_choices = AsyncMock(return_value=empty)
+        core.register_workspace = AsyncMock(return_value=saved)
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            app.open_workspace_choices()
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen))
+            choices = app.screen
+            self.assertTrue(choices.query_one("#choice-save", Button).disabled)
+            choices.query_one("#choice-register", Button).press()
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceRegisterScreen))
+            form = app.screen
+            form.query_one("#workspace-register-name", Input).value = "susy-dev"
+            form.query_one("#workspace-register-path", Input).value = "/home/user/Supersymmetry"
+            form.query_one("#workspace-register-save", Button).press()
+            await self._settle(pilot, lambda: app.screen is choices)
+            core.register_workspace.assert_awaited_once_with(
+                "susy-dev", "/home/user/Supersymmetry", make_default=True,
+                expected_record_id="before",
+            )
+            self.assertEqual("susy-dev", choices.query_one("#choice-workspace", Select).value)
+            self.assertFalse(choices.query_one("#choice-save", Button).disabled)
 
     async def test_two_workspaces_save_independent_choices_and_reopen(self) -> None:
         core = _core()

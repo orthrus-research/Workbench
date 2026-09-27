@@ -12,6 +12,37 @@ from workbench_core import check_storage, tooling_provision as tooling
 
 
 class ToolingProvisionTests(unittest.TestCase):
+    def test_prism_only_setup_does_not_acquire_packwiz(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            seed = root / "seed"
+            seed.mkdir()
+            archive = seed / "prism-test.zip"
+            with ZipFile(archive, "w") as target:
+                target.writestr("PrismLauncher", b"#!/bin/sh\nexit 0\n")
+            digest, size = tooling.sha256_file(archive)
+            policy = {
+                "filename": archive.name,
+                "url": "https://github.com/PrismLauncher/PrismLauncher/releases/download/test/prism-test.zip",
+                "sha256": digest,
+                "size": size,
+                "executable": "PrismLauncher",
+                "archive": "zip",
+            }
+            policies = {
+                "linux-x64": {**tooling.ASSETS["linux-x64"], "prism": policy},
+                "windows-x64": tooling.ASSETS["windows-x64"],
+            }
+            with (patch.object(tooling, "ASSETS", policies),
+                  patch.object(tooling, "_prepare_packwiz", side_effect=AssertionError(
+                      "Prism setup must not acquire Packwiz"))):
+                result = tooling.prepare_prism_launcher(
+                    root / "state", key="linux-x64", seed_dir=seed)
+                self.assertEqual("ready", result["state"])
+                self.assertTrue(Path(result["executable"]).is_file())
+                self.assertEqual("missing", tooling.inspect_tools(
+                    root / "state", key="linux-x64")["tools"]["packwiz"]["state"])
+
     def test_bundled_packwiz_source_is_exact_and_contains_license_and_vendor(self):
         with tempfile.TemporaryDirectory() as temporary:
             bundle = tooling._bundle(Path(temporary) / tooling.SOURCE_BUNDLE)

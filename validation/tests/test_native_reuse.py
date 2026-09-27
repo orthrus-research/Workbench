@@ -191,7 +191,8 @@ class NativeReuseTests(unittest.TestCase):
                     "--from-wheelhouse", str(source), "--output", str(output),
                     "--diagnostics", str(base / "diagnostics"),
                 ]))
-            producer.assert_called_once_with(source, staged, None, suite=False)
+            producer.assert_called_once_with(source, staged, None, suite=False,
+                                             with_tui=False)
             self.assertEqual(
                 {**manifest, "artifact_tree_id": reference.tree_id,
                  "artifact_path": str(reference.path)},

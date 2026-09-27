@@ -338,7 +338,8 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
         return 0
     if (
         selected.profile_config is not None or selected.java_home is not None or selected.java_feature is not None
-        or selected.clear_profile or selected.clear_java or selected.expected_record_id
+        or selected.clear_profile or selected.clear_java
+        or (selected.expected_record_id and selected.operation != "add")
     ):
         parser.error("profile and Java choices require workspace select")
     if selected.operation in {"remove", "default", "clear-default"}:
@@ -361,10 +362,16 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
         return 0
     if selected.name is None or selected.path is None:
         parser.error("workspace add requires NAME and PATH")
-    result = register_workspace(selected.name, selected.path, make_default=selected.default)
-    print(f"Saved workspace {selected.name}: {selected.path}")
-    if result["default"] == selected.name:
-        print(f"Default workspace: {selected.name}")
+    result = register_workspace(
+        selected.name, selected.path, make_default=selected.default,
+        expected_record_id=selected.expected_record_id,
+    )
+    if selected.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        print(f"Saved workspace {selected.name}: {selected.path}")
+        if result["default"] == selected.name:
+            print(f"Default workspace: {selected.name}")
     return 0
 
 

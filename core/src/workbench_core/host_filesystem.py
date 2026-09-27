@@ -533,14 +533,17 @@ def fsync_directory(path: Path) -> None:
         kernel32.CloseHandle(handle)
 
 
-def promote_prepared_directory(payload: Path, target: Path) -> Path:
+def promote_prepared_directory(
+    payload: Path, target: Path, *,
+    stage_marker: tuple[tuple[int, int], str, bytes] | None = None,
+) -> Path:
     """Expose Core's pinned no-replace directory move to API consumers."""
 
     # The promotion module uses this module's private-path guard. Import only
     # at call time to keep that dependency acyclic.
     from .prepared_directory_promotion import promote_prepared_directory as promote
 
-    return promote(payload, target)
+    return promote(payload, target, stage_marker=stage_marker)
 
 
 def count_prepared_directory_stages(target: Path, *, stage_prefix: str) -> int:

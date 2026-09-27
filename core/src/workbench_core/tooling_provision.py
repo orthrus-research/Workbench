@@ -420,6 +420,30 @@ def prepare_tools(
     return inspect_tools(root, key=selected)
 
 
+def prepare_prism_launcher(
+    state_root: Path | str, *, key: str | None = None,
+    seed_dir: Path | str | None = None,
+) -> dict[str, Any]:
+    """Acquire only the pinned Prism launcher for a fresh client setup."""
+
+    selected = host_key() if key is None else key
+    if selected not in ASSETS:
+        raise ToolingProvisionError("unsupported managed Prism host")
+    root = storage.initialize(Path(state_root).expanduser().absolute())
+    parent = _managed_root(root) / selected
+    parent.mkdir(parents=True, exist_ok=True)
+    seed = None if seed_dir is None else Path(seed_dir).expanduser().absolute()
+    if seed is not None and (seed.is_symlink() or not seed.is_dir()):
+        raise ToolingProvisionError("seed directory must be an ordinary directory")
+    if inspect_tools(root, key=selected)["tools"]["prism"]["state"] != "ready":
+        _prepare_prism(root, selected, seed)
+    row = inspect_tools(root, key=selected)["tools"]["prism"]
+    if row["state"] != "ready":
+        raise ToolingProvisionError("managed Prism launcher is unavailable after acquisition")
+    return {"format": FORMAT + "-prism-result", "host": selected,
+            "version": PRISM_VERSION, **row}
+
+
 def _plan(state_root: Path, key: str, seed_dir: Path | None,
           go_executable: Path | None) -> dict[str, Any]:
     check = inspect_tools(state_root, key=key)
@@ -516,4 +540,5 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
 
-__all__ = ["ASSETS", "ToolingProvisionError", "host_key", "inspect_tools", "prepare_tools", "main"]
+__all__ = ["ASSETS", "ToolingProvisionError", "host_key", "inspect_tools",
+           "prepare_tools", "prepare_prism_launcher", "main"]

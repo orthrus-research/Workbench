@@ -14,12 +14,23 @@ python tools/component_versions.py check
 | --- | --- | --- |
 | `source` | Frozen repository validation | `validation/validate.py --full` |
 | `native-component` | Selected Python package, including the opt-in Textual client, and declared dependency closure | `tools/build_native_distribution.py --component COMPONENT --output NEW_DIRECTORY` |
-| `native-suite` | All current native modules and profiles | `tools/build_native_distribution.py --suite --output NEW_DIRECTORY` |
+| `native-suite` | All current native modules and profiles, with an optional Textual client | `tools/build_native_distribution.py --suite --output NEW_DIRECTORY` |
 | `client` | One independently versioned IDE client | `tools/build_release_clients.py --component COMPONENT` |
 
 Without a component selector the native builder assembles Core and its
-dependencies only. `--suite` excludes the optional Textual client; select
-`workbench-tui` explicitly to include its Python wheel and Textual closure.
+dependencies only. Plain `--suite` excludes the optional Textual client. Use
+`--suite --with-tui` to add its wheel and Textual dependency closure to the
+complete Suite, or select `workbench-tui` explicitly for a smaller assembly:
+
+```bash
+python tools/build_native_distribution.py --suite --with-tui --plan
+python tools/build_native_distribution.py --suite --with-tui --output NEW_DIRECTORY
+python tools/validate_native_packages.py --wheelhouse NEW_DIRECTORY
+```
+
+Native conformance accepts the exact Suite inventory with or without the
+current TUI wheel. For the combined assembly it also opens the installed
+Textual Home headlessly against the installed Core, outside the checkout.
 Building can download dependencies; installing a completed
 wheelhouse is offline and hash-locked. The assembly records its build-input
 digest and exact package versions, Python minor version, OS and architecture.

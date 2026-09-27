@@ -1,0 +1,8 @@
+schema = "workbench/config/v1"
+
+[selection]
+pack_document = "profiles/packs/supersymmetry/profile.yaml"
+pack_variant = "cleanroom-provisional"
+platform_document = "profiles/platforms/cleanroom/provisional.yaml"
+
+[bindings]

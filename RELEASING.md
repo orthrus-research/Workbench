@@ -110,6 +110,76 @@ distribution or version. See [native assembly details](packaging/README.md).
    original dependency wheels because a later fresh resolve may select newer
    versions permitted by the native manifests.
 
+## Prepare the one-command Linux bundle
+
+This is the next-bundle plan, not a claim about the published September 23
+preview. The public first-run entry point is one release-specific shell asset:
+
+```sh
+curl -fsSLo workbench-install-linux-x64.sh "https://github.com/orthrus-research/Workbench/releases/download/<TAG>/workbench-install-linux-x64.sh" && sh workbench-install-linux-x64.sh
+```
+
+Use the exact reviewed tag in release notes after publication. Offer a
+download-and-inspect variant beside the one-line command. The hook contains the
+archive URL and SHA-256 and a separately pinned `python-build-standalone`
+runtime URL and SHA-256. It installs in the user's XDG data directory without
+sudo, Pixi, a source checkout, a system Python, or shell profile changes. It
+installs one named bundle edition. The full Suite edition retains the Axiom
+engine and IDE clients. The Supersymmetry client edition omits those independent
+artifacts. Only Linux x64 with GNU libc 2.28 or newer is admitted; qualify
+other targets with their own artifacts and hooks before advertising them.
+
+1. Freeze one clean reviewed commit. For the Supersymmetry client edition,
+   build the Linux x64/Python 3.14 wheelhouse with four explicit roots. Its
+   dependency closure currently contains twelve Workbench wheels:
+
+   ```text
+   python tools/build_native_distribution.py --component workbench-core --component workbench-shell --component workbench-profile-supersymmetry --component workbench-tui --output .workbench/build/install-supersymmetry-client
+   python tools/install_workbench.py .workbench/build/install-supersymmetry-client --destination /absolute/new/install-client-check
+   /absolute/new/install-client-check/bin/workbench version --json
+   /absolute/new/install-client-check/bin/workbench-tui --help
+   ```
+
+   The full Suite edition remains available with `--suite --with-tui` and
+   `tools/validate_native_packages.py --wheelhouse`. Build and qualify the
+   independent Axiom engine and both IDE clients only when selecting that
+   edition. Use one edition per release tag.
+2. Assemble the exact Supersymmetry client wheelhouse and guide, then generate
+   the release-bound hook. Use new output directories and exact input paths:
+
+   ```text
+   python tools/assemble_install_bundle.py assemble --edition supersymmetry-client --wheelhouse .workbench/build/install-supersymmetry-client --guide docs/guides/getting-started.md --release-tag TAG --output-dir .workbench/build/install-bundle
+   python tools/assemble_install_bundle.py verify --archive .workbench/build/install-bundle/workbench-linux-x64-py314-TAG.tar.gz --descriptor .workbench/build/install-bundle/workbench-linux-x64-py314-install.json
+   python tools/render_install_hook.py --descriptor .workbench/build/install-bundle/workbench-linux-x64-py314-install.json --output .workbench/build/install-hook/workbench-install-linux-x64.sh
+   ```
+
+   The full Suite assembler invocation additionally requires `--engine-zip`,
+   `--vscode-vsix`, `--intellij-zip` and `--clients-manifest`. The composer
+   requires a clean checkout, current-source wheelhouse and matching native
+   versions. Core stages and catalogs
+   the exact archive and descriptor as one tree; the command reports its tree
+   ID and output path. The renderer publishes its hook and checksum in a
+   separate Core-managed tree so the bundle remains unchanged. The descriptor and
+   `BUNDLE-MANIFEST.json` remain `qualified: false`/`assembled`. The renderer
+   checks the archive digest and writes `SHA256SUMS`. Neither tool publishes.
+3. Exercise the **exact hook and archive bytes** from outside the checkout on
+   a fresh supported host with no Python or Pixi on `PATH`. Record the pinned
+   Python acquisition, clean installation, CLI setup check, terminal client
+   launch, repeated-run behavior, changed-download refusal and retained failed
+   receipt. For the Supersymmetry edition, also prove fresh acquisition of all
+   required pack files through the Workbench-specific provider key, Textual
+   choices, exact instance installation, Java and launcher binding, and a real
+   client launch checkpoint. Until that provider path is available, a complete
+   Prism instance ZIP import chosen in Textual is an interim route and does not qualify fresh
+   acquisition. For the full Suite edition, independently qualify its retained
+   IDE clients and Axiom engine. A unit-test fixture or assembled manifest does
+   not qualify an install target.
+4. Retain the exact hook, archive, checksum file, source revision, host facts,
+   commands and results in a separate qualification receipt. Publish only those
+   already qualified bytes after the ordinary release controls and review are
+   satisfied. Verify the public downloads and their hashes before replacing
+   the README's preview entry point.
+
 ## Clean-root public history and future updates
 
 The public baseline is an export of reviewed tracked bytes into a fresh

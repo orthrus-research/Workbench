@@ -1,4 +1,7 @@
 """Native packaging closure, identity, archive and content-boundary checks."""
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -9,6 +12,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 import native_distribution as distribution
+import build_native_distribution as builder
 
 
 class NativePackageTests(unittest.TestCase):
@@ -24,6 +28,29 @@ class NativePackageTests(unittest.TestCase):
         self.assertIn("workbench-axiom", requested)
         self.assertEqual(1, sum(row["id"] == "workbench-core" for row in selected))
         self.assertNotIn("workbench-tui", requested)
+
+    def test_combined_suite_adds_only_the_optional_textual_client(self):
+        plain_requested, plain_selected = distribution.selected_components(suite=True)
+        requested, selected = distribution.selected_components(suite=True, with_tui=True)
+        self.assertEqual(set(plain_requested) | {"workbench-tui"}, set(requested))
+        self.assertEqual({row["id"] for row in plain_selected} | {"workbench-tui"},
+                         {row["id"] for row in selected})
+        self.assertEqual(20, len(requested))
+        self.assertEqual(20, len(selected))
+
+    def test_combined_suite_cli_plan_and_modifier_boundary(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(0, builder.main(["--suite", "--with-tui", "--plan"]))
+        requested, selected = json.loads(output.getvalue())
+        self.assertIn("workbench-tui", requested)
+        self.assertEqual({"workbench-tui"}, {row["id"] for row in selected}
+                         - {row["id"] for row in distribution.selected_components(suite=True)[1]})
+        with self.assertRaisesRegex(distribution.DistributionError, "requires --suite"):
+            distribution.selected_components(with_tui=True)
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as error:
+            builder.main(["--with-tui", "--plan"])
+        self.assertEqual(2, error.exception.code)
 
     def test_textual_client_is_explicit_and_does_not_change_core_closure(self):
         requested, selected = distribution.selected_components(["workbench-tui"])
