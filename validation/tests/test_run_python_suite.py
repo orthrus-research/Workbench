@@ -26,6 +26,7 @@ from run_python_suite import (  # noqa: E402
     _tests_in,
     _write_report,
     _write_inventory,
+    main as suite_main,
     TimingResult,
 )
 from orchestration import OrchestrationFailure, load_suite_report, load_test_inventory
@@ -136,6 +137,47 @@ class PythonSuiteIsolationTests(unittest.TestCase):
                 {"test_conformance", "test_interface", "test_lifecycle", "test_simulation"},
                 {test.split(".", 1)[0] for test in body["test_ids"]},
             )
+
+    def test_core_ci_collection_flag_rejects_generic_or_foreign_targets_before_collection(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            report = Path(temporary) / "unregistered.json"
+            script = str(VALIDATION_ROOT / "run_python_suite.py")
+            for arguments in (
+                ("validation-native-fixtures", "--core-ci-collection"),
+                ("validation-native-fixtures", "--collect-only", "--report", str(report), "--core-ci-collection"),
+                ("validation", "--collect-only", "--report", str(report), "--core-ci-collection"),
+            ):
+                with self.subTest(arguments=arguments):
+                    command = [sys.executable, script, *arguments]
+                    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+                    self.assertNotEqual(0, completed.returncode)
+                    self.assertIn("error:", completed.stderr)
+                    self.assertFalse(report.exists())
+
+    def test_core_ci_collection_cli_publishes_both_exact_reports(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+
+            def one_collected_test(_selected):
+                return unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])
+
+            from core_run_custody import SOURCE_CI_COLLECTION_FILES
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(home)}), \
+                    patch("run_python_suite.ROOT", root), \
+                    patch("run_python_suite._configure_suite"), \
+                    patch("run_python_suite._discover_tests", side_effect=one_collected_test):
+                for suite, filename in SOURCE_CI_COLLECTION_FILES.items():
+                    target = root / ".workbench/validation" / filename
+                    arguments = ["run_python_suite.py", suite, "--collect-only", "--report",
+                                 str(target), "--core-ci-collection"]
+                    with patch.object(sys, "argv", arguments), patch("sys.stdout", new_callable=StringIO):
+                        self.assertEqual(0, suite_main())
+                    self.assertEqual("workbench-python-test-collection-v1",
+                                     json.loads(target.read_bytes())["format"])
+            from ci_validation import source_ci_collection_failures
+            self.assertEqual([], source_ci_collection_failures(root=root, configuration_home=home))
 
     def _run_cases(self, cases):
         suite = unittest.TestSuite(cases)

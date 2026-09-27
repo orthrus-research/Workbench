@@ -15,12 +15,203 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "validation"))
 from ci_validation import REQUIRED_TESTS, STAGES, gate, plan, required_test_failures
+from ci_validation import source_ci_collection_failures
 from ci_validation import main as ci_main
-from core_run_custody import publish_ci_plan
+from core_run_custody import (
+    SOURCE_CI_COLLECTION_FILES, _source_core, publish_ci_plan,
+    publish_source_ci_collection, read_source_ci_collection,
+)
 from suite_measurement import inventory_digest
 
 
 class CiValidationTests(unittest.TestCase):
+    @staticmethod
+    def _collection_bytes(suite: str, ids: list[str]) -> bytes:
+        document = {
+            "format": "workbench-python-test-collection-v1",
+            "suite": suite,
+            "state": "not-run",
+            "reason": "Collected for inventory only; no tests executed.",
+            "test_ids": ids,
+            "inventory_digest": inventory_digest(ids),
+        }
+        return (json.dumps(document, indent=2, sort_keys=True) + "\n").encode()
+
+    def test_source_ci_collections_keep_exact_v1_paths_and_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            for suite, filename in SOURCE_CI_COLLECTION_FILES.items():
+                target = root / ".workbench/validation" / filename
+                payload = self._collection_bytes(suite, [f"{suite}.Fixture.test_one"])
+                self.assertEqual(target, publish_source_ci_collection(
+                    root, suite, payload, selected_path=target,
+                    configuration_home=home,
+                ))
+                self.assertEqual(payload, target.read_bytes())
+                self.assertEqual(payload, read_source_ci_collection(
+                    root, suite, selected_path=target,
+                    configuration_home=home,
+                ))
+                if os.name != "nt":
+                    self.assertEqual(0o600, target.stat().st_mode & 0o777)
+                    self.assertEqual(0o700, target.parent.stat().st_mode & 0o777)
+            self.assertEqual([], source_ci_collection_failures(
+                root=root, configuration_home=home,
+            ))
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(home)}), \
+                    patch("ci_validation.ROOT", root), redirect_stdout(io.StringIO()):
+                self.assertEqual(0, ci_main(["assert-collections"]))
+            from workbench_core.storage.registered import ResourceCatalog
+            rows = ResourceCatalog(home).inventory(workspace=root)["record_stores"]
+            self.assertEqual(["validation-ci-collections-v1"], [row["family"] for row in rows])
+
+    def test_source_ci_collection_refuses_foreign_target_existing_file_and_stage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            suite, filename = next(iter(SOURCE_CI_COLLECTION_FILES.items()))
+            target = root / ".workbench/validation" / filename
+            payload = self._collection_bytes(suite, ["fixture.Test.test_one"])
+            with self.assertRaisesRegex(ValueError, "historical path"):
+                publish_source_ci_collection(
+                    root, suite, payload, selected_path=root / "other.json",
+                    configuration_home=home,
+                )
+            self.assertFalse((root / ".workbench").exists())
+            with self.assertRaises(FileNotFoundError):
+                read_source_ci_collection(root, suite, selected_path=target,
+                                          configuration_home=home)
+            self.assertFalse((root / ".workbench").exists())
+            self.assertFalse(home.exists())
+            target.parent.mkdir(parents=True)
+            stage = target.parent / f".{filename}.interrupted"
+            stage.write_bytes(payload)
+            with self.assertRaisesRegex(OSError, "interrupted source-CI collection stage"):
+                publish_source_ci_collection(
+                    root, suite, payload, selected_path=target,
+                    configuration_home=home,
+                )
+            self.assertFalse(target.exists())
+            self.assertEqual(payload, stage.read_bytes())
+            stage.unlink()
+            publish_source_ci_collection(root, suite, payload, selected_path=target,
+                                         configuration_home=home)
+            with self.assertRaisesRegex(OSError, "already exists"):
+                publish_source_ci_collection(root, suite, payload, selected_path=target,
+                                             configuration_home=home)
+            self.assertEqual(payload, target.read_bytes())
+
+    @unittest.skipIf(os.name == "nt", "symbolic links may require Windows developer privileges")
+    def test_source_ci_collection_rejects_redirected_parent_without_touching_destination(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            suite, filename = next(iter(SOURCE_CI_COLLECTION_FILES.items()))
+            validation = root / ".workbench/validation"
+            validation.parent.mkdir()
+            outside = Path(temporary) / "outside"
+            outside.mkdir()
+            validation.symlink_to(outside, target_is_directory=True)
+            target = validation / filename
+            payload = self._collection_bytes(suite, ["fixture.Test.test_one"])
+            with self.assertRaises((OSError, ValueError)):
+                publish_source_ci_collection(root, suite, payload, selected_path=target,
+                                             configuration_home=home)
+            self.assertEqual([], list(outside.iterdir()))
+            self.assertFalse(home.exists())
+
+    def test_historical_nonprivate_collection_remains_readable_without_rewrite(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            suite, filename = next(iter(SOURCE_CI_COLLECTION_FILES.items()))
+            target = root / ".workbench/validation" / filename
+            target.parent.mkdir(parents=True)
+            payload = self._collection_bytes(suite, ["fixture.Test.test_one"])
+            target.write_bytes(payload)
+            if os.name != "nt":
+                target.parent.chmod(0o755)
+                target.chmod(0o644)
+            self.assertEqual(payload, read_source_ci_collection(
+                root, suite, selected_path=target, configuration_home=home,
+            ))
+            self.assertEqual(payload, target.read_bytes())
+            if os.name != "nt":
+                self.assertEqual(0o644, target.stat().st_mode & 0o777)
+                self.assertEqual(0o700, target.parent.stat().st_mode & 0o777)
+
+    def test_source_ci_collection_retains_post_link_uncertainty(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            suite, filename = next(iter(SOURCE_CI_COLLECTION_FILES.items()))
+            target = root / ".workbench/validation" / filename
+            payload = self._collection_bytes(suite, ["fixture.Test.test_one"])
+            _source_core()
+            from workbench_core import durable_records
+            original_flush = durable_records.fsync_directory
+
+            def fail_after_link(path):
+                if path == target.parent and target.exists():
+                    raise OSError("forced flush failure")
+                return original_flush(path)
+
+            with patch.object(durable_records, "fsync_directory", side_effect=fail_after_link):
+                with self.assertRaisesRegex(OSError, "forced flush failure"):
+                    publish_source_ci_collection(root, suite, payload, selected_path=target,
+                                                 configuration_home=home)
+            stages = list(target.parent.glob(f".{filename}.*.tmp"))
+            self.assertEqual(1, len(stages))
+            self.assertEqual(payload, stages[0].read_bytes())
+            self.assertEqual(payload, target.read_bytes())
+            self.assertTrue(source_ci_collection_failures(root=root, configuration_home=home))
+            with self.assertRaisesRegex(OSError, "interrupted source-CI collection stage"):
+                publish_source_ci_collection(root, suite, payload, selected_path=target,
+                                             configuration_home=home)
+            self.assertEqual(payload, stages[0].read_bytes())
+
+    def test_source_ci_collection_admission_rejects_changed_or_malformed_inventory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "checkout"
+            root.mkdir()
+            home = Path(temporary) / "config"
+            targets = {}
+            for suite, filename in SOURCE_CI_COLLECTION_FILES.items():
+                target = root / ".workbench/validation" / filename
+                publish_source_ci_collection(
+                    root, suite, self._collection_bytes(suite, ["fixture.Test.test_one"]),
+                    selected_path=target, configuration_home=home,
+                )
+                targets[suite] = target
+            self.assertEqual([], source_ci_collection_failures(root=root, configuration_home=home))
+            first = targets[next(iter(targets))]
+            before = first.read_bytes()
+            for changed in (
+                {**json.loads(before), "state": "passed"},
+                {**json.loads(before), "inventory_digest": "sha256:" + "0" * 64},
+                {**json.loads(before), "test_ids": ["fixture.Test.test_one", "fixture.Test.test_one"]},
+            ):
+                first.write_bytes((json.dumps(changed) + "\n").encode())
+                self.assertTrue(source_ci_collection_failures(root=root, configuration_home=home))
+            first.write_bytes(json.dumps(json.loads(before), sort_keys=True).encode() + b"\n")
+            self.assertTrue(source_ci_collection_failures(root=root, configuration_home=home))
+            first.write_bytes(before)
+            self.assertEqual([], source_ci_collection_failures(root=root, configuration_home=home))
+            other = Path(temporary) / "foreign.json"
+            other.write_bytes(before)
+            first.unlink()
+            if os.name == "nt":
+                return
+            first.symlink_to(other)
+            self.assertTrue(source_ci_collection_failures(root=root, configuration_home=home))
+            self.assertEqual(before, other.read_bytes())
+
     def selected(self, event="pull_request", paths=None):
         return plan(event, paths if paths is not None else ["modules/crucible/src/graph.py"], revision="a" * 40)
 
@@ -166,6 +357,12 @@ class CiValidationTests(unittest.TestCase):
         self.assertIn("--tier source-ci", source)
         self.assertIn("validation-native-fixtures --collect-only --report", source)
         self.assertIn("blueprints-native-fixtures --collect-only --report", source)
+        collections = [step for step in jobs["source-ci"]["steps"] if "--core-ci-collection" in step.get("run", "")]
+        self.assertEqual(2, len(collections))
+        admission = next(step for step in jobs["source-ci"]["steps"] if "assert-collections" in step.get("run", ""))
+        self.assertLess(jobs["source-ci"]["steps"].index(collections[-1]), jobs["source-ci"]["steps"].index(admission))
+        validation = next(step for step in jobs["source-ci"]["steps"] if "--tier source-ci" in step.get("run", ""))
+        self.assertLess(jobs["source-ci"]["steps"].index(admission), jobs["source-ci"]["steps"].index(validation))
         self.assertIn("axiom_runtime.py --provision-java --github-env-file", source)
         workbench = "\n".join(step.get("run", "") for step in jobs["workbench"]["steps"])
         self.assertIn("axiom_runtime.py --provision-java --github-env-file", workbench)

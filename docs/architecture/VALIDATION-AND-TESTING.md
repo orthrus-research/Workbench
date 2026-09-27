@@ -126,6 +126,15 @@ compares terminal IDs with its retained admission, so a same-count replacement
 cannot hide missing coverage. Reports retain skipped/expected-failure reasons,
 subtest and fixture diagnostics, and explicit unrun cases after fixture errors.
 
+Source CI retains its two native-fixture collections at the existing
+`.workbench/validation/native-fixtures-not-run.json` and
+`.workbench/validation/blueprints-native-fixtures-not-run.json` paths. Core
+publishes each once, and CI reads both back to check the exact V1 bytes and
+not-run inventory before source validation continues. Core secures an older
+0755 diagnostics parent in place while leaving historical report bytes
+unchanged. An existing report or uncertain publication stage requires review
+or a fresh checkout; these collections do not execute the native fixtures.
+
 Measurements separate configuration/import/collection, module and class
 fixtures, test setup, bodies, teardown and cleanup. Nested phase measurements
 exclude their children to avoid double counting. Suite elapsed time includes

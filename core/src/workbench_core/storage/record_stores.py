@@ -113,6 +113,10 @@ class CoreRecordStores:
         elif self.owner_id == "validation" and family == "validation-ci-plan-v1" and selected == self.workspace:
             # The workflow uploads this exact historical plan directory.
             root = selected / ".workbench/validation/ci"
+        elif self.owner_id == "validation" and family == "validation-ci-collections-v1" and selected == self.workspace:
+            # Source CI retains its two fixture inventories directly in the
+            # historical validation diagnostics parent, not in a new subdir.
+            root = selected / ".workbench/validation"
         elif self.owner_id == "validation" and family == "validation-invocations-v1" and selected == self.workspace:
             # Keep validation's per-invocation V1 result URI inside the checkout.
             root = selected / ".workbench/validation/invocations"

@@ -334,6 +334,7 @@ def main() -> int:
     parser.add_argument("--admission-file", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--core-allocation-id", help=argparse.SUPPRESS)
     parser.add_argument("--core-configuration-home", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--core-ci-collection", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--collect-only",
         action="store_true",
@@ -366,6 +367,16 @@ def main() -> int:
         parser.error("Core allocation requires an admitted executing suite")
     if (args.core_allocation_id is None) != (args.core_configuration_home is None):
         parser.error("Core allocation and configuration home must be supplied together")
+    if args.core_ci_collection and (
+        not args.collect_only or args.report is None or args.core_allocation_id is not None
+    ):
+        parser.error("Core source-CI collection requires --collect-only and --report")
+    if args.core_ci_collection:
+        from core_run_custody import _source_ci_collection_target
+        try:
+            _source_ci_collection_target(ROOT, args.suite, args.report)
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
     if not args.collect_only and args.run_id is None:
         parser.error(
             "--run-id and --source-fingerprint are required when executing a suite"
@@ -404,17 +415,24 @@ def main() -> int:
         return 1
     if args.collect_only:
         if args.report is not None:
-            if args.report.exists() or args.report.is_symlink():
+            if not args.core_ci_collection and (args.report.exists() or args.report.is_symlink()):
                 parser.error(f"refusing to replace a previous collection report: {args.report}")
             ids = sorted(test.id() for test in _tests_in(discovered))
-            _write_json(args.report, {
+            document = {
                 "format": "workbench-python-test-collection-v1",
                 "suite": selected.name,
                 "state": "not-run",
                 "reason": "Collected for inventory only; no tests executed.",
                 "test_ids": ids,
                 "inventory_digest": inventory_digest(ids),
-            })
+            }
+            if args.core_ci_collection:
+                from core_run_custody import publish_source_ci_collection
+                publish_source_ci_collection(
+                    ROOT, selected.name, _json_bytes(document), selected_path=args.report,
+                )
+            else:
+                _write_json(args.report, document)
         print(f"[{selected.name}] collected {count} tests without import errors.")
         return 0
 

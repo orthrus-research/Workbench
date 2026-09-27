@@ -9,7 +9,9 @@ import re
 import subprocess
 
 from orchestration import OrchestrationFailure, fingerprint_paths, load_suite_report
-from core_run_custody import publish_ci_plan
+from core_run_custody import (
+    SOURCE_CI_COLLECTION_FILES, publish_ci_plan, read_source_ci_collection,
+)
 from suite_measurement import inventory_digest
 
 STAGES = ("workbench", "source-ci", "native-packages", "axiom", "ide", "physical-cleanroom")
@@ -135,6 +137,53 @@ def required_test_failures(result_path: Path, group: str, *, root: Path) -> list
         return [f"required probe evidence is unavailable or invalid: {error}"]
 
 
+def source_ci_collection_failures(
+    *, root: Path, configuration_home: Path | None = None,
+) -> list[str]:
+    """Admit both retained not-run inventories before source-CI continues."""
+
+    failures: list[str] = []
+    for suite, filename in SOURCE_CI_COLLECTION_FILES.items():
+        target = root / ".workbench/validation" / filename
+        try:
+            raw = read_source_ci_collection(
+                root, suite, selected_path=target,
+                configuration_home=configuration_home,
+            )
+            document = json.loads(
+                raw,
+                object_pairs_hook=_unique_collection_object,
+                parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"invalid JSON constant {value}")),
+            )
+            ids = document["test_ids"]
+            if (
+                type(document) is not dict
+                or set(document) != {"format", "suite", "state", "reason", "test_ids", "inventory_digest"}
+                or document["format"] != "workbench-python-test-collection-v1"
+                or document["suite"] != suite
+                or document["state"] != "not-run"
+                or document["reason"] != "Collected for inventory only; no tests executed."
+                or type(ids) is not list or not ids
+                or any(type(test_id) is not str or not test_id for test_id in ids)
+                or ids != sorted(set(ids))
+                or document["inventory_digest"] != inventory_digest(ids)
+                or raw != (json.dumps(document, indent=2, sort_keys=True) + "\n").encode("utf-8")
+            ):
+                raise ValueError("collection document does not match its declared not-run inventory")
+        except (OSError, KeyError, TypeError, UnicodeError, ValueError) as error:
+            failures.append(f"{suite} collection is unavailable or invalid: {error}")
+    return failures
+
+
+def _unique_collection_object(pairs: list[tuple[str, object]]) -> dict:
+    document: dict = {}
+    for key, value in pairs:
+        if key in document:
+            raise ValueError(f"duplicate collection key {key!r}")
+        document[key] = value
+    return document
+
+
 def changed_paths(event: str, document: dict) -> list[str]:
     if event != "pull_request":
         return []
@@ -160,7 +209,15 @@ def main(argv=None) -> int:
     probes = commands.add_parser("assert-tests")
     probes.add_argument("--result", type=Path, required=True)
     probes.add_argument("--group", choices=tuple(REQUIRED_TESTS), required=True)
+    commands.add_parser("assert-collections")
     args = parser.parse_args(argv)
+    if args.command == "assert-collections":
+        failures = source_ci_collection_failures(root=ROOT)
+        for failure in failures:
+            print(f"CI VALIDATION FAILED: {failure}")
+        if not failures:
+            print("Both source-CI fixture inventories are retained and admitted as not run.")
+        return int(bool(failures))
     if args.command == "assert-tests":
         failures = required_test_failures(args.result, args.group, root=Path(__file__).resolve().parents[1])
         print("\n".join(failures) if failures else f"Required {args.group} probes passed in the referenced invocation.")

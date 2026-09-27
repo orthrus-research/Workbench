@@ -22,6 +22,11 @@ if TYPE_CHECKING:
 
 _SUITE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _MAX_CI_PLAN = 4 * 1024 * 1024
+_MAX_CI_COLLECTION = 4 * 1024 * 1024
+SOURCE_CI_COLLECTION_FILES = {
+    "validation-native-fixtures": "native-fixtures-not-run.json",
+    "blueprints-native-fixtures": "blueprints-native-fixtures-not-run.json",
+}
 _RUN_RECORD_SUFFIX = {
     "inventory": ".inventory.json",
     "admission": ".admitted.json",
@@ -266,6 +271,97 @@ def publish_validation_timing(root: Path, suite_name: str, payload: bytes) -> Pa
         secure_private_path(target, directory=False)
     replace_private_bytes(target, payload, byte_limit=max(len(payload), previous_size))
     return target
+
+
+def _source_ci_collection_target(root: Path, suite_name: str, selected_path: Path):
+    if suite_name not in SOURCE_CI_COLLECTION_FILES:
+        raise ValueError("source-CI collection suite is unsupported")
+    selected_root = Path(root).resolve(strict=True)
+    target = selected_root / ".workbench/validation" / SOURCE_CI_COLLECTION_FILES[suite_name]
+    supplied = Path(selected_path)
+    if ".." in supplied.parts or Path(os.path.abspath(supplied)) != target:
+        raise ValueError("source-CI collection differs from its historical path")
+    return selected_root, target
+
+
+def _source_ci_collection_store(
+    root: Path, suite_name: str, selected_path: Path,
+    configuration_home: Path | None,
+):
+    """Bind one historical source-CI fixture inventory to its Core store."""
+
+    selected_root, target = _source_ci_collection_target(root, suite_name, selected_path)
+    _source_core()
+    from workbench_core.storage.record_stores import CoreRecordStores
+    from workbench_core.user_config_home import default_user_config_home
+
+    selected_home = default_user_config_home() if configuration_home is None else Path(configuration_home)
+    if not selected_home.is_absolute() or ".." in selected_home.parts:
+        raise ValueError("Core validation configuration home must be an absolute stable path")
+    store = CoreRecordStores(
+        workspace=selected_root, configuration_home=selected_home,
+        owner_id="validation",
+    ).open("validation-ci-collections-v1", selected_root)
+    if store.root != target.parent:
+        raise ValueError("Core source-CI collection store changed")
+    return store, target
+
+
+def _reject_source_ci_collection_stages(target: Path) -> None:
+    from workbench_core.host_filesystem import count_uncertain_record_stages
+
+    if count_uncertain_record_stages(target.parent, targets=(target.name,)):
+        raise OSError("interrupted source-CI collection stage requires review")
+
+
+def publish_source_ci_collection(
+    root: Path, suite_name: str, payload: bytes, *, selected_path: Path,
+    configuration_home: Path | None = None,
+) -> Path:
+    """Create one exact V1 fixture inventory; preserve uncertain stages."""
+
+    if type(payload) is not bytes or not 0 < len(payload) <= _MAX_CI_COLLECTION:
+        raise ValueError("source-CI collection bytes exceed their bound")
+    _, target = _source_ci_collection_store(
+        root, suite_name, selected_path, configuration_home,
+    )
+    from workbench_core.host_filesystem import (
+        fsync_directory, publish_commit_witness_bytes,
+        read_private_single_link_bytes,
+    )
+
+    _reject_source_ci_collection_stages(target)
+    publish_commit_witness_bytes(target, payload, byte_limit=_MAX_CI_COLLECTION)
+    # Persist removal of the visible preparation stage before admission.
+    fsync_directory(target.parent)
+    _reject_source_ci_collection_stages(target)
+    if read_private_single_link_bytes(target, byte_limit=_MAX_CI_COLLECTION) != payload:
+        raise OSError("source-CI collection changed after publication")
+    return target
+
+
+def read_source_ci_collection(
+    root: Path, suite_name: str, *, selected_path: Path,
+    configuration_home: Path | None = None,
+) -> bytes:
+    """Reopen the exact Core collection target before domain admission."""
+
+    _, target = _source_ci_collection_target(root, suite_name, selected_path)
+    # Observation of a missing historical result must not create a Core store
+    # or diagnostic directory. Only an existing candidate is adopted for read.
+    if not target.exists() and not target.is_symlink():
+        raise FileNotFoundError(f"source-CI collection is absent: {target}")
+    _, target = _source_ci_collection_store(
+        root, suite_name, selected_path, configuration_home,
+    )
+    from workbench_core.host_filesystem import read_bounded_single_link_bytes
+
+    _reject_source_ci_collection_stages(target)
+    # The old writer used a regular file under a sometimes-public directory.
+    # Core can read that historical V1 without changing its file bytes/mode.
+    payload = read_bounded_single_link_bytes(target, byte_limit=_MAX_CI_COLLECTION)
+    _reject_source_ci_collection_stages(target)
+    return payload
 
 
 def open_validation_invocation(
