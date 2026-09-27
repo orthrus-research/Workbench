@@ -596,6 +596,8 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         input_raw = input_path.read_bytes()
         self.assertEqual(check_storage.canonical(json.loads(input_raw)) + b'\n', input_raw)
         self.assertEqual(sha256(input_raw).hexdigest(), result['input_manifest']['sha256'])
+        result_path = attempt / 'result.json'
+        self.assertEqual(check_storage.canonical(result) + b'\n', result_path.read_bytes())
         self.assertEqual(b'eula=true\n', (attempt / 'execution/eula.txt').read_bytes())
         self.assertEqual(b'eula=false\n', (self.runtime / 'eula.txt').read_bytes())
         (self.source / 'groovy/recipes.groovy').write_bytes(b'next saved edit')
@@ -609,13 +611,20 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         )
         if os.name != 'nt':
             input_path.chmod(0o644)
+            result_path.chmod(0o644)
             try:
                 with patch.object(capture, 'read_bounded_single_link_bytes',
                                   wraps=capture.read_bounded_single_link_bytes) as historical_read:
                     self.assertEqual(result, capture.show(self.state, result['attempt_id']))
-                historical_read.assert_called_once_with(input_path, byte_limit=32 * 1024**2)
+                self.assertEqual(
+                    [(result_path,), (input_path,)],
+                    [call.args for call in historical_read.call_args_list],
+                )
+                self.assertTrue(all(call.kwargs == {'byte_limit': 32 * 1024**2}
+                                    for call in historical_read.call_args_list))
             finally:
                 input_path.chmod(0o600)
+                result_path.chmod(0o600)
         self.assertEqual(1, self.native.call_count)
         with self.assertRaisesRegex(ValueError, 'already attempted'):
             self.run_capture({'attempt_id': result['attempt_id'], 'id': result['prepared_id']})
@@ -684,7 +693,7 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         try:
             path.write_bytes(b'{"capture_id":"first","capture_id":"second"}\n')
             with self.assertRaisesRegex(ValueError, 'duplicate keys'):
-                capture._read_input_manifest(path)
+                capture._read_bounded_ordinary_json(path)
             with self.assertRaises((OSError, ValueError, ProcessError)):
                 capture.show(self.state, result['attempt_id'])
         finally:
@@ -700,7 +709,7 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                 attempt = self.attempt(prepared)
                 input_path = attempt / 'input-manifest.json'
                 old_stage = attempt / ('.record-' + 'a' * 32)
-                new_stage = attempt / '.input-manifest.json.0123456789abcdef.tmp'
+                new_stage = attempt / '.input-manifest.json.01234567'
                 old_stage.write_bytes(b'old stage remains')
                 new_stage.write_bytes(b'new stage remains')
 
@@ -728,6 +737,86 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'already attempted'):
                     self.run_capture(prepared)
                 self.native.assert_not_called()
+
+    def test_failed_result_reopens_through_core_as_historical_ordinary_v1(self):
+        prepared = self.prepare()
+        with patch.object(self.adapter, 'RECIPE_GRAPH_API_VERSION', 2):
+            with self.assertRaisesRegex(ValueError, 'API'):
+                self.run_capture(prepared)
+        attempt = self.attempt(prepared)
+        result_path = attempt / 'result.json'
+        failed = capture.show(self.state, prepared['attempt_id'])
+        self.assertEqual(('failed', False), (failed['state'], failed['native_admitted']))
+        self.assertEqual(check_storage.canonical(failed) + b'\n', result_path.read_bytes())
+        if os.name != 'nt':
+            result_path.chmod(0o644)
+            try:
+                with patch.object(capture, 'read_bounded_single_link_bytes',
+                                  wraps=capture.read_bounded_single_link_bytes) as historical_read:
+                    self.assertEqual(failed, capture.show(self.state, prepared['attempt_id']))
+                historical_read.assert_called_once_with(result_path, byte_limit=32 * 1024**2)
+            finally:
+                result_path.chmod(0o600)
+
+    def test_result_readback_refuses_changed_and_duplicate_keys(self):
+        result = self.run_capture()
+        path = self.attempt(result) / 'result.json'
+        original = path.read_bytes()
+        for replacement in (b'{"id":"first","id":"second"}\n', b'changed result bytes'):
+            with self.subTest(replacement=replacement):
+                path.write_bytes(replacement)
+                try:
+                    with self.assertRaises((OSError, ValueError, ProcessError)):
+                        capture.show(self.state, result['attempt_id'])
+                finally:
+                    path.write_bytes(original)
+        path.unlink()
+        try:
+            self.assertEqual('interrupted', capture.show(self.state, result['attempt_id'])['state'])
+        finally:
+            path.write_bytes(original)
+        self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_result_interruption_keeps_both_stage_shapes_and_blocks_replay(self):
+        original_link = durable_records.os.link
+        original_fsync = durable_records.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                prepared = self.prepare()
+                attempt = self.attempt(prepared)
+                result_path = attempt / 'result.json'
+                old_stage = attempt / ('.record-' + 'b' * 32)
+                new_stage = attempt / '.result.json.01234567'
+                old_stage.write_bytes(b'old stage remains')
+                new_stage.write_bytes(b'new stage remains')
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    if Path(target) == result_path:
+                        raise OSError('synthetic result before-link interruption')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    if Path(directory) == attempt and result_path.exists():
+                        raise OSError('synthetic result after-link interruption')
+                    return original_fsync(directory)
+
+                native_before = self.native.call_count
+                target = ('os.link' if moment == 'before-link' else 'fsync_directory')
+                replacement = interrupt_link if moment == 'before-link' else interrupt_flush
+                with patch.object(durable_records.os if target == 'os.link' else durable_records,
+                                  'link' if target == 'os.link' else target, side_effect=replacement):
+                    with self.assertRaisesRegex(OSError, 'synthetic result .* interruption'):
+                        self.run_capture(prepared)
+                self.assertEqual(native_before + 1, self.native.call_count)
+                self.assertEqual(moment == 'after-link-before-flush', result_path.exists())
+                self.assertEqual(b'old stage remains', old_stage.read_bytes())
+                self.assertEqual(b'new stage remains', new_stage.read_bytes())
+                self.assertTrue((attempt / 'run-started.json').is_file())
+                observed = capture.show(self.state, prepared['attempt_id'])
+                self.assertEqual('complete' if result_path.exists() else 'interrupted', observed['state'])
+                with self.assertRaisesRegex(ValueError, 'already attempted'):
+                    self.run_capture(prepared)
+                self.assertEqual(native_before + 1, self.native.call_count)
 
     def test_show_cancellation_reaches_graph_verification(self):
         result = self.run_capture()

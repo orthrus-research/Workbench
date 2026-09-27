@@ -28,7 +28,7 @@ PREPARED = 'workbench-developer-recipe-capture-prepared-v1'
 RESULT = 'workbench-developer-recipe-capture-result-v1'
 _CUSTODY = ('request.json', 'prepared.json', 'launch.json', 'runtime-lock.json',
             'protocol.json', 'input-manifest.json', 'audit.json')
-_INPUT_MANIFEST_BYTE_LIMIT = 32 * 1024**2
+_RECORD_BYTE_LIMIT = 32 * 1024**2
 
 
 def _digest(value):
@@ -74,14 +74,14 @@ def _write_input_manifest(path, value):
     # Keep the V1 canonical JSON and newline while Core owns publication.
     publish_immutable_bytes(
         path, storage.canonical(value) + b'\n',
-        byte_limit=_INPUT_MANIFEST_BYTE_LIMIT,
+        byte_limit=_RECORD_BYTE_LIMIT,
     )
 
 
-def _read_input_manifest(path):
+def _read_bounded_ordinary_json(path):
     # Historical V1 files need the ordinary-file reader, including prior modes.
     storage.ordinary(path)
-    raw = read_bounded_single_link_bytes(path, byte_limit=_INPUT_MANIFEST_BYTE_LIMIT)
+    raw = read_bounded_single_link_bytes(path, byte_limit=_RECORD_BYTE_LIMIT)
 
     def unique(pairs):
         result = {}
@@ -92,6 +92,22 @@ def _read_input_manifest(path):
         return result
 
     return json.loads(raw, object_pairs_hook=unique)
+
+
+def _write_result_record(attempt, value):
+    result = storage.seal('recipe-capture-result', value)
+    publish_immutable_bytes(attempt / 'result.json', storage.canonical(result) + b'\n',
+                            byte_limit=_RECORD_BYTE_LIMIT)
+    return result
+
+
+def _read_result_record(attempt, *, request_id):
+    value = _read_bounded_ordinary_json(attempt / 'result.json')
+    if (not isinstance(value, dict)
+            or storage.seal('recipe-capture-result', {k: v for k, v in value.items() if k != 'id'}) != value
+            or value.get('request_id') != request_id):
+        raise ValueError('retained capture record identity changed')
+    return value
 
 
 def _owner(profile):
@@ -262,10 +278,13 @@ def _current(attempt, request):
 
 def _fail(attempt, filename, kind, request, stage, exc):
     if not (attempt / filename).exists():
-        _record(attempt, filename, kind,
-                {'format': RESULT, 'request_id': request['id'], 'attempt_id': attempt.name,
-                 'state': 'failed', 'stage': stage, 'error': f'{type(exc).__name__}: {exc}',
-                 'native_admitted': False})
+        body = {'format': RESULT, 'request_id': request['id'], 'attempt_id': attempt.name,
+                'state': 'failed', 'stage': stage, 'error': f'{type(exc).__name__}: {exc}',
+                'native_admitted': False}
+        if filename == 'result.json' and kind == 'recipe-capture-result':
+            _write_result_record(attempt, body)
+        else:
+            _record(attempt, filename, kind, body)
 
 
 def prepare(root, identity, confirm, *, cancelled):
@@ -420,15 +439,15 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
                 report = audit_recipe_dead_ends(view, check_cancelled=cancel.check)
             storage.write_json(attempt / 'audit.json', report, byte_limit=None)
             cancel.check()
-            return _record(attempt, 'result.json', 'recipe-capture-result',
-                           {'format': RESULT, 'request_id': request['id'], 'prepared_id': prepared['id'],
-                            'attempt_id': identity, 'state': 'complete', 'native_admitted': True,
-                            'process': process.reference, 'launch_id': launch['id'], 'projection': projection,
-                            'input_manifest': _file(input_path), 'audit': _file(attempt / 'audit.json'),
-                            'custody': {name: _file(attempt / name, check_cancelled=cancel.check) for name in _CUSTODY},
-                            'capture_files': workspace_storage.inventory(attempt / 'capture', cancelled=cancel.is_set),
-                            'observer_files': workspace_storage.inventory(attempt / 'observer-build', cancelled=cancel.is_set),
-                            'summary': report['summary'], 'coverage': report['coverage']})
+            return _write_result_record(attempt,
+                                        {'format': RESULT, 'request_id': request['id'], 'prepared_id': prepared['id'],
+                                         'attempt_id': identity, 'state': 'complete', 'native_admitted': True,
+                                         'process': process.reference, 'launch_id': launch['id'], 'projection': projection,
+                                         'input_manifest': _file(input_path), 'audit': _file(attempt / 'audit.json'),
+                                         'custody': {name: _file(attempt / name, check_cancelled=cancel.check) for name in _CUSTODY},
+                                         'capture_files': workspace_storage.inventory(attempt / 'capture', cancelled=cancel.is_set),
+                                         'observer_files': workspace_storage.inventory(attempt / 'observer-build', cancelled=cancel.is_set),
+                                         'summary': report['summary'], 'coverage': report['coverage']})
         except BaseException as exc:
             _fail(attempt, 'result.json', 'recipe-capture-result', request, stage, exc)
             raise
@@ -441,7 +460,7 @@ def show(root, identity, *, cancelled=None):
     attempt = reference.path
     _source(attempt, request, cancelled=cancel.is_set)
     if (attempt / 'result.json').exists():
-        result = _read(attempt, 'result.json', 'recipe-capture-result', request_id=request['id'])
+        result = _read_result_record(attempt, request_id=request['id'])
         if result['state'] == 'complete':
             if set(result.get('custody', {})) != set(_CUSTODY):
                 raise ValueError('retained capture custody is incomplete')
@@ -453,7 +472,7 @@ def show(root, identity, *, cancelled=None):
                     raise ValueError('retained capture evidence changed')
             prepared = _read(attempt, 'prepared.json', 'recipe-capture-prepared', request_id=request['id'])
             launch = storage.read_json(attempt / 'launch.json')
-            manifest = _read_input_manifest(attempt / 'input-manifest.json')
+            manifest = _read_bounded_ordinary_json(attempt / 'input-manifest.json')
             capture_manifest = storage.read_json(attempt / 'capture/manifest.json')
             if (prepared['id'] != result['prepared_id'] or launch['id'] != result['launch_id']
                     or manifest['candidate_lock_sha256'] != _digest(storage.read_json(attempt / 'runtime-lock.json'))
