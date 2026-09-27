@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supersymmetry.dev/deconstruction/blueprints-simulation-observation-v2.schema.json",
+  "title": "Supersymmetry Blueprints retained simulation observation v2",
+  "type": "object",
+  "required": [
+    "schema_version", "format", "observation_id", "candidate_id", "plan_id",
+    "target_state_id", "environment_lock_sha256", "status", "gate_status",
+    "gates", "scratch_lease_id", "scratch_disposition", "git_supervision",
+    "sandbox_supervision", "descendant_absence"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 2},
+    "format": {"const": "susy-blueprints-simulation-observation-v2"},
+    "observation_id": {
+      "type": "string",
+      "pattern": "^blueprints-simulation-observation-v2:sha256:[0-9a-f]{64}$"
+    },
+    "candidate_id": {"type": "string", "pattern": "^blueprints-candidate:sha256:[0-9a-f]{64}$"},
+    "plan_id": {"type": "string", "pattern": "^blueprints-plan:sha256:[0-9a-f]{64}$"},
+    "target_state_id": {"type": "string", "pattern": "^blueprints-target-state:sha256:[0-9a-f]{64}$"},
+    "environment_lock_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "status": {"const": "observed-unqualified"},
+    "gate_status": {"enum": ["passed", "failed"]},
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["ordinal", "stage_id", "status", "evidence_sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "ordinal": {"type": "integer", "minimum": 0},
+          "stage_id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+          "status": {"enum": ["passed", "failed", "unavailable"]},
+          "evidence_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "scratch_lease_id": {
+      "type": "string", "pattern": "^workbench-temporary-lease-v1:[0-9a-f]{32}$"
+    },
+    "scratch_disposition": {"const": "retained-process-absence-unproven"},
+    "git_supervision": {"const": "direct-child-wait-only"},
+    "sandbox_supervision": {"const": "initial-process-group-only"},
+    "descendant_absence": {"const": "unproven"}
+  }
+}

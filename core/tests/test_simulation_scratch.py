@@ -1,0 +1,79 @@
+"""Opt-in Blueprints simulation scratch is Core issued and retained."""
+
+from __future__ import annotations
+
+from pathlib import Path
+import tempfile
+import unittest
+
+from workbench_api.simulation_scratch import (
+    SimulationScratchError, allocate_simulation_scratch, simulation_scratch_scope,
+)
+from workbench_core.simulation_scratch import CoreSimulationScratch
+from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
+
+
+_PLAN = "blueprints-plan:sha256:" + "a" * 64
+
+
+class SimulationScratchTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory(dir="/tmp")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        self.workspace = root / "workspace"
+        self.workspace.mkdir()
+        self.configuration_home = root / "config"
+        self.parent = self.workspace / ".workbench/blueprints/session/simulation-workspaces"
+        self.host = CoreSimulationScratch(
+            workspace=self.workspace, configuration_home=self.configuration_home,
+        )
+
+    def test_unbound_request_refuses_before_allocation(self) -> None:
+        with self.assertRaisesRegex(SimulationScratchError, "Core scratch host"):
+            allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN)
+        self.assertFalse(self.parent.exists())
+
+    def test_completed_and_failed_calls_remain_in_restart_inventory(self) -> None:
+        with simulation_scratch_scope(self.host):
+            with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as completed:
+                (completed.path / "candidate.txt").write_text("retained", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "interrupted"):
+                with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as failed:
+                    (failed.path / "partial.txt").write_text("partial", encoding="utf-8")
+                    raise RuntimeError("interrupted")
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.workspace,
+        )
+        self.assertEqual(2, len(rows))
+        self.assertEqual({completed.lease_id, failed.lease_id}, {row["lease_id"] for row in rows})
+        self.assertEqual({"retained-unproven"}, {row["status"] for row in rows})
+        self.assertEqual({"blueprints-simulation-v2"}, {row["role"] for row in rows})
+        self.assertEqual("retained", (completed.path / "candidate.txt").read_text(encoding="utf-8"))
+        self.assertEqual("partial", (failed.path / "partial.txt").read_text(encoding="utf-8"))
+        leases = CoreTemporaryLeases(
+            workspace=self.workspace, configuration_home=self.configuration_home,
+            locations={"blueprints-simulation-v2": self.parent}, owner_id="blueprints",
+        )
+        with self.assertRaises(TemporaryLeaseError) as disposal:
+            leases.reconcile(completed.lease_id, drained=lambda: True)
+        self.assertEqual("temporary.policy", disposal.exception.code)
+        self.assertTrue(completed.path.is_dir())
+
+    def test_changed_lease_refuses_retention_and_remains_for_review(self) -> None:
+        with simulation_scratch_scope(self.host):
+            with self.assertRaises(SimulationScratchError):
+                with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as reference:
+                    (reference.path / ".workbench-temporary-lease.json").write_bytes(b"changed\n")
+        self.assertTrue(reference.path.is_dir())
+
+    def test_parent_outside_selected_workspace_is_refused(self) -> None:
+        outside = self.workspace.parent / "elsewhere"
+        with simulation_scratch_scope(self.host), self.assertRaises(SimulationScratchError):
+            with allocate_simulation_scratch(parent=outside, plan_id=_PLAN):
+                self.fail("outside scratch should not be issued")
+        self.assertFalse(outside.exists())
+
+
+if __name__ == "__main__":
+    unittest.main()

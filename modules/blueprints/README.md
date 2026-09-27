@@ -50,6 +50,11 @@ The V1 engine provides:
 - verification and reproducible local history; and
 - resumable sessions behind one CLI interface.
 
+An internal opt-in [V2 simulation observation](contracts/retained-simulation-observation-v2.md)
+retains Core-issued private scratch and reports its process and cleanup limits.
+It is diagnostic and has no CLI binding or release admission; the V1 CLI route
+remains the default.
+
 Blueprints does not ship a generic standard registry. A caller must select an
 explicit profile-owned registry and ledger; this prevents one pack's rules from
 becoming an implicit universal. Supersymmetry currently exposes one tested

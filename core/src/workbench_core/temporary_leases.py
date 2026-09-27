@@ -660,6 +660,11 @@ class CoreTemporaryLeases:
                 "temporary.policy",
                 "IDE toolchain source stage remains retained until its admission and history policy is complete",
             )
+        if reservation["role"] == "blueprints-simulation-v2":
+            raise TemporaryLeaseError(
+                "temporary.policy",
+                "Blueprints simulation V2 scratch remains retained until Core proves process absence",
+            )
         if not callable(drained) or drained() is not True:
             raise TemporaryLeaseError("temporary.active", "temporary lease process tree is not confirmed drained")
         try:

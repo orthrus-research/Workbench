@@ -91,6 +91,10 @@ class CoreRecordStores:
             # Keep the V1 evidence locator's exact selected CAS root while
             # registering its physical custody with Core.
             root = selected
+        elif self.owner_id == "blueprints" and family == "blueprints-simulation-evidence-v2":
+            # V2 retained-scratch observations use a separate CAS namespace.
+            # Historical V1 locators remain bound to their original bytes.
+            root = selected
         elif self.owner_id == "blueprints" and family == "blueprints-artifact-v1":
             # Release, history and session callers select distinct historical
             # CAS roots. Keep their V1 object keys and locators unchanged.

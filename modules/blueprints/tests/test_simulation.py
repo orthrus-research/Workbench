@@ -29,6 +29,9 @@ from _support import (
     WORKBENCH_ROOT,
     sealed_store_scope,
 )
+from workbench_api.simulation_scratch import simulation_scratch_scope
+from workbench_core.simulation_scratch import CoreSimulationScratch
+from workbench_core.temporary_leases import CoreTemporaryLeases
 
 REPO_ROOT = WORKBENCH_ROOT
 BLUEPRINTS_TOOLS = SOURCE_ROOT
@@ -322,9 +325,143 @@ class SimulationTest(unittest.TestCase):
         for name in (
             "blueprints-environment-lock-v1.schema.json",
             "blueprints-simulation-evidence-v1.schema.json",
+            "blueprints-simulation-evidence-v2.schema.json",
+            "blueprints-simulation-observation-v2.schema.json",
         ):
             schema = json.loads((SCHEMA_ROOT / name).read_text(encoding="utf-8"))
             Draft202012Validator.check_schema(schema)
+
+    def test_v2_nonzero_command_retains_core_scratch_as_unqualified_observation(self) -> None:
+        self.workspace_root = (
+            self.repository / ".workbench/blueprints/simulation-test/simulation-workspaces"
+        )
+        host = CoreSimulationScratch(
+            workspace=self.repository, configuration_home=self.configuration_home,
+        )
+        command = {
+            "exit_code": 7, "timed_out": False, "output_limited": False,
+            "stdout_sha256": simulation.EMPTY_SHA256,
+            "stderr_sha256": simulation.EMPTY_SHA256,
+            "command_sha256": "a" * 64,
+        }
+        with simulation_scratch_scope(host), patch.object(
+            simulation, "_command_result", return_value=command,
+        ):
+            result = self._simulator().execute(
+                self.planning_result, intake=self.intake, target_manifest=self.target,
+                planning_evidence=self.planning_evidence,
+                environment_lock=self.environment, custody_mode="retained-v2",
+            )
+        self.assertNotIn("simulation", result)
+        observation = result["observation_v2"]
+        self.assertEqual("observed-unqualified", observation["status"])
+        self.assertEqual("failed", observation["gate_status"])
+        self.assertEqual("retained-process-absence-unproven", observation["scratch_disposition"])
+        self.assertEqual("initial-process-group-only", observation["sandbox_supervision"])
+        evidence = simulation.SimulationEvidenceStore(self.evidence_root).read_v2(
+            result["evidence_locator_v2"]
+        )
+        self.assertEqual(observation["scratch_lease_id"], evidence["scratch_lease_id"])
+        self.assertEqual("BPX128_COMMAND_FAILED", next(
+            row["reason_code"] for row in evidence["gates"]
+            if row["stage_id"] == "isolated-compilation"
+        ))
+        with self.assertRaises(simulation.SimulationDiagnostic):
+            simulation.SimulationEvidenceStore(self.evidence_root).read(
+                result["evidence_locator_v2"]
+            )
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.repository,
+        )
+        self.assertEqual(1, len(rows))
+        self.assertEqual("retained-unproven", rows[0]["status"])
+        self.assertEqual(observation["scratch_lease_id"], rows[0]["lease_id"])
+        self.assertTrue(Path(rows[0]["path"]).is_dir())
+
+    def test_v2_all_domain_gates_pass_but_observation_stays_unqualified(self) -> None:
+        self.workspace_root = (
+            self.repository / ".workbench/blueprints/simulation-test/simulation-workspaces"
+        )
+        host = CoreSimulationScratch(
+            workspace=self.repository, configuration_home=self.configuration_home,
+        )
+        command = {
+            "exit_code": 0, "timed_out": False, "output_limited": False,
+            "stdout_sha256": simulation.EMPTY_SHA256,
+            "stderr_sha256": simulation.EMPTY_SHA256,
+            "command_sha256": "a" * 64,
+        }
+        with simulation_scratch_scope(host), patch.object(
+            simulation, "_command_result", return_value=command,
+        ):
+            result = self._simulator().execute(
+                self.planning_result, intake=self.intake, target_manifest=self.target,
+                planning_evidence=self.planning_evidence,
+                environment_lock=self.environment, custody_mode="retained-v2",
+            )
+        observation = result["observation_v2"]
+        self.assertEqual("passed", observation["gate_status"])
+        self.assertEqual("observed-unqualified", observation["status"])
+        self.assertTrue(all(row["status"] == "passed" for row in observation["gates"]))
+        self.assertNotIn("simulation", result)
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.repository,
+        )
+        self.assertEqual("retained-unproven", rows[0]["status"])
+
+    def test_v2_requires_core_scratch_binding_before_scratch_creation(self) -> None:
+        self.workspace_root = (
+            self.repository / ".workbench/blueprints/simulation-test/simulation-workspaces"
+        )
+        with self.assertRaises(simulation.SimulationDiagnostic) as refused:
+            self._simulator().execute(
+                self.planning_result, intake=self.intake, target_manifest=self.target,
+                planning_evidence=self.planning_evidence,
+                environment_lock=self.environment, custody_mode="retained-v2",
+            )
+        self.assertEqual("BPX158_SCRATCH", refused.exception.code)
+        self.assertFalse(self.workspace_root.exists())
+
+    def test_default_v1_still_disposes_scratch_and_uses_historical_evidence(self) -> None:
+        command = {
+            "exit_code": 0, "timed_out": False, "output_limited": False,
+            "stdout_sha256": simulation.EMPTY_SHA256,
+            "stderr_sha256": simulation.EMPTY_SHA256,
+            "command_sha256": "a" * 64,
+        }
+        with patch.object(simulation, "_command_result", return_value=command):
+            result = self._execute()
+        self.assertIn("simulation", result)
+        self.assertNotIn("observation_v2", result)
+        self.assertEqual("passed", result["simulation"]["status"])
+        self.assertEqual([], list(self.workspace_root.iterdir()))
+        evidence = simulation.SimulationEvidenceStore(self.evidence_root).read(
+            result["evidence_locator"]
+        )
+        self.assertTrue(evidence["disposable_worktrees_removed"])
+
+    def test_v2_interruption_retains_core_scratch_without_publishing_a_pass(self) -> None:
+        self.workspace_root = (
+            self.repository / ".workbench/blueprints/simulation-test/simulation-workspaces"
+        )
+        host = CoreSimulationScratch(
+            workspace=self.repository, configuration_home=self.configuration_home,
+        )
+        with simulation_scratch_scope(host), patch.object(
+            simulation, "_reconstruct_target", side_effect=KeyboardInterrupt,
+        ), self.assertRaises(KeyboardInterrupt):
+            self._simulator().execute(
+                self.planning_result, intake=self.intake, target_manifest=self.target,
+                planning_evidence=self.planning_evidence,
+                environment_lock=self.environment, custody_mode="retained-v2",
+            )
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.repository,
+        )
+        self.assertEqual(1, len(rows))
+        self.assertEqual("retained-unproven", rows[0]["status"])
+        self.assertTrue(Path(rows[0]["path"]).is_dir())
+        self.assertFalse((self.evidence_root / "v2").exists())
 
     def test_exact_dirty_target_passes_all_gates_without_mutation_or_disclosure(
         self,
@@ -630,6 +767,50 @@ class SimulationEvidenceCustodyTests(unittest.TestCase):
                              (root / "config/resources-v1/stores").glob("*.json")]
             self.assertEqual([str(store.root)], [row["root"] for row in registrations
                               if row["family"] == "blueprints-simulation-evidence-v1"])
+
+    def test_v2_reader_is_exact_and_does_not_change_historical_v1(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            evidence = self._evidence()
+            evidence.pop("disposable_worktrees_removed")
+            evidence.update({
+                "schema_version": 2,
+                "format": "susy-blueprints-simulation-evidence-v2",
+                "status": "observed-unqualified",
+                "scratch_lease_id": "workbench-temporary-lease-v1:" + "b" * 32,
+                "scratch_disposition": "retained-process-absence-unproven",
+                "git_supervision": "direct-child-wait-only",
+                "sandbox_supervision": "initial-process-group-only",
+                "descendant_absence": "unproven",
+            })
+            store = simulation.SimulationEvidenceStore(
+                workspace / ".workbench/blueprints/evidence-test/simulation-evidence"
+            )
+            with sealed_store_scope(workspace, root / "config"):
+                locator = store.put_v2(evidence)
+                self.assertEqual(evidence, store.read_v2(locator))
+                with self.assertRaises(simulation.SimulationDiagnostic):
+                    store.put_v2({**evidence, "disposable_worktrees_removed": True})
+                bad_gate = copy.deepcopy(evidence)
+                bad_gate["gates"][0]["evidence_sha256"] = "f" * 64
+                with self.assertRaises(simulation.SimulationDiagnostic) as bad_gate_read:
+                    store.read_v2(store.put_v2(bad_gate))
+                self.assertEqual("BPX154_GATE_EVIDENCE", bad_gate_read.exception.code)
+                with self.assertRaises(simulation.SimulationDiagnostic):
+                    store.read(locator)
+                with self.assertRaises(simulation.SimulationDiagnostic):
+                    store.read_v2(locator.replace("evidence-v2", "evidence", 1))
+                content = standards.canonical_json(evidence).encode("utf-8")
+                digest = hashlib.sha256(content).hexdigest()
+                self.assertEqual("local-simulation-evidence-v2:sha256:" + digest, locator)
+                stored = store.root / "v2/objects" / digest[:2] / f"{digest}.json"
+                self.assertEqual(content, stored.read_bytes())
+                stored.write_bytes(b"X" + content[1:])
+                with self.assertRaises(simulation.SimulationDiagnostic) as rejected:
+                    store.read_v2(locator)
+                self.assertEqual("BPX151_EVIDENCE_DIGEST", rejected.exception.code)
 
     def test_historical_v1_locator_reopens_without_and_with_core(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

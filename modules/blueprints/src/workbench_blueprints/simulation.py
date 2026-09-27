@@ -15,6 +15,7 @@ import shutil
 import signal
 import stat
 import subprocess
+import sys
 import tempfile
 from typing import Any, Callable, NoReturn
 
@@ -26,6 +27,9 @@ from workbench_api.host_filesystem import (
     read_private_bytes, secure_private_path,
 )
 from workbench_api.record_stores import open_record_store
+from workbench_api.simulation_scratch import (
+    SimulationScratchError, allocate_simulation_scratch,
+)
 from workbench_blueprints import planner, standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
 
@@ -36,6 +40,12 @@ ENVIRONMENT_SCHEMA = (
 )
 SIMULATION_EVIDENCE_SCHEMA = (
     SCHEMA_ROOT / "blueprints-simulation-evidence-v1.schema.json"
+)
+SIMULATION_EVIDENCE_V2_SCHEMA = (
+    SCHEMA_ROOT / "blueprints-simulation-evidence-v2.schema.json"
+)
+SIMULATION_OBSERVATION_V2_SCHEMA = (
+    SCHEMA_ROOT / "blueprints-simulation-observation-v2.schema.json"
 )
 ENGINE_CONTRACT_ID = "BLUEPRINTS-EXECUTABLE-ENGINE-V1"
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
@@ -488,6 +498,71 @@ class SimulationEvidenceStore:
                     f"{locator}:{row['ordinal']}",
                     "gate evidence identity drifted",
                 )
+        return evidence
+
+    def put_v2(self, evidence: dict[str, Any]) -> str:
+        """Publish a distinct retained-scratch observation, never a V1 pass."""
+
+        _validate(evidence, SIMULATION_EVIDENCE_V2_SCHEMA, "simulation-evidence-v2")
+        content = standards.canonical_json(evidence).encode("utf-8")
+        digest = _digest_bytes(content)
+        root = self.root / "v2"
+        path = root / "objects" / digest[:2] / f"{digest}.json"
+        try:
+            managed = open_record_store("blueprints-simulation-evidence-v2", root)
+            if managed is None or managed.root != root:
+                _fail("BPX115_EVIDENCE_ROOT", str(root), "V2 evidence requires its Core store")
+            for directory in (root / "objects", path.parent):
+                secure_private_path(directory, directory=True)
+            publish_immutable_bytes(
+                path, content, byte_limit=len(content), idempotent=True,
+            )
+            observed = read_private_bytes(path, byte_limit=len(content))
+        except (DurableResourceError, DurableRecordError, HostFilesystemError, OSError, ValueError) as exc:
+            if isinstance(exc, SimulationDiagnostic):
+                raise
+            _fail("BPX115_EVIDENCE_ROOT", str(root), str(exc))
+        if observed != content:
+            _fail("BPX116_EVIDENCE_COLLISION", str(path), "V2 evidence collision")
+        return "local-simulation-evidence-v2:sha256:" + digest
+
+    def read_v2(self, locator: str) -> dict[str, Any]:
+        match = re.fullmatch(
+            r"local-simulation-evidence-v2:sha256:([0-9a-f]{64})", locator
+        )
+        if match is None:
+            _fail("BPX149_EVIDENCE_LOCATOR", "/", "invalid V2 evidence locator")
+        digest = match.group(1)
+        root = self.root / "v2"
+        path = root / "objects" / digest[:2] / f"{digest}.json"
+        if any(candidate.is_symlink() for candidate in (root, root / "objects", path.parent, path)):
+            _fail("BPX115_EVIDENCE_ROOT", str(path), "V2 evidence path is redirected")
+        if not path.is_file():
+            _fail("BPX150_EVIDENCE_MISSING", str(path), "V2 evidence is missing")
+        try:
+            managed = open_record_store("blueprints-simulation-evidence-v2", root)
+            if managed is None or managed.root != root:
+                _fail("BPX115_EVIDENCE_ROOT", str(root), "V2 evidence requires its Core store")
+            size = path.lstat().st_size
+            content = read_private_bytes(path, byte_limit=size)
+        except (DurableResourceError, DurableRecordError, HostFilesystemError, OSError, ValueError) as exc:
+            if isinstance(exc, SimulationDiagnostic):
+                raise
+            _fail("BPX150_EVIDENCE_MISSING", str(path), str(exc))
+        if _digest_bytes(content) != digest:
+            _fail("BPX151_EVIDENCE_DIGEST", locator, "V2 evidence bytes drifted")
+        try:
+            evidence = json.loads(content)
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            _fail("BPX152_EVIDENCE_JSON", locator, str(exc))
+        if not isinstance(evidence, dict) or standards.canonical_json(evidence).encode("utf-8") != content:
+            _fail("BPX153_EVIDENCE_CANONICAL", locator, "V2 evidence is not canonical")
+        _validate(evidence, SIMULATION_EVIDENCE_V2_SCHEMA, locator)
+        for row in evidence["gates"]:
+            projected = dict(row)
+            observed = projected.pop("evidence_sha256")
+            if observed != _digest_json(projected):
+                _fail("BPX154_GATE_EVIDENCE", f"{locator}:{row['ordinal']}", "V2 gate identity drifted")
         return evidence
 
 
@@ -1060,8 +1135,12 @@ class Simulator:
         environment_lock: dict[str, Any],
         choices: dict[str, Any] | None = None,
         edit_generation: int = 0,
+        custody_mode: str = "v1",
     ) -> dict[str, Any]:
-        """Simulate one exact ready candidate and return no candidate bytes."""
+        """Run V1 by default; opt in to a retained, unqualified V2 observation."""
+
+        if custody_mode not in {"v1", "retained-v2"}:
+            _fail("BPX158_SCRATCH", "/custody-mode", "unknown simulation custody mode")
 
         request = planning_result.get("request")
         plan = planning_result.get("plan")
@@ -1132,7 +1211,8 @@ class Simulator:
             if gate["required"]
         }
 
-        self.workspace_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if custody_mode == "v1":
+            self.workspace_root.mkdir(mode=0o700, parents=True, exist_ok=True)
         source_before = planner.capture_target_state(
             self.target_repository, target_manifest["repository_id"]
         )
@@ -1142,11 +1222,24 @@ class Simulator:
                 str(self.target_repository),
                 "target changed before simulation",
             )
-        temporary = tempfile.TemporaryDirectory(
-            prefix="blueprints-simulation.", dir=self.workspace_root
-        )
-        try:
+        temporary = None
+        scratch_context = None
+        scratch_reference = None
+        if custody_mode == "retained-v2":
+            try:
+                scratch_context = allocate_simulation_scratch(
+                    parent=self.workspace_root, plan_id=plan["plan_id"],
+                )
+                scratch_reference = scratch_context.__enter__()
+            except SimulationScratchError as exc:
+                _fail("BPX158_SCRATCH", str(self.workspace_root), str(exc))
+            root = scratch_reference.path
+        else:
+            temporary = tempfile.TemporaryDirectory(
+                prefix="blueprints-simulation.", dir=self.workspace_root
+            )
             root = Path(temporary.name)
+        try:
             for stage in plan["validation_stages"]:
                 ordinal = stage["ordinal"]
                 stage_id = stage["stage_id"]
@@ -1452,7 +1545,11 @@ class Simulator:
                 if status != "passed":
                     failed = True
         finally:
-            temporary.cleanup()
+            if scratch_context is not None:
+                scratch_context.__exit__(*sys.exc_info())
+            else:
+                assert temporary is not None
+                temporary.cleanup()
 
         source_after = planner.capture_target_state(
             self.target_repository, target_manifest["repository_id"]
@@ -1476,8 +1573,12 @@ class Simulator:
                 "approved environment changed during simulation",
             )
         evidence = {
-            "schema_version": 1,
-            "format": "susy-blueprints-simulation-evidence-v1",
+            "schema_version": 2 if custody_mode == "retained-v2" else 1,
+            "format": (
+                "susy-blueprints-simulation-evidence-v2"
+                if custody_mode == "retained-v2"
+                else "susy-blueprints-simulation-evidence-v1"
+            ),
             "contract_id": ENGINE_CONTRACT_ID,
             "candidate_id": candidate["candidate_id"],
             "plan_id": plan["plan_id"],
@@ -1493,9 +1594,21 @@ class Simulator:
                 else result_manifest["manifest_sha256"]
             ),
             "gates": private_gates,
-            "disposable_worktrees_removed": True,
         }
-        evidence_locator = self.evidence_store.put(evidence)
+        if custody_mode == "retained-v2":
+            assert scratch_reference is not None
+            evidence.update({
+                "status": "observed-unqualified",
+                "scratch_lease_id": scratch_reference.lease_id,
+                "scratch_disposition": "retained-process-absence-unproven",
+                "git_supervision": "direct-child-wait-only",
+                "sandbox_supervision": "initial-process-group-only",
+                "descendant_absence": "unproven",
+            })
+            evidence_locator = self.evidence_store.put_v2(evidence)
+        else:
+            evidence["disposable_worktrees_removed"] = True
+            evidence_locator = self.evidence_store.put(evidence)
         public_gates = [
             {
                 "ordinal": row["ordinal"],
@@ -1505,6 +1618,31 @@ class Simulator:
             }
             for row in private_gates
         ]
+        if custody_mode == "retained-v2":
+            observation = {
+                "schema_version": 2,
+                "format": "susy-blueprints-simulation-observation-v2",
+                "candidate_id": candidate["candidate_id"],
+                "plan_id": plan["plan_id"],
+                "target_state_id": target_manifest["target_state_id"],
+                "environment_lock_sha256": lock_sha256,
+                "status": "observed-unqualified",
+                "gate_status": (
+                    "passed" if all(row["status"] == "passed" for row in public_gates)
+                    else "failed"
+                ),
+                "gates": public_gates,
+                "scratch_lease_id": scratch_reference.lease_id,
+                "scratch_disposition": "retained-process-absence-unproven",
+                "git_supervision": "direct-child-wait-only",
+                "sandbox_supervision": "initial-process-group-only",
+                "descendant_absence": "unproven",
+            }
+            observation["observation_id"] = (
+                "blueprints-simulation-observation-v2:sha256:" + _digest_json(observation)
+            )
+            _validate(observation, SIMULATION_OBSERVATION_V2_SCHEMA, "simulation-observation-v2")
+            return {"observation_v2": observation, "evidence_locator_v2": evidence_locator}
         simulation = {
             "candidate_id": candidate["candidate_id"],
             "status": (
