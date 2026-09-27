@@ -338,7 +338,10 @@ class WorkbenchRuntimeManagerRoutingTests(unittest.TestCase):
             with (
                 patch.dict(
                     os.environ,
-                    {"WORKBENCH_STATE_ROOT": str(selected)},
+                    {
+                        "WORKBENCH_CONFIG_HOME": str(Path(temporary) / "config"),
+                        "WORKBENCH_STATE_ROOT": str(selected),
+                    },
                     clear=True,
                 ),
                 patch.object(cli, "main", return_value=17) as delegated,

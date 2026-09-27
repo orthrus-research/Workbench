@@ -282,6 +282,19 @@ class RuntimeManagerTests(unittest.TestCase):
         )
         return matches[0]
 
+    def test_current_unproven_catalog_protects_runtime_cleanup(self) -> None:
+        runtime = self._create_runtime("unproven-cleanup")
+        item = self._item_with_suffix(
+            self._inventory(), "fixtures/managed-runtime--fixture--unproven-cleanup"
+        )
+        self.assertEqual("protected", item["deletion"]["state"])
+        self.assertIn("registered-catalog-unproven", item["deletion"]["reason_codes"])
+        plan = plan_cleanup(self.root, selector=item["item_id"], now=NOW)
+        self.assertEqual("blocked", plan["status"])
+        with self.assertRaises(RuntimeManagerError):
+            execute_cleanup(self.root, plan, now=NOW)
+        self.assertTrue(runtime.is_dir())
+
     def test_inventory_is_read_only_conservative_and_counts_hardlinks_once(self) -> None:
         template = _runtime_template(self.root)
         iteration = self.storage / "iterations/worldgen/complete"
