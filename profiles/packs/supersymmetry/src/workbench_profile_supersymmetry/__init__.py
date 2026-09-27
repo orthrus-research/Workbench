@@ -13,6 +13,7 @@ def profile():
         'release-local-input-policy': 'runtime/release-local-input-policy-v1.json',
         'release-resourcepack-input-policy': 'runtime/release-resourcepack-input-policy-v1.json',
         'release-mod-augmentation-policy': 'runtime/release-mod-augmentation-policy-v1.json',
+        'release-mod-augmentation-policy-v2': 'runtime/release-mod-augmentation-policy-v2.json',
         'manual-artifacts': 'runtime/manual-artifacts-v1.json',
         'worldgen': 'worldgen/worldgen-iteration-profile-v2.json',
         'registration-catalog': 'registration/catalog-v1.json',

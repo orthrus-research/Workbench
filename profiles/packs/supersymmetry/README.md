@@ -104,6 +104,21 @@ prior tree, and record both local file identities without source paths. The
 new tree can be reopened after the local sources disappear. This retains
 reviewed bytes; it does not establish CurseForge origin or install mods.
 
+The selected client manifest also declares Susy-Core 0.1.121 as a required mod
+(`846224/8891423`); the release ZIP does not contain its JAR. The
+[follow-on policy](runtime/release-mod-augmentation-policy-v2.json) binds one
+7008015-byte JAR by filename, SHA-1, and SHA-256. Core's
+`plan_mod_augmentation_v2`, `apply_mod_augmentation_v2`, and
+`reopen_mod_augmentation_v2` operations extend an exact retained 189-JAR V1
+augmentation tree to a new 190-JAR `mods/` tree. The caller supplies the exact
+`state_root/artifacts/sha256/<expected digest>` cache location convention.
+Core hashes the held cache file during review and copy; the artifact transport
+receipt is separate. The new tree references the V1 tree and reopens without
+the cache file or the original download. Both trees remain in Core custody.
+The plan and result omit source paths. The new JAR's CurseForge file identity
+remains unproven by these local assertions. No installation or JAR execution
+occurs.
+
 The selected 0.1.16.16 client manifest also declares three required file IDs
 that the [pack-owned placement policy](runtime/release-resourcepack-input-policy-v1.json)
 classifies as resource packs under that input plan:

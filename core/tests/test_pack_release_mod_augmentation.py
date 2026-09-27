@@ -11,6 +11,7 @@ from unittest.mock import patch
 from zipfile import ZipFile
 
 from workbench_core import pack_release_mod_augmentation as augmentation
+from workbench_core.artifact_store import fetch_verified_artifact
 from workbench_core.managed_trees import CoreManagedTrees
 from workbench_core.pack_release_local import _canonical
 from workbench_core.pack_release_prism_import import apply_prism_import, plan_prism_import
@@ -19,6 +20,7 @@ from workbench_core.pack_release_prism_import import apply_prism_import, plan_pr
 ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / "profiles/packs/supersymmetry/runtime/release-local-input-policy-v1.json"
 AUGMENTATION_POLICY = ROOT / "profiles/packs/supersymmetry/runtime/release-mod-augmentation-policy-v1.json"
+AUGMENTATION_POLICY_V2 = ROOT / "profiles/packs/supersymmetry/runtime/release-mod-augmentation-policy-v2.json"
 
 
 class ModAugmentationTests(unittest.TestCase):
@@ -66,6 +68,9 @@ class ModAugmentationTests(unittest.TestCase):
             declarations.append({"project_id": project, "file_id": file_id, "required": True})
         declarations.extend({"project_id": row["project_id"], "file_id": row["file_id"],
                              "required": True} for row in self.reviewed)
+        self.susy_id = (846224, 8891423)
+        declarations.append({"project_id": self.susy_id[0], "file_id": self.susy_id[1],
+                             "required": True})
         body = {"format": "workbench-pack-release-input-plan-v1", "schema_version": 1,
                 "profile": "supersymmetry", "release_id": "profile-release:sha256:" + "2" * 64,
                 "version": "0.1.16.16", "manifest_sha256": "sha256:" + "3" * 64,
@@ -91,6 +96,23 @@ class ModAugmentationTests(unittest.TestCase):
                        "manifest_sha256": self.input_plan["manifest_sha256"],
                        "external_file_count": len(declarations), "sources": self.reviewed}
         self.augmentation_policy.write_text(json.dumps(test_policy), encoding="utf-8")
+        susy_bytes = b"reviewed-susy-core"
+        actual_v2 = augmentation.load_augmentation_policy_v2(AUGMENTATION_POLICY_V2)
+        self.susy_source = self.root / "source-susy-core.jar"
+        self.susy_source.write_bytes(susy_bytes)
+        self.susy_row = dict(actual_v2["sources"][0], size=len(susy_bytes),
+                             sha1=sha1(susy_bytes).hexdigest(),
+                             sha256="sha256:" + sha256(susy_bytes).hexdigest())
+        self.artifact_path, _ = fetch_verified_artifact(
+            url=self.susy_source.as_uri(), expected_sha256=self.susy_row["sha256"][7:],
+            expected_size=self.susy_row["size"], state_root=self.state, label="synthetic Susy-Core",
+        )
+        self.augmentation_policy_v2 = self.root / "augmentation-policy-v2.json"
+        test_v2 = {**actual_v2, "input_plan_id": self.input_plan["plan_id"],
+                   "release_id": self.input_plan["release_id"],
+                   "manifest_sha256": self.input_plan["manifest_sha256"],
+                   "external_file_count": len(declarations), "sources": [self.susy_row]}
+        self.augmentation_policy_v2.write_text(json.dumps(test_v2), encoding="utf-8")
 
     def _plan(self):
         return augmentation.plan_mod_augmentation(
@@ -109,12 +131,31 @@ class ModAugmentationTests(unittest.TestCase):
             expected_plan_id=plan["plan_id"],
         )
 
+    def _plan_v2(self, prior):
+        return augmentation.plan_mod_augmentation_v2(
+            self.input_plan, prior_plan_id=prior["plan_id"], prior_tree_id=prior["tree_id"],
+            artifact_path=self.artifact_path, policy_path=POLICY,
+            prior_augmentation_policy_path=self.augmentation_policy,
+            augmentation_policy_path=self.augmentation_policy_v2,
+            state_root=self.state, config_home=self.config,
+        )
+
+    def _apply_v2(self, prior, plan):
+        return augmentation.apply_mod_augmentation_v2(
+            self.input_plan, prior_plan_id=prior["plan_id"], prior_tree_id=prior["tree_id"],
+            artifact_path=self.artifact_path, policy_path=POLICY,
+            prior_augmentation_policy_path=self.augmentation_policy,
+            augmentation_policy_path=self.augmentation_policy_v2,
+            state_root=self.state, config_home=self.config, expected_plan_id=plan["plan_id"],
+        )
+
     def test_combines_189_exact_mods_references_old_tree_and_reopens_without_sources(self) -> None:
         before = (self.old_path / "mod-000.jar").read_bytes()
         plan = self._plan()
         self.assertEqual("acquire", plan["action"])
         self.assertEqual(189, plan["retained_file_count"])
-        self.assertEqual([], plan["unresolved"])
+        self.assertEqual([{"project_id": self.susy_id[0], "file_id": self.susy_id[1],
+                           "required": True}], plan["unresolved"])
         self.assertEqual(self.old_tree_id, plan["prior_tree_id"])
         self.assertNotIn(str(self.root), json.dumps(plan))
         result = self._apply(plan)
@@ -183,6 +224,102 @@ class ModAugmentationTests(unittest.TestCase):
                 augmentation_policy_path=self.augmentation_policy,
                 state_root=self.state, config_home=self.config,
             )
+
+    def test_v2_extends_189_tree_references_parent_and_reopens_without_cache(self) -> None:
+        prior_plan = self._plan()
+        prior = self._apply(prior_plan)
+        prior_target = self.state / "pack-release-mod-augmentations" / prior_plan["plan_id"].rsplit(":", 1)[-1] / "snapshot"
+        original = (prior_target / "mods" / "mod-000.jar").read_bytes()
+        plan = self._plan_v2(prior)
+        self.assertEqual("acquire", plan["action"])
+        self.assertEqual(190, plan["retained_file_count"])
+        self.assertEqual([], plan["unresolved"])
+        self.assertEqual(prior["tree_id"], plan["prior_tree_id"])
+        self.assertNotIn(str(self.root), json.dumps(plan))
+        result = self._apply_v2(prior, plan)
+        self.assertEqual("retained", result["outcome"])
+        self.assertEqual(augmentation.RESULT_FORMAT_V2, result["format"])
+        self.assertEqual("unproven-by-local-assertions", result["curseforge_file_identity_state"])
+        self.assertEqual("not-installed", result["installation_state"])
+        self.assertNotIn(str(self.root), json.dumps(result))
+        target = self.state / "pack-release-mod-augmentations" / plan["plan_id"].rsplit(":", 1)[-1] / "snapshot"
+        self.assertEqual(190, len(list((target / "mods").iterdir())))
+        self.assertEqual(original, (prior_target / "mods" / "mod-000.jar").read_bytes())
+        self.assertEqual(self.susy_source.read_bytes(), (target / "mods" / self.susy_row["filename"]).read_bytes())
+        host = CoreManagedTrees(
+            workspace=self.state, configuration_home=self.config,
+            locations={"artifacts": self.state / "pack-release-mod-augmentations"},
+            owner_id="supersymmetry", policy_id=plan["policy_id"],
+        )
+        self.assertEqual((prior["tree_id"],), host.describe(result["tree_id"]).references)
+        self.artifact_path.unlink()
+        self.susy_source.unlink()
+        self.older.rename(self.root / "former-older")
+        self.mods.rename(self.root / "former-prism-mods")
+        reopened = augmentation.reopen_mod_augmentation_v2(
+            self.input_plan, expected_plan_id=plan["plan_id"], policy_path=POLICY,
+            prior_augmentation_policy_path=self.augmentation_policy,
+            augmentation_policy_path=self.augmentation_policy_v2,
+            state_root=self.state, config_home=self.config,
+        )
+        self.assertEqual("reopened", reopened["outcome"])
+        self.assertEqual(result["tree_content_sha256"], reopened["tree_content_sha256"])
+        v1_reopened = augmentation.reopen_mod_augmentation(
+            self.input_plan, expected_plan_id=prior_plan["plan_id"], policy_path=POLICY,
+            augmentation_policy_path=self.augmentation_policy,
+            state_root=self.state, config_home=self.config,
+        )
+        self.assertEqual(prior["tree_content_sha256"], v1_reopened["tree_content_sha256"])
+
+    def test_v2_refuses_wrong_cache_path_changed_bytes_and_prior_tree(self) -> None:
+        prior = self._apply(self._plan())
+        wrong = self.root / self.artifact_path.name
+        wrong.write_bytes(self.artifact_path.read_bytes())
+        with self.assertRaisesRegex(ValueError, "exact verified Core artifact-cache path"):
+            augmentation.plan_mod_augmentation_v2(
+                self.input_plan, prior_plan_id=prior["plan_id"], prior_tree_id=prior["tree_id"],
+                artifact_path=wrong, policy_path=POLICY,
+                prior_augmentation_policy_path=self.augmentation_policy,
+                augmentation_policy_path=self.augmentation_policy_v2,
+                state_root=self.state, config_home=self.config,
+            )
+        with self.assertRaises(ValueError):
+            augmentation.plan_mod_augmentation_v2(
+                self.input_plan, prior_plan_id=prior["plan_id"],
+                prior_tree_id="workbench-tree-v1:" + "0" * 32,
+                artifact_path=self.artifact_path, policy_path=POLICY,
+                prior_augmentation_policy_path=self.augmentation_policy,
+                augmentation_policy_path=self.augmentation_policy_v2,
+                state_root=self.state, config_home=self.config,
+            )
+        plan = self._plan_v2(prior)
+        self.artifact_path.write_bytes(b"x" * self.susy_row["size"])
+        with self.assertRaisesRegex(ValueError, "reviewed identity"):
+            self._apply_v2(prior, plan)
+        target = self.state / "pack-release-mod-augmentations" / plan["plan_id"].rsplit(":", 1)[-1] / "snapshot"
+        self.assertFalse(target.exists())
+
+    def test_v2_reuses_exact_tree_and_incomplete_stage_refuses(self) -> None:
+        prior = self._apply(self._plan())
+        plan = self._plan_v2(prior)
+        result = self._apply_v2(prior, plan)
+        reused_plan = self._plan_v2(prior)
+        self.assertEqual("reuse", reused_plan["action"])
+        self.assertEqual(result["tree_id"], reused_plan["tree_id"])
+        reused = self._apply_v2(prior, reused_plan)
+        self.assertEqual("reused", reused["outcome"])
+        self.assertEqual(result["tree_id"], reused["tree_id"])
+        self.assertEqual(result["tree_content_sha256"], reused["tree_content_sha256"])
+
+    def test_v2_incomplete_stage_stays_visible_and_refuses_next_plan(self) -> None:
+        prior = self._apply(self._plan())
+        plan = self._plan_v2(prior)
+        with patch.object(augmentation, "_copy_v2_to_stage", side_effect=RuntimeError("interrupted V2 copy")):
+            with self.assertRaisesRegex(RuntimeError, "interrupted V2 copy"):
+                self._apply_v2(prior, plan)
+        with self.assertRaisesRegex(ValueError, "incomplete stage"):
+            self._plan_v2(prior)
+        self.assertTrue(list((self.state / "pack-release-mod-augmentations").glob("**/.workbench-tree-*.pending")))
 
 
 if __name__ == "__main__":

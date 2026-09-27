@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Supersymmetry selected release verified-cache mod augmentation policy V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile", "input_plan_format", "input_plan_id", "release_id", "version", "manifest_sha256", "external_file_count", "destination_root", "source_kind", "prior_retained_file_count", "sources"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-release-mod-augmentation-policy-v2"},
+    "schema_version": {"const": 2},
+    "profile": {"const": "supersymmetry"},
+    "input_plan_format": {"const": "workbench-pack-release-input-plan-v1"},
+    "input_plan_id": {"type": "string", "pattern": "^workbench-pack-release-input-plan:sha256:[0-9a-f]{64}$"},
+    "release_id": {"type": "string", "pattern": "^profile-release:sha256:[0-9a-f]{64}$"},
+    "version": {"const": "0.1.16.16"},
+    "manifest_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "external_file_count": {"const": 193},
+    "destination_root": {"const": "mods"},
+    "source_kind": {"const": "verified-core-artifact-cache"},
+    "prior_retained_file_count": {"const": 189},
+    "sources": {
+      "type": "array", "minItems": 1, "maxItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["project_id", "file_id", "filename", "size", "sha1", "sha256"],
+        "properties": {
+          "project_id": {"const": 846224},
+          "file_id": {"const": 8891423},
+          "filename": {"const": "Susy-Core-0.1.121.jar"},
+          "size": {"const": 7008015},
+          "sha1": {"const": "e9bf00e371a7c30bd8224bd6077c3aebce932dbc"},
+          "sha256": {"const": "sha256:90803381d7441a2f83aa46c19a778eb62ca601c2d736ae59414a109ce35e0e1a"}
+        }
+      }
+    }
+  }
+}

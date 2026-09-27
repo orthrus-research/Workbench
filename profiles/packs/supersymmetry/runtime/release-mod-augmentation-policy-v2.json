@@ -1,0 +1,24 @@
+{
+  "format": "workbench-supersymmetry-release-mod-augmentation-policy-v2",
+  "schema_version": 2,
+  "profile": "supersymmetry",
+  "input_plan_format": "workbench-pack-release-input-plan-v1",
+  "input_plan_id": "workbench-pack-release-input-plan:sha256:8c188e58c33556c6dae0a5d7de8a069054bc0f45d3bccb6607adca9850673f0f",
+  "release_id": "profile-release:sha256:4b881312a29cf0fa1464be1b4531690c755306350bc9ecfec01682cbb2bf92c1",
+  "version": "0.1.16.16",
+  "manifest_sha256": "sha256:a4d67c7961e281c6ba9ecfffa58c9de2d14f3a424c9498537166dd6687b04d7d",
+  "external_file_count": 193,
+  "destination_root": "mods",
+  "source_kind": "verified-core-artifact-cache",
+  "prior_retained_file_count": 189,
+  "sources": [
+    {
+      "project_id": 846224,
+      "file_id": 8891423,
+      "filename": "Susy-Core-0.1.121.jar",
+      "size": 7008015,
+      "sha1": "e9bf00e371a7c30bd8224bd6077c3aebce932dbc",
+      "sha256": "sha256:90803381d7441a2f83aa46c19a778eb62ca601c2d736ae59414a109ce35e0e1a"
+    }
+  ]
+}

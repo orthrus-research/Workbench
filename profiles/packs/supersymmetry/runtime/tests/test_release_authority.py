@@ -117,6 +117,28 @@ class ReleaseAuthorityTests(unittest.TestCase):
         self.assertIn("runtime/release-mod-augmentation-policy-v1.json", bundled)
         self.assertIn("schemas/workbench-supersymmetry-release-mod-augmentation-policy-v1.schema.json", bundled)
 
+    def test_verified_cache_follow_on_mod_policy_is_selected_release_owned_and_packaged(self) -> None:
+        owner = profile()
+        policy_path = owner.resource("release-mod-augmentation-policy-v2")
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        schema = json.loads(
+            (owner.root / "schemas/workbench-supersymmetry-release-mod-augmentation-policy-v2.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(policy)
+        self.assertEqual("0.1.16.16", policy["version"])
+        self.assertEqual("workbench-pack-release-input-plan:sha256:8c188e58c33556c6dae0a5d7de8a069054bc0f45d3bccb6607adca9850673f0f", policy["input_plan_id"])
+        self.assertEqual("verified-core-artifact-cache", policy["source_kind"])
+        self.assertEqual(189, policy["prior_retained_file_count"])
+        self.assertEqual((846224, 8891423),
+                         (policy["sources"][0]["project_id"], policy["sources"][0]["file_id"]))
+        self.assertNotIn("prior_plan_id", policy)
+        self.assertNotIn("prior_tree_id", policy)
+        bundled = tomllib.loads((owner.root / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]["workbench_resources.profiles.packs.supersymmetry"]
+        self.assertIn("runtime/release-mod-augmentation-policy-v2.json", bundled)
+        self.assertIn("schemas/workbench-supersymmetry-release-mod-augmentation-policy-v2.schema.json", bundled)
+
 
 if __name__ == "__main__":
     unittest.main()
