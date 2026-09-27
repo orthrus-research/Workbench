@@ -586,6 +586,116 @@ class PackReleaseService:
                 "action": "local-inputs", "status": "planned", "reason": None,
                 "local_input_plan": plan}
 
+    def prism_inputs(self, mods_root: Path, policy_path: Path, *,
+                     optional_selected: tuple[tuple[int, int], ...] = ()) -> dict[str, Any]:
+        """Review local Prism/Packwiz bytes without changing the saved choice."""
+
+        from .pack_release_prism_import import plan_prism_import
+
+        first = self.inputs()
+        if first["status"] != "planned":
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-inputs", "status": first["status"],
+                    "reason": "selected pack release inputs are unavailable",
+                    "prism_import_plan": None}
+        try:
+            plan = plan_prism_import(
+                first["input_plan"], source_root=mods_root,
+                archive_path=Path(first["selected"]["artifact_path"]),
+                policy_path=policy_path, state_root=self.state_root,
+                config_home=self.choice_path.parent,
+                optional_selected=optional_selected,
+            )
+        except (DurableRecordError, DurableResourceError, OSError, ValueError):
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-inputs", "status": "unavailable",
+                    "reason": "Prism source or Core custody did not pass review",
+                    "prism_import_plan": None}
+        current = self.inputs()
+        if (current["status"] != "planned"
+                or current["input_plan"]["plan_id"] != first["input_plan"]["plan_id"]
+                or current["selected"] != first["selected"]):
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-inputs", "status": "stale",
+                    "reason": "selected pack release changed during Prism review",
+                    "prism_import_plan": None}
+        return {"schema": "workbench.pack-release.prism-import.v1",
+                "action": "prism-inputs", "status": "planned", "reason": None,
+                "prism_import_plan": plan}
+
+    def import_prism_inputs(self, mods_root: Path, policy_path: Path, *,
+                            expected_plan_id: str,
+                            optional_selected: tuple[tuple[int, int], ...] = ()) -> dict[str, Any]:
+        """Retain reviewed local bytes through Core; leave installation unresolved."""
+
+        from .pack_release_prism_import import apply_prism_import
+
+        first = self.inputs()
+        if first["status"] != "planned":
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-import", "status": first["status"],
+                    "reason": "selected pack release inputs are unavailable",
+                    "prism_import_result": None}
+        try:
+            result = apply_prism_import(
+                first["input_plan"], source_root=mods_root,
+                archive_path=Path(first["selected"]["artifact_path"]),
+                policy_path=policy_path, state_root=self.state_root,
+                config_home=self.choice_path.parent,
+                expected_plan_id=expected_plan_id,
+                optional_selected=optional_selected,
+            )
+        except (DurableRecordError, DurableResourceError, OSError, ValueError):
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-import", "status": "unavailable",
+                    "reason": "Prism source or Core custody did not pass review",
+                    "prism_import_result": None}
+        current = self.inputs()
+        if (current["status"] != "planned"
+                or current["input_plan"]["plan_id"] != first["input_plan"]["plan_id"]
+                or current["selected"] != first["selected"]):
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-import", "status": "stale",
+                    "reason": "selected pack release changed during Prism import",
+                    "prism_import_result": result}
+        return {"schema": "workbench.pack-release.prism-import.v1",
+                "action": "prism-import", "status": "retained", "reason": None,
+                "prism_import_result": result}
+
+    def reopen_prism_inputs(self, policy_path: Path, *, expected_plan_id: str) -> dict[str, Any]:
+        """Reopen retained Core bytes even when the external Prism source is gone."""
+
+        from .pack_release_prism_import import reopen_prism_import
+
+        first = self.inputs()
+        if first["status"] != "planned":
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-reopen", "status": first["status"],
+                    "reason": "selected pack release inputs are unavailable",
+                    "prism_import_result": None}
+        try:
+            result = reopen_prism_import(
+                first["input_plan"], expected_plan_id=expected_plan_id,
+                policy_path=policy_path, state_root=self.state_root,
+                config_home=self.choice_path.parent,
+            )
+        except (DurableRecordError, DurableResourceError, OSError, ValueError):
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-reopen", "status": "unavailable",
+                    "reason": "retained Core tree did not pass readback",
+                    "prism_import_result": None}
+        current = self.inputs()
+        if (current["status"] != "planned"
+                or current["input_plan"]["plan_id"] != first["input_plan"]["plan_id"]
+                or current["selected"] != first["selected"]):
+            return {"schema": "workbench.pack-release.prism-import.v1",
+                    "action": "prism-reopen", "status": "stale",
+                    "reason": "selected pack release changed during retained readback",
+                    "prism_import_result": None}
+        return {"schema": "workbench.pack-release.prism-import.v1",
+                "action": "prism-reopen", "status": "reopened", "reason": None,
+                "prism_import_result": result}
+
     def check(self) -> dict[str, Any]:
         choice = self._read_choice()
         try:
@@ -715,20 +825,42 @@ class PackReleaseService:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="workbench pack release")
-    parser.add_argument("action", choices=("show", "check", "accept", "ignore", "prepare", "inputs", "local-inputs"))
+    parser.add_argument("action", choices=("show", "check", "accept", "ignore", "prepare", "inputs", "local-inputs", "prism-inputs", "prism-import", "prism-reopen"))
     parser.add_argument("--profile", required=True, choices=(PROFILE,))
     parser.add_argument("--expected-release-id")
     parser.add_argument("--sources", type=Path)
+    parser.add_argument("--mods-root", type=Path)
+    parser.add_argument("--expected-plan-id")
+    parser.add_argument("--include-optional", action="append", default=[], metavar="PROJECT:FILE")
     parser.add_argument("--json", action="store_true")
     selected = parser.parse_args(argv)
-    if selected.action in {"show", "check", "inputs", "local-inputs"} and selected.expected_release_id is not None:
-        parser.error("show, check, inputs, and local-inputs do not accept an expected release ID")
+    if selected.action in {"show", "check", "inputs", "local-inputs", "prism-inputs", "prism-import", "prism-reopen"} and selected.expected_release_id is not None:
+        parser.error("this action does not accept an expected release ID")
     if selected.action in {"accept", "ignore", "prepare"} and selected.expected_release_id is None:
         parser.error("accept, ignore, and prepare require --expected-release-id")
     if selected.action == "local-inputs" and selected.sources is None:
         parser.error("local-inputs requires --sources")
     if selected.action != "local-inputs" and selected.sources is not None:
         parser.error("--sources is only accepted by local-inputs")
+    if selected.action in {"prism-inputs", "prism-import"} and selected.mods_root is None:
+        parser.error("Prism actions require --mods-root")
+    if selected.action not in {"prism-inputs", "prism-import"} and selected.mods_root is not None:
+        parser.error("--mods-root is only accepted by Prism actions")
+    if selected.action in {"prism-import", "prism-reopen"} and selected.expected_plan_id is None:
+        parser.error("prism-import and prism-reopen require --expected-plan-id")
+    if selected.action not in {"prism-import", "prism-reopen"} and selected.expected_plan_id is not None:
+        parser.error("--expected-plan-id is only accepted by prism-import and prism-reopen")
+    if selected.action not in {"prism-inputs", "prism-import"} and selected.include_optional:
+        parser.error("--include-optional is only accepted by Prism actions")
+    optional_selected: tuple[tuple[int, int], ...] = ()
+    if selected.include_optional:
+        pairs = []
+        for value in selected.include_optional:
+            if not re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", value):
+                parser.error("--include-optional requires PROJECT:FILE IDs")
+            project, file = value.split(":", 1)
+            pairs.append((int(project), int(file)))
+        optional_selected = tuple(pairs)
     resources = profile_resources("release-authority")
     if PROFILE not in resources:
         raise ValueError("Supersymmetry release authority profile is unavailable")
@@ -737,7 +869,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         config_home=default_user_config_home(),
         state_root=default_runtime_state_root(),
     )
-    if selected.action == "local-inputs":
+    if selected.action in {"local-inputs", "prism-inputs", "prism-import", "prism-reopen"}:
         policies = profile_resources("release-local-input-policy")
         if PROFILE not in policies:
             raise ValueError("Supersymmetry local input policy profile is unavailable")
@@ -745,6 +877,10 @@ def main(argv: Sequence[str] | None = None) -> int:
               service.check() if selected.action == "check" else
               service.inputs() if selected.action == "inputs" else
               service.local_inputs(selected.sources, policies[PROFILE]) if selected.action == "local-inputs" else
+              service.prism_inputs(selected.mods_root, policies[PROFILE], optional_selected=optional_selected) if selected.action == "prism-inputs" else
+              service.import_prism_inputs(selected.mods_root, policies[PROFILE], expected_plan_id=selected.expected_plan_id,
+                                          optional_selected=optional_selected) if selected.action == "prism-import" else
+              service.reopen_prism_inputs(policies[PROFILE], expected_plan_id=selected.expected_plan_id) if selected.action == "prism-reopen" else
               service.accept(selected.expected_release_id) if selected.action == "accept" else
               service.ignore(selected.expected_release_id) if selected.action == "ignore" else
               service.prepare(selected.expected_release_id))
@@ -760,6 +896,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"  Required files unresolved: {plan['required_unresolved']}")
             print(f"  Optional files selected but unresolved: {plan['optional_selected_unresolved']}")
             print("  CurseForge file identity: unproven by local hash")
+    elif selected.action in {"prism-inputs", "prism-import", "prism-reopen"}:
+        print(f"Supersymmetry Prism input: {result['status'].replace('_', ' ')}")
+        if result["reason"]:
+            print(f"  Reason: {result['reason']}")
+        detail = result.get("prism_import_plan") or result.get("prism_import_result")
+        if detail is not None:
+            print(f"  Local files: {detail['retained_file_count']}")
+            print(f"  Required or selected files unresolved: {len(detail['unresolved'])}")
+            print("  CurseForge file identity: unproven by local sidecar")
+            print("  Installation: not installed")
     else:
         print(f"Supersymmetry release: {result['status'].replace('_', ' ')}")
         if result["candidate"]:

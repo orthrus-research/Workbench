@@ -68,6 +68,33 @@ Cleanroom instance. A later acquisition must recheck the live inputs.
 Even `local-byte-set-reviewed` is insufficient to authorize installation until
 the file-ID provenance is independently established by a reviewed owner policy.
 
+For an existing Prism/Packwiz instance, Core can review its `mods/` files and
+`.index/*.pw.toml` sidecars, then retain matching bytes in the Linux Workbench
+state directory. Use the selected release's prepared client ZIP first. The
+three commands below review the source, retain the exact reviewed candidate,
+and reopen retained bytes later without the Prism directory:
+
+```sh
+workbench pack release prism-inputs --profile supersymmetry --mods-root /absolute/Prism/instance/minecraft/mods --json
+workbench pack release prism-import --profile supersymmetry --mods-root /absolute/Prism/instance/minecraft/mods --expected-plan-id 'workbench-pack-release-prism-import-plan:sha256:<digest>' --json
+workbench pack release prism-reopen --profile supersymmetry --expected-plan-id 'workbench-pack-release-prism-import-plan:sha256:<digest>' --json
+```
+
+Use the exact `plan_id` returned by `prism-inputs`. Add `--include-optional
+PROJECT:FILE` to both the review and import commands for each optional manifest
+file you choose. The import rechecks sidecar assertions, source SHA-1, reviewed
+size and SHA-256, and publishes an exact Core-managed tree. A read-only WSL 9p
+Prism directory is accepted as a best-effort input observation; the retained
+Linux tree supplies stable local byte custody. A changed source requires a new
+review. An interrupted stage is preserved for review and cannot be reused.
+
+The returned plan and result omit source paths. A Packwiz sidecar and matching
+hash do not prove the bytes' CurseForge project/file identity. Unresolved
+required files remain unresolved, and retained files are not installed. Core
+uses its stable runtime state root as the shared pack-byte workspace identity;
+these bytes are independent of a developer project checkout and are bound to
+the selected release and pack policy by the retained plan ID.
+
 ## Contents
 
 - `source-locks/`: exact upstream source and binary provenance.
