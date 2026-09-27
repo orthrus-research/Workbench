@@ -8,15 +8,35 @@ from io import BytesIO
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import zipfile
 
 from .check_storage import ordinary, safe_path, tree_manifest, seal, CheckStorageError
+from .filesystem_paths import native_path
 
 DIRECTORY = "workbench-check-attachment"
 JAR = DIRECTORY + "/observer.jar"
 CONFIG = DIRECTORY + "/observer.properties"
 BRIDGE = DIRECTORY + "/bridge.jar"
+
+
+def _external_compiler(executable):
+    """Accept a regular selected JDK tool without private-record link rules."""
+
+    name = "javac.exe" if os.name == "nt" else "javac"
+    path = Path(os.path.abspath(Path(executable).with_name(name)))
+    for component in (*reversed(path.parents), path):
+        physical = native_path(component)
+        if physical.is_symlink() or getattr(physical, "is_junction", lambda: False)():
+            raise CheckStorageError("compiler path traverses a symbolic link")
+    try:
+        info = native_path(path).stat()
+    except OSError as exc:
+        raise CheckStorageError("selected JDK compiler is unavailable") from exc
+    if not stat.S_ISREG(info.st_mode):
+        raise CheckStorageError("selected JDK compiler is not a regular file")
+    return path
 
 
 def build(directory, executable, specification):
@@ -49,7 +69,7 @@ def build(directory, executable, specification):
         target = source / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(raw)
-    compiler = ordinary(Path(executable).with_name("javac"))
+    compiler = _external_compiler(executable)
     environment = {key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL") if key in os.environ}
     with (directory / "compiler.log").open("wb") as log:
         bridge_names = {name.rsplit(".", 1)[-1] + ".java" for name in specification["bootstrap_classes"]}

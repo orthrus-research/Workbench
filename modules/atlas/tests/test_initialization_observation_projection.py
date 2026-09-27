@@ -61,6 +61,17 @@ class InitializationProjectionTests(unittest.TestCase):
             yield
         self.enterContext(patch.object(CoreManagedTrees, "_references", synthetic_reference))
         self.enterContext(patch.object(CoreManagedTrees, "_record_check_consumers", lambda *args: None))
+        def synthetic_closure(workspace, edges, catalog_root):
+            self.assertEqual(root / "workspace", Path(workspace))
+            self.assertEqual(self._trees.catalog.root, Path(catalog_root))
+            self.assertTrue(all(
+                reference == "workbench-check-v1:" + "a" * 64
+                for _tree_id, reference in edges
+            ))
+        self.enterContext(patch(
+            "workbench_core.check_lifecycle.verify_tree_reference_closure",
+            side_effect=synthetic_closure,
+        ))
 
     def test_cli_accepts_parent_segments_and_symlinked_parent_receipts(self):
         reader, _ = reader_fixture()

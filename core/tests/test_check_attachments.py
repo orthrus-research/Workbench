@@ -1,6 +1,7 @@
 """Attachment custody/build contract, independently of any game profile."""
 from copy import deepcopy
 from hashlib import sha256
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -78,3 +79,16 @@ class CheckAttachmentTests(unittest.TestCase):
         self.assertIsNone(attachments.build(self.root / "none", self.java, None))
         self.assertEqual(attachments.arguments(self.root, None), [])
         self.assertFalse((self.root / "none").exists())
+
+    def test_selected_jdk_compiler_may_have_another_hard_link(self):
+        compiler = self.java.with_name("javac")
+        os.link(compiler, self.root / "compiler-alias")
+        result = self.build("hardlinked-compiler")
+        self.assertEqual(sha256(b"compiler").hexdigest(), result["compiler_sha256"])
+
+    def test_selected_jdk_compiler_rejects_a_redirected_path(self):
+        compiler = self.java.with_name("javac")
+        compiler.unlink()
+        compiler.symlink_to(self.root / "other-compiler")
+        with self.assertRaisesRegex(CheckStorageError, "symbolic link"):
+            self.build("redirected-compiler")
