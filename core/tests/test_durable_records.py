@@ -15,9 +15,9 @@ from unittest.mock import patch
 
 from workbench_api.host_filesystem import (
     DurableRecordError, acquire_private_owned_marker, append_private_line,
-    count_interrupted_create_once_stages,
+    count_interrupted_create_once_stages, count_uncertain_record_stages,
     inspect_private_journal, private_exclusive_marker, private_record_lock,
-    publish_create_once_bytes,
+    publish_commit_witness_bytes, publish_create_once_bytes,
     publish_immutable_bytes, read_bounded_bytes, read_bounded_single_link_bytes,
     read_private_bytes,
     read_private_single_link_bytes, remove_private_bytes, replace_private_bytes,
@@ -112,6 +112,80 @@ class DurableRecordTests(unittest.TestCase):
         self.assertEqual("write", collision.exception.code)
         self.assertEqual(b"recoverable", stage.read_bytes())
         self.assertFalse(self.path.exists())
+
+    def test_commit_witness_removes_stage_only_after_parent_flush(self) -> None:
+        original_flush = durable_records.fsync_directory
+        flushed: list[Path] = []
+
+        def observe_flush(directory: Path) -> None:
+            stages = list(self.root.glob('.current.json.*.tmp'))
+            self.assertEqual(1, len(stages))
+            self.assertTrue(self.path.exists())
+            flushed.append(directory)
+            original_flush(directory)
+
+        with patch.object(durable_records, 'fsync_directory', side_effect=observe_flush):
+            publish_commit_witness_bytes(self.path, b'committed\n', byte_limit=1024)
+        self.assertEqual([self.root], flushed)
+        self.assertEqual(0, count_uncertain_record_stages(self.root, targets=('current.json',)))
+        self.assertEqual(b'committed\n', read_private_single_link_bytes(self.path, byte_limit=1024))
+
+    def test_commit_witness_retains_stage_before_link_and_after_failed_flush(self) -> None:
+        original_link = durable_records.os.link
+        for moment in ('before-link', 'after-link'):
+            with self.subTest(moment=moment):
+                def interrupt_link(source: Path, target: Path, **kwargs: object) -> None:
+                    if moment == 'before-link' and target == self.path:
+                        raise OSError('before witness link')
+                    original_link(source, target, **kwargs)
+
+                def interrupt_flush(directory: Path) -> None:
+                    raise OSError('after witness link')
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaises(DurableRecordError):
+                        publish_commit_witness_bytes(self.path, b'pending\n', byte_limit=1024)
+                stages = list(self.root.glob('.current.json.*.tmp'))
+                self.assertEqual(1, len(stages))
+                self.assertEqual(moment == 'after-link', self.path.exists())
+                self.assertEqual(1, count_uncertain_record_stages(self.root, targets=('current.json',)))
+                self.assertEqual(b'pending\n', stages[0].read_bytes())
+                stages[0].unlink()
+                self.path.unlink(missing_ok=True)
+
+    def test_commit_witness_hard_exit_after_link_retains_stage(self) -> None:
+        code = (
+            "import os,sys; from pathlib import Path; "
+            "from workbench_core import durable_records as records; "
+            "records.fsync_directory=lambda directory: os._exit(74); "
+            "records.publish_commit_witness_bytes(Path(sys.argv[1]), b'pending\\n', byte_limit=1024)"
+        )
+        roots = Path(__file__).resolve().parents
+        environment = {**os.environ, "PYTHONPATH": os.pathsep.join((
+            str(roots[2] / "api/src"), str(roots[1] / "src"),
+        ))}
+        stopped = subprocess.run([sys.executable, "-c", code, str(self.path)],
+                                 env=environment, capture_output=True, text=True)
+        self.assertEqual(74, stopped.returncode)
+        self.assertEqual(b'pending\n', self.path.read_bytes())
+        stages = list(self.root.glob('.current.json.*.tmp'))
+        self.assertEqual(1, len(stages))
+        self.assertEqual(1, count_uncertain_record_stages(self.root, targets=('current.json',)))
+        self.assertEqual(b'pending\n', stages[0].read_bytes())
+
+    def test_uncertain_record_stage_inventory_preserves_unknown_legacy_and_redirects(self) -> None:
+        old = self.root / ('.record-' + 'a' * 32)
+        named = self.root / '.current.json.unknown'
+        old.write_bytes(b'legacy')
+        named.write_bytes(b'named')
+        self.assertEqual(2, count_uncertain_record_stages(self.root, targets=('current.json',)))
+        self.assertEqual((b'legacy', b'named'), (old.read_bytes(), named.read_bytes()))
+        redirected = self.root / '.current.json.redirect'
+        redirected.symlink_to(old)
+        with self.assertRaises(DurableRecordError) as unsafe:
+            count_uncertain_record_stages(self.root, targets=('current.json',))
+        self.assertEqual('unsafe', unsafe.exception.code)
 
     def test_single_link_private_read_rejects_hardlink(self) -> None:
         replace_private_bytes(self.path, b'{}\n', byte_limit=1024, require_absent=True)

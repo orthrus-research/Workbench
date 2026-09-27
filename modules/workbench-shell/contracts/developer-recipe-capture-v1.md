@@ -138,6 +138,11 @@ profile drift invalidates preparation/execution of an earlier plan. Failed and
 completed attempts remain separate; an attempted preparation or run cannot be
 reused to certify changed inputs.
 
+An older prepared attempt remains readable through `show`, but cannot start a
+new game run because it has no retained preparation-complete witness. An
+interrupted preparation also cannot be resumed or run. Create a new plan and
+prepare a new attempt in either case; Workbench retains the original evidence.
+
 A completed record supplies the audit path, summary, coverage and graph
 projection identity. The retained graph can also be queried independently:
 

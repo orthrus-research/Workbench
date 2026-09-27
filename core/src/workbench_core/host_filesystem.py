@@ -388,9 +388,19 @@ def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> No
     publish(path, data, byte_limit=byte_limit)
 
 
+def publish_commit_witness_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:
+    from .durable_records import publish_commit_witness_bytes as publish
+    publish(path, data, byte_limit=byte_limit)
+
+
 def count_interrupted_create_once_stages(path: Path) -> int:
     from .durable_records import count_interrupted_create_once_stages as count
     return count(path)
+
+
+def count_uncertain_record_stages(directory: Path, *, targets: tuple[str, ...]) -> int:
+    from .durable_records import count_uncertain_record_stages as count
+    return count(directory, targets=targets)
 
 
 def replace_private_bytes(

@@ -464,19 +464,19 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         failure_path = attempt / 'prepare-failed.json'
         old_stage = attempt / ('.record-' + 'c' * 32)
         new_stage = attempt / '.prepared.json.01234567'
-        old_stage.write_bytes(b'old stage remains')
-        new_stage.write_bytes(b'new stage remains')
-        original_fsync = check_storage.fsync_directory
+        original_fsync = durable_records.fsync_directory
         interrupted = False
 
         def interrupt_after_link(directory):
             nonlocal interrupted
             if Path(directory) == attempt and prepared_path.exists() and not interrupted:
                 interrupted = True
+                old_stage.write_bytes(b'old stage remains')
+                new_stage.write_bytes(b'new stage remains')
                 raise OSError('synthetic prepared post-link interruption')
             return original_fsync(directory)
 
-        with patch.object(check_storage, 'fsync_directory', side_effect=interrupt_after_link):
+        with patch.object(durable_records, 'fsync_directory', side_effect=interrupt_after_link):
             with self.assertRaisesRegex(OSError, 'synthetic prepared post-link interruption'):
                 self.prepare(request)
         self.assertTrue(interrupted)
@@ -522,6 +522,136 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                 self.run_capture(prepared)
             self.assertFalse((attempt / 'run-started.json').exists())
             self.native.assert_not_called()
+
+    def test_prepared_v1_bytes_and_ready_witness_bind_exact_request_and_prepared(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        with patch.object(capture, 'publish_immutable_bytes',
+                          wraps=capture.publish_immutable_bytes) as published:
+            prepared = self.prepare(request)
+        prepared_path = attempt / 'prepared.json'
+        raw = prepared_path.read_bytes()
+        self.assertEqual(check_storage.canonical(prepared) + b'\n', raw)
+        self.assertIn(prepared_path, [call.args[0] for call in published.call_args_list])
+        intent = json.loads((attempt / 'prepare-intent.json').read_bytes())
+        ready = json.loads((attempt / 'prepare-ready.json').read_bytes())
+        self.assertEqual(sha256((attempt / 'request.json').read_bytes()).hexdigest(), intent['request_sha256'])
+        self.assertEqual(intent['id'], ready['intent_id'])
+        self.assertEqual(prepared['id'], ready['prepared_id'])
+        self.assertEqual(sha256(raw).hexdigest(), ready['prepared_sha256'])
+        self.assertEqual(len(raw), ready['prepared_size'])
+        self.assertEqual(prepared, capture.show(self.state, request['attempt_id']))
+
+    def test_historical_prepared_v1_is_readable_but_cannot_start_new_native_run(self):
+        prepared = self.prepare()
+        attempt = self.attempt(prepared)
+        prepared_path = attempt / 'prepared.json'
+        before = prepared_path.read_bytes()
+        (attempt / 'prepare-intent.json').unlink()
+        (attempt / 'prepare-ready.json').unlink()
+        if os.name != 'nt':
+            prepared_path.chmod(0o644)
+        self.assertEqual(prepared, capture.show(self.state, prepared['attempt_id']))
+        with self.assertRaisesRegex(ValueError, 'durable intent witness'):
+            self.run_capture(prepared)
+        self.assertEqual(before, prepared_path.read_bytes())
+        self.assertFalse((attempt / 'run-started.json').exists())
+        self.native.assert_not_called()
+
+    def test_prepared_final_without_failure_or_ready_refuses_native_run(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        prepared_path = attempt / 'prepared.json'
+        original_flush = durable_records.fsync_directory
+
+        def interrupt_flush(directory):
+            if Path(directory) == attempt and prepared_path.exists() and not (attempt / 'prepare-ready.json').exists():
+                raise OSError('prepared post-link flush unavailable')
+            return original_flush(directory)
+
+        with (patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush),
+              patch.object(capture, '_fail', side_effect=OSError('failure receipt unavailable'))):
+            with self.assertRaisesRegex(OSError, 'failure receipt unavailable'):
+                self.prepare(request)
+        prepared = json.loads(prepared_path.read_bytes())
+        self.assertFalse((attempt / 'prepare-failed.json').exists())
+        self.assertFalse((attempt / 'prepare-ready.json').exists())
+        self.assertEqual('interrupted', capture.show(self.state, request['attempt_id'])['state'])
+        with self.assertRaisesRegex(ValueError, 'durable ready witness'):
+            self.run_capture(prepared)
+        self.assertFalse((attempt / 'run-started.json').exists())
+        self.native.assert_not_called()
+
+    def test_ready_witness_interruption_retains_stage_and_refuses_native_run(self):
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                request = self.plan()
+                attempt = self.attempt(request)
+                ready_path = attempt / 'prepare-ready.json'
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    if Path(target) == ready_path and moment == 'before-link':
+                        raise OSError('ready before-link interruption')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    if (Path(directory) == attempt and ready_path.exists()
+                            and moment == 'after-link-before-flush'):
+                        raise OSError('ready post-link flush unavailable')
+                    return original_flush(directory)
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush),
+                      patch.object(capture, '_fail', side_effect=OSError('failure receipt unavailable'))):
+                    with self.assertRaisesRegex(OSError, 'failure receipt unavailable'):
+                        self.prepare(request)
+                prepared = json.loads((attempt / 'prepared.json').read_bytes())
+                stages = list(attempt.glob('.prepare-ready.json.*.tmp'))
+                self.assertEqual(1, len(stages))
+                stage_bytes = stages[0].read_bytes()
+                self.assertEqual(moment == 'after-link-before-flush', ready_path.exists())
+                self.assertFalse((attempt / 'prepare-failed.json').exists())
+                self.assertEqual('interrupted', capture.show(self.state, request['attempt_id'])['state'])
+                with self.assertRaisesRegex(ValueError, 'uncertain record stage'):
+                    self.run_capture(prepared)
+                self.assertEqual(stage_bytes, stages[0].read_bytes())
+                self.assertFalse((attempt / 'run-started.json').exists())
+                self.native.assert_not_called()
+
+    def test_old_or_named_preparation_stage_blocks_native_run_after_ready(self):
+        prepared = self.prepare()
+        attempt = self.attempt(prepared)
+        for name in ('.record-' + 'f' * 32, '.prepared.json.unknown'):
+            with self.subTest(name=name):
+                stage = attempt / name
+                stage.write_bytes(b'unknown retained stage')
+                with self.assertRaisesRegex(ValueError, 'uncertain record stage'):
+                    self.run_capture(prepared)
+                self.assertEqual('interrupted', capture.show(self.state, prepared['attempt_id'])['state'])
+                self.assertEqual(b'unknown retained stage', stage.read_bytes())
+                self.assertFalse((attempt / 'run-started.json').exists())
+                self.native.assert_not_called()
+                stage.unlink()
+
+    def test_complete_reopen_verifies_present_preparation_witness_pair(self):
+        result = self.run_capture()
+        attempt = self.attempt(result)
+        ready_path = attempt / 'prepare-ready.json'
+        original = ready_path.read_bytes()
+        try:
+            ready_path.write_bytes(b'changed witness')
+            with self.assertRaises((OSError, ValueError)):
+                capture.show(self.state, result['attempt_id'])
+            ready_path.unlink()
+            with self.assertRaises((OSError, ValueError)):
+                capture.show(self.state, result['attempt_id'])
+        finally:
+            ready_path.write_bytes(original)
+            if os.name != 'nt':
+                ready_path.chmod(0o600)
+        self.assertEqual(result, capture.show(self.state, result['attempt_id']))
 
     def test_preparation_replaces_complete_source_roots_and_preserves_original_runtime(self):
         prepared = self.prepare()
@@ -683,7 +813,7 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                                   wraps=capture.read_bounded_single_link_bytes) as historical_read:
                     self.assertEqual(result, capture.show(self.state, result['attempt_id']))
                 self.assertEqual(
-                    [(result_path,), (input_path,)],
+                    [(result_path,), (attempt / 'prepared.json',), (input_path,)],
                     [call.args for call in historical_read.call_args_list],
                 )
                 self.assertTrue(all(call.kwargs == {'byte_limit': 32 * 1024**2}
@@ -776,16 +906,20 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                 input_path = attempt / 'input-manifest.json'
                 old_stage = attempt / ('.record-' + 'a' * 32)
                 new_stage = attempt / '.input-manifest.json.01234567'
-                old_stage.write_bytes(b'old stage remains')
-                new_stage.write_bytes(b'new stage remains')
+
+                def seed_stages():
+                    old_stage.write_bytes(b'old stage remains')
+                    new_stage.write_bytes(b'new stage remains')
 
                 def interrupt_link(source, target, *args, **kwargs):
                     if Path(target) == input_path:
+                        seed_stages()
                         raise OSError('synthetic before-link interruption')
                     return original_link(source, target, *args, **kwargs)
 
                 def interrupt_flush(directory):
                     if Path(directory) == attempt and input_path.exists():
+                        seed_stages()
                         raise OSError('synthetic after-link interruption')
                     return original_fsync(directory)
 
@@ -853,16 +987,20 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                 result_path = attempt / 'result.json'
                 old_stage = attempt / ('.record-' + 'b' * 32)
                 new_stage = attempt / '.result.json.01234567'
-                old_stage.write_bytes(b'old stage remains')
-                new_stage.write_bytes(b'new stage remains')
+
+                def seed_stages():
+                    old_stage.write_bytes(b'old stage remains')
+                    new_stage.write_bytes(b'new stage remains')
 
                 def interrupt_link(source, target, *args, **kwargs):
                     if Path(target) == result_path:
+                        seed_stages()
                         raise OSError('synthetic result before-link interruption')
                     return original_link(source, target, *args, **kwargs)
 
                 def interrupt_flush(directory):
                     if Path(directory) == attempt and result_path.exists():
+                        seed_stages()
                         raise OSError('synthetic result after-link interruption')
                     return original_fsync(directory)
 

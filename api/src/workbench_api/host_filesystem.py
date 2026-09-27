@@ -38,7 +38,9 @@ class HostFilesystem(Protocol):
     ) -> bytes: ...
     def publish_immutable_bytes(self, path: Path, data: bytes, *, byte_limit: int, idempotent: bool = False) -> None: ...
     def publish_create_once_bytes(self, path: Path, data: bytes, *, byte_limit: int) -> None: ...
+    def publish_commit_witness_bytes(self, path: Path, data: bytes, *, byte_limit: int) -> None: ...
     def count_interrupted_create_once_stages(self, path: Path) -> int: ...
+    def count_uncertain_record_stages(self, directory: Path, *, targets: tuple[str, ...]) -> int: ...
     def replace_private_bytes(
         self, path: Path, data: bytes, *, byte_limit: int,
         expected_sha256: str | None = None, require_absent: bool = False,
@@ -179,6 +181,15 @@ def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> No
     operation(path, data, byte_limit=byte_limit)
 
 
+def publish_commit_witness_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:
+    """Publish a create-once witness with its stage retained on uncertainty."""
+
+    operation = getattr(_filesystem(), "publish_commit_witness_bytes", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide commit witness publication")
+    operation(path, data, byte_limit=byte_limit)
+
+
 def count_interrupted_create_once_stages(path: Path) -> int:
     """Count historical ``.<name>.<nonce>.tmp`` stages without changing them."""
 
@@ -186,6 +197,15 @@ def count_interrupted_create_once_stages(path: Path) -> int:
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide create-once stage inventory")
     return operation(path)
+
+
+def count_uncertain_record_stages(directory: Path, *, targets: tuple[str, ...]) -> int:
+    """Inspect legacy anonymous and named stages without changing them."""
+
+    operation = getattr(_filesystem(), "count_uncertain_record_stages", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide record stage inventory")
+    return operation(directory, targets=targets)
 
 
 def replace_private_bytes(

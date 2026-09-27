@@ -149,11 +149,13 @@ def read_bounded_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
 @contextmanager
 def _prepared(
     path: Path, data: bytes, *, create_once_stage: bool = False,
+    retain_stage_on_error: bool = False,
 ) -> Iterator[tuple[Path, os.stat_result]]:
     descriptor = -1
     temporary: Path | None = None
     opened = False
     created = False
+    completed = False
     try:
         if create_once_stage:
             # The historical adoption recovery reader sees this exact shape.
@@ -180,6 +182,7 @@ def _prepared(
         if not stat.S_ISREG(secured.st_mode) or _identity(created) != _identity(secured):
             raise DurableRecordError("changed", "staged private record changed while secured")
         yield temporary, secured
+        completed = True
     except DurableRecordError:
         raise
     except HostFilesystemError as exc:
@@ -189,7 +192,7 @@ def _prepared(
     finally:
         if opened:
             os.close(descriptor)
-        if created and temporary is not None:
+        if created and temporary is not None and (completed or not retain_stage_on_error):
             temporary.unlink(missing_ok=True)
 
 
@@ -242,6 +245,73 @@ def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> No
         # Keep the visible stage until the destination directory is durable.
         # A process crash before that flush must remain observable on reopen.
         fsync_directory(path.parent)
+
+
+def publish_commit_witness_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:
+    """Create one witness, retaining its visible stage on uncertain publication.
+
+    The stage is removed only after the destination directory flush succeeds.
+    A caught post-link error and a hard exit therefore have the same conservative
+    recovery signal. This stricter policy is deliberately separate from the
+    historical create-once publisher.
+    """
+
+    _parent(path)
+    _check_data(data, byte_limit)
+    if path.exists() or path.is_symlink():
+        raise DurableRecordError("collision", "commit witness already exists")
+    with _prepared(path, data, create_once_stage=True, retain_stage_on_error=True) as (temporary, secured):
+        try:
+            os.link(temporary, path, follow_symlinks=False)
+        except FileExistsError as exc:
+            raise DurableRecordError("collision", "commit witness raced") from exc
+        except OSError as exc:
+            raise DurableRecordError("write", f"cannot publish commit witness: {exc}") from exc
+        published = _ordinary(path, byte_limit=byte_limit)
+        if _identity(published) != _identity(secured) or read_private_bytes(path, byte_limit=byte_limit) != data:
+            raise DurableRecordError("changed", "published commit witness changed")
+        fsync_directory(path.parent)
+
+
+def count_uncertain_record_stages(directory: Path, *, targets: tuple[str, ...]) -> int:
+    """Count old anonymous and target-prefixed stages without claiming ownership.
+
+    Historical attempt directories may have ordinary, rather than current
+    owner-private, permissions. This inventory reads names and file kinds only.
+    Unknown or redirected stage entries refuse instead of being followed.
+    """
+
+    if (not isinstance(directory, Path) or not directory.is_absolute()
+            or not isinstance(targets, tuple) or not targets
+            or any(not isinstance(name, str) or re.fullmatch(r"[a-z][a-z0-9-]*\.json", name) is None
+                   for name in targets)):
+        raise DurableRecordError("path", "record stage inventory requires an exact directory and target names")
+    from . import check_storage
+    try:
+        check_storage.ordinary(directory, directory=True)
+        before = directory.stat()
+        prefixes = tuple(f".{name}." for name in targets)
+        count = 0
+        entries = 0
+        for candidate in directory.iterdir():
+            entries += 1
+            if entries > 10000:
+                raise DurableRecordError("bounds", "record stage inventory exceeds its entry bound")
+            if not (candidate.name.startswith(".record-")
+                    or candidate.name.startswith(prefixes)):
+                continue
+            if not stat.S_ISREG(candidate.lstat().st_mode):
+                raise DurableRecordError("unsafe", "uncertain record stage is not an ordinary file")
+            count += 1
+        after = check_storage.ordinary(directory, directory=True).stat()
+        if (before.st_dev, before.st_ino, before.st_mtime_ns, before.st_ctime_ns) != (
+                after.st_dev, after.st_ino, after.st_mtime_ns, after.st_ctime_ns):
+            raise DurableRecordError("changed", "record stage directory changed during inventory")
+        return count
+    except DurableRecordError:
+        raise
+    except (OSError, ValueError) as exc:
+        raise DurableRecordError("unavailable", f"cannot inspect uncertain record stages: {exc}") from exc
 
 
 def count_interrupted_create_once_stages(path: Path) -> int:

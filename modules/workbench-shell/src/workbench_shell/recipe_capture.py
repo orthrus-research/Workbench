@@ -10,7 +10,11 @@ import re
 from threading import Event
 
 from workbench_api.processes import capture_process, ProcessError, open_process_output, read_captured_process
-from workbench_api.host_filesystem import publish_immutable_bytes, read_bounded_single_link_bytes
+from workbench_api.host_filesystem import (
+    count_uncertain_record_stages, publish_commit_witness_bytes,
+    publish_immutable_bytes, read_bounded_single_link_bytes,
+    read_private_single_link_bytes,
+)
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
 from workbench_api.managed_attempts import managed_attempts
 from workbench_api.fixture_selections import fixture_selections
@@ -26,9 +30,17 @@ ATTEMPT_PREFIX = 'recipe-capture'
 REQUEST = 'workbench-developer-recipe-capture-request-v1'
 PREPARED = 'workbench-developer-recipe-capture-prepared-v1'
 RESULT = 'workbench-developer-recipe-capture-result-v1'
+PREPARE_INTENT = 'workbench-developer-recipe-capture-prepare-intent-v1'
+PREPARE_READY = 'workbench-developer-recipe-capture-prepare-ready-v1'
 _CUSTODY = ('request.json', 'prepared.json', 'launch.json', 'runtime-lock.json',
             'protocol.json', 'input-manifest.json', 'audit.json')
 _RECORD_BYTE_LIMIT = 32 * 1024**2
+_WITNESS_BYTE_LIMIT = 4096
+_PREPARE_STAGE_TARGETS = (
+    'request.json', 'prepare-intent.json', 'prepare-started.json',
+    'prepared.json', 'prepare-ready.json', 'prepare-failed.json',
+    'run-started.json', 'result.json', 'input-manifest.json',
+)
 
 
 def _digest(value):
@@ -78,11 +90,7 @@ def _write_input_manifest(path, value):
     )
 
 
-def _read_bounded_ordinary_json(path):
-    # Historical V1 files need the ordinary-file reader, including prior modes.
-    storage.ordinary(path)
-    raw = read_bounded_single_link_bytes(path, byte_limit=_RECORD_BYTE_LIMIT)
-
+def _decode_unique_json(raw):
     def unique(pairs):
         result = {}
         for key, value in pairs:
@@ -92,6 +100,74 @@ def _read_bounded_ordinary_json(path):
         return result
 
     return json.loads(raw, object_pairs_hook=unique)
+
+
+def _read_bounded_ordinary_json_with_raw(path):
+    # Historical V1 files need the ordinary-file reader, including prior modes.
+    storage.ordinary(path)
+    raw = read_bounded_single_link_bytes(path, byte_limit=_RECORD_BYTE_LIMIT)
+    return _decode_unique_json(raw), raw
+
+
+def _read_bounded_ordinary_json(path):
+    return _read_bounded_ordinary_json_with_raw(path)[0]
+
+
+def _read_prepared_record(attempt, *, request_id):
+    value, raw = _read_bounded_ordinary_json_with_raw(attempt / 'prepared.json')
+    if (not isinstance(value, dict)
+            or storage.seal('recipe-capture-prepared', {k: v for k, v in value.items() if k != 'id'}) != value
+            or value.get('request_id') != request_id):
+        raise ValueError('retained capture record identity changed')
+    return value, raw
+
+
+def _request_raw(attempt, request):
+    raw = storage.read_bytes(attempt / 'request.json', byte_limit=_RECORD_BYTE_LIMIT)
+    if raw != storage.canonical(request) + b'\n':
+        raise ValueError('retained capture request bytes changed')
+    return raw
+
+
+def _read_preparation_witness(attempt, name, kind, *, fields):
+    raw = read_private_single_link_bytes(attempt / name, byte_limit=_WITNESS_BYTE_LIMIT)
+    value = _decode_unique_json(raw)
+    if (not isinstance(value, dict) or set(value) != fields
+            or storage.seal(kind, {k: v for k, v in value.items() if k != 'id'}) != value
+            or raw != storage.canonical(value) + b'\n'):
+        raise ValueError('retained preparation witness identity changed')
+    return value
+
+
+def _uncertain_prepare_stages(attempt):
+    return count_uncertain_record_stages(attempt, targets=_PREPARE_STAGE_TARGETS) != 0
+
+
+def _verify_prepared_ready(attempt, request, prepared, prepared_raw, *, check_stages=True):
+    if check_stages and _uncertain_prepare_stages(attempt):
+        raise ValueError('preparation has an uncertain record stage; make a new plan')
+    if not os.path.lexists(native_path(attempt / 'prepare-intent.json')):
+        raise ValueError('preparation has no durable intent witness; make a new plan')
+    if not os.path.lexists(native_path(attempt / 'prepare-ready.json')):
+        raise ValueError('preparation has no durable ready witness; make a new plan')
+    intent = _read_preparation_witness(
+        attempt, 'prepare-intent.json', 'recipe-capture-prepare-intent',
+        fields={'format', 'attempt_id', 'request_id', 'request_sha256', 'id'},
+    )
+    ready = _read_preparation_witness(
+        attempt, 'prepare-ready.json', 'recipe-capture-prepare-ready',
+        fields={'format', 'attempt_id', 'request_id', 'request_sha256',
+                'intent_id', 'prepared_id', 'prepared_sha256', 'prepared_size', 'id'},
+    )
+    request_sha256 = sha256(_request_raw(attempt, request)).hexdigest()
+    if (intent['format'] != PREPARE_INTENT or intent['attempt_id'] != attempt.name
+            or intent['request_id'] != request['id'] or intent['request_sha256'] != request_sha256
+            or ready['format'] != PREPARE_READY or ready['attempt_id'] != attempt.name
+            or ready['request_id'] != request['id'] or ready['request_sha256'] != request_sha256
+            or ready['intent_id'] != intent['id'] or ready['prepared_id'] != prepared['id']
+            or ready['prepared_sha256'] != sha256(prepared_raw).hexdigest()
+            or ready['prepared_size'] != len(prepared_raw)):
+        raise ValueError('retained preparation witness does not bind the prepared capture')
 
 
 def _write_result_record(attempt, value):
@@ -293,16 +369,28 @@ def prepare(root, identity, confirm, *, cancelled):
     if confirm != request['id']:
         raise ValueError('preparation requires the exact reviewed plan ID')
     with managed_attempts().execution(reference):
-        if any((attempt / name).exists() for name in ('prepare-started.json', 'prepared.json', 'prepare-failed.json')):
+        if any(os.path.lexists(native_path(attempt / name)) for name in (
+                'prepare-intent.json', 'prepare-started.json', 'prepared.json',
+                'prepare-ready.json', 'prepare-failed.json')):
             raise ValueError('this preparation was already attempted; make a new plan')
+        if _uncertain_prepare_stages(attempt):
+            raise ValueError('this preparation has an uncertain record stage; make a new plan')
         cancel = Cancellation(cancelled, reference)
         cancel.check()
         owner = _current(attempt, request)
         execution_root = java_execution_path(attempt)
         if str(execution_root) != request['execution_root']:
             raise ValueError('reviewed Java execution path changed; make a new plan')
-        storage.write_json(attempt / 'prepare-started.json', {'request_id': request['id']})
         try:
+            request_sha256 = sha256(_request_raw(attempt, request)).hexdigest()
+            intent = storage.seal('recipe-capture-prepare-intent', {
+                'format': PREPARE_INTENT, 'attempt_id': identity,
+                'request_id': request['id'], 'request_sha256': request_sha256,
+            })
+            publish_immutable_bytes(attempt / 'prepare-intent.json',
+                                    storage.canonical(intent) + b'\n',
+                                    byte_limit=_WITNESS_BYTE_LIMIT)
+            storage.write_json(attempt / 'prepare-started.json', {'request_id': request['id']})
             retained = workspace_storage.materialize(
                 attempt, runtime_root=Path(request['runtime']), runtime_files=request['runtime_files'],
                 java_home=Path(request['java_home']), java_files=request['java_files'],
@@ -328,12 +416,29 @@ def prepare(root, identity, confirm, *, cancelled):
             if workspace_storage.inventory(java_home, cancelled=cancel.is_set) != retained['java_files']:
                 raise ValueError('retained Java changed during observer compilation')
             _current(attempt, request)
-            return _record(attempt, 'prepared.json', 'recipe-capture-prepared',
-                           {'format': PREPARED, 'request_id': request['id'], 'attempt_id': identity,
-                            'state': 'prepared', 'native_executed': False, 'runtime_files': runtime_files,
-                            'execution_root': str(execution_root),
-                            'java_files': retained['java_files'], 'java': java, 'java_properties': properties,
-                            'observer_build': build})
+            prepared = storage.seal('recipe-capture-prepared',
+                                    {'format': PREPARED, 'request_id': request['id'], 'attempt_id': identity,
+                                     'state': 'prepared', 'native_executed': False, 'runtime_files': runtime_files,
+                                     'execution_root': str(execution_root),
+                                     'java_files': retained['java_files'], 'java': java, 'java_properties': properties,
+                                     'observer_build': build})
+            prepared_raw = storage.canonical(prepared) + b'\n'
+            publish_immutable_bytes(attempt / 'prepared.json', prepared_raw,
+                                    byte_limit=_RECORD_BYTE_LIMIT)
+            reopened, observed_raw = _read_prepared_record(attempt, request_id=request['id'])
+            if reopened != prepared or observed_raw != prepared_raw:
+                raise ValueError('published prepared record changed before ready witness')
+            ready = storage.seal('recipe-capture-prepare-ready', {
+                'format': PREPARE_READY, 'attempt_id': identity,
+                'request_id': request['id'], 'request_sha256': request_sha256,
+                'intent_id': intent['id'], 'prepared_id': prepared['id'],
+                'prepared_sha256': sha256(prepared_raw).hexdigest(),
+                'prepared_size': len(prepared_raw),
+            })
+            publish_commit_witness_bytes(attempt / 'prepare-ready.json',
+                                         storage.canonical(ready) + b'\n',
+                                         byte_limit=_WITNESS_BYTE_LIMIT)
+            return prepared
         except BaseException as exc:
             _fail(attempt, 'prepare-failed.json', 'recipe-capture-failure', request, 'prepare', exc)
             raise
@@ -355,14 +460,17 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
     attempt = reference.path
     if not accept_eula:
         raise ValueError('Minecraft EULA acceptance is required: read https://www.minecraft.net/en-us/eula and supply --accept-eula')
-    prepared = _read(attempt, 'prepared.json', 'recipe-capture-prepared', request_id=request['id'])
-    if prepared.get('format') != PREPARED or confirm != prepared['id']:
-        raise ValueError('execution requires the exact prepared capture ID')
     with managed_attempts().execution(reference):
-        if any((attempt / name).exists() for name in ('run-started.json', 'result.json')):
+        if any(os.path.lexists(native_path(attempt / name)) for name in ('run-started.json', 'result.json')):
             raise ValueError('this capture was already attempted; make a new plan')
         if os.path.lexists(native_path(attempt / 'prepare-failed.json')):
             raise ValueError('this preparation failed; make a new plan')
+        if _uncertain_prepare_stages(attempt):
+            raise ValueError('preparation has an uncertain record stage; make a new plan')
+        prepared, prepared_raw = _read_prepared_record(attempt, request_id=request['id'])
+        if prepared.get('format') != PREPARED or confirm != prepared['id']:
+            raise ValueError('execution requires the exact prepared capture ID')
+        _verify_prepared_ready(attempt, request, prepared, prepared_raw)
         cancel = Cancellation(cancelled, reference)
         cancel.check()
         owner = _current(attempt, request)
@@ -472,7 +580,11 @@ def show(root, identity, *, cancelled=None):
             for name, key in (('capture', 'capture_files'), ('observer-build', 'observer_files')):
                 if workspace_storage.inventory(attempt / name, cancelled=cancel.is_set) != result[key]:
                     raise ValueError('retained capture evidence changed')
-            prepared = _read(attempt, 'prepared.json', 'recipe-capture-prepared', request_id=request['id'])
+            prepared, prepared_raw = _read_prepared_record(attempt, request_id=request['id'])
+            if (os.path.lexists(native_path(attempt / 'prepare-intent.json'))
+                    or os.path.lexists(native_path(attempt / 'prepare-ready.json'))):
+                _verify_prepared_ready(attempt, request, prepared, prepared_raw,
+                                       check_stages=False)
             launch = storage.read_json(attempt / 'launch.json')
             manifest = _read_bounded_ordinary_json(attempt / 'input-manifest.json')
             capture_manifest = storage.read_json(attempt / 'capture/manifest.json')
@@ -502,13 +614,29 @@ def show(root, identity, *, cancelled=None):
                 if view.manifest['graph_set_id'] != result['projection']['graph_set_id']:
                     raise ValueError('retained graph identity changed')
         return result
-    for filename, kind in (('prepare-failed.json', 'recipe-capture-failure'), ('prepared.json', 'recipe-capture-prepared')):
-        if (attempt / filename).exists():
-            value = _read(attempt, filename, kind, request_id=request['id'])
-            if (attempt / 'run-started.json').exists():
-                return {'format': RESULT, 'attempt_id': identity, 'state': 'running' if managed_attempts().active(reference) else 'interrupted', 'prepared': value}
-            return value
-    if (attempt / 'prepare-started.json').exists():
+    if os.path.lexists(native_path(attempt / 'prepare-failed.json')):
+        return _read(attempt, 'prepare-failed.json', 'recipe-capture-failure', request_id=request['id'])
+    if os.path.lexists(native_path(attempt / 'prepared.json')):
+        prepared, prepared_raw = _read_prepared_record(attempt, request_id=request['id'])
+        if (attempt / 'run-started.json').exists():
+            return {'format': RESULT, 'attempt_id': identity,
+                    'state': 'running' if managed_attempts().active(reference) else 'interrupted',
+                    'prepared': prepared}
+        has_intent = os.path.lexists(native_path(attempt / 'prepare-intent.json'))
+        has_ready = os.path.lexists(native_path(attempt / 'prepare-ready.json'))
+        if _uncertain_prepare_stages(attempt) or has_intent != has_ready:
+            return {'format': RESULT, 'attempt_id': identity,
+                    'state': 'preparing' if managed_attempts().active(reference) else 'interrupted',
+                    'prepared': prepared}
+        if has_intent:
+            _verify_prepared_ready(attempt, request, prepared, prepared_raw)
+        # A historical V1 prepared record remains readable. Without the new
+        # ready witness it cannot authorize a new native run.
+        return prepared
+    if (os.path.lexists(native_path(attempt / 'prepare-intent.json'))
+            or os.path.lexists(native_path(attempt / 'prepare-started.json'))
+            or os.path.lexists(native_path(attempt / 'prepare-ready.json'))
+            or _uncertain_prepare_stages(attempt)):
         return {'format': RESULT, 'attempt_id': identity, 'state': 'preparing' if managed_attempts().active(reference) else 'interrupted', 'request': request}
     return request
 
