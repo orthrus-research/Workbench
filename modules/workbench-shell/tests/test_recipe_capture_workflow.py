@@ -457,6 +457,72 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             self.prepare(request)
         self.native.assert_not_called()
 
+    def test_post_link_preparation_failure_cannot_authorize_native_run(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        prepared_path = attempt / 'prepared.json'
+        failure_path = attempt / 'prepare-failed.json'
+        old_stage = attempt / ('.record-' + 'c' * 32)
+        new_stage = attempt / '.prepared.json.01234567'
+        old_stage.write_bytes(b'old stage remains')
+        new_stage.write_bytes(b'new stage remains')
+        original_fsync = check_storage.fsync_directory
+        interrupted = False
+
+        def interrupt_after_link(directory):
+            nonlocal interrupted
+            if Path(directory) == attempt and prepared_path.exists() and not interrupted:
+                interrupted = True
+                raise OSError('synthetic prepared post-link interruption')
+            return original_fsync(directory)
+
+        with patch.object(check_storage, 'fsync_directory', side_effect=interrupt_after_link):
+            with self.assertRaisesRegex(OSError, 'synthetic prepared post-link interruption'):
+                self.prepare(request)
+        self.assertTrue(interrupted)
+        prepared_bytes = prepared_path.read_bytes()
+        failure_bytes = failure_path.read_bytes()
+        prepared = json.loads(prepared_bytes)
+        self.assertEqual('failed', capture.show(self.state, request['attempt_id'])['state'])
+        with self.assertRaisesRegex(ValueError, 'preparation failed'):
+            self.run_capture(prepared)
+        self.assertEqual(prepared_bytes, prepared_path.read_bytes())
+        self.assertEqual(failure_bytes, failure_path.read_bytes())
+        self.assertEqual(b'old stage remains', old_stage.read_bytes())
+        self.assertEqual(b'new stage remains', new_stage.read_bytes())
+        self.assertFalse((attempt / 'run-started.json').exists())
+        self.native.assert_not_called()
+
+    def test_historical_preparation_failure_blocks_run_with_prepared_record(self):
+        prepared = self.prepare()
+        attempt = self.attempt(prepared)
+        failure = check_storage.seal('recipe-capture-failure', {
+            'format': capture.RESULT, 'request_id': prepared['request_id'],
+            'attempt_id': prepared['attempt_id'], 'state': 'failed',
+            'stage': 'prepare', 'error': 'historical preparation failure',
+            'native_admitted': False,
+        })
+        failure_path = attempt / 'prepare-failed.json'
+        check_storage.write_json(failure_path, failure)
+        prepared_path = attempt / 'prepared.json'
+        before = (prepared_path.read_bytes(), failure_path.read_bytes())
+        if os.name != 'nt':
+            prepared_path.chmod(0o644)
+            failure_path.chmod(0o644)
+        self.assertEqual(failure, capture.show(self.state, prepared['attempt_id']))
+        with self.assertRaisesRegex(ValueError, 'preparation failed'):
+            self.run_capture(prepared)
+        self.assertEqual(before, (prepared_path.read_bytes(), failure_path.read_bytes()))
+        self.assertFalse((attempt / 'run-started.json').exists())
+        self.native.assert_not_called()
+        if os.name != 'nt':
+            failure_path.unlink()
+            failure_path.symlink_to('unavailable-failure-record')
+            with self.assertRaisesRegex(ValueError, 'preparation failed'):
+                self.run_capture(prepared)
+            self.assertFalse((attempt / 'run-started.json').exists())
+            self.native.assert_not_called()
+
     def test_preparation_replaces_complete_source_roots_and_preserves_original_runtime(self):
         prepared = self.prepare()
         runtime = self.attempt(prepared) / 'runtime'

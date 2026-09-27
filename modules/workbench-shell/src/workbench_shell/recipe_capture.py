@@ -361,6 +361,8 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
     with managed_attempts().execution(reference):
         if any((attempt / name).exists() for name in ('run-started.json', 'result.json')):
             raise ValueError('this capture was already attempted; make a new plan')
+        if os.path.lexists(native_path(attempt / 'prepare-failed.json')):
+            raise ValueError('this preparation failed; make a new plan')
         cancel = Cancellation(cancelled, reference)
         cancel.check()
         owner = _current(attempt, request)
