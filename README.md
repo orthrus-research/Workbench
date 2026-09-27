@@ -8,12 +8,10 @@ Make a pack change with the evidence in view. Workbench brings together local
 project inspection, captured recipe relationships, saved-source review, and
 explicit native checks for Minecraft 1.12.2 development.
 
-**Current download:** [Linux x64 preview for Python 3.14](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-2026-09-23).
-Its release notes list exact components, supported contexts, and qualification.
-CleanroomMC and Supersymmetry are the first platform and pack integrations.
-The [next Linux bundle plan](RELEASING.md#prepare-the-one-command-linux-bundle)
-adds a release-specific terminal installer that obtains Python and installs the
-reviewed wheel assembly. That hook is not part of the current preview.
+**Current download:** [Linux x64 Supersymmetry client 0.1.2](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-0.1.2).
+It includes Core, Atlas, Axiom, Shell, Textual, the pack profiles, and the
+matching Axiom engine. CleanroomMC and Supersymmetry are the first platform and
+pack integrations. See the release notes for its exact scope and limitations.
 
 ## What would you like to do?
 
@@ -43,15 +41,25 @@ recipes you add, change, or remove. It does not test machines in a world.
 
 ## Get started
 
-1. [Download the preview bundle](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-2026-09-23),
-   verify its checksum, and follow its included `GETTING-STARTED.md`.
-2. [Open one project](docs/guides/getting-started.md#2-open-your-project) and
-   inspect the installed modules, profiles, and available commands.
-3. [Choose a workflow](docs/guides/getting-started.md#3-choose-a-workflow) from the paths above.
+On Linux x64 with GNU libc 2.28 or newer, run:
 
-The [current source guide](docs/guides/getting-started.md) covers ongoing
-development, alternate wheelhouse composition, IDE setup, and runtime
-requirements. The preview bundle's guide is pinned to its exact source commit.
+```sh
+curl -fsSL https://susy.work/install.sh | bash
+```
+
+This also works in a compatible WSL2 Linux shell. Keep Workbench's state on the
+Linux filesystem. The installer verifies a pinned Python runtime and the
+matching release bundle, installs in your user directory, and prints the full
+path to `workbench-tui` for guided setup. It does not require sudo or a source
+checkout, and it does not add commands to your `PATH`. To inspect the script
+first, download `workbench-install-linux-x64.sh` and verify it against
+`SHA256SUMS` on the [release page](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-0.1.2).
+
+In Textual, open one project and choose a workflow. Workbench does not provide
+the external game files: you can import a complete Prism instance ZIP, while
+fresh CurseForge file acquisition awaits a Workbench API key. The
+[getting started guide](docs/guides/getting-started.md) covers setup, alternate
+installation, IDEs, and runtime requirements.
 
 ## Explore the repository
 

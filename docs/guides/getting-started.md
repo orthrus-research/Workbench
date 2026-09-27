@@ -12,8 +12,8 @@ initialization checks.
 
 ## 1. Choose an installation
 
-The September 23 Linux x64 preview uses the wheelhouse procedure below. Once
-the Supersymmetry client release is published, its hosted installer is:
+The current [Supersymmetry client 0.1.2 release](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-0.1.2)
+has a hosted Linux x64 installer:
 
 ```sh
 curl -fsSL https://susy.work/install.sh | bash
@@ -21,8 +21,9 @@ curl -fsSL https://susy.work/install.sh | bash
 
 To inspect the script before running it, use
 `curl -fsSLo workbench-install-linux-x64.sh https://susy.work/install.sh && sh workbench-install-linux-x64.sh`.
-The release notes provide its SHA-256 and the exact matching GitHub release
-asset. Run the command inside a Linux shell, including on WSL2.
+The release's `SHA256SUMS` lists the matching script and bundle hashes. Run the
+command inside a Linux shell, including on WSL2. The September 23 Linux x64
+preview remains available through the wheelhouse procedure below.
 
 The hook downloads a pinned Python 3.14 runtime and the exact release bundle,
 checks their SHA-256 hashes, then installs the release's selected native
@@ -39,11 +40,11 @@ environment. It needs HTTPS access, `curl`, `sha256sum`, `tar` and common POSIX
 shell tools; it needs no preinstalled Python, Pixi or source checkout. Download
 the script to a file first if you want to inspect it before executing it.
 
-The Supersymmetry client edition is still being completed and qualified. The
-Workbench hook alone does not install a runnable game instance. Fresh required
-pack-file acquisition needs Workbench's own CurseForge API key and a guided
-Textual install flow. A complete Prism instance ZIP selected in Textual is the
-interim import route; the published pack ZIP contains only external file IDs
+The 0.1.2 client is a pre-release. The Workbench hook alone does not install a
+runnable game instance. Fresh required pack-file acquisition needs Workbench's
+own CurseForge API key and a guided Textual install flow. A complete Prism
+instance ZIP selected in Textual is the interim import route; the published
+pack ZIP contains only external file IDs
 and overrides. ZIP import does not establish the fresh-acquisition release gate.
 
 For a direct wheelhouse installation, use Python 3.12–3.14 and a reviewed

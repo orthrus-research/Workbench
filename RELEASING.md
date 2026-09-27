@@ -112,15 +112,17 @@ distribution or version. See [native assembly details](packaging/README.md).
 
 ## Prepare the one-command Linux bundle
 
-This is the next-bundle plan, not a claim about the published September 23
-preview. Serve the generated release-bound hook at the site's stable entry
-point after its exact bundle is published:
+The [0.1.2 Supersymmetry client pre-release](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-0.1.2)
+is the current one-command Linux x64 edition. Its release-bound hook is served
+at the site's stable entry point. The pre-release discloses its validation
+limits; the procedure below describes the target for later releases.
 
 ```sh
 curl -fsSL https://susy.work/install.sh | bash
 ```
 
-Use the exact reviewed tag and hook SHA-256 in release notes after publication.
+The 0.1.2 release carries the exact hook and archive hashes in `SHA256SUMS`.
+For later editions, bind the reviewed tag and hook SHA-256 in release notes.
 Offer a download-and-inspect variant beside the one-line command, which needs
 the caller's `pipefail` setting to report an initial `curl` failure reliably.
 The hook contains the archive URL and SHA-256, plus a separately pinned
@@ -181,8 +183,8 @@ before advertising them.
 4. Retain the exact hook, archive, checksum file, source revision, host facts,
    commands and results in a separate qualification receipt. Publish only those
    already qualified bytes after the ordinary release controls and review are
-   satisfied. Verify the public downloads and their hashes before replacing
-   the README's preview entry point.
+   satisfied. Verify public downloads and their hashes before updating the
+   README's current release entry point.
 
 ## Clean-root public history and future updates
 
