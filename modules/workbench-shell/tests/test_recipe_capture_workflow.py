@@ -19,12 +19,13 @@ from threading import Event
 import unittest
 from unittest.mock import patch
 
-from workbench_api import ExecutionContext
+from workbench_api import ExecutionContext, processes as process_port
+from workbench_api import host_filesystem as filesystem_port
 from workbench_api.processes import ProcessError, read_captured_process as api_read_captured_process
 from workbench_api.managed_attempts import managed_attempts_scope
 from workbench_api.fixture_selections import fixture_selections_scope
 from workbench_atlas_categorical_graph import CategoricalGraphBundleBuilder, edge_record, node_record
-from workbench_core import check_storage, runtime_java, tool_process
+from workbench_core import check_storage, durable_records, host_filesystem as core_filesystem, runtime_java, tool_process
 from workbench_core.fixture_selection_port import CoreFixtureSelections
 from workbench_core.managed_attempts import CoreManagedAttempts
 from workbench_core.storage.registered import ResourceCatalog
@@ -168,6 +169,10 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.cancelled = Event()
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
+        # Exercise the actual public filesystem API with the real Core host,
+        # scoped to this direct owner test instead of depending on suite order.
+        self.stack.enter_context(patch.object(filesystem_port, '_host', core_filesystem))
+        self.stack.enter_context(patch.object(process_port, '_host', tool_process))
         self.evidence = self.root / 'Selected evidence'
         self.config = self.root / 'User config'
         self.stack.enter_context(managed_attempts_scope(CoreManagedAttempts(
@@ -240,6 +245,20 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.assertEqual('registered-unverified', result['state'])
         self.assertEqual(str(self.java), result['selection']['java_home'])
         self.assertTrue((self.config / 'recipe-fixtures-v1.json').is_file())
+
+    def test_direct_shell_entry_binds_core_filesystem_host(self):
+        from workbench_api import host_filesystem as filesystem_port
+        from workbench_core import host_filesystem as core_filesystem, host_services
+        from workbench_shell import cli as shell_cli
+
+        with (patch.object(host_services, 'install_local_host_services',
+                           wraps=host_services.install_local_host_services) as install,
+              patch.object(sys, 'stdout', StringIO()),
+              self.assertRaises(SystemExit) as stopped):
+            shell_cli.main(['--help'])
+        self.assertEqual(0, stopped.exception.code)
+        install.assert_called_once()
+        self.assertIs(core_filesystem, filesystem_port._filesystem())
 
     def prepare(self, request=None):
         request = request or self.plan()
@@ -573,6 +592,10 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         result = self.run_capture()
         self.assertEqual(('complete', 1), (result['state'], result['summary']['recipe_count']))
         attempt = self.attempt(result)
+        input_path = attempt / 'input-manifest.json'
+        input_raw = input_path.read_bytes()
+        self.assertEqual(check_storage.canonical(json.loads(input_raw)) + b'\n', input_raw)
+        self.assertEqual(sha256(input_raw).hexdigest(), result['input_manifest']['sha256'])
         self.assertEqual(b'eula=true\n', (attempt / 'execution/eula.txt').read_bytes())
         self.assertEqual(b'eula=false\n', (self.runtime / 'eula.txt').read_bytes())
         (self.source / 'groovy/recipes.groovy').write_bytes(b'next saved edit')
@@ -584,6 +607,15 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             attempt / 'process', binding=result['launch_id'],
             expected_id=result['process']['id'],
         )
+        if os.name != 'nt':
+            input_path.chmod(0o644)
+            try:
+                with patch.object(capture, 'read_bounded_single_link_bytes',
+                                  wraps=capture.read_bounded_single_link_bytes) as historical_read:
+                    self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+                historical_read.assert_called_once_with(input_path, byte_limit=32 * 1024**2)
+            finally:
+                input_path.chmod(0o600)
         self.assertEqual(1, self.native.call_count)
         with self.assertRaisesRegex(ValueError, 'already attempted'):
             self.run_capture({'attempt_id': result['attempt_id'], 'id': result['prepared_id']})
@@ -627,6 +659,7 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         result = self.run_capture()
         attempt = self.attempt(result)
         for relative in ('prepared.json', 'launch.json', 'runtime-lock.json', 'protocol.json',
+                         'input-manifest.json',
                          'capture/manifest.json', 'capture/recipes.json',
                          'observer-build/fixture-observer.jar', 'observer-build/compiler/stdout.raw'):
             path = attempt / relative
@@ -643,6 +676,58 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                     finally:
                         path.write_bytes(original)
         self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_input_manifest_duplicate_keys_refuse_historical_readback(self):
+        result = self.run_capture()
+        path = self.attempt(result) / 'input-manifest.json'
+        original = path.read_bytes()
+        try:
+            path.write_bytes(b'{"capture_id":"first","capture_id":"second"}\n')
+            with self.assertRaisesRegex(ValueError, 'duplicate keys'):
+                capture._read_input_manifest(path)
+            with self.assertRaises((OSError, ValueError, ProcessError)):
+                capture.show(self.state, result['attempt_id'])
+        finally:
+            path.write_bytes(original)
+        self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_input_manifest_interruption_keeps_attempt_and_both_stage_shapes(self):
+        original_link = durable_records.os.link
+        original_fsync = durable_records.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                prepared = self.prepare()
+                attempt = self.attempt(prepared)
+                input_path = attempt / 'input-manifest.json'
+                old_stage = attempt / ('.record-' + 'a' * 32)
+                new_stage = attempt / '.input-manifest.json.0123456789abcdef.tmp'
+                old_stage.write_bytes(b'old stage remains')
+                new_stage.write_bytes(b'new stage remains')
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    if Path(target) == input_path:
+                        raise OSError('synthetic before-link interruption')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    if Path(directory) == attempt and input_path.exists():
+                        raise OSError('synthetic after-link interruption')
+                    return original_fsync(directory)
+
+                target = ('os.link' if moment == 'before-link' else 'fsync_directory')
+                replacement = interrupt_link if moment == 'before-link' else interrupt_flush
+                with patch.object(durable_records.os if target == 'os.link' else durable_records,
+                                  'link' if target == 'os.link' else target, side_effect=replacement):
+                    with self.assertRaisesRegex(OSError, 'synthetic .* interruption'):
+                        self.run_capture(prepared)
+                self.assertEqual(moment == 'after-link-before-flush', input_path.exists())
+                self.assertEqual(b'old stage remains', old_stage.read_bytes())
+                self.assertEqual(b'new stage remains', new_stage.read_bytes())
+                self.assertTrue((attempt / 'run-started.json').is_file())
+                self.assertEqual('failed', capture.show(self.state, prepared['attempt_id'])['state'])
+                with self.assertRaisesRegex(ValueError, 'already attempted'):
+                    self.run_capture(prepared)
+                self.native.assert_not_called()
 
     def test_show_cancellation_reaches_graph_verification(self):
         result = self.run_capture()

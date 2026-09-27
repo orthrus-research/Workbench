@@ -10,6 +10,7 @@ import re
 from threading import Event
 
 from workbench_api.processes import capture_process, ProcessError, open_process_output, read_captured_process
+from workbench_api.host_filesystem import publish_immutable_bytes, read_bounded_single_link_bytes
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
 from workbench_api.managed_attempts import managed_attempts
 from workbench_api.fixture_selections import fixture_selections
@@ -27,6 +28,7 @@ PREPARED = 'workbench-developer-recipe-capture-prepared-v1'
 RESULT = 'workbench-developer-recipe-capture-result-v1'
 _CUSTODY = ('request.json', 'prepared.json', 'launch.json', 'runtime-lock.json',
             'protocol.json', 'input-manifest.json', 'audit.json')
+_INPUT_MANIFEST_BYTE_LIMIT = 32 * 1024**2
 
 
 def _digest(value):
@@ -66,6 +68,30 @@ def _read(attempt, name, kind, *, request_id=None):
             or request_id is not None and value.get('request_id') != request_id):
         raise ValueError('retained capture record identity changed')
     return value
+
+
+def _write_input_manifest(path, value):
+    # Keep the V1 canonical JSON and newline while Core owns publication.
+    publish_immutable_bytes(
+        path, storage.canonical(value) + b'\n',
+        byte_limit=_INPUT_MANIFEST_BYTE_LIMIT,
+    )
+
+
+def _read_input_manifest(path):
+    # Historical V1 files need the ordinary-file reader, including prior modes.
+    storage.ordinary(path)
+    raw = read_bounded_single_link_bytes(path, byte_limit=_INPUT_MANIFEST_BYTE_LIMIT)
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise storage.CheckStorageError('managed record has duplicate keys')
+            result[key] = value
+        return result
+
+    return json.loads(raw, object_pairs_hook=unique)
 
 
 def _owner(profile):
@@ -355,7 +381,7 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
                 capture_id=identity, launch_id=identity + '-launch', candidate_lock_sha256=_digest(dependency_lock),
                 adapter_profile_sha256=_digest(protocol), observation_preparation=request['descriptor']['observation_preparation'])
             input_path = attempt / 'input-manifest.json'
-            storage.write_json(input_path, manifest)
+            _write_input_manifest(input_path, manifest)
             launch = owner.plan_capture_launch(manifest, runtime_files=execution_files,
                 artifact_paths=request['artifact_paths'], observer_path=request['descriptor']['observer_path'],
                 observer_build=prepared['observer_build'], java=game_java, runtime_root=execution_root / 'execution',
@@ -427,7 +453,7 @@ def show(root, identity, *, cancelled=None):
                     raise ValueError('retained capture evidence changed')
             prepared = _read(attempt, 'prepared.json', 'recipe-capture-prepared', request_id=request['id'])
             launch = storage.read_json(attempt / 'launch.json')
-            manifest = storage.read_json(attempt / 'input-manifest.json')
+            manifest = _read_input_manifest(attempt / 'input-manifest.json')
             capture_manifest = storage.read_json(attempt / 'capture/manifest.json')
             if (prepared['id'] != result['prepared_id'] or launch['id'] != result['launch_id']
                     or manifest['candidate_lock_sha256'] != _digest(storage.read_json(attempt / 'runtime-lock.json'))
