@@ -8,7 +8,8 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, Mock
 
-from textual.widgets import Button, Input, OptionList, Select, Static
+from textual.containers import VerticalScroll
+from textual.widgets import Button, DataTable, Input, OptionList, Select, Static
 
 from workbench_tui.app import PackInstanceScreen, ReviewModal, SetupScreen, WorkbenchApp
 from workbench_tui.core_client import CoreClient, CoreClientError
@@ -142,6 +143,28 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertTrue(screen.query_one("#setup-profile", Input).display)
 
+    async def test_dependency_table_appears_only_when_core_reports_rows(self) -> None:
+        core = fake_core("/home/test/workspace")
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(58, 24)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.view.setup = None
+            app.push_screen(SetupScreen(app.view, initial_workspace="/home/test/workspace"))
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                               and bool(app.screen.query("#setup-dependencies")))
+            screen = app.screen
+            table = screen.query_one("#setup-dependencies", DataTable)
+            self.assertFalse(table.display)
+            self.assertIn("Choose a workspace, then Check selection.",
+                          str(screen.query_one("#setup-status", Static).content))
+            core.setup_check.return_value = {
+                **core.setup_check.return_value,
+                "dependencies": [{"id": "java", "label": "Java", "state": "ready",
+                                  "detail": "Installed JDK"}],
+            }
+            screen.query_one("#setup-check", Button).press()
+            await self._settle(pilot, lambda: table.display and table.row_count == 1)
+
     async def test_explicit_profile_path_starts_in_developer_setup(self) -> None:
         app = WorkbenchApp(
             fake_core("/home/test/workspace"),
@@ -206,6 +229,23 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
             self.assertIs(app.focused, modal.query_one("#review-confirm", Button))
             await pilot.press("enter")
             await self._settle(pilot, lambda: app.screen is not modal)
+
+    async def test_review_modal_pages_long_text_without_changing_choice(self) -> None:
+        app = WorkbenchApp(fake_core("/home/test/workspace"))
+        async with app.run_test(size=(58, 24)) as pilot:
+            modal = ReviewModal("Read this plan", "\n".join(
+                f"Plan detail {index}" for index in range(80)
+            ), confirm_label="Apply")
+            app.push_screen(modal)
+            await self._settle(pilot, lambda: app.screen is modal
+                               and bool(modal.query("#review-scroll")))
+            scroll = modal.query_one("#review-scroll", VerticalScroll)
+            self.assertIs(app.focused, modal.query_one("#review-cancel", Button))
+            await pilot.press("pagedown")
+            await self._settle(pilot, lambda: scroll.scroll_y > 0)
+            self.assertIs(app.focused, modal.query_one("#review-cancel", Button))
+            await pilot.press("pageup")
+            await self._settle(pilot, lambda: scroll.scroll_y == 0)
 
     async def test_escape_returns_from_setup_navigation(self) -> None:
         app = WorkbenchApp(fake_core("/home/test/workspace"))

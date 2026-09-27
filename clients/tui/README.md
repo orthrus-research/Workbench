@@ -42,8 +42,14 @@ neither command needs to be on the global `PATH`.
 ## Configuration and moving to a new installation
 
 The wheel supplies the default Workbench theme, layout, key bindings and CSS.
-Its default palette is black and charcoal with white accents. The landing page
-uses a terminal-cell version of the supplied mark, derived from
+Its default palette is black and charcoal with white text, straw guidance and
+teal actions and focus. Arrow keys move through lists and fields; Enter opens
+or edits the selected item, Enter confirms an edit, and Escape returns. The
+header shows the active screen beneath the Workbench name. The compact layout
+is checked at 64 columns by 22 rows for an approximately 800×600 terminal
+window; the exact cell count depends on the user's font and window chrome.
+Wider windows use a two-column layout. The
+landing page uses a terminal-cell version of the supplied mark, derived from
 `assets/workbench-mark.jpg`. Orthrus Research owns and licenses this artwork
 and its terminal rendering under the repository's `LGPL-3.0-only` license;
 the image is kept as source artwork and is not a runtime image dependency.

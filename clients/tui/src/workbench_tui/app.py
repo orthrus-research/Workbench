@@ -18,6 +18,7 @@ from textual import work
 from textual import events
 from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
+from textual.content import Content
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.theme import Theme
@@ -196,7 +197,8 @@ class ReviewModal(ModalScreen[bool]):
             yield Static(self.heading, id="review-heading")
             with VerticalScroll(id="review-scroll"):
                 yield Static(Text(self.body), id="review-body")
-            yield Static("←/→ Choose  ·  Enter Confirm  ·  Esc Cancel", classes="keyboard-hint")
+            yield Static("PgUp/Dn Read · ←/→ Choose · Enter OK · Esc Back",
+                         classes="keyboard-hint")
             with Horizontal(classes="button-row"):
                 yield Button("Cancel", id="review-cancel")
                 yield Button(self.confirm_label, id="review-confirm", variant="warning")
@@ -205,7 +207,11 @@ class ReviewModal(ModalScreen[bool]):
         self.query_one("#review-cancel", Button).focus()
 
     def on_key(self, event: events.Key) -> None:
-        if event.key in {"right", "down"}:
+        if event.key in {"pageup", "pagedown"}:
+            scroll = self.query_one("#review-scroll", VerticalScroll)
+            (scroll.scroll_page_up if event.key == "pageup" else scroll.scroll_page_down)()
+            event.stop()
+        elif event.key in {"right", "down"}:
             self.query_one("#review-confirm", Button).focus()
             event.stop()
         elif event.key in {"left", "up"}:
@@ -385,19 +391,17 @@ class ReleaseUpdateModal(ModalScreen[str]):
                 else ""
             )
             explanation = (
-                "GitHub lists different client archive bytes under the same release tag.\n"
+                "GitHub now serves different archive bytes under this same release tag.\n"
                 + digest_detail
-                + "\nUse published archive asks Core to verify and retain those exact bytes, "
-                "then saves them as your pack choice. Your current workspace files are "
-                "not changed. Ignore this publication keeps your saved choice and "
-                "suppresses only this exact published release identity."
+                + "\nUse published archive downloads and checks those bytes, then saves "
+                "them as your pack choice. Your workspace stays unchanged. Ignore "
+                "keeps your saved choice and stops prompting for those bytes."
             )
         else:
             explanation = (
-                "Version up asks Core to verify and retain the release archive, then "
-                "saves it as your pack choice. Your current workspace files are not changed. "
-                "Ignore this release keeps your saved choice and suppresses only this "
-                "exact published release identity."
+                "Version up downloads and checks this archive, then saves it as your "
+                "pack choice. Your workspace stays unchanged. Ignore keeps your "
+                "current choice and stops prompting for this release."
             )
         self.body = (
             f"Saved pack: {check['selected_version']}\n"
@@ -589,6 +593,8 @@ class InstancePathPicker(ModalScreen[Path | None]):
 class PackInstanceScreen(KeyboardFormScreen):
     """Collect a complete Prism ZIP and install choices through Core."""
 
+    SUB_TITLE = "Set up Supersymmetry"
+
     KEYBOARD_CANCEL = "pack-instance-back"
 
     KEYBOARD_FIELDS = (
@@ -651,7 +657,7 @@ class PackInstanceScreen(KeyboardFormScreen):
                 ("Import a complete Prism instance ZIP", "zip"),
             ], value=self.source_mode, allow_blank=False, id="pack-source-mode")
             yield Static("Checking official download availability…", id="pack-source-note")
-            yield Checkbox("Include the pack's optional mod", value=True,
+            yield Checkbox("Include optional mods", value=True,
                            id="pack-fresh-optional")
             yield Static("Complete Prism instance ZIP", classes="field-label", id="pack-zip-label")
             with Horizontal(classes="instance-path-row", id="pack-zip-row"):
@@ -673,7 +679,7 @@ class PackInstanceScreen(KeyboardFormScreen):
             yield Static("3  PRISM LOCATION", classes="field-label")
             with Horizontal(classes="instance-path-row"):
                 yield Input(value=launcher, id="pack-prism-root")
-                yield Button("Browse folders", id="pack-prism-browse")
+                yield Button("Browse", id="pack-prism-browse")
             if self.installations:
                 yield Static("Installed instances", classes="field-label")
                 yield Select([
@@ -752,23 +758,32 @@ class PackInstanceScreen(KeyboardFormScreen):
         self.query_one("#pack-installed-actions", Horizontal).display = installed
         if official:
             note = (
-                "Official download is waiting for Workbench's CurseForge access. "
-                "Press Enter on Pack source to choose a complete Prism ZIP, or check saved files."
+                "Official download is unavailable right now. Saved files can still be checked."
                 if self.provider_unavailable else
-                "Workbench's file provider is configured. Review the release to try the download."
+                "Official download is available."
             ) if self.provider_checked else "Checking official download access…"
         else:
             note = (
-                "Official download needs Workbench access. Import a complete Prism ZIP, "
-                "or switch back to check saved files."
+                "Official download is unavailable right now. A complete Prism ZIP can be imported."
                 if self.provider_checked and self.provider_unavailable else
-                "Choose a complete Prism instance ZIP with its game files."
+                "Choose a complete Prism ZIP containing the game files."
             )
         if self.provider_problem and official:
             note = f"Could not check download access: {self.provider_problem}. You can check saved files."
         if saved.get("source_plan_id") and self.choice.get("source_state") == "retained" and not retained:
             note += " A source from the other route is saved; switch back to install it."
         self.query_one("#pack-source-note", Static).update(note)
+
+    def _source_instruction(self) -> str:
+        official = self.query_one("#pack-source-mode", Select).value != "zip"
+        has_workspace = bool(self.workspaces.get("entries"))
+        if not has_workspace:
+            return "Add a workspace, then choose your pack files."
+        if not official:
+            return "Choose a complete Prism ZIP, then Import complete ZIP."
+        if self.provider_unavailable:
+            return "Choose Check saved official files, or switch to ZIP import."
+        return "Choose Download game files to prepare the published release."
 
     @work(exclusive=True, group="pack-provider-preflight")
     async def check_official_availability(self) -> None:
@@ -782,8 +797,9 @@ class PackInstanceScreen(KeyboardFormScreen):
         self.provider_checked = True
         if self.provider_unavailable and not self.choice["choice"].get("source_plan_id"):
             self.query_one("#pack-source-mode", Select).value = "zip"
+        if not self.choice["choice"].get("source_plan_id"):
             self.query_one("#pack-instance-status", Static).update(
-                "Official download is unavailable. Choose a complete Prism ZIP to continue."
+                self._source_instruction()
             )
         self._update_source_mode()
 
@@ -832,6 +848,10 @@ class PackInstanceScreen(KeyboardFormScreen):
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "pack-source-mode":
             self._update_source_mode()
+            if self.provider_checked and not self.choice["choice"].get("source_plan_id"):
+                self.query_one("#pack-instance-status", Static).update(
+                    self._source_instruction()
+                )
         elif event.select.id == "pack-installed-choice" and isinstance(event.value, str):
             self.install_plan_id = event.value
 
@@ -1152,7 +1172,7 @@ class PackInstanceScreen(KeyboardFormScreen):
                  f"Download {remaining} selected game files?"),
                 f"Published pack: {progress['release_version']}\n"
                 f"Already retained: {ready}/{total}\n"
-                f"Optional mod: {'included' if optional_mode == 'default' else 'omitted'}\n\n"
+                f"Optional mods: {'included' if optional_mode == 'default' else 'omitted'}\n\n"
                 + ("Core will verify and compose the saved files into a source for installation."
                  if remaining == 0 else
                  "Core will download each authorized file, verify it, and retain progress "
@@ -1386,6 +1406,7 @@ class ResultScreen(Screen[None]):
     def __init__(self, heading: str, output: str) -> None:
         super().__init__()
         self.heading = heading
+        self.sub_title = heading
         self.output = output
 
     def compose(self) -> ComposeResult:
@@ -1543,8 +1564,15 @@ def _analysis_summary(owner: str, record: Mapping[str, Any]) -> str:
                 lines.append("More matches exist. Narrow the search or raise its limit.")
         selection = record.get("selection")
         if isinstance(selection, dict):
-            lines.append(f"Selection: {selection.get('semantic_key', selection.get('selection_id', '?'))}")
+            selected_name = _atlas_match_name(selection)
+            if selected_name == selection.get("selection_id"):
+                selected_name = str(selection.get("kind") or "Evidence") + " selection"
+            lines.append(f"Selection: {selected_name}")
             lines.append(f"Kind: {selection.get('kind', '?')}")
+            snippet = selection.get("snippet")
+            if isinstance(snippet, str) and snippet.strip():
+                short = " ".join(snippet.split())
+                lines.append("Source text: " + (short[:157] + "…" if len(short) > 160 else short))
         if record.get("role"):
             lines.append(f"Evidence role: {record['role']}")
         ownership = record.get("ownership")
@@ -1664,6 +1692,7 @@ class AnalysisResultScreen(Screen[None]):
     def __init__(self, heading: str, owner: str, record: Mapping[str, Any]) -> None:
         super().__init__()
         self.heading = heading
+        self.sub_title = heading
         self.owner = owner
         self.record = record
         self.raw = False
@@ -1686,7 +1715,7 @@ class AnalysisResultScreen(Screen[None]):
         if self._can_search_graph():
             hint += " · S Search graph"
         yield Static(hint + " · Esc Back", classes="keyboard-hint")
-        yield RichLog(id="result-log", wrap=True, highlight=False, markup=False,
+        yield RichLog(id="result-log", min_width=1, wrap=True, highlight=False, markup=False,
                       auto_scroll=False)
         with Horizontal(classes="button-row"):
             if self._can_import_atlas():
@@ -1797,6 +1826,8 @@ def _observation_graph_root(record: Mapping[str, Any]) -> Path | None:
 
 class AtlasImportScreen(KeyboardFormScreen):
     """Review one Axiom-owned snapshot before Atlas publishes a new graph."""
+
+    SUB_TITLE = "Open this check in Atlas"
 
     KEYBOARD_CANCEL = "atlas-import-back"
     KEYBOARD_FIELDS = ("atlas-import-output", "atlas-import-side",
@@ -1955,7 +1986,9 @@ def _atlas_search_scope(record: Mapping[str, Any]) -> str:
 class AtlasSearchScreen(Screen[None]):
     """Let one exact search selection open its owner-backed report or links."""
 
-    BINDINGS = [("escape", "back", "Back"), ("b", "browse", "Browse links")]
+    SUB_TITLE = "Atlas recipe search"
+
+    BINDINGS = [("escape", "back", "Back")]
 
     def __init__(self, catalog: Mapping[str, Any], path: str,
                  record: Mapping[str, Any]) -> None:
@@ -1969,10 +2002,21 @@ class AtlasSearchScreen(Screen[None]):
     def core(self) -> CoreClient:
         return self.app.core  # type: ignore[attr-defined]
 
+    def _can_browse(self) -> bool:
+        context = self.record.get("context") or {}
+        return (isinstance(context, dict)
+                and "graph" in str(context.get("context_type", ""))
+                and any(row.get("command_id") == "atlas.recipes-browse"
+                        and _runnable_catalog_action(row)
+                        for row in self.catalog.get("commands", [])
+                        if isinstance(row, dict)))
+
     def compose(self) -> ComposeResult:
         yield Header(icon="W")
         yield Static("Atlas recipe search", classes="screen-heading")
-        yield Static("↑/↓ Choose  ·  Enter Inspect  ·  B Browse links  ·  Esc Back",
+        yield Static("↑/↓ Choose  ·  Enter Inspect  ·  "
+                     + ("B Browse links  ·  " if self._can_browse() else "")
+                     + "Esc Back",
                      classes="keyboard-hint")
         yield Static(_atlas_search_scope(self.record), classes="screen-intro",
                      id="atlas-search-context")
@@ -1982,7 +2026,9 @@ class AtlasSearchScreen(Screen[None]):
                 yield Static("Select a result", id="atlas-search-detail")
                 with Horizontal(classes="button-row"):
                     yield Button("Inspect", id="atlas-search-inspect", disabled=True)
-                    yield Button("Browse links", id="atlas-search-browse", disabled=True)
+                    browse = Button("Browse links", id="atlas-search-browse", disabled=True)
+                    browse.display = self._can_browse()
+                    yield browse
         with Horizontal(classes="button-row"):
             yield Button("Back", id="atlas-search-back")
         yield Footer()
@@ -2010,12 +2056,7 @@ class AtlasSearchScreen(Screen[None]):
         self.selected = rows[index] if isinstance(rows, list) and 0 <= index < len(rows) else None
         selected = self.selected
         self.query_one("#atlas-search-inspect", Button).disabled = selected is None
-        context = self.record.get("context") or {}
-        graph = isinstance(context, dict) and "graph" in str(context.get("context_type", ""))
-        can_browse = graph and any(
-            row.get("command_id") == "atlas.recipes-browse"
-            for row in self.catalog.get("commands", []) if isinstance(row, dict)
-        )
+        can_browse = self._can_browse()
         self.query_one("#atlas-search-browse", Button).disabled = not (selected and can_browse)
         if selected:
             detail = Text()
@@ -2024,7 +2065,7 @@ class AtlasSearchScreen(Screen[None]):
             if selected.get("snippet"):
                 detail.append("\n" + str(selected["snippet"]), style=_DESCRIPTION_COLOR)
             detail.append("\n\nEnter to inspect exact evidence. "
-                          + ("Browse links to follow observed relationships." if graph else
+                          + ("Browse links to follow observed relationships." if can_browse else
                              "This source-only view has no observed links."))
             self.query_one("#atlas-search-detail", Static).update(detail)
 
@@ -2057,6 +2098,11 @@ class AtlasSearchScreen(Screen[None]):
         if not self.query_one("#atlas-search-browse", Button).disabled:
             self.browse_selection()
 
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "b" and self._can_browse():
+            self.action_browse()
+            event.stop()
+
     @work(exclusive=True, group="atlas-follow")
     async def _follow(self, command_id: str) -> None:
         if not self.selected or not isinstance(self.selected.get("selection_id"), str):
@@ -2088,6 +2134,8 @@ class AtlasSearchScreen(Screen[None]):
 class AtlasObservationSearchScreen(KeyboardFormScreen):
     """Explore one admitted Axiom graph through Atlas's read-only query actions."""
 
+    SUB_TITLE = "Atlas observations"
+
     KEYBOARD_CANCEL = "atlas-observation-back"
     KEYBOARD_FIELDS = ("atlas-observation-query", "atlas-observation-search",
                        "atlas-observation-inspect", "atlas-observation-links",
@@ -2113,25 +2161,28 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
     def compose(self) -> ComposeResult:
         yield Header(icon="W")
         yield Static("Atlas observations", classes="screen-heading")
-        yield Static("↑/↓ Choose  ·  Enter Inspect  ·  ← Query  ·  → Actions  ·  Esc Back",
+        yield Static("↑/↓ Select  ·  Enter Edit/Inspect  ·  Esc Back",
                      classes="keyboard-hint")
-        yield Static("Recorded values and links from this Axiom check. They do not prove causes or gameplay behavior.",
+        yield Static("Recorded values and links from this Axiom check; gameplay behavior is unverified.",
                      classes="screen-intro", id="atlas-observation-scope")
         with Horizontal(classes="axiom-path-row"):
+            yield Static("QUERY>", classes="inline-prompt")
             yield Input(placeholder="Material, registration, recipe family…",
                         id="atlas-observation-query")
-            yield Button("Search", id="atlas-observation-search", disabled=True)
+            yield Button("S Search", id="atlas-observation-search", disabled=True)
         yield Static("Verifying this observation graph…", id="atlas-observation-status")
         with Horizontal(id="workflow-body"):
             yield OptionList(id="atlas-observation-results")
             with Vertical(id="workflow-detail-panel"):
                 yield Static("Enter a term and choose Search.", id="atlas-observation-detail")
                 with Horizontal(classes="button-row"):
-                    yield Button("Inspect", id="atlas-observation-inspect", disabled=True)
-                    yield Button("Links", id="atlas-observation-links", disabled=True)
-                    yield Button("More", id="atlas-observation-more", disabled=True)
+                    yield Button("I Inspect", id="atlas-observation-inspect", disabled=True)
+                    yield Button("L Links", id="atlas-observation-links", disabled=True)
+                    more = Button("M More", id="atlas-observation-more", disabled=True)
+                    more.display = False
+                    yield more
         with Horizontal(classes="button-row"):
-            yield Button("Back", id="atlas-observation-back")
+            yield Button("Esc Back", id="atlas-observation-back")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -2149,7 +2200,7 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
                 return
             self.session = session
             self.query_one("#atlas-observation-search", Button).disabled = False
-            status.update("Graph verified. Enter a term and choose Search.")
+            status.update("Graph ready. Enter a query, then press S to search.")
         except (CoreClientError, TimeoutError) as exc:
             self.session_error = str(exc)
             if self.is_mounted:
@@ -2163,7 +2214,8 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
             self.session = None
 
     def on_key(self, event: events.Key) -> None:
-        if isinstance(self.app.focused, OptionList):
+        focused = self.app.focused
+        if isinstance(focused, OptionList):
             if event.key in {"left", "right"}:
                 target = ("atlas-observation-links" if event.key == "right"
                           and not self.query_one("#atlas-observation-links", Button).disabled
@@ -2176,13 +2228,27 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
             elif event.key == "enter":
                 self.follow("atlas.observations-inspect")
                 event.stop()
-            return
+                return
+        if (self._keyboard_editing is None
+                and not isinstance(focused, Input)
+                and event.key in {"s", "i", "l", "m"}):
+            if event.key == "s":
+                self.search()
+            elif event.key == "i":
+                self.follow("atlas.observations-inspect")
+            elif event.key == "l":
+                self.follow("atlas.observations-relationships")
+            elif self.next_cursor:
+                self.search(more=True)
+            event.stop()
         # Textual also dispatches KeyboardFormScreen.on_key for form focus.
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "atlas-observation-query" and event.value.strip() != self.current_query:
             self.next_cursor = None
-            self.query_one("#atlas-observation-more", Button).disabled = True
+            more = self.query_one("#atlas-observation-more", Button)
+            more.disabled = True
+            more.display = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "atlas-observation-back":
@@ -2265,6 +2331,7 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
                        id=str(index)) for index, row in enumerate(self.results)
             ])
             self.query_one("#atlas-observation-more", Button).disabled = not self.next_cursor
+            self.query_one("#atlas-observation-more", Button).display = bool(self.next_cursor)
             status.update(f"{len(self.results)} observations shown" +
                           (" · more available" if self.next_cursor else ""))
             if listing.option_count:
@@ -2327,6 +2394,8 @@ def _axiom_problem(exc: Exception) -> str:
 
 class AxiomHistoryScreen(Screen[None]):
     """Open retained native checks without copying attempt IDs."""
+
+    SUB_TITLE = "Axiom check history"
 
     BINDINGS = [("escape", "back", "Back")]
 
@@ -2430,6 +2499,8 @@ class AxiomHistoryScreen(Screen[None]):
 class AxiomJourneyScreen(KeyboardFormScreen):
     """Keyboard-first native-check setup, execution, and retained results."""
 
+    SUB_TITLE = "Axiom native check"
+
     KEYBOARD_CANCEL = "axiom-back"
     KEYBOARD_FIELDS = (
         "axiom-pack", "axiom-pack-browse", "axiom-engine", "axiom-engine-browse",
@@ -2453,8 +2524,7 @@ class AxiomJourneyScreen(KeyboardFormScreen):
         yield Header(icon="W")
         yield Static("Axiom native check", classes="screen-heading")
         yield Static(
-            "Check saved Supersymmetry edits through Core and Axiom. "
-            "The selected pack stays unchanged; results are retained for inspection.",
+            "Check your Supersymmetry source with Axiom. Core keeps the findings for later.",
             classes="screen-intro",
         )
         yield Static("↑/↓ Choose  ·  Enter Edit or Open  ·  Esc Back", classes="keyboard-hint")
@@ -2464,22 +2534,18 @@ class AxiomJourneyScreen(KeyboardFormScreen):
                 yield Input(value=self.view.workspace, placeholder="Choose a checkout containing pack source",
                             id="axiom-pack")
                 yield Button("Browse", id="axiom-pack-browse")
-            yield Static("Axiom engine ZIP or installed engine folder", classes="field-label")
+            yield Static("Axiom engine", classes="field-label")
             with Horizontal(classes="axiom-path-row"):
-                yield Input(placeholder="Choose an engine source when preparing setup",
+                yield Input(placeholder="Bundled ZIP or installed engine folder",
                             id="axiom-engine")
                 yield Button("Browse", id="axiom-engine-browse")
-            yield Static("Java executable · optional if already saved in Core", classes="field-label")
+            yield Static("Java executable (optional)", classes="field-label")
             with Horizontal(classes="axiom-path-row"):
-                yield Input(placeholder="Use saved Java or select an installed JDK",
+                yield Input(placeholder="Saved Java is used if blank",
                             id="axiom-java-path")
                 yield Button("Find", id="axiom-java-detect")
-            yield Static(
-                "Check setup → choose engine → Prepare → Run check. "
-                "Java can come from the saved Workbench choice or this field.",
-                id="axiom-guide",
-            )
-            yield Static("Select the pack source checkout, then check setup.", id="axiom-status")
+            yield Static("Check setup → Prepare if needed → Run check", id="axiom-guide")
+            yield Static("Choose a source checkout, then Check setup.", id="axiom-status")
             with Horizontal(classes="button-row"):
                 yield Button("Check setup", id="axiom-check-setup")
                 yield Button("Prepare", id="axiom-prepare", disabled=True)
@@ -2769,6 +2835,8 @@ class AxiomJourneyScreen(KeyboardFormScreen):
 class WorkspaceRegisterScreen(KeyboardFormScreen):
     """Register one named workspace through Core's revisioned user choices."""
 
+    SUB_TITLE = "Add a workspace"
+
     KEYBOARD_CANCEL = "workspace-register-cancel"
 
     KEYBOARD_FIELDS = (
@@ -2856,6 +2924,8 @@ class WorkspaceRegisterScreen(KeyboardFormScreen):
 
 class WorkspaceChoicesScreen(KeyboardFormScreen):
     """Edit Core's local profile and Java candidates for one named workspace."""
+
+    SUB_TITLE = "Workspace choices"
 
     KEYBOARD_CANCEL = "choice-back"
 
@@ -3212,6 +3282,8 @@ class WorkspaceChoicesScreen(KeyboardFormScreen):
 class EnvironmentImportScreen(KeyboardFormScreen):
     """Present Core's read-only import plan before binding local choices."""
 
+    SUB_TITLE = "Import environment selection"
+
     KEYBOARD_CANCEL = "import-back"
 
     KEYBOARD_FIELDS = (
@@ -3411,6 +3483,8 @@ class EnvironmentImportScreen(KeyboardFormScreen):
 class ModulesScreen(Screen[None]):
     """Compare DataTable and tabs as module/profile presentation primitives."""
 
+    SUB_TITLE = "Installed capabilities"
+
     BINDINGS = [("escape", "back", "Back")]
 
     def __init__(self, view: EnvironmentView) -> None:
@@ -3519,6 +3593,8 @@ class ModulesScreen(Screen[None]):
 class SetupScreen(KeyboardFormScreen):
     """Guided Core check → plan → explicit apply, with one frozen option set."""
 
+    SUB_TITLE = "Environment setup"
+
     KEYBOARD_CANCEL = "setup-back"
 
     KEYBOARD_FIELDS = (
@@ -3561,7 +3637,7 @@ class SetupScreen(KeyboardFormScreen):
         default_mode = "repair" if has_saved_profile else "full" if has_profile else "review"
         yield Header(icon="W")
         with VerticalScroll(id="setup-scroll"):
-            yield Static("Set up Workbench", classes="screen-heading")
+            yield Static("Environment setup", classes="screen-heading")
             yield Static(
                 "New here? Choose a workspace to explore source and workflows. "
                 "For development, connect an existing workbench.toml. "
@@ -3616,13 +3692,15 @@ class SetupScreen(KeyboardFormScreen):
             with Horizontal(classes="button-row"):
                 yield Button("Browse workflows", id="setup-workflows")
                 yield Button("Back", id="setup-back")
-            yield Static("Choose a setup type and workspace, then review the plan.", id="setup-status")
+            yield Static("Choose a workspace, then Check selection.", id="setup-status")
             yield DataTable(id="setup-dependencies", cursor_type="row")
             yield Static("", id="setup-plan-detail")
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#setup-dependencies", DataTable).add_columns(
+        dependencies = self.query_one("#setup-dependencies", DataTable)
+        dependencies.display = False
+        dependencies.add_columns(
             "Dependency", "State", "Detail / repair"
         )
         self.query_one("#setup-plan-detail", Static).display = False
@@ -3704,6 +3782,7 @@ class SetupScreen(KeyboardFormScreen):
     def _show_dependencies(self, record: Mapping[str, Any]) -> None:
         table = self.query_one("#setup-dependencies", DataTable)
         table.clear()
+        count = 0
         for item in record.get("dependencies", []):
             if not isinstance(item, dict):
                 continue
@@ -3713,6 +3792,8 @@ class SetupScreen(KeyboardFormScreen):
                 str(item.get("state") or "?"),
                 str(detail),
             )
+            count += 1
+        table.display = bool(count)
 
     def _show_plan(self, plan: Mapping[str, Any]) -> None:
         lines = [
@@ -4118,6 +4199,8 @@ class CatalogInputsScreen(ModalScreen[dict[str, Any] | None]):
 class WorkflowsScreen(Screen[None]):
     """Present installed catalog actions this Textual client can run."""
 
+    SUB_TITLE = "Workflows"
+
     def __init__(self, view: EnvironmentView) -> None:
         super().__init__()
         self.view = view
@@ -4129,7 +4212,7 @@ class WorkflowsScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header(icon="W")
-        yield Static("Workbench workflows", classes="screen-heading")
+        yield Static("Workflows", classes="screen-heading")
         yield Static(
             "Choose an action to run. This list shows actions Textual can collect "
             "and launch here.",
@@ -4326,6 +4409,7 @@ class WorkflowsScreen(Screen[None]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "workflow-search":
+            event.stop()
             self.query_one("#workflow-list", OptionList).focus()
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
@@ -4419,6 +4503,7 @@ class WorkflowsScreen(Screen[None]):
 
 
 class HomeScreen(Screen[None]):
+    SUB_TITLE = "Home"
     def on_resize(self, event: events.Resize) -> None:
         self.app._size_brand()  # type: ignore[attr-defined]
 
@@ -4442,13 +4527,19 @@ _HOME_ACTION_HELP = {
 class WorkbenchApp(App[None]):
     CSS_PATH = "workbench.tcss"
     TITLE = "Workbench"
-    SUB_TITLE = "Developer environment"
-    HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (64, "-wide")]
+    SUB_TITLE = ""
+    HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (80, "-wide")]
     BINDINGS = [
         ("ctrl+t", "toggle_clock", "Clock"),
         ("r", "refresh_environment", "Refresh"),
         ("q", "quit", "Quit"),
     ]
+
+    def format_title(self, title: str, sub_title: str) -> Content:
+        if not sub_title:
+            return Content(title)
+        accent = _DESCRIPTION_COLOR if self.current_theme.dark else self.current_theme.primary
+        return Content.assemble((title, "bold"), "\n", (sub_title, f"bold {accent}"))
 
     def get_default_screen(self) -> Screen[None]:
         return HomeScreen(id="_default")
@@ -4526,7 +4617,7 @@ class WorkbenchApp(App[None]):
         home = self.screen_stack[0]
         if not home.query("#home-panels"):
             return
-        home.set_class(self.size.width < 64, "narrow-brand")
+        home.set_class(self.size.width < 80, "narrow-brand")
 
     def _remember_theme(self, theme: Theme) -> None:
         if theme.name == self.preferences.theme or (
@@ -4628,12 +4719,12 @@ class WorkbenchApp(App[None]):
             return
         approved = await self.push_screen_wait(ReviewModal(
             f"Prepare Supersymmetry {version}?",
-            ("The saved archive belongs to another Workbench state root. "
-             "Core will prepare a verified copy in the current state root.\n\n"
+            ("This release was saved under another Workbench location. "
+             "A checked copy will be prepared here.\n\n"
              if choice["artifact_state"] == "other_root" else "")
-            + f"Core will download and verify the saved published client archive "
-            f"({selected['asset_size'] / (1024 * 1024):.1f} MiB), then retain it "
-            "in Workbench's stable artifact store. Your workspace files will not change.",
+            + "Workbench will download and check the published pack ZIP "
+            f"({selected['asset_size'] / (1024 * 1024):.1f} MiB), then keep it in your "
+            "Workbench files. Your workspace files will not change.",
             confirm_label="Prepare verified archive",
         ))
         if not approved:

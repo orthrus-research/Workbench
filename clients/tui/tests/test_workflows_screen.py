@@ -90,6 +90,31 @@ class WorkflowInteractionTests(unittest.IsolatedAsyncioTestCase):
             core.open_document.assert_awaited_once()
             core.run_reviewed_command.assert_not_awaited()
 
+    async def test_search_enter_focuses_results_without_opening_an_action(self) -> None:
+        core = catalog_core()
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(58, 24)) as pilot:
+            await self._settle(pilot, lambda: app.view.catalog is not None)
+            app.open_workflows()
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkflowsScreen))
+            screen = app.screen
+            await self._settle(pilot, lambda: bool(screen.query("#workflow-list"))
+                               and app.focused is screen.query_one(
+                                   "#workflow-list", OptionList))
+            await pilot.press("/")
+            search = screen.query_one("#workflow-search", Input)
+            self.assertIs(app.focused, search)
+            search.value = "manuals"
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: app.focused is screen.query_one(
+                "#workflow-list", OptionList))
+            self.assertIs(app.screen, screen)
+            core.open_document.assert_not_awaited()
+            core.command_review.assert_not_awaited()
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
+            core.open_document.assert_awaited_once()
+
     async def test_read_only_action_collects_required_input_before_review(self) -> None:
         core = catalog_core()
         action = {

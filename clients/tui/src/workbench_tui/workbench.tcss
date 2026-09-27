@@ -9,10 +9,165 @@ Screen {
 Header {
     background: $background;
     color: $primary;
+    height: 3;
+    border-bottom: solid $secondary;
+}
+
+/* Two text rows and a rule use the same space as the former separate heading. */
+Header HeaderIcon {
+    width: 3;
+    padding: 0 1;
+    color: $metadata;
+    content-align: left top;
+}
+
+Header HeaderTitle {
+    height: 2;
+    padding: 0 1;
+    content-align: left top;
+    text-wrap: nowrap;
+}
+
+Header HeaderClock {
+    content-align: center top;
+}
+
+.screen-heading {
+    display: none;
 }
 
 Footer {
     background: $background;
+}
+
+Screen.-narrow FooterKey.-command-palette {
+    display: none;
+}
+
+/* Keep controls on the terminal grid.  Focus uses inverse video, as a DOS
+   menu would, while the amber and teal text distinguish actions from data. */
+Button {
+    width: auto;
+    min-width: 0;
+    height: 1;
+    min-height: 1;
+    padding: 0 1;
+    border: none !important;
+    background: $background !important;
+    color: $metadata !important;
+    text-style: bold;
+}
+
+Button.-primary, Button.-warning, Button.-success {
+    color: $description !important;
+}
+
+Button:hover {
+    background: $panel !important;
+    color: $description !important;
+}
+
+Button:focus, Button.keyboard-selected, Button.-active {
+    background: $metadata !important;
+    color: $background !important;
+}
+
+Button:disabled {
+    background: $background !important;
+    color: $foreground-muted !important;
+    text-opacity: 1 !important;
+    text-style: none;
+}
+
+Input {
+    height: 1;
+    min-height: 1;
+    padding: 0 1;
+    border: none !important;
+    background: $background;
+    color: $foreground;
+}
+
+Input:focus, Input.keyboard-editing {
+    background: $panel;
+    color: $description;
+    background-tint: transparent;
+}
+
+Input.keyboard-selected {
+    background: $panel;
+    color: $metadata;
+}
+
+Input > .input--placeholder, Input > .input--suggestion {
+    color: $foreground-muted;
+}
+
+OptionList {
+    background: $background;
+    border: solid $secondary;
+    padding: 0 1;
+}
+
+OptionList:focus {
+    border: solid $metadata;
+    background-tint: transparent;
+}
+
+OptionList > .option-list--option-highlighted,
+OptionList:focus > .option-list--option-highlighted {
+    background: $metadata;
+    color: $background;
+    text-style: bold;
+}
+
+OptionList > .option-list--option-hover {
+    background: $panel;
+}
+
+DataTable {
+    background: $background;
+}
+
+DataTable:focus {
+    background-tint: transparent;
+}
+
+DataTable:focus > .datatable--cursor {
+    background: $metadata;
+    color: $background;
+}
+
+Select > SelectCurrent,
+Select:focus > SelectCurrent {
+    border: none !important;
+    background: $background;
+    padding: 0 1;
+}
+
+Select:focus > SelectCurrent {
+    background: $panel;
+    background-tint: transparent;
+}
+
+Select.keyboard-selected > SelectCurrent {
+    background: $metadata;
+    color: $background;
+}
+
+Select.keyboard-selected > SelectCurrent Static#label,
+Select.keyboard-selected > SelectCurrent .arrow {
+    color: $background;
+}
+
+Select > SelectOverlay {
+    background: $background;
+    border: solid $metadata;
+}
+
+Checkbox {
+    background: $background;
+    border: none !important;
 }
 
 #home-scroll {
@@ -138,21 +293,11 @@ Screen.narrow-brand #actions-panel {
 }
 
 .keyboard-selected {
-    outline: solid $primary;
-}
-
-Select.keyboard-selected > SelectCurrent {
-    border: solid $primary;
-    background: $primary;
-}
-
-Select.keyboard-selected > SelectCurrent Static#label,
-Select.keyboard-selected > SelectCurrent .arrow {
-    color: $background;
+    outline: none;
 }
 
 .keyboard-editing {
-    outline: double $warning;
+    outline: none;
 }
 
 #keyboard-choice-list {
@@ -250,7 +395,7 @@ Select.keyboard-selected > SelectCurrent .arrow {
 }
 
 .button-row Button {
-    margin-right: 1;
+    margin-right: 2;
 }
 
 #setup-status {
@@ -268,7 +413,7 @@ Select.keyboard-selected > SelectCurrent .arrow {
     height: auto;
     min-height: 4;
     padding: 1 2;
-    background: $panel;
+    background: $background;
     border: solid $secondary;
 }
 
@@ -289,8 +434,8 @@ Select.keyboard-selected > SelectCurrent .arrow {
 
 .inventory-detail-panel {
     width: 1fr;
-    background: $panel;
-    border: solid $secondary;
+    background: $background;
+    border-left: solid $secondary;
     padding: 1;
     overflow-x: hidden;
 }
@@ -312,9 +457,9 @@ Select.keyboard-selected > SelectCurrent .arrow {
 
 #workflow-detail-panel {
     width: 2fr;
-    background: $panel;
-    border: solid $secondary;
-    padding: 1;
+    background: $background;
+    border-left: solid $secondary;
+    padding: 0 1;
 }
 
 #workflow-detail {
@@ -337,7 +482,7 @@ AtlasObservationSearchScreen #atlas-observation-detail {
     border: solid $secondary;
     margin: 1 2;
     padding: 1;
-    background: $panel;
+    background: $background;
     overflow-x: hidden;
 }
 
@@ -355,7 +500,21 @@ AtlasObservationSearchScreen #atlas-observation-detail {
 }
 
 .axiom-path-row {
-    height: 3;
+    height: 1;
+}
+
+.axiom-path-row .field-label {
+    width: auto;
+    height: 1;
+    margin: 0;
+    color: $description;
+}
+
+.axiom-path-row .inline-prompt {
+    width: auto;
+    height: 1;
+    color: $description;
+    text-style: bold;
 }
 
 .axiom-path-row Input {
@@ -364,6 +523,16 @@ AtlasObservationSearchScreen #atlas-observation-detail {
 
 .axiom-path-row Button {
     width: 12;
+    margin-left: 1;
+}
+
+AtlasObservationSearchScreen #atlas-observation-query {
+    width: 1fr;
+    min-width: 0;
+}
+
+AtlasObservationSearchScreen #atlas-observation-search {
+    width: auto;
     margin-left: 1;
 }
 
@@ -400,7 +569,7 @@ ReviewModal, ReleaseUpdateModal, InstancePathPicker, CatalogInputsScreen, Catalo
     width: 76;
     max-width: 95%;
     height: 75%;
-    background: $panel;
+    background: $background;
     border: double $warning;
     padding: 1 2;
 }
@@ -413,6 +582,17 @@ ReviewModal, ReleaseUpdateModal, InstancePathPicker, CatalogInputsScreen, Catalo
 
 #review-scroll {
     height: 1fr;
+}
+
+ReviewModal #review-dialog {
+    height: auto;
+    max-height: 90%;
+}
+
+ReviewModal #review-scroll {
+    height: auto;
+    max-height: 12;
+    overflow-y: auto;
 }
 
 #review-body {
@@ -440,7 +620,7 @@ ReviewModal, ReleaseUpdateModal, InstancePathPicker, CatalogInputsScreen, Catalo
     width: 86;
     max-width: 96%;
     height: 86%;
-    background: $panel;
+    background: $background;
     border: solid $secondary;
     padding: 1 2;
 }
@@ -568,14 +748,14 @@ Screen.-narrow #axiom-journey-body #axiom-status {
 }
 
 Screen.-narrow #axiom-journey-body .button-row {
-    height: 2;
+    height: 1;
 }
 
 Screen.-narrow #axiom-journey-body .button-row Button {
     width: 1fr;
     min-width: 0;
-    height: 2;
-    min-height: 2;
+    height: 1;
+    min-height: 1;
     border: none;
     margin-right: 1;
 }
@@ -625,6 +805,12 @@ Screen.-narrow #workflow-detail-panel {
     min-height: 5;
     max-height: 8;
     padding: 0 1;
+    border-left: none;
+    border-top: solid $secondary;
+}
+
+Screen.-narrow #workflow-detail-panel {
+    padding-bottom: 1;
 }
 
 Screen.-narrow #workflow-detail {
@@ -656,16 +842,45 @@ Screen.-narrow #workflow-detail-panel .button-row {
 }
 
 Screen.-narrow #workflow-detail-panel .button-row Button {
-    width: 1fr;
+    width: auto;
     min-width: 0;
     height: 1;
     min-height: 1;
     border: none;
-    margin-right: 1;
+    margin-right: 2;
+}
+
+#workflow-detail-panel #workflow-back {
+    margin-left: 3 !important;
 }
 
 AtlasObservationSearchScreen.-narrow #workflow-body {
     height: 1fr;
+}
+
+AtlasSearchScreen.-narrow #workflow-body {
+    height: 1fr;
+}
+
+AtlasSearchScreen.-narrow #atlas-search-results {
+    width: 100%;
+    height: 1fr;
+    min-height: 3;
+}
+
+AtlasSearchScreen.-narrow #workflow-detail-panel {
+    width: 100%;
+    height: 6;
+    min-height: 6;
+    max-height: 6;
+    border: none;
+    border-top: solid $secondary;
+    padding: 0 1;
+}
+
+AtlasSearchScreen.-narrow #atlas-search-detail {
+    height: 3;
+    overflow-y: auto;
 }
 
 AtlasObservationSearchScreen.-narrow #atlas-observation-results {
@@ -679,6 +894,8 @@ AtlasObservationSearchScreen.-narrow #workflow-detail-panel {
     height: 5;
     min-height: 5;
     max-height: 5;
+    border: none;
+    border-top: solid $secondary;
     padding: 0 1;
 }
 
@@ -698,6 +915,15 @@ CatalogInputsScreen.-narrow #review-dialog, CatalogValueScreen.-narrow #review-d
     width: 95%;
     height: 90%;
     padding: 0 1;
+}
+
+ReviewModal.-narrow #review-dialog {
+    height: auto;
+    max-height: 90%;
+}
+
+ReviewModal.-narrow #review-scroll {
+    max-height: 8;
 }
 
 ReviewModal.-narrow #review-dialog .button-row, ReleaseUpdateModal.-narrow #review-dialog .button-row,

@@ -4,7 +4,7 @@ import unittest
 
 from textual.widgets import OptionList, Static
 
-from workbench_tui.app import EnvironmentView, WorkbenchApp
+from workbench_tui.app import EnvironmentView, WorkbenchApp, WorkflowsScreen
 from workbench_tui.core_client import CoreClientError
 
 
@@ -14,6 +14,20 @@ class _UnavailableCore:
 
 
 class BrandingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_header_names_the_active_screen_at_800_by_600_size(self) -> None:
+        app = WorkbenchApp(_UnavailableCore())
+        async with app.run_test(size=(64, 22)) as pilot:
+            await pilot.pause()
+            self.assertEqual("Home", app.screen.sub_title)
+            app.view.catalog = {"commands": []}
+            app.open_workflows()
+            await pilot.pause()
+            self.assertIsInstance(app.screen, WorkflowsScreen)
+            self.assertEqual("Workflows", app.screen.sub_title)
+            self.assertNotIn("Developer environment", app.format_title(
+                app.title, app.screen.sub_title or ""
+            ).plain)
+
     async def test_default_controls_are_monochrome_with_straw_and_teal_text(self) -> None:
         app = WorkbenchApp(_UnavailableCore())
         theme = app.get_theme("workbench-dark")
@@ -60,6 +74,10 @@ class BrandingTests(unittest.IsolatedAsyncioTestCase):
                 len("Set up developer environment") + 4,
             )
             self.assertIs(actions, panels.children[0])
+            await pilot.resize_terminal(64, 22)
+            await pilot.pause()
+            self.assertTrue(home.has_class("narrow-brand"))
+            self.assertGreaterEqual(home.query_one("#home-actions").size.width, 50)
             await pilot.resize_terminal(100, 34)
             await pilot.pause()
             self.assertFalse(home.has_class("narrow-brand"))

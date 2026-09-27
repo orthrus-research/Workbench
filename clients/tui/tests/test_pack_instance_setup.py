@@ -339,10 +339,18 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
             screen = app.screen
             self.assertEqual("zip", screen.query_one("#pack-source-mode", Select).value)
             self.assertIn("Official download is unavailable", str(
+                screen.query_one("#pack-source-note", Static).content,
+            ))
+            self.assertIn("Import complete ZIP", str(
                 screen.query_one("#pack-instance-status", Static).content,
             ))
             core.pack_instance_fresh_overrides.assert_not_awaited()
             self.assertFalse(screen.query_one("#pack-zip-import", Button).disabled)
+            screen.query_one("#pack-source-mode", Select).value = "official"
+            await pilot.pause()
+            self.assertIn("Check saved official files", str(
+                screen.query_one("#pack-instance-status", Static).content,
+            ))
 
     async def test_saved_official_files_can_finish_without_provider_access(self) -> None:
         core = fake_core("/home/test/workspace")

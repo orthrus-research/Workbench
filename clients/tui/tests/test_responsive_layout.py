@@ -24,7 +24,7 @@ class _UnavailableCore:
 class ResponsiveLayoutTests(unittest.IsolatedAsyncioTestCase):
     async def test_secondary_screens_fit_narrow_terminals(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            for width, height in ((40, 18), (58, 24)):
+            for width, height in ((40, 18), (58, 24), (64, 22)):
                 with self.subTest(size=(width, height)):
                     app = WorkbenchApp(
                         _UnavailableCore(),

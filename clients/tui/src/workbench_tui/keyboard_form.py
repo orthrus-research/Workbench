@@ -19,6 +19,7 @@ class ChoicePicker(ModalScreen[Any | None]):
     def __init__(self, label: str, options: list[tuple[str, Any]], current: Any) -> None:
         super().__init__()
         self.label = label
+        self.sub_title = label
         self.options = options
         self.current = current
 

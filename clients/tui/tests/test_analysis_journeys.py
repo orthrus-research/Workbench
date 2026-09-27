@@ -37,6 +37,20 @@ def owner_output(command_id: str, record: dict) -> CommandOutput:
 
 
 class AnalysisResultTests(unittest.TestCase):
+    def test_source_inspection_shows_location_without_opaque_selection_id(self) -> None:
+        opaque = "source-text:" + "a" * 64 + ":groovy%2Fclasses%2FCoolant.groovy:245:252"
+        summary = _analysis_summary("atlas", {
+            "format": "workbench-atlas-recipe-health-report-v1",
+            "context": {"context_type": "source-only-checkout", "root": "/saved-pack"},
+            "selection": {"kind": "source-occurrence", "selection_id": opaque,
+                          "source_path": "groovy/classes/Coolant.groovy",
+                          "line": 10, "column": 16,
+                          "snippet": "public int circuit = 0;"},
+        })
+        self.assertIn("Selection: groovy/classes/Coolant.groovy:10:16", summary)
+        self.assertIn("Source text: public int circuit = 0;", summary)
+        self.assertNotIn(opaque, summary)
+
     def test_observation_uses_record_key_without_dumping_raw_value(self) -> None:
         node = {"id": "workbench-atlas-node-v2:example:" + "a" * 64,
                 "semantic_key": "a" * 64, "kind": "initialization-block-hardness",
@@ -266,6 +280,10 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("groovy/test.groovy:7:4",
                           str(screen.query_one("#atlas-search-results", OptionList).options[0].prompt))
             self.assertTrue(screen.query_one("#atlas-search-browse", Button).disabled)
+            self.assertFalse(screen.query_one("#atlas-search-browse", Button).display)
+            self.assertNotIn("B Browse links", str(screen.query_one(".keyboard-hint").content))
+            await pilot.press("b")
+            self.assertIs(app.screen, screen)
             await pilot.press("enter")
             await self._settle(pilot, lambda: isinstance(app.screen, AnalysisResultScreen))
             self.assertEqual("source-text:one",
@@ -626,10 +644,16 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
                 await self._settle(pilot, lambda: isinstance(app.screen, AtlasObservationSearchScreen)
                                    and app.screen.session is session)
                 search = app.screen
+                await pilot.press("enter", "s", "i", "l", "m")
+                self.assertEqual("silm", search.query_one("#atlas-observation-query", Input).value)
+                session.request.assert_not_awaited()
+                await pilot.press("escape")
+                self.assertEqual("", search.query_one("#atlas-observation-query", Input).value)
                 search.query_one("#atlas-observation-query", Input).value = "iron"
-                search.query_one("#atlas-observation-search", Button).press()
+                await pilot.press("s")
                 await self._settle(pilot, lambda: search.selected is not None and not search.busy)
                 self.assertEqual("observation-1", search.selected["id"])
+                self.assertFalse(search.query_one("#atlas-observation-more", Button).display)
                 self.assertIs(app.screen, search)
                 self.assertIsInstance(app.focused, OptionList)
                 self.assertEqual(0, app.focused.highlighted)
