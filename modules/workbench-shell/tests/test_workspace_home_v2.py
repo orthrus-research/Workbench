@@ -49,6 +49,8 @@ from workbench_shell.workspace_dashboard import (  # noqa: E402
     WorkspaceHomeV2Error,
     _adoption_state_revision,
     _canonical_bytes,
+    _cleanroom_fixture_profile,
+    _cleanroom_fixture_tool_context,
     _eligibility_digest,
     _home_id,
     _read_adoption,
@@ -673,6 +675,131 @@ class WorkspaceHomeV2Tests(unittest.TestCase):
                     suite_root=REPOSITORY_ROOT,
                 )
 
+    def test_cleanroom_fixture_source_contract_accepts_exact_legacy_or_portable_set(self) -> None:
+        profile = _cleanroom_fixture_profile()
+        self.assertIsNotNone(profile)
+        sources = profile.source_inputs()
+        fixture_owner = SimpleNamespace(reference={"freshness": "current"})
+
+        def context(owner: SimpleNamespace) -> dict:
+            with mock.patch(
+                "workbench_shell.workspace_dashboard._cleanroom_fixture_profile",
+                return_value=owner,
+            ), mock.patch.dict(os.environ, {
+                "WORKBENCH_CLEANROOM_FIXTURE_GRADLEW": "",
+                "WORKBENCH_CLEANROOM_FIXTURE_JAVA_HOME": "",
+            }):
+                return _cleanroom_fixture_tool_context(
+                    REPOSITORY_ROOT, fixture_owner,
+                )
+
+        legacy = context(SimpleNamespace(source_inputs=lambda: sources[:3]))
+        self.assertEqual(
+            ["CLEANROOM_FIXTURE_TOOL_CONFIGURATION_REQUIRED"], legacy["blockers"],
+        )
+        self.assertEqual(
+            {"fixture-owner-lock", "fixture-owner-schema", "profile-preflight-tool"},
+            {row["kind"] for row in legacy["tool_inputs"]},
+        )
+        portable_owner = SimpleNamespace(
+            source_inputs=lambda: sources,
+            read_execution_policy=profile.read_execution_policy,
+            validate_execution_policy=profile.validate_execution_policy,
+        )
+        portable = context(portable_owner)
+        self.assertEqual(
+            ["CLEANROOM_FIXTURE_TOOL_CONFIGURATION_REQUIRED"], portable["blockers"],
+        )
+        self.assertEqual(
+            {row["kind"] for row in sources},
+            {row["kind"] for row in portable["tool_inputs"]},
+        )
+        for invalid in (
+            sources[:-1],
+            (*sources, sources[0]),
+            (*sources, {**sources[0], "kind": "unexpected-fixture-source"}),
+            (*sources[:3], sources[0]),
+        ):
+            with self.subTest(invalid=tuple(row["kind"] for row in invalid)):
+                refused = context(SimpleNamespace(
+                    source_inputs=lambda invalid=invalid: invalid,
+                    read_execution_policy=profile.read_execution_policy,
+                    validate_execution_policy=profile.validate_execution_policy,
+                ))
+                self.assertEqual(
+                    ["CLEANROOM_FIXTURE_PREFLIGHT_UNAVAILABLE"], refused["blockers"],
+                )
+                self.assertEqual([], refused["tool_inputs"])
+
+        changed_policy = dict(profile.read_execution_policy())
+        changed_policy["scope"] = "foreign-scope"
+        refused = context(SimpleNamespace(
+            source_inputs=lambda: sources,
+            read_execution_policy=lambda: changed_policy,
+            validate_execution_policy=profile.validate_execution_policy,
+        ))
+        self.assertEqual(
+            ["CLEANROOM_FIXTURE_PREFLIGHT_UNAVAILABLE"], refused["blockers"],
+        )
+        self.assertEqual([], refused["tool_inputs"])
+
+        absent_validator = context(SimpleNamespace(
+            source_inputs=lambda: sources,
+            read_execution_policy=profile.read_execution_policy,
+        ))
+        self.assertEqual(
+            ["CLEANROOM_FIXTURE_PREFLIGHT_UNAVAILABLE"],
+            absent_validator["blockers"],
+        )
+        self.assertEqual([], absent_validator["tool_inputs"])
+
+    def test_cleanroom_fixture_portable_witness_change_stales_home(self) -> None:
+        workspace = (
+            REPOSITORY_ROOT
+            / "profiles/platforms/cleanroom/fixtures/generic-mod-daily-loop"
+        )
+        profile = _cleanroom_fixture_profile()
+        self.assertIsNotNone(profile)
+        with mock.patch.dict(os.environ, {
+            "WORKBENCH_CLEANROOM_FIXTURE_GRADLEW": "",
+            "WORKBENCH_CLEANROOM_FIXTURE_JAVA_HOME": "",
+        }):
+            home = build_workspace_home_v2(REPOSITORY_ROOT, workspace)
+            job = next(row for row in home["jobs"]
+                       if row["id"] == "cleanroom-fixture-build")
+            portable_kinds = {
+                "fixture-cleanup-init", "fixture-execution-policy",
+                "fixture-execution-schema",
+            }
+            self.assertTrue(portable_kinds.issubset(
+                {row["kind"] for row in job["tool_inputs"]},
+            ))
+            with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+                sources = profile.source_inputs()
+                for kind in sorted(portable_kinds):
+                    with self.subTest(kind=kind):
+                        copied = Path(temporary) / f"{kind}.copy"
+                        original = next(row for row in sources
+                                        if row["kind"] == kind)
+                        copied.write_bytes(Path(original["path"]).read_bytes() + b"\n")
+                        changed_sources = tuple(
+                            {**row, "path": copied} if row["kind"] == kind else row
+                            for row in sources
+                        )
+                        changed_owner = mock.Mock(wraps=profile)
+                        changed_owner.source_inputs.return_value = changed_sources
+                        with mock.patch(
+                            "workbench_shell.workspace_dashboard._cleanroom_fixture_profile",
+                            return_value=changed_owner,
+                        ):
+                            with self.assertRaisesRegex(
+                                WorkspaceHomeV2Error,
+                                "source bytes changed during validation|preflight inputs are stale",
+                            ):
+                                validate_workspace_home_v2(
+                                    home, suite_root=REPOSITORY_ROOT,
+                                )
+
     def test_cleanroom_fixture_context_is_not_inferred_for_a_copied_tree(self) -> None:
         fixture = (
             REPOSITORY_ROOT
@@ -829,6 +956,8 @@ class WorkspaceHomeV2Tests(unittest.TestCase):
             self.assertEqual(
                 {
                     "fixture-cleanup-init",
+                    "fixture-execution-policy",
+                    "fixture-execution-schema",
                     "fixture-owner-lock",
                     "fixture-owner-schema",
                     "gradle-executable",

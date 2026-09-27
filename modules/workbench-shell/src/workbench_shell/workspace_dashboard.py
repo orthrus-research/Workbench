@@ -102,6 +102,12 @@ _CLEANROOM_CONSTRUCTION_KIND = "workbench-new-project-kind:cleanroom-mod"
 _CLEANROOM_CONSTRUCTION_OWNER_FORMAT = (
     "workbench-cleanroom-mod-construction-owner-v2"
 )
+_CLEANROOM_FIXTURE_LEGACY_SOURCES = frozenset({
+    "fixture-owner-lock", "fixture-owner-schema", "profile-preflight-tool",
+})
+_CLEANROOM_FIXTURE_PORTABLE_SOURCES = _CLEANROOM_FIXTURE_LEGACY_SOURCES | frozenset({
+    "fixture-cleanup-init", "fixture-execution-policy", "fixture-execution-schema",
+})
 _FILE_CUSTODY_FIELDS = (
     "st_dev",
     "st_ino",
@@ -1075,26 +1081,39 @@ def _cleanroom_fixture_tool_context(
         if owner is None:
             raise WorkspaceHomeV2Error("Cleanroom fixture profile API is unavailable")
         sources = owner.source_inputs()
-        if (
-            type(sources) not in {tuple, list}
-            or {row.get("kind") for row in sources if type(row) is dict}
-            != {"fixture-owner-lock", "fixture-owner-schema", "profile-preflight-tool"}
-            or len(sources) != 3
-        ):
+        if type(sources) not in {tuple, list}:
             raise WorkspaceHomeV2Error("Cleanroom fixture profile source contract is invalid")
         for row in sources:
             if (
                 type(row) is not dict
                 or set(row) != {"kind", "path", "display_path"}
+                or type(row["kind"]) is not str
                 or not isinstance(row["display_path"], str)
                 or not row["display_path"]
             ):
                 raise WorkspaceHomeV2Error("Cleanroom fixture profile source contract is invalid")
+        kinds = [row["kind"] for row in sources]
+        source_kinds = frozenset(kinds)
+        if (len(kinds) != len(source_kinds)
+                or source_kinds not in {
+                    _CLEANROOM_FIXTURE_LEGACY_SOURCES,
+                    _CLEANROOM_FIXTURE_PORTABLE_SOURCES,
+                }):
+            raise WorkspaceHomeV2Error("Cleanroom fixture profile source contract is invalid")
+        if source_kinds == _CLEANROOM_FIXTURE_PORTABLE_SOURCES:
+            read_policy = getattr(owner, "read_execution_policy", None)
+            validate_policy = getattr(owner, "validate_execution_policy", None)
+            if not callable(read_policy) or not callable(validate_policy):
+                raise WorkspaceHomeV2Error("Cleanroom fixture execution policy API is unavailable")
+            policy = read_policy()
+            if validate_policy(policy) != policy:
+                raise WorkspaceHomeV2Error("Cleanroom fixture execution policy is invalid")
+        for row in sources:
             tool_inputs.append(
                 _tool_input(Path(row["path"]), kind=row["kind"],
                             display_path=row["display_path"])
             )
-    except (OSError, ValueError, TypeError, WorkspaceHomeV2Error) as exc:
+    except Exception as exc:
         source_error = str(exc)
     raw_gradle = os.environ.get("WORKBENCH_CLEANROOM_FIXTURE_GRADLEW") or None
     raw_java_home = os.environ.get("WORKBENCH_CLEANROOM_FIXTURE_JAVA_HOME") or None
