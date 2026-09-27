@@ -10,6 +10,7 @@ from typing import Any, Mapping
 from jsonschema import Draft202012Validator
 
 from . import profile
+from . import fixture_artifact
 from . import fixture_build
 
 
@@ -196,6 +197,24 @@ def build_portable_command(
         "capture": dict(policy["capture"]),
         "restart": policy["restart"],
     }
+
+
+def portable_artifact_spec(
+    *, fixture_lock: Mapping[str, Any], execution_policy: Mapping[str, Any],
+    gradle_properties: bytes,
+) -> dict[str, Any]:
+    """Derive the remapped JAR identity from retained fixture owner inputs."""
+
+    return fixture_artifact.artifact_spec(
+        fixture_lock=fixture_lock, execution_policy=execution_policy,
+        gradle_properties=gradle_properties,
+    )
+
+
+def inspect_portable_artifact(raw: bytes, *, spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Inspect exact JAR bytes without trusting a child Gradle task outcome."""
+
+    return fixture_artifact.inspect_artifact_bytes(raw, spec=spec)
 
 
 def build_input_digest(inputs: dict[str, Any]) -> str:

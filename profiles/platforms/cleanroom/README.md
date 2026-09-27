@@ -47,6 +47,13 @@ retains bounded stdout and stderr, and rechecks the source and Java/Gradle
 inputs around the run. An interrupted attempt remains unknown and blocks an
 automatic rerun. Even an observed exit, including exit code zero, leaves the
 generated fixture artifacts and complete environment reconstruction unadmitted.
+The profile separately derives the expected remapped JAR path from its locked
+Gradle properties and inspects exact JAR bytes, including archive integrity,
+mod identity and required class content. After a zero-exit supervised attempt,
+Core can publish a prepared attempt, an immutable owner-validated JAR snapshot
+and a linked admission result. That admission describes the retained bytes;
+it does not establish independent build provenance, detached child absence or
+a complete environment rebuild.
 
 The generic-mod fixture runner accepts `--core-supervised` for a local build.
 Core holds the existing source projection lease while Gradle runs as a child,

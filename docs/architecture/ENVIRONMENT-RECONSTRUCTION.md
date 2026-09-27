@@ -311,6 +311,16 @@ historical results retain their original markers. Profile fixture execution,
 managed tool runtime materialization and a supported clean-root rebuild remain
 unresolved, so this plan is not an environment reconstruction result.
 
+Cleanroom fixture artifact admission is a separate Core operation after a
+zero-exit supervised fixture attempt. The installed profile derives the sole
+remapped JAR path from retained locked inputs and checks the exact ZIP content.
+Core pins the output read, records a prepared attempt, retains an immutable JAR
+resource, and links a result to the exact execution evidence. Reopen validates
+the retained bytes and resource chain even if the mutable build output changes.
+A prepared attempt without its final result remains unknown and cannot retry
+automatically. This admits an observed artifact snapshot, not an independent
+build provenance or a complete environment reconstruction.
+
 `environment feasibility` is read-only and uses the same local options as
 `plan`. Its [versioned report schema](../../core/src/workbench_core/schemas/workbench-environment-feasibility-v1.schema.json)
 names the exact import plan, local blockers and missing acquisition inputs. The
