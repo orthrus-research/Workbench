@@ -37,7 +37,16 @@ class AxiomRuntimeTests(unittest.TestCase):
         provision = json.loads((ROOT / "validation/ide-toolchains-v1.json").read_bytes())
         self.assertEqual("axiom.jvm-runtime.v1", policy["schema"])
         self.assertEqual("cleanroom", policy["profile"])
-        self.assertEqual(provision["java_platform"], policy["archive"])
+        self.assertEqual(
+            policy["archive"],
+            {key: provision["java_platform"][key] for key in policy["archive"]},
+        )
+        self.assertEqual(
+            {"archive_size"},
+            set(provision["java_platform"]) - set(policy["archive"]),
+        )
+        self.assertIs(type(provision["java_platform"]["archive_size"]), int)
+        self.assertGreater(provision["java_platform"]["archive_size"], 0)
         self.assertEqual(profile["java"]["runtime_provision"]["java_vendor"], policy["vendor"])
         self.assertEqual(profile["java"]["runtime_provision"]["release_name"], policy["archive"]["archive_root"])
         self.assertEqual("selected-workbench-mvp-runtime", policy["selectionStatus"])
