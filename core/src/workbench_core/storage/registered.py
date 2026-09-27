@@ -957,7 +957,7 @@ class ResourceCatalog:
             if workspace is None or store["workspace"] == str(workspace)
         ]
         overlay_envelopes: list[dict[str, object]] = []
-        for store in record_stores:
+        for store in all_record_stores:
             if store["family"] != "overlay-envelope-inputs":
                 continue
             from ..overlay_envelope_inputs import CoreOverlayEnvelopeInputs
@@ -968,12 +968,15 @@ class ResourceCatalog:
             if store["path"] != str(host.root):
                 raise DurableResourceError("resource.changed", "overlay attempt store registration changed")
             if store["status"] != "available":
-                overlay_envelopes.append({"store_id": store["store_id"], "status": "store-unavailable"})
+                if workspace is None or store["workspace"] == str(workspace):
+                    overlay_envelopes.append({"store_id": store["store_id"], "status": "store-unavailable"})
                 continue
             try:
-                overlay_envelopes.extend(host.inventory())
+                attempts = host.inventory()
             except (OSError, ValueError, TypeError) as exc:
                 raise DurableResourceError("resource.changed", "overlay attempt inventory changed") from exc
+            if workspace is None or store["workspace"] == str(workspace):
+                overlay_envelopes.extend(attempts)
         registered_overlay_roots = {
             store["path"] for store in all_record_stores
             if store["family"] == "overlay-envelope-inputs"

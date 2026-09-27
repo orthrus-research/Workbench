@@ -652,6 +652,31 @@ class OverlayEnvelopeInputTests(unittest.TestCase):
         with self.assertRaises(DurableResourceError):
             ResourceCatalog(self.configuration_home).inventory(workspace=self.workspace)
 
+    def test_catalog_validates_foreign_overlay_attempt_before_workspace_filter(self) -> None:
+        foreign_workspace = self.base / "foreign-workspace"
+        foreign_workspace.mkdir()
+        foreign = CoreOverlayEnvelopeInputs(
+            workspace=foreign_workspace, configuration_home=self.configuration_home,
+            owner_id="crucible",
+        )
+        self.host._ensure()
+        foreign._ensure()
+        (self.host.root / ("a" * 32)).mkdir(mode=0o700)
+        foreign_attempt = foreign.root / ("b" * 32)
+        foreign_attempt.mkdir(mode=0o700)
+
+        catalog = ResourceCatalog(self.configuration_home)
+        selected = catalog.inventory(workspace=self.workspace)
+        self.assertEqual("ready-unproven", selected["root_state"])
+        self.assertEqual(1, len(selected["overlay_envelopes"]))
+        self.assertEqual("orphan-pre-reservation", selected["overlay_envelopes"][0]["status"])
+        self.assertEqual(2, len(catalog.inventory()["overlay_envelopes"]))
+
+        (foreign_attempt / "unrecognized").write_bytes(b"?")
+        with self.assertRaises(DurableResourceError) as changed:
+            catalog.inventory(workspace=self.workspace)
+        self.assertEqual("resource.changed", changed.exception.code)
+
     def test_failed_plan_stream_is_a_visible_pre_reservation_orphan(self) -> None:
         with self.trees.stage("artifacts", "config", requested_path=self.target) as stage:
             with self.assertRaisesRegex(OverlayEnvelopeInputError, "plan chunk"):
