@@ -186,6 +186,23 @@ def _read_result_record(attempt, *, request_id):
     return value
 
 
+def _write_prepare_failure_record(attempt, value):
+    result = storage.seal('recipe-capture-failure', value)
+    publish_immutable_bytes(attempt / 'prepare-failed.json',
+                            storage.canonical(result) + b'\n',
+                            byte_limit=_RECORD_BYTE_LIMIT)
+    return result
+
+
+def _read_prepare_failure_record(attempt, *, request_id):
+    value = _read_bounded_ordinary_json(attempt / 'prepare-failed.json')
+    if (not isinstance(value, dict)
+            or storage.seal('recipe-capture-failure', {k: v for k, v in value.items() if k != 'id'}) != value
+            or value.get('request_id') != request_id):
+        raise ValueError('retained capture record identity changed')
+    return value
+
+
 def _owner(profile):
     owner = require_profile_extension(GROUP, profile)
     if getattr(owner, 'PROFILE_API_VERSION', None) != 1:
@@ -359,6 +376,8 @@ def _fail(attempt, filename, kind, request, stage, exc):
                 'native_admitted': False}
         if filename == 'result.json' and kind == 'recipe-capture-result':
             _write_result_record(attempt, body)
+        elif filename == 'prepare-failed.json' and kind == 'recipe-capture-failure':
+            _write_prepare_failure_record(attempt, body)
         else:
             _record(attempt, filename, kind, body)
 
@@ -615,7 +634,7 @@ def show(root, identity, *, cancelled=None):
                     raise ValueError('retained graph identity changed')
         return result
     if os.path.lexists(native_path(attempt / 'prepare-failed.json')):
-        return _read(attempt, 'prepare-failed.json', 'recipe-capture-failure', request_id=request['id'])
+        return _read_prepare_failure_record(attempt, request_id=request['id'])
     if os.path.lexists(native_path(attempt / 'prepared.json')):
         prepared, prepared_raw = _read_prepared_record(attempt, request_id=request['id'])
         if (attempt / 'run-started.json').exists():

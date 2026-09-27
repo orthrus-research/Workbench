@@ -457,6 +457,84 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             self.prepare(request)
         self.native.assert_not_called()
 
+    def test_preparation_failure_v1_bytes_and_historical_core_readback(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        failure_path = attempt / 'prepare-failed.json'
+        (self.runtime / 'fixture-runtime.bin').write_bytes(b'changed runtime')
+        with patch.object(capture, 'publish_immutable_bytes',
+                          wraps=capture.publish_immutable_bytes) as published:
+            with self.assertRaisesRegex(ValueError, 'runtime changed'):
+                self.prepare(request)
+        failure = capture.show(self.state, request['attempt_id'])
+        raw = failure_path.read_bytes()
+        self.assertEqual(check_storage.canonical(failure) + b'\n', raw)
+        self.assertIn(failure_path, [call.args[0] for call in published.call_args_list])
+        if os.name != 'nt':
+            failure_path.chmod(0o644)
+        with patch.object(capture, 'read_bounded_single_link_bytes',
+                          wraps=capture.read_bounded_single_link_bytes) as historical_read:
+            self.assertEqual(failure, capture.show(self.state, request['attempt_id']))
+        historical_read.assert_called_once_with(failure_path, byte_limit=32 * 1024**2)
+        for replacement in (b'{"id":"one","id":"two"}\n', b'changed failure'):
+            with self.subTest(replacement=replacement):
+                failure_path.write_bytes(replacement)
+                with self.assertRaises((OSError, ValueError)):
+                    capture.show(self.state, request['attempt_id'])
+        failure_path.write_bytes(raw)
+        self.assertEqual(failure, capture.show(self.state, request['attempt_id']))
+        failure_path.unlink()
+        self.assertEqual('interrupted', capture.show(self.state, request['attempt_id'])['state'])
+        self.native.assert_not_called()
+
+    def test_preparation_failure_publication_faults_retain_stages_and_block_run(self):
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                request = self.plan()
+                attempt = self.attempt(request)
+                failure_path = attempt / 'prepare-failed.json'
+                old_stage = attempt / ('.record-' + 'd' * 32)
+                new_stage = attempt / '.prepare-failed.json.01234567'
+                (self.runtime / 'fixture-runtime.bin').write_bytes(f'changed runtime {moment}'.encode())
+
+                def seed_stages():
+                    old_stage.write_bytes(b'old stage remains')
+                    new_stage.write_bytes(b'new stage remains')
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    if Path(target) == failure_path and moment == 'before-link':
+                        seed_stages()
+                        raise OSError('preparation failure before link')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    if (Path(directory) == attempt and failure_path.exists()
+                            and moment == 'after-link-before-flush'):
+                        seed_stages()
+                        raise OSError('preparation failure after link')
+                    return original_flush(directory)
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaises(OSError):
+                        self.prepare(request)
+                self.assertEqual(moment == 'after-link-before-flush', failure_path.exists())
+                self.assertEqual(b'old stage remains', old_stage.read_bytes())
+                self.assertEqual(b'new stage remains', new_stage.read_bytes())
+                observed = capture.show(self.state, request['attempt_id'])
+                self.assertEqual('failed' if failure_path.exists() else 'interrupted', observed['state'])
+                if failure_path.exists():
+                    self.assertEqual(check_storage.canonical(observed) + b'\n', failure_path.read_bytes())
+                with self.assertRaisesRegex(ValueError, 'preparation failed|uncertain record stage'):
+                    capture.run(self.state, request['attempt_id'], 'no-prepared-id',
+                                accept_eula=True, cancelled=self.cancelled)
+                with self.assertRaisesRegex(ValueError, 'already attempted'):
+                    self.prepare(request)
+                self.assertFalse((attempt / 'run-started.json').exists())
+                self.native.assert_not_called()
+
     def test_post_link_preparation_failure_cannot_authorize_native_run(self):
         request = self.plan()
         attempt = self.attempt(request)
