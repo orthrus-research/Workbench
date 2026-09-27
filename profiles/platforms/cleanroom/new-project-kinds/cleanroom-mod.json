@@ -5,12 +5,12 @@
       "admission_state": "owner-admitted",
       "construction_slot": {
         "construction_contract_id": "BLUEPRINTS-FRESH-PROJECT-CONSTRUCTION-V2",
-        "construction_owner_id": "workbench-cleanroom-mod-construction-owner:sha256:ec1132bc4e9aac9d8306e707f46c66d3c700ec36dca7aa692171d4ede1a4afb9",
+        "construction_owner_id": "workbench-cleanroom-mod-construction-owner:sha256:9880c764803e2786b32febb07e7fdc739aadf27fd3835ecdc861831ba8c81be0",
         "construction_owner_ref": {
           "path": "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2-core.json",
           "schema_path": "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json",
           "schema_sha256": "sha256:d7bf003ea570c221045c30d7b4f508fbbdb98e12b206287a0a44c5ae7335325a",
-          "sha256": "sha256:ba1635ee16efe509ace7df8035f3e5b4c72c1a5d44eb27509bde007bb23e04c0"
+          "sha256": "sha256:f618a9f90e553b1c9254158d44caab98eee9b7c34393f4b025909dca15546038"
         },
         "constructor_component_id": "blueprints",
         "plan_schema_ref": {

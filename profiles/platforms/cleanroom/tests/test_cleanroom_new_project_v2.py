@@ -18,9 +18,11 @@ from unittest.mock import patch
 from jsonschema import Draft202012Validator, FormatChecker
 from workbench_api.host_filesystem import bind_host_filesystem
 from workbench_api.git_bootstrap import git_bootstrap_scope
+from workbench_api.git_bootstrap import GitBootstrapError
+from workbench_api.processes import ProcessError, bind_process_host
 from workbench_api.record_stores import record_store_scope
 from workbench_api.source_transactions import source_transactions_scope
-from workbench_core import host_filesystem
+from workbench_core import host_filesystem, tool_process
 from workbench_core.git_bootstrap import HOST as GIT_BOOTSTRAP_HOST
 from workbench_core.source_transactions import CoreSourceTransactions
 from workbench_core.storage.record_stores import CoreRecordStores
@@ -44,6 +46,7 @@ PREVIOUS_CORE_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-ow
 BOOTSTRAP_CORE_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-bootstrap.json"
 M2_LOCK_CORE_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-m2-lock.json"
 FRESH_GIT_PREVIOUS_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-fresh-git-previous.json"
+GIT_INIT_PREVIOUS_OWNER = PROFILE / "new-project-kinds/cleanroom-mod-construction-owner-v2-core-git-init-previous.json"
 KIND = PROFILE / "new-project-kinds/cleanroom-mod.json"
 
 
@@ -84,6 +87,7 @@ class _CoreCustodyCase(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(dir="/tmp")
         self.addCleanup(temporary.cleanup)
         bind_host_filesystem(host_filesystem)
+        bind_process_host(tool_process)
         scopes = ExitStack()
         self.addCleanup(scopes.close)
         scopes.enter_context(record_store_scope(CoreRecordStores(
@@ -218,7 +222,7 @@ class FreshProjectV2Tests(_CoreCustodyCase):
             with self.assertRaisesRegex(ValueError, "ordinary directory"):
                 fresh_project.observe_fresh_target(link)
 
-    def test_bootstrap_restores_exact_empty_and_unborn_states(self) -> None:
+    def test_bootstrap_retains_new_git_and_restores_original_unborn_state(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             parent = Path(temporary)
             for state_name in ("absent", "empty", "unborn"):
@@ -242,23 +246,126 @@ class FreshProjectV2Tests(_CoreCustodyCase):
                     # The old V2 writer used an owner-controlled 0755 state
                     # root. Core must reopen it for exact recovery in place.
                     state_root.chmod(0o755)
-                    restored = fresh_project.restore_fresh_target(
-                        target, state_root, plan_id=f"plan:{state_name}"
-                    )
-                    self.assertEqual("restored", restored["outcome"])
-                    self.assertFalse(journal_path.exists())
-                    self.assertEqual(0o700, stat.S_IMODE(state_root.stat().st_mode))
-                    if state_name == "absent":
-                        self.assertFalse(target.exists())
-                    elif state_name == "empty":
-                        self.assertEqual([], list(target.iterdir()))
-                    else:
+                    if state_name == "unborn":
+                        restored = fresh_project.restore_fresh_target(
+                            target, state_root, plan_id=f"plan:{state_name}"
+                        )
+                        self.assertEqual("restored", restored["outcome"])
+                        self.assertEqual(0o700, stat.S_IMODE(state_root.stat().st_mode))
+                        self.assertFalse(journal_path.exists())
                         self.assertEqual(
                             exclude_before, (target / ".git/info/exclude").read_bytes()
                         )
+                    else:
+                        with self.assertRaisesRegex(
+                            fresh_project.FreshProjectError, "whole-tree recovery requires",
+                        ):
+                            fresh_project.restore_fresh_target(
+                                target, state_root, plan_id=f"plan:{state_name}"
+                            )
+                        self.assertEqual(0o700, stat.S_IMODE(state_root.stat().st_mode))
+                        self.assertTrue(journal_path.exists())
+                        self.assertTrue((target / ".git").is_dir())
+                        self.assertTrue((state_root / "git-init-attempts").is_dir())
+
+    def test_new_git_init_attempt_refuses_destructive_recovery_when_intent_is_damaged(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh"
+            state_root = root / "state"
+            observation = fresh_project.observe_fresh_target(target)
+            fresh_project.prepare_fresh_target(
+                target, observation, state_root, plan_id="plan:damaged",
+            )
+            attempts = state_root / "git-init-attempts"
+            for record in attempts.iterdir():
+                record.unlink()
+            self.assertEqual([], list(attempts.iterdir()))
+            with self.assertRaisesRegex(
+                fresh_project.FreshProjectError, "whole-tree recovery requires",
+            ):
+                fresh_project.restore_fresh_target(
+                    target, state_root, plan_id="plan:damaged",
+                )
+            self.assertTrue((target / ".git").is_dir())
+            self.assertTrue((state_root / "fresh-bootstrap-v2.json").exists())
+
+    def test_interrupted_core_git_init_retains_journal_and_attempt_for_review(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh"
+            state_root = root / "state"
+            observation = fresh_project.observe_fresh_target(target)
+            with patch(
+                "workbench_core.git_bootstrap.execute_process",
+                side_effect=ProcessError("interrupted"),
+            ), self.assertRaisesRegex(GitBootstrapError, "did not close cleanly"):
+                fresh_project.prepare_fresh_target(
+                    target, observation, state_root, plan_id="plan:interrupted-git",
+                )
+            self.assertTrue(target.is_dir())
+            self.assertFalse((target / ".git").exists())
+            self.assertTrue((state_root / "fresh-bootstrap-v2.json").is_file())
+            self.assertEqual(1, len(list((state_root / "git-init-attempts").glob("*.json"))))
+            with self.assertRaisesRegex(
+                fresh_project.FreshProjectError, "whole-tree recovery requires",
+            ):
+                fresh_project.restore_fresh_target(
+                    target, state_root, plan_id="plan:interrupted-git",
+                )
 
 
 class CleanroomModConstructionV2Tests(_CoreCustodyCase):
+    def _prepare_pre_core_git_init(
+        self, target: Path, observation: dict[str, object], state_root: Path, *, plan_id: str,
+        allow_existing_attempts: bool = False,
+    ) -> None:
+        """Model a V2 journal written before Core's init-attempt namespace."""
+
+        def old_init(
+            selected: Path, selected_state: Path, *, plan_id: str,
+            observation_id: str, parent_identity: tuple[int, int],
+            target_identity: tuple[int, int] | None,
+        ) -> None:
+            del selected_state, plan_id, observation_id, parent_identity
+            if target_identity is None:
+                selected.mkdir(mode=0o700)
+            result = _git(selected, "init", "--quiet", "--initial-branch=main")
+            self.assertEqual("", result.stdout)
+            self.assertEqual("", result.stderr)
+
+        with patch.object(GIT_BOOTSTRAP_HOST, "initialize_repository", side_effect=old_init):
+            fresh_project.prepare_fresh_target(
+                target, observation, state_root, plan_id=plan_id,
+            )
+        if not allow_existing_attempts:
+            self.assertFalse((state_root / "git-init-attempts").exists())
+
+    def test_shared_state_root_recovers_only_verified_unrelated_historical_plan(self) -> None:
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            state_root = root / "state"
+            current_target = root / "current"
+            fresh_project.prepare_fresh_target(
+                current_target, fresh_project.observe_fresh_target(current_target),
+                state_root, plan_id="plan:current",
+            )
+            fresh_project.finalize_fresh_target(
+                current_target, state_root, plan_id="plan:current",
+            )
+            historical_target = root / "historical"
+            self._prepare_pre_core_git_init(
+                historical_target, fresh_project.observe_fresh_target(historical_target),
+                state_root, plan_id="plan:historical", allow_existing_attempts=True,
+            )
+            recovered = fresh_project.restore_fresh_target(
+                historical_target, state_root, plan_id="plan:historical",
+            )
+            self.assertEqual("restored", recovered["outcome"])
+            self.assertFalse(historical_target.exists())
+            self.assertTrue((current_target / ".git").is_dir())
+            self.assertTrue((state_root / "git-init-attempts").is_dir())
+
     def _preview(self, target: Path, *, direct: bool = False) -> dict[str, object]:
         request = construction.build_cleanroom_mod_request(
             target,
@@ -410,30 +517,28 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
                     ROOT, request, adapters=AdapterSet()
                 )
 
-    def test_partial_failure_restores_absent_target(self) -> None:
+    def test_partial_failure_retains_new_git_target_for_review(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             root = Path(temporary)
             target = root / "fresh-project"
             state_root = root / "state"
             plan = self._preview(target, direct=True)["plan"]
-            result = construction.apply_cleanroom_mod_construction(
-                ROOT,
-                plan,
-                state_root,
-                consent_plan_id=plan["id"],
-                fail_after_ordinal=7,
-            )
-            self.assertEqual("rejected", result["state"])
-            self.assertEqual(
-                "BLUEPRINTS_M2_PARTIAL_FAILURE_ROLLED_BACK",
-                result["application_receipt"]["diagnostic_code"],
-            )
-            self.assertEqual("restored", result["recovery"]["outcome"])
+            with self.assertRaisesRegex(
+                fresh_project.FreshProjectError, "whole-tree recovery requires",
+            ):
+                construction.apply_cleanroom_mod_construction(
+                    ROOT,
+                    plan,
+                    state_root,
+                    consent_plan_id=plan["id"],
+                    fail_after_ordinal=7,
+                )
             self.assertFalse((state_root / "prepared-receipt.json").exists())
             self.assertFalse((state_root / "active-transaction.json").exists())
-            self.assertFalse(target.exists())
+            self.assertTrue((state_root / "fresh-bootstrap-v2.json").exists())
+            self.assertTrue((target / ".git").is_dir())
 
-    def test_recovery_restores_bootstrap_interrupted_before_transaction(self) -> None:
+    def test_recovery_refuses_new_git_bootstrap_interrupted_before_transaction(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
             root = Path(temporary)
             target = root / "fresh-project"
@@ -445,11 +550,12 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
                 state_root,
                 plan_id=plan["id"],
             )
-            result = construction.recover_cleanroom_mod_construction(
-                ROOT, plan, state_root
-            )
-            self.assertEqual("restored", result["state"])
-            self.assertFalse(target.exists())
+            with self.assertRaisesRegex(
+                fresh_project.FreshProjectError, "whole-tree recovery requires",
+            ):
+                construction.recover_cleanroom_mod_construction(ROOT, plan, state_root)
+            self.assertTrue((state_root / "fresh-bootstrap-v2.json").exists())
+            self.assertTrue((target / ".git").is_dir())
 
     def test_recovery_quarantines_historical_m2_lock_before_mutation(self) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
@@ -457,7 +563,7 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             target = root / "fresh-project"
             state_root = root / "state"
             plan = self._preview(target, direct=True)["plan"]
-            fresh_project.prepare_fresh_target(
+            self._prepare_pre_core_git_init(
                 target, plan["target_observation"], state_root, plan_id=plan["id"],
             )
             token = "d" * 32
@@ -505,7 +611,7 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
                     ROOT, plan, allow_historical_owner=True,
                 ),
             )
-            fresh_project.prepare_fresh_target(
+            self._prepare_pre_core_git_init(
                 target, plan["target_observation"], state_root, plan_id=plan["id"],
             )
             recovered = construction.recover_cleanroom_mod_construction(
@@ -534,7 +640,7 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             self.assertEqual(plan, construction.validate_cleanroom_mod_plan(
                 ROOT, plan, allow_historical_owner=True,
             ))
-            fresh_project.prepare_fresh_target(
+            self._prepare_pre_core_git_init(
                 target, plan["target_observation"], state_root, plan_id=plan["id"],
             )
             recovered = construction.recover_cleanroom_mod_construction(
@@ -565,7 +671,7 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             self.assertEqual(plan, construction.validate_cleanroom_mod_plan(
                 ROOT, plan, allow_historical_owner=True,
             ))
-            fresh_project.prepare_fresh_target(
+            self._prepare_pre_core_git_init(
                 target, plan["target_observation"], state_root, plan_id=plan["id"],
             )
             recovered = construction.recover_cleanroom_mod_construction(
@@ -596,7 +702,7 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             self.assertEqual(plan, construction.validate_cleanroom_mod_plan(
                 ROOT, plan, allow_historical_owner=True,
             ))
-            fresh_project.prepare_fresh_target(
+            self._prepare_pre_core_git_init(
                 target, plan["target_observation"], state_root, plan_id=plan["id"],
             )
             recovered = construction.recover_cleanroom_mod_construction(
@@ -632,7 +738,41 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
                     ROOT, plan, allow_historical_owner=True,
                 ),
             )
-            fresh_project.prepare_fresh_target(
+            self._prepare_pre_core_git_init(
+                target, plan["target_observation"], state_root, plan_id=plan["id"],
+            )
+            recovered = construction.recover_cleanroom_mod_construction(
+                ROOT, plan, state_root,
+            )
+            self.assertEqual("restored", recovered["state"])
+            self.assertFalse(target.exists())
+
+    def test_previous_git_init_owner_plan_reopens_only_for_recovery(self) -> None:
+        self.assertEqual(
+            construction.GIT_INIT_PREVIOUS_OWNER_SHA256,
+            sha256(GIT_INIT_PREVIOUS_OWNER.read_bytes()).hexdigest(),
+        )
+        package = tomllib.loads((PROFILE / "pyproject.toml").read_text(encoding="utf-8"))
+        resources = package["tool"]["setuptools"]["package-data"][
+            "workbench_resources.profiles.platforms.cleanroom"
+        ]
+        self.assertIn(
+            "new-project-kinds/cleanroom-mod-construction-owner-v2-core-git-init-previous.json",
+            resources,
+        )
+        with tempfile.TemporaryDirectory(dir="/tmp") as temporary:
+            root = Path(temporary)
+            target = root / "fresh-project"
+            state_root = root / "state"
+            plan = self._previous_core_plan(
+                target, owner_id=construction.GIT_INIT_PREVIOUS_OWNER_ID,
+            )
+            with self.assertRaisesRegex(ValueError, "owner binding changed"):
+                construction.validate_cleanroom_mod_plan(ROOT, plan)
+            self.assertEqual(plan, construction.validate_cleanroom_mod_plan(
+                ROOT, plan, allow_historical_owner=True,
+            ))
+            self._prepare_pre_core_git_init(
                 target, plan["target_observation"], state_root, plan_id=plan["id"],
             )
             recovered = construction.recover_cleanroom_mod_construction(
@@ -647,7 +787,7 @@ class CleanroomModConstructionV2Tests(_CoreCustodyCase):
             target = root / "fresh-project"
             state_root = root / "state"
             plan = self._historical_plan(target)
-            fresh_project.prepare_fresh_target(
+            self._prepare_pre_core_git_init(
                 target, plan["target_observation"], state_root, plan_id=plan["id"],
             )
             # Recreate the previous M2 writer's exact token-named stage and

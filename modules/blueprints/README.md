@@ -21,8 +21,11 @@ state root and publishes, reads, revises, and removes its historical journal
 and retained receipt. Core physically replaces and restores the reviewed Git
 exclude bytes and creates and removes the exact bootstrap marker at their
 historical paths. Blueprints decides the V2 state transitions and recovery
-admission. Git initialization and whole-tree bootstrap cleanup are a separate
-physical custody boundary. Profile-local direct apply still requires a
+admission. Core records a Git initialization intent before creating an absent
+target or running Git, and retains the initialized target identity. An
+interrupted or failed new initialization remains at its target with the V2
+journal for review; whole-tree bootstrap cleanup still needs proof of exact
+ownership and process absence. Profile-local direct apply still requires a
 Core-composed entry route for that state custody.
 
 For native package development, install `api/` and `modules/blueprints/` in a

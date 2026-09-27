@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 import stat
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from workbench_api.git_bootstrap import GitBootstrapError, git_bootstrap_host, git_bootstrap_scope
+from workbench_api.processes import ProcessError, bind_process_host
+from workbench_api.record_stores import record_store_scope
+from workbench_core import tool_process
 from workbench_core.git_bootstrap import HOST
 from workbench_core.host_services import install_local_host_services
+from workbench_core.storage.record_stores import CoreRecordStores
 
 
 class GitBootstrapTests(unittest.TestCase):
@@ -118,6 +124,68 @@ class GitBootstrapTests(unittest.TestCase):
         self.assertEqual("stage", blocked.exception.code)
         self.assertEqual(b"before\n", self.exclude.read_bytes())
         self.assertEqual(b"after\n", stage.read_bytes())
+
+    def test_core_git_init_retains_intent_and_exact_result(self) -> None:
+        parent = self.target.parent
+        fresh = parent / "core-initialized"
+        state_root = parent / "state"
+        bind_process_host(tool_process)
+        with record_store_scope(CoreRecordStores(
+            workspace=parent, configuration_home=parent / "config", owner_id="workbench-shell",
+        )), git_bootstrap_scope(HOST):
+            port = git_bootstrap_host()
+            port.initialize_repository(
+                fresh, state_root, plan_id="plan:core-init", observation_id="observation:one",
+                parent_identity=(parent.stat().st_dev, parent.stat().st_ino),
+                target_identity=None,
+            )
+            self.assertTrue((fresh / ".git").is_dir())
+            self.assertTrue(port.has_init_attempt(state_root, plan_id="plan:core-init"))
+            attempts = state_root / "git-init-attempts"
+            self.assertEqual(2, len(list(attempts.glob("*.json"))))
+            intent_path = next(path for path in attempts.glob("*.json") if not path.name.endswith(".result.json"))
+            intent = json.loads(intent_path.read_bytes())
+            result = json.loads(intent_path.with_name(f"{intent_path.stem}.result.json").read_bytes())
+            self.assertEqual("workbench-core-fresh-git-init-attempt-v1", intent["format"])
+            self.assertEqual(intent["id"], result["attempt_id"])
+            self.assertEqual(
+                [fresh.stat().st_dev, fresh.stat().st_ino], result["target_identity"],
+            )
+            self.assertEqual(
+                [(fresh / ".git").stat().st_dev, (fresh / ".git").stat().st_ino],
+                result["git_identity"],
+            )
+            with self.assertRaises(GitBootstrapError):
+                port.initialize_repository(
+                    fresh, state_root, plan_id="plan:core-init", observation_id="observation:one",
+                    parent_identity=(parent.stat().st_dev, parent.stat().st_ino),
+                    target_identity=None,
+                )
+            self.assertFalse(port.has_init_attempt(state_root, plan_id="plan:unrelated-old"))
+            intent_path.with_name(f"{intent_path.stem}.result.json").write_bytes(b"damaged\n")
+            self.assertTrue(port.has_init_attempt(state_root, plan_id="plan:unrelated-old"))
+
+    def test_core_git_init_process_failure_retains_intent(self) -> None:
+        parent = self.target.parent
+        fresh = parent / "interrupted-init"
+        state_root = parent / "state"
+        with record_store_scope(CoreRecordStores(
+            workspace=parent, configuration_home=parent / "config", owner_id="workbench-shell",
+        )), git_bootstrap_scope(HOST), patch(
+            "workbench_core.git_bootstrap.execute_process", side_effect=ProcessError("interrupted"),
+        ):
+            with self.assertRaises(GitBootstrapError) as failed:
+                git_bootstrap_host().initialize_repository(
+                    fresh, state_root, plan_id="plan:interrupted", observation_id="observation:one",
+                    parent_identity=(parent.stat().st_dev, parent.stat().st_ino),
+                    target_identity=None,
+                )
+            self.assertEqual("process", failed.exception.code)
+            self.assertTrue(fresh.is_dir())
+            self.assertFalse((fresh / ".git").exists())
+            self.assertTrue(git_bootstrap_host().has_init_attempt(
+                state_root, plan_id="plan:interrupted",
+            ))
 
 
 if __name__ == "__main__":

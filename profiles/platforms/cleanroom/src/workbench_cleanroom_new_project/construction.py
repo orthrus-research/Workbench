@@ -94,6 +94,14 @@ FRESH_GIT_PREVIOUS_OWNER_ID = (
     "98535f25724e337fd7e166fa053c03b4b3cd04e6cbbbcdd789b28baaa6adb142"
 )
 FRESH_GIT_PREVIOUS_OWNER_SHA256 = "8d90bde8ce677ef7270165e844f5201ce419ce594f1d7a5728853953190cd032"
+GIT_INIT_PREVIOUS_OWNER_RELATIVE = Path(
+    "profiles/platforms/cleanroom/new-project-kinds/cleanroom-mod-construction-owner-v2-core-git-init-previous.json"
+)
+GIT_INIT_PREVIOUS_OWNER_ID = (
+    "workbench-cleanroom-mod-construction-owner:sha256:"
+    "ec1132bc4e9aac9d8306e707f46c66d3c700ec36dca7aa692171d4ede1a4afb9"
+)
+GIT_INIT_PREVIOUS_OWNER_SHA256 = "ba1635ee16efe509ace7df8035f3e5b4c72c1a5d44eb27509bde007bb23e04c0"
 OWNER_SCHEMA_RELATIVE = Path(
     "profiles/platforms/cleanroom/schemas/workbench-cleanroom-mod-construction-owner-v2.schema.json"
 )
@@ -494,6 +502,8 @@ def _historical_construction_owner(
         relative, expected_sha256 = M2_LOCK_CORE_OWNER_RELATIVE, M2_LOCK_CORE_OWNER_SHA256
     elif owner_id == FRESH_GIT_PREVIOUS_OWNER_ID:
         relative, expected_sha256 = FRESH_GIT_PREVIOUS_OWNER_RELATIVE, FRESH_GIT_PREVIOUS_OWNER_SHA256
+    elif owner_id == GIT_INIT_PREVIOUS_OWNER_ID:
+        relative, expected_sha256 = GIT_INIT_PREVIOUS_OWNER_RELATIVE, GIT_INIT_PREVIOUS_OWNER_SHA256
     else:
         _fail("historical construction owner is not admitted")
     path = _suite_file(suite, relative, "historical construction owner")
@@ -661,6 +671,7 @@ def validate_cleanroom_mod_plan(
         if allow_historical_owner and plan.get("owner_record_id") in {
             HISTORICAL_OWNER_ID, PREVIOUS_CORE_OWNER_ID, BOOTSTRAP_CORE_OWNER_ID,
             M2_LOCK_CORE_OWNER_ID, FRESH_GIT_PREVIOUS_OWNER_ID,
+            GIT_INIT_PREVIOUS_OWNER_ID,
         }
         else validate_construction_owner(suite)
     )

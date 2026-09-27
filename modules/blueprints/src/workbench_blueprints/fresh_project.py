@@ -479,14 +479,19 @@ def prepare_fresh_target(
         journal_path, initial_journal, byte_limit=_MAXIMUM_GIT_METADATA_BYTES,
     )
     try:
-        if created_target:
-            path.mkdir(mode=0o700)
+        if created_git:
+            parent_identity = reviewed["parent_identity"]
+            target_identity = reviewed["target_identity"]
+            git_bootstrap_host().initialize_repository(
+                path, state, plan_id=plan_id, observation_id=reviewed["id"],
+                parent_identity=(parent_identity["device"], parent_identity["inode"]),
+                target_identity=(
+                    None if target_identity is None
+                    else (target_identity["device"], target_identity["inode"])
+                ),
+            )
         else:
             _ordinary_directory(path, "fresh target")
-        if created_git:
-            result = _git(path, "init", "--quiet", "--initial-branch=main")
-            if result.stdout or result.stderr:
-                _fail("Git bootstrap emitted unexpected output")
         git_path = path / ".git"
         _ordinary_directory(git_path, "bootstrapped .git")
         exclude_path = git_path / "info/exclude"
@@ -709,6 +714,11 @@ def restore_fresh_target(
     _validate_state_root(path, state)
     _state_store(state)
     journal, journal_raw = _load_bootstrap_journal(path, state, plan_id)
+    if journal["created_git"] and git_bootstrap_host().has_init_attempt(state, plan_id=plan_id):
+        _fail(
+            f"Core Git initialization under {state} is retained; "
+            "whole-tree recovery requires ownership and process review"
+        )
     marker_path = path / ".git/workbench-fresh-project-v2.json"
     marker_present = marker_path.exists() or marker_path.is_symlink()
     if marker_present and not journal["created_git"]:
