@@ -1141,7 +1141,7 @@ def _verify_client_output(path: Path, result: Mapping[str, Any], selected: set[s
             raise ClientBuildError(f"client archive manifest changed: {name}")
 
 
-def build(
+def _produce_clients(
     output_dir: Path,
     *,
     component: str | None = None,
@@ -1259,14 +1259,41 @@ def build_managed(
         )
     return publish_build_tree(
         output_dir,
-        lambda staged: build(staged, component=component, lane=lane,
-                             skip_build=skip_build, skip_vscode_extension_host=skip_vscode_extension_host),
+        lambda staged: _produce_clients(
+            staged, component=component, lane=lane,
+            skip_build=skip_build,
+            skip_vscode_extension_host=skip_vscode_extension_host,
+        ),
         lambda path, result: _verify_client_output(path, result, selected),
         lambda _path, result: str(result["client_artifact_manifest_id"]),
         owner_id="developer-client-build",
         configuration_home=configuration_home,
         default_output_root=default_output_root,
     )
+
+
+def build(
+    output_dir: Path,
+    *,
+    component: str | None = None,
+    lane: str = PUBLIC_LANE,
+    skip_build: bool = False,
+    skip_vscode_extension_host: bool = False,
+    configuration_home: Path | None = None,
+    default_output_root: Path | None = None,
+) -> dict[str, Any]:
+    """Build through source Core while retaining the historical manifest return."""
+
+    result, _custody = build_managed(
+        output_dir,
+        component=component,
+        lane=lane,
+        skip_build=skip_build,
+        skip_vscode_extension_host=skip_vscode_extension_host,
+        configuration_home=configuration_home,
+        default_output_root=default_output_root,
+    )
+    return result
 
 
 def main(argv: Sequence[str] | None = None) -> int:

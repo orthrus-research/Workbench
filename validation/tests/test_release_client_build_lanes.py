@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 import re
 import tempfile
+from contextlib import redirect_stdout
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from xml.etree import ElementTree
@@ -24,38 +26,40 @@ builder = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(builder)
 
 
+FAKE_VSCODE_DOMAIN = {
+    "client_id": "vscode",
+    "package_artifact_id": "vscode-vsix",
+    "version": builder.VSCODE_VERSION,
+    "host_boundary": "vscode fixture",
+}
+
+
+def _produce_vscode_fixture(staged: Path, **_kwargs):
+    staged.mkdir()
+    artifact = staged / builder.VSCODE_ARTIFACT_NAME
+    with zipfile.ZipFile(artifact, "w") as archive:
+        archive.writestr("extension/package.json", b"{}")
+    result = {
+        "format": builder.FORMAT,
+        "schema_version": builder.SCHEMA_VERSION,
+        "client_artifact_manifest_id": "pending",
+        "lane": builder.PUBLIC_LANE,
+        "artifacts": [builder._artifact_row(artifact, FAKE_VSCODE_DOMAIN, {})],
+    }
+    result["client_artifact_manifest_id"] = builder.manifest_id(result)
+    (staged / "workbench-developer-clients-manifest-v1.json").write_bytes(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+    )
+    return result
+
+
 class ReleaseClientBuildLaneTest(unittest.TestCase):
     def test_client_cli_bundle_has_core_custody_and_exact_manifest_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             output = base / "clients"
-            domain = {
-                "client_id": "vscode",
-                "package_artifact_id": "vscode-vsix",
-                "version": builder.VSCODE_VERSION,
-                "host_boundary": "vscode fixture",
-            }
-
-            def produce(staged: Path, **_kwargs):
-                staged.mkdir()
-                artifact = staged / builder.VSCODE_ARTIFACT_NAME
-                with zipfile.ZipFile(artifact, "w") as archive:
-                    archive.writestr("extension/package.json", b"{}")
-                result = {
-                    "format": builder.FORMAT,
-                    "schema_version": builder.SCHEMA_VERSION,
-                    "client_artifact_manifest_id": "pending",
-                    "lane": builder.PUBLIC_LANE,
-                    "artifacts": [builder._artifact_row(artifact, domain, {})],
-                }
-                result["client_artifact_manifest_id"] = builder.manifest_id(result)
-                (staged / "workbench-developer-clients-manifest-v1.json").write_bytes(
-                    json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
-                )
-                return result
-
-            with patch.object(builder, "build", side_effect=produce), patch.object(
-                builder, "verify_vscode", return_value=domain,
+            with patch.object(builder, "_produce_clients", side_effect=_produce_vscode_fixture), patch.object(
+                builder, "verify_vscode", return_value=FAKE_VSCODE_DOMAIN,
             ):
                 result, custody = builder.build_managed(
                     output, component="workbench-vscode",
@@ -88,7 +92,7 @@ class ReleaseClientBuildLaneTest(unittest.TestCase):
                     "artifacts": [],
                 }
 
-            with patch.object(builder, "build", side_effect=produce):
+            with patch.object(builder, "_produce_clients", side_effect=produce):
                 with self.assertRaisesRegex(builder.ClientBuildError, "missing or extra"):
                     builder.build_managed(
                         output, component="workbench-vscode",
@@ -101,6 +105,67 @@ class ReleaseClientBuildLaneTest(unittest.TestCase):
                     ".workbench-tree-*.pending/payload/workbench-developer-clients-manifest-v1.json"
                 )],
             )
+
+    def test_direct_build_adapter_uses_core_and_preserves_manifest_return(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            output = base / "clients"
+            with patch.object(builder, "_produce_clients", side_effect=_produce_vscode_fixture), patch.object(
+                builder, "verify_vscode", return_value=FAKE_VSCODE_DOMAIN,
+            ):
+                result = builder.build(
+                    output, component="workbench-vscode",
+                    configuration_home=base / "core-home",
+                )
+            self.assertEqual(
+                result,
+                json.loads((output / "workbench-developer-clients-manifest-v1.json").read_bytes()),
+            )
+            self.assertEqual(
+                result["client_artifact_manifest_id"],
+                builder.manifest_id(result),
+            )
+            from workbench_core.storage.registered import ResourceCatalog
+            catalog = ResourceCatalog(base / "core-home")
+            inventory = catalog.inventory(workspace=ROOT)
+            self.assertEqual(
+                [("developer-client-build", str(output))],
+                [(row["owner_id"], row["path"]) for row in inventory["trees"]],
+            )
+            reference = catalog.trees.describe(inventory["trees"][0]["tree_id"], workspace=ROOT)
+            self.assertEqual(result["client_artifact_manifest_id"], reference.domain_id)
+            with patch.object(builder, "_produce_clients") as producer:
+                with self.assertRaisesRegex(ValueError, "new directory"):
+                    builder.build(
+                        output, component="workbench-vscode",
+                        configuration_home=base / "core-home",
+                    )
+                producer.assert_not_called()
+            self.assertEqual(
+                result,
+                json.loads((output / "workbench-developer-clients-manifest-v1.json").read_bytes()),
+            )
+
+    def test_cli_routes_through_managed_build_and_reports_tree(self) -> None:
+        result = {"client_artifact_manifest_id": "client-fixture"}
+        custody = SimpleNamespace(tree_id="tree-fixture", path=Path("client-fixture"))
+        output = io.StringIO()
+        with patch.object(builder, "build_managed", return_value=(result, custody)) as managed, patch.object(
+            builder, "_produce_clients",
+        ) as producer, redirect_stdout(output):
+            self.assertEqual(0, builder.main(["--component", "workbench-vscode"]))
+        managed.assert_called_once_with(
+            None,
+            component="workbench-vscode",
+            lane=builder.PUBLIC_LANE,
+            skip_build=False,
+            skip_vscode_extension_host=False,
+        )
+        producer.assert_not_called()
+        self.assertEqual(
+            {**result, "artifact_tree_id": custody.tree_id, "artifact_path": str(custody.path)},
+            json.loads(output.getvalue()),
+        )
 
     def test_public_v1_is_the_only_lane_and_versions_are_component_owned(self) -> None:
         lane_default = inspect.signature(builder.build).parameters["lane"].default
