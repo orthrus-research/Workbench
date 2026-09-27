@@ -35,6 +35,25 @@ class LongLivedProcessRequest:
     command: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class StagedToolProcessRequest:
+    """Pre-stage reservation for tools that can mutate one private output tree.
+
+    The target and tool artifacts are known before Core creates a stage. A
+    future broker must bind the actual stage inode and exact argv at launch.
+    This request alone is never an absence proof.
+    """
+
+    workspace: Path
+    owner_id: str
+    stage_parent: Path
+    stage_policy: Literal["core-posix-exact-v1"]
+    target: Path
+    source_variant_id: str
+    source_receipt_sha256: str
+    tool_artifacts: tuple[tuple[str, str], ...]
+
+
 class LongLivedProcessLease(Protocol):
     """A retained scope whose launch and absence observation stay in Core.
 
@@ -101,3 +120,45 @@ def observe_process_absence(lease: LongLivedProcessLease) -> ProcessAbsence:
             or any(character in observed.reason for character in "\r\n\x00")):
         raise LongLivedProcessError("Core returned an invalid absence observation")
     return observed
+
+
+def reserve_staged_tool_process(request: StagedToolProcessRequest) -> None:
+    """Fail closed until Core can launch and observe every staged tool.
+
+    A reservation must precede stage creation. The current Core host refuses;
+    an unexpected host return still cannot authorize a legacy process launch.
+    """
+
+    if (not isinstance(request, StagedToolProcessRequest)
+            or not isinstance(request.workspace, Path) or not request.workspace.is_absolute()
+            or not isinstance(request.stage_parent, Path) or not request.stage_parent.is_absolute()
+            or request.stage_policy != "core-posix-exact-v1"
+            or not isinstance(request.target, Path) or not request.target.is_absolute()
+            or request.target.parent != request.stage_parent
+            or request.owner_id != "workbench-shell"
+            or type(request.source_variant_id) is not str
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", request.source_variant_id) is None
+            or type(request.source_receipt_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", request.source_receipt_sha256) is None
+            or not isinstance(request.tool_artifacts, tuple)
+            or any(type(row) is not tuple or len(row) != 2
+                   or type(row[0]) is not str or type(row[1]) is not str
+                   for row in request.tool_artifacts)
+            or tuple(row[0] for row in request.tool_artifacts) != (
+                "packwiz-refresh", "cleanroom-installer", "packwiz-installer"
+            )
+            or any(re.fullmatch(r"[0-9a-f]{64}", row[1]) is None
+                   for row in request.tool_artifacts)):
+        raise LongLivedProcessError("staged tool process request is invalid")
+    if _host is None:
+        raise LongLivedProcessError("no Core long-lived process host is bound")
+    reserve = getattr(_host, "reserve_staged_tool", None)
+    if not callable(reserve):
+        raise LongLivedProcessError("Core staged tool process reservation is unavailable")
+    reservation = reserve(request)
+    close = getattr(reservation, "close", None)
+    if callable(close):
+        close()
+    raise LongLivedProcessError(
+        "Core staged tool launch and descendant absence proof are unavailable"
+    )

@@ -1011,7 +1011,9 @@ class _MaterializationFixture:
     def materialize_core(self, configuration_home: Path, **overrides):
         with suite_managed_tree_scope(
             workspace=self.suite, configuration_home=configuration_home,
-        ):
+        ), patch.object(server_materialize, "_require_core_staged_tool_custody"):
+            # These older cases isolate Core tree inventory and publication.
+            # They do not qualify the user-facing process-custody gate.
             return self.materialize(
                 template_custody="core-posix-exact-v1", **overrides,
             )
@@ -1025,6 +1027,74 @@ class SusyServerMaterializationTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux process-custody gate")
+    def test_core_exact_refuses_before_stage_or_tool_acquisition(self) -> None:
+        home = self.fixture.root / "core-home"
+        target = self.fixture.server_target(core_exact=True)
+        observed = []
+        actual_reserve = server_materialize.reserve_staged_tool_process
+
+        def reserve(request):
+            observed.append(request)
+            self.assertEqual(self.fixture.suite, request.workspace)
+            self.assertEqual(target, request.target)
+            self.assertEqual(target.parent, request.stage_parent)
+            self.assertEqual("core-posix-exact-v1", request.stage_policy)
+            self.assertEqual(
+                ("packwiz-refresh", "cleanroom-installer", "packwiz-installer"),
+                tuple(label for label, _digest in request.tool_artifacts),
+            )
+            return actual_reserve(request)
+
+        with suite_managed_tree_scope(
+            workspace=self.fixture.suite, configuration_home=home,
+        ), patch.object(server_materialize, "reserve_staged_tool_process", side_effect=reserve), patch.object(
+            server_materialize, "ensure_java_runtime", side_effect=AssertionError("Java acquisition reached")
+        ), patch.object(
+            server_materialize, "_ensure_state_directory", side_effect=AssertionError("stage parent created")
+        ):
+            with self.assertRaisesRegex(
+                SusyServerMaterializationError, "Core staged tool process custody is unavailable"
+            ):
+                self.fixture.materialize(template_custody="core-posix-exact-v1")
+        self.assertEqual(1, len(observed))
+        self.assertFalse(target.parent.exists())
+        self.assertFalse(target.exists())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux /proc diagnostic")
+    def test_detached_child_with_open_stage_file_escapes_legacy_scan(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="w5-detached-stage-") as directory:
+            stage = Path(directory)
+            held = stage / "held.txt"
+            held.write_text("probe\n", encoding="utf-8")
+            code = (
+                "import os, pathlib, time; "
+                "fd = os.open(pathlib.Path(os.environ['W5_PROBE_ROOT']) / 'held.txt', os.O_RDONLY); "
+                "os.chdir('/'); print(fd, flush=True); time.sleep(30)"
+            )
+            child = subprocess.Popen(
+                [sys.executable, "-c", code], cwd="/",
+                env={**os.environ, "W5_PROBE_ROOT": directory},
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, start_new_session=True,
+            )
+            try:
+                assert child.stdout is not None
+                descriptor = int(child.stdout.readline().strip())
+                self.assertIsNone(child.poll())
+                self.assertEqual(
+                    str(held), os.readlink(f"/proc/{child.pid}/fd/{descriptor}"),
+                )
+                self.assertEqual({}, server_materialize._scoped_linux_processes(stage))
+            finally:
+                if child.poll() is None:
+                    child.kill()
+                child.wait(timeout=5)
+                if child.stdout is not None:
+                    child.stdout.close()
+                if child.stderr is not None:
+                    child.stderr.close()
 
     def test_core_exact_opt_in_publishes_and_reuses_separate_target(self) -> None:
         home = self.fixture.root / "core-home"

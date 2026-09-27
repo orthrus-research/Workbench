@@ -132,8 +132,9 @@ def _dev_parser() -> argparse.ArgumentParser:
         "--template-custody",
         choices=("core-posix-exact-v1",),
         help=(
-            "opt into Core POSIX exact tree custody for automatic launch-server "
-            "materialization; the default server-v2 route remains available"
+            "require Core POSIX exact tree and restartable staged-tool process "
+            "custody for automatic launch-server materialization; this strict "
+            "route currently refuses without a host process broker"
         ),
     )
     parser.add_argument(

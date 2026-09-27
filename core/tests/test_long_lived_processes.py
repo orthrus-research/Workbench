@@ -17,9 +17,11 @@ from workbench_api.long_lived_processes import (  # noqa: E402
     LongLivedProcessError,
     LongLivedProcessRequest,
     ProcessAbsence,
+    StagedToolProcessRequest,
     bind_long_lived_process_host,
     observe_process_absence,
     reserve_long_lived_process,
+    reserve_staged_tool_process,
 )
 from workbench_core.long_lived_processes import HOST  # noqa: E402
 
@@ -84,6 +86,42 @@ class LongLivedProcessTests(unittest.TestCase):
                 )
         with self.assertRaisesRegex(LongLivedProcessError, "invalid"):
             observe_process_absence(Lease(ProcessAbsence("absent", "")))
+
+    @unittest.skipUnless(platform.system() == "Linux", "Linux staged tool gate")
+    def test_staged_tool_reservation_refuses_before_stage_creation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "private/server-template"
+            request = StagedToolProcessRequest(
+                workspace=root,
+                owner_id="workbench-shell",
+                stage_parent=target.parent,
+                stage_policy="core-posix-exact-v1",
+                target=target,
+                source_variant_id="sha256:" + "a" * 64,
+                source_receipt_sha256="b" * 64,
+                tool_artifacts=(
+                    ("packwiz-refresh", "c" * 64),
+                    ("cleanroom-installer", "d" * 64),
+                    ("packwiz-installer", "e" * 64),
+                ),
+            )
+            with self.assertRaisesRegex(LongLivedProcessError, "restartable containment"):
+                reserve_staged_tool_process(request)
+            self.assertFalse(target.parent.exists())
+
+            invalid = StagedToolProcessRequest(
+                workspace=request.workspace,
+                owner_id=request.owner_id,
+                stage_parent=request.stage_parent,
+                stage_policy=request.stage_policy,
+                target=request.target,
+                source_variant_id=request.source_variant_id,
+                source_receipt_sha256=request.source_receipt_sha256,
+                tool_artifacts=(("packwiz-refresh", "wrong"),),
+            )
+            with self.assertRaisesRegex(LongLivedProcessError, "request is invalid"):
+                reserve_staged_tool_process(invalid)
 
 
 if __name__ == "__main__":

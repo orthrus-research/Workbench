@@ -44,6 +44,11 @@ from workbench_api.verified_artifacts import (
     acquire_verified_artifact,
 )
 from workbench_api.managed_trees import ManagedTreeError, managed_trees
+from workbench_api.long_lived_processes import (
+    LongLivedProcessError,
+    StagedToolProcessRequest,
+    reserve_staged_tool_process,
+)
 from workbench_core.configuration import (
     CONFIGURATION_PATH,
     WorkbenchConfiguration,
@@ -111,6 +116,40 @@ MATERIALIZATION_LIMITATIONS = [
 
 class SusyServerMaterializationError(RuntimeError):
     """An exact SUSY Cleanroom server template cannot be materialized safely."""
+
+
+def _require_core_staged_tool_custody(
+    *, workspace: Path, target: Path, source_variant_id: str,
+    source_receipt_sha256: str, packwiz_sha256: str,
+    cleanroom_sha256: str, installer_sha256: str,
+) -> None:
+    """Refuse Core tree publication without a stage-bound process scope.
+
+    Reservation runs before this invocation creates the target parent, stage
+    or tool cache.
+    Core currently cannot issue a lease that launches the tools and proves
+    descendant absence, so no strict attempt reaches a legacy runner.
+    """
+
+    try:
+        reserve_staged_tool_process(StagedToolProcessRequest(
+            workspace=workspace,
+            owner_id="workbench-shell",
+            stage_parent=target.parent,
+            stage_policy=CORE_EXACT_TEMPLATE_CUSTODY,
+            target=target,
+            source_variant_id=source_variant_id,
+            source_receipt_sha256=source_receipt_sha256,
+            tool_artifacts=(
+                ("packwiz-refresh", packwiz_sha256),
+                ("cleanroom-installer", cleanroom_sha256),
+                ("packwiz-installer", installer_sha256),
+            ),
+        ))
+    except LongLivedProcessError as exc:
+        raise SusyServerMaterializationError(
+            f"Core staged tool process custody is unavailable: {exc}"
+        ) from exc
 
 
 def _canonical(value: Any) -> bytes:
@@ -1492,13 +1531,31 @@ def materialize_susy_server(
         if template_custody == CORE_EXACT_TEMPLATE_CUSTODY
         else "fixtures/supersymmetry/server-v2"
     )
-    fixture_parent = _ensure_state_directory(
-        state,
-        fixture_family_relative,
-    )
+    fixture_parent = state / fixture_family_relative
     fixture_root = fixture_parent / str(
         source_variant["variant_id"]
     ).removeprefix("sha256:")[:16]
+
+    if template_custody == CORE_EXACT_TEMPLATE_CUSTODY:
+        canonical_tools = canonical_receipt.get("tools")
+        canonical_packwiz = (
+            canonical_tools.get("packwiz")
+            if isinstance(canonical_tools, dict) else None
+        )
+        _require_core_staged_tool_custody(
+            workspace=suite,
+            target=fixture_root,
+            source_variant_id=str(source_variant["variant_id"]),
+            source_receipt_sha256=str(canonical_provenance["receipt_sha256"]),
+            packwiz_sha256=(
+                str(canonical_packwiz.get("sha256"))
+                if isinstance(canonical_packwiz, dict) else ""
+            ),
+            cleanroom_sha256=str(locks["cleanroom_server"]["sha256"]),
+            installer_sha256=str(locks["packwiz_installer"]["sha256"]),
+        )
+
+    fixture_parent = _ensure_state_directory(state, fixture_family_relative)
 
     native_host = host_platform()
     candidates = None if server_java is None else [
