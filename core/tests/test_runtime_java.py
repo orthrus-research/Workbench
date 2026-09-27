@@ -127,8 +127,7 @@ cat >&2 <<EOF
 Property settings:
     java.version = 1.8.0_504
     java.runtime.version = 1.8.0_504-b01
-    java.vendor = Eclipse Adoptium
-    java.vendor.version = Temurin-8u504-b01
+    java.vendor = Temurin
     java.home = $jdk_home_dir/jre
     java.vm.name = OpenJDK 64-Bit Server VM
     java.vm.version = 25.504-b01
@@ -192,6 +191,18 @@ class JavaRuntimeTest(unittest.TestCase):
             "runtime_version": "1.8.0_504-b01", "vendor": "Eclipse Adoptium",
             "os_arch": "amd64",
         }, selected, HOST))
+        self.assertIsNone(runtime_java_module._probe_mismatch({
+            "runtime_version": "1.8.0_504-b01", "vendor": "Temurin",
+            "os_arch": "amd64",
+        }, selected, HOST))
+        self.assertIsNotNone(runtime_java_module._probe_mismatch({
+            "runtime_version": "1.8.0_504-b01", "vendor": "Other Temurin",
+            "os_arch": "amd64",
+        }, selected, HOST))
+        self.assertIsNotNone(runtime_java_module._probe_mismatch({
+            "runtime_version": "25.0.4+7-LTS", "vendor": "Temurin",
+            "os_arch": "amd64",
+        }, default, HOST))
         self.assertIsNotNone(runtime_java_module._probe_mismatch({
             "runtime_version": "1.8.0_502-b07", "vendor": "Eclipse Adoptium",
             "os_arch": "amd64",
@@ -229,6 +240,7 @@ class JavaRuntimeTest(unittest.TestCase):
             created = materialize_temurin_runtime(policy, deepcopy(HOST), asset, state_root=state)
             self.assertEqual("provisioned", created["outcome"])
             receipt = created["receipt"]
+            self.assertEqual("Temurin", receipt["probe"]["vendor"])
             self.assertIn("/jre", receipt["probe"]["java_home"])
             self.assertIn("/bin/java", receipt["target"]["java_uri"])
             reused = materialize_temurin_runtime(policy, deepcopy(HOST), asset, state_root=state)

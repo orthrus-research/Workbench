@@ -629,9 +629,13 @@ def _probe_mismatch(
         )
     vendor = probe.get("vendor", "").casefold()
     vendor_version = probe.get("vendor_version", "").casefold()
+    # Temurin 8 reports its vendor as "Temurin" and does not necessarily
+    # expose java.vendor.version. Later releases report "Eclipse Adoptium".
+    temurin8_vendor = policy["feature_version"] == 8 and vendor == "temurin"
     if (
         str(policy["java_vendor"]).casefold() not in vendor
         and "temurin" not in vendor_version
+        and not temurin8_vendor
     ):
         return (
             f"requires Eclipse Temurin, found "
