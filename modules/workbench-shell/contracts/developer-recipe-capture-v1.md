@@ -138,10 +138,15 @@ profile drift invalidates preparation/execution of an earlier plan. Failed and
 completed attempts remain separate; an attempted preparation or run cannot be
 reused to certify changed inputs.
 
-An older prepared attempt remains readable through `show`, but cannot start a
-new game run because it has no retained preparation-complete witness. An
-interrupted preparation also cannot be resumed or run. Create a new plan and
-prepare a new attempt in either case; Workbench retains the original evidence.
+An older planned attempt remains readable through `show`, but cannot start a
+new preparation because it has no retained planning-complete witness. An older
+prepared attempt remains readable, but cannot start a new game run if it has
+no preparation-complete witness. An interrupted plan or preparation cannot be
+resumed. Create a new plan in these cases; Workbench retains the original
+evidence. A prepared attempt that already has a valid preparation-complete
+witness can still run even if it predates the planning-complete witness: the
+later witness binds the exact request and prepared bytes. If planning stopped
+before the request was saved, `show` has no reviewable request to return.
 
 A completed record supplies the audit path, summary, coverage and graph
 projection identity. The retained graph can also be queried independently:

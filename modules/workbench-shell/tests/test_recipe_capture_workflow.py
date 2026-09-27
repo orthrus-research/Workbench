@@ -312,6 +312,258 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                                cancelled=self.cancelled)
         self.assertEqual(request, capture.show(None, request['attempt_id']))
 
+    def test_request_v1_bytes_and_ready_witness_bind_exact_request(self):
+        with patch.object(capture, 'publish_immutable_bytes',
+                          wraps=capture.publish_immutable_bytes) as published:
+            request = self.plan()
+        attempt = self.attempt(request)
+        raw = (attempt / 'request.json').read_bytes()
+        self.assertEqual(check_storage.canonical(request) + b'\n', raw)
+        self.assertIn(attempt / 'request.json', [call.args[0] for call in published.call_args_list])
+        intent = json.loads((attempt / 'plan-intent.json').read_bytes())
+        ready = json.loads((attempt / 'request-ready.json').read_bytes())
+        self.assertEqual(capture.PLAN_INTENT, intent['format'])
+        self.assertEqual(capture.REQUEST_READY, ready['format'])
+        self.assertEqual(request['id'], ready['request_id'])
+        self.assertEqual(intent['id'], ready['intent_id'])
+        self.assertEqual(sha256(raw).hexdigest(), ready['request_sha256'])
+        self.assertEqual(len(raw), ready['request_size'])
+        self.assertEqual(request, capture.show(self.state, request['attempt_id']))
+
+    def test_historical_request_is_readable_but_cannot_start_preparation(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        request_path = attempt / 'request.json'
+        raw = request_path.read_bytes()
+        (attempt / 'plan-intent.json').unlink()
+        (attempt / 'request-ready.json').unlink()
+        if os.name != 'nt':
+            request_path.chmod(0o644)
+        with patch.object(capture, 'read_bounded_single_link_bytes',
+                          wraps=capture.read_bounded_single_link_bytes) as historical_read:
+            self.assertEqual(request, capture.show(self.state, request['attempt_id']))
+        self.assertIn((request_path,), [call.args for call in historical_read.call_args_list])
+        with self.assertRaisesRegex(ValueError, 'durable plan intent witness'):
+            self.prepare(request)
+        self.assertEqual(raw, request_path.read_bytes())
+        self.assertFalse((attempt / 'prepare-started.json').exists())
+        self.native.assert_not_called()
+
+    def test_plan_intent_faults_retain_stage_without_a_reviewable_request(self):
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        attempts_root = self.state / '.workbench/check-attempts'
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                before = {path.name for path in attempts_root.iterdir()} if attempts_root.exists() else set()
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    if Path(target).name == 'plan-intent.json' and moment == 'before-link':
+                        raise OSError('intent before-link interruption')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    if (Path(directory).name.startswith('recipe-capture-')
+                            and (Path(directory) / 'plan-intent.json').exists()
+                            and moment == 'after-link-before-flush'):
+                        raise OSError('intent post-link flush unavailable')
+                    return original_flush(directory)
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaises(OSError):
+                        self.plan()
+                [name] = {path.name for path in attempts_root.iterdir()} - before
+                attempt = attempts_root / name
+                stages = list(attempt.glob('.plan-intent.json.*.tmp'))
+                self.assertEqual(1, len(stages))
+                self.assertEqual(moment == 'after-link-before-flush', (attempt / 'plan-intent.json').exists())
+                self.assertFalse((attempt / 'request.json').exists())
+                with self.assertRaises(FileNotFoundError):
+                    capture.show(self.state, name)
+                self.assertFalse((attempt / 'prepare-started.json').exists())
+                self.native.assert_not_called()
+
+    def test_request_publication_faults_leave_unready_attempt(self):
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        attempts_root = self.state / '.workbench/check-attempts'
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                before = {path.name for path in attempts_root.iterdir()} if attempts_root.exists() else set()
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    if Path(target).name == 'request.json' and moment == 'before-link':
+                        raise OSError('request before-link interruption')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    if (Path(directory).name.startswith('recipe-capture-')
+                            and (Path(directory) / 'request.json').exists()
+                            and moment == 'after-link-before-flush'):
+                        raise OSError('request post-link flush unavailable')
+                    return original_flush(directory)
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaises(OSError):
+                        self.plan()
+                [name] = {path.name for path in attempts_root.iterdir()} - before
+                attempt = attempts_root / name
+                self.assertTrue((attempt / 'plan-intent.json').exists())
+                self.assertEqual(moment == 'after-link-before-flush', (attempt / 'request.json').exists())
+                self.assertFalse((attempt / 'request-ready.json').exists())
+                if (attempt / 'request.json').exists():
+                    self.assertEqual('interrupted', capture.show(self.state, name)['state'])
+                    request = json.loads((attempt / 'request.json').read_bytes())
+                    with self.assertRaisesRegex(ValueError, 'durable ready witness'):
+                        self.prepare(request)
+                else:
+                    with self.assertRaises(FileNotFoundError):
+                        capture.show(self.state, name)
+                self.assertFalse((attempt / 'prepare-started.json').exists())
+                self.native.assert_not_called()
+
+    def test_request_ready_faults_keep_uncertain_stage_and_refuse_preparation(self):
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        attempts_root = self.state / '.workbench/check-attempts'
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                before = {path.name for path in attempts_root.iterdir()} if attempts_root.exists() else set()
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    if Path(target).name == 'request-ready.json' and moment == 'before-link':
+                        raise OSError('ready before-link interruption')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    if (Path(directory).name.startswith('recipe-capture-')
+                            and (Path(directory) / 'request-ready.json').exists()
+                            and moment == 'after-link-before-flush'):
+                        raise OSError('ready post-link flush unavailable')
+                    return original_flush(directory)
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaises(OSError):
+                        self.plan()
+                [name] = {path.name for path in attempts_root.iterdir()} - before
+                attempt = attempts_root / name
+                request = json.loads((attempt / 'request.json').read_bytes())
+                stages = list(attempt.glob('.request-ready.json.*.tmp'))
+                self.assertEqual(1, len(stages))
+                stage_bytes = stages[0].read_bytes()
+                self.assertEqual(moment == 'after-link-before-flush', (attempt / 'request-ready.json').exists())
+                self.assertEqual('interrupted', capture.show(self.state, name)['state'])
+                with self.assertRaisesRegex(ValueError, 'uncertain record stage'):
+                    self.prepare(request)
+                self.assertEqual(stage_bytes, stages[0].read_bytes())
+                self.assertFalse((attempt / 'prepare-started.json').exists())
+                self.native.assert_not_called()
+
+    def test_request_witness_change_or_missing_half_refuses_preparation(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        intent_path = attempt / 'plan-intent.json'
+        original_intent = intent_path.read_bytes()
+        ready_path = attempt / 'request-ready.json'
+        original = ready_path.read_bytes()
+        ready_path.unlink()
+        self.assertEqual('interrupted', capture.show(self.state, request['attempt_id'])['state'])
+        with self.assertRaisesRegex(ValueError, 'durable ready witness'):
+            self.prepare(request)
+        ready_path.write_bytes(original)
+        if os.name != 'nt':
+            ready_path.chmod(0o600)
+        intent_path.unlink()
+        self.assertEqual('interrupted', capture.show(self.state, request['attempt_id'])['state'])
+        with self.assertRaisesRegex(ValueError, 'durable plan intent witness'):
+            self.prepare(request)
+        intent_path.write_bytes(original_intent)
+        if os.name != 'nt':
+            intent_path.chmod(0o600)
+        changed = json.loads(original)
+        changed['request_sha256'] = '0' * 64
+        changed = check_storage.seal('recipe-capture-request-ready',
+                                     {key: value for key, value in changed.items() if key != 'id'})
+        ready_path.write_bytes(check_storage.canonical(changed) + b'\n')
+        with self.assertRaisesRegex(ValueError, 'does not bind'):
+            capture.show(self.state, request['attempt_id'])
+        with self.assertRaisesRegex(ValueError, 'does not bind'):
+            self.prepare(request)
+        self.assertFalse((attempt / 'prepare-started.json').exists())
+        self.native.assert_not_called()
+
+    def test_request_bytes_and_old_or_named_stages_refuse_preparation(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        request_path = attempt / 'request.json'
+        original = request_path.read_bytes()
+        for name in ('.record-' + 'f' * 32, '.request-ready.json.unknown'):
+            with self.subTest(name=name):
+                stage = attempt / name
+                stage.write_bytes(b'unknown retained stage')
+                self.assertEqual('interrupted', capture.show(self.state, request['attempt_id'])['state'])
+                with self.assertRaisesRegex(ValueError, 'uncertain record stage'):
+                    self.prepare(request)
+                self.assertEqual(b'unknown retained stage', stage.read_bytes())
+                stage.unlink()
+        for replacement in (b' ' + original, b'{"id":"one","id":"two"}\n'):
+            with self.subTest(replacement=replacement[:16]):
+                request_path.write_bytes(replacement)
+                with self.assertRaises((OSError, ValueError)):
+                    capture.show(self.state, request['attempt_id'])
+                with self.assertRaises((OSError, ValueError)):
+                    self.prepare(request)
+        request_path.write_bytes(original)
+        self.assertEqual(request, capture.show(self.state, request['attempt_id']))
+        self.assertFalse((attempt / 'prepare-started.json').exists())
+        self.native.assert_not_called()
+
+    def test_prepare_reopens_request_after_acquiring_attempt_lock(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        request_path = attempt / 'request.json'
+        original = request_path.read_bytes()
+        original_load = capture.load
+
+        def change_after_load(root, identity):
+            observed = original_load(root, identity)
+            request_path.write_bytes(b' ' + original)
+            return observed
+
+        with patch.object(capture, 'load', side_effect=change_after_load):
+            with self.assertRaisesRegex(ValueError, 'does not bind'):
+                self.prepare(request)
+        self.assertFalse((attempt / 'prepare-started.json').exists())
+        self.native.assert_not_called()
+
+    def test_existing_prepared_witness_remains_runnable_without_new_request_pair(self):
+        prepared = self.prepare()
+        attempt = self.attempt(prepared)
+        (attempt / 'plan-intent.json').unlink()
+        (attempt / 'request-ready.json').unlink()
+        result = self.run_capture(prepared)
+        self.assertEqual('complete', result['state'])
+        self.assertEqual(result, capture.show(self.state, prepared['attempt_id']))
+
+    def test_complete_reopen_verifies_present_request_witness_pair(self):
+        result = self.run_capture()
+        attempt = self.attempt(result)
+        ready_path = attempt / 'request-ready.json'
+        original = ready_path.read_bytes()
+        ready_path.write_bytes(b'changed request witness')
+        with self.assertRaises((OSError, ValueError)):
+            capture.show(self.state, result['attempt_id'])
+        ready_path.unlink()
+        with self.assertRaises((OSError, ValueError)):
+            capture.show(self.state, result['attempt_id'])
+        ready_path.write_bytes(original)
+        if os.name != 'nt':
+            ready_path.chmod(0o600)
+        self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
     def test_export_requires_complete_verified_local_custody(self):
         from workbench_atlas_recipe_health import completed_scan
 
@@ -475,7 +727,10 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         with patch.object(capture, 'read_bounded_single_link_bytes',
                           wraps=capture.read_bounded_single_link_bytes) as historical_read:
             self.assertEqual(failure, capture.show(self.state, request['attempt_id']))
-        historical_read.assert_called_once_with(failure_path, byte_limit=32 * 1024**2)
+        self.assertEqual(
+            [(attempt / 'request.json',), (attempt / 'request.json',), (failure_path,)],
+            [call.args for call in historical_read.call_args_list],
+        )
         for replacement in (b'{"id":"one","id":"two"}\n', b'changed failure'):
             with self.subTest(replacement=replacement):
                 failure_path.write_bytes(replacement)
@@ -891,7 +1146,9 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                                   wraps=capture.read_bounded_single_link_bytes) as historical_read:
                     self.assertEqual(result, capture.show(self.state, result['attempt_id']))
                 self.assertEqual(
-                    [(result_path,), (attempt / 'prepared.json',), (input_path,)],
+                    [(attempt / 'request.json',), (attempt / 'request.json',),
+                     (result_path,), (attempt / 'prepared.json',),
+                     (attempt / 'request.json',), (input_path,)],
                     [call.args for call in historical_read.call_args_list],
                 )
                 self.assertTrue(all(call.kwargs == {'byte_limit': 32 * 1024**2}
@@ -1032,7 +1289,10 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                 with patch.object(capture, 'read_bounded_single_link_bytes',
                                   wraps=capture.read_bounded_single_link_bytes) as historical_read:
                     self.assertEqual(failed, capture.show(self.state, prepared['attempt_id']))
-                historical_read.assert_called_once_with(result_path, byte_limit=32 * 1024**2)
+                self.assertEqual(
+                    [(attempt / 'request.json',), (attempt / 'request.json',), (result_path,)],
+                    [call.args for call in historical_read.call_args_list],
+                )
             finally:
                 result_path.chmod(0o600)
 

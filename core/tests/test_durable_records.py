@@ -115,24 +115,24 @@ class DurableRecordTests(unittest.TestCase):
 
     def test_commit_witness_removes_stage_only_after_parent_flush(self) -> None:
         original_flush = durable_records.fsync_directory
-        flushed: list[Path] = []
+        flushed: list[tuple[Path, bool]] = []
 
         def observe_flush(directory: Path) -> None:
             stages = list(self.root.glob('.current.json.*.tmp'))
             self.assertEqual(1, len(stages))
-            self.assertTrue(self.path.exists())
-            flushed.append(directory)
+            flushed.append((directory, self.path.exists()))
             original_flush(directory)
 
         with patch.object(durable_records, 'fsync_directory', side_effect=observe_flush):
             publish_commit_witness_bytes(self.path, b'committed\n', byte_limit=1024)
-        self.assertEqual([self.root], flushed)
+        self.assertEqual([(self.root, False), (self.root, True)], flushed)
         self.assertEqual(0, count_uncertain_record_stages(self.root, targets=('current.json',)))
         self.assertEqual(b'committed\n', read_private_single_link_bytes(self.path, byte_limit=1024))
 
     def test_commit_witness_retains_stage_before_link_and_after_failed_flush(self) -> None:
         original_link = durable_records.os.link
-        for moment in ('before-link', 'after-link'):
+        original_flush = durable_records.fsync_directory
+        for moment in ('before-stage-flush', 'before-link', 'after-link'):
             with self.subTest(moment=moment):
                 def interrupt_link(source: Path, target: Path, **kwargs: object) -> None:
                     if moment == 'before-link' and target == self.path:
@@ -140,7 +140,9 @@ class DurableRecordTests(unittest.TestCase):
                     original_link(source, target, **kwargs)
 
                 def interrupt_flush(directory: Path) -> None:
-                    raise OSError('after witness link')
+                    if moment == 'before-stage-flush' or (moment == 'after-link' and self.path.exists()):
+                        raise OSError('witness directory flush interrupted')
+                    original_flush(directory)
 
                 with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
                       patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
@@ -158,7 +160,8 @@ class DurableRecordTests(unittest.TestCase):
         code = (
             "import os,sys; from pathlib import Path; "
             "from workbench_core import durable_records as records; "
-            "records.fsync_directory=lambda directory: os._exit(74); "
+            "original=records.fsync_directory; "
+            "records.fsync_directory=lambda directory: os._exit(74) if Path(sys.argv[1]).exists() else original(directory); "
             "records.publish_commit_witness_bytes(Path(sys.argv[1]), b'pending\\n', byte_limit=1024)"
         )
         roots = Path(__file__).resolve().parents

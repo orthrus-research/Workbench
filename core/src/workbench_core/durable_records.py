@@ -261,6 +261,9 @@ def publish_commit_witness_bytes(path: Path, data: bytes, *, byte_limit: int) ->
     if path.exists() or path.is_symlink():
         raise DurableRecordError("collision", "commit witness already exists")
     with _prepared(path, data, create_once_stage=True, retain_stage_on_error=True) as (temporary, secured):
+        # Persist the stage name before publishing the final link. Otherwise a
+        # power loss could preserve that link but lose the uncertainty marker.
+        fsync_directory(path.parent)
         try:
             os.link(temporary, path, follow_symlinks=False)
         except FileExistsError as exc:

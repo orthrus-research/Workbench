@@ -32,12 +32,15 @@ PREPARED = 'workbench-developer-recipe-capture-prepared-v1'
 RESULT = 'workbench-developer-recipe-capture-result-v1'
 PREPARE_INTENT = 'workbench-developer-recipe-capture-prepare-intent-v1'
 PREPARE_READY = 'workbench-developer-recipe-capture-prepare-ready-v1'
+PLAN_INTENT = 'workbench-developer-recipe-capture-plan-intent-v1'
+REQUEST_READY = 'workbench-developer-recipe-capture-request-ready-v1'
 _CUSTODY = ('request.json', 'prepared.json', 'launch.json', 'runtime-lock.json',
             'protocol.json', 'input-manifest.json', 'audit.json')
 _RECORD_BYTE_LIMIT = 32 * 1024**2
 _WITNESS_BYTE_LIMIT = 4096
 _PREPARE_STAGE_TARGETS = (
-    'request.json', 'prepare-intent.json', 'prepare-started.json',
+    'plan-intent.json', 'request.json', 'request-ready.json',
+    'prepare-intent.json', 'prepare-started.json',
     'prepared.json', 'prepare-ready.json', 'prepare-failed.json',
     'run-started.json', 'result.json', 'input-manifest.json',
 )
@@ -113,6 +116,24 @@ def _read_bounded_ordinary_json(path):
     return _read_bounded_ordinary_json_with_raw(path)[0]
 
 
+def _write_request_record(attempt, value):
+    request = storage.seal('recipe-capture-request', value)
+    publish_immutable_bytes(attempt / 'request.json',
+                            storage.canonical(request) + b'\n',
+                            byte_limit=_RECORD_BYTE_LIMIT)
+    return request
+
+
+def _read_request_record(attempt):
+    value, raw = _read_bounded_ordinary_json_with_raw(attempt / 'request.json')
+    if (not isinstance(value, dict)
+            or storage.seal('recipe-capture-request', {k: v for k, v in value.items() if k != 'id'}) != value):
+        raise ValueError('retained capture record identity changed')
+    if value.get('format') != REQUEST or value.get('attempt_id') != attempt.name:
+        raise ValueError('unsupported capture request or changed attempt identity')
+    return value, raw
+
+
 def _read_prepared_record(attempt, *, request_id):
     value, raw = _read_bounded_ordinary_json_with_raw(attempt / 'prepared.json')
     if (not isinstance(value, dict)
@@ -123,8 +144,8 @@ def _read_prepared_record(attempt, *, request_id):
 
 
 def _request_raw(attempt, request):
-    raw = storage.read_bytes(attempt / 'request.json', byte_limit=_RECORD_BYTE_LIMIT)
-    if raw != storage.canonical(request) + b'\n':
+    observed, raw = _read_request_record(attempt)
+    if observed != request or raw != storage.canonical(request) + b'\n':
         raise ValueError('retained capture request bytes changed')
     return raw
 
@@ -141,6 +162,31 @@ def _read_preparation_witness(attempt, name, kind, *, fields):
 
 def _uncertain_prepare_stages(attempt):
     return count_uncertain_record_stages(attempt, targets=_PREPARE_STAGE_TARGETS) != 0
+
+
+def _verify_request_ready(attempt, request, request_raw, *, check_stages=True):
+    if check_stages and _uncertain_prepare_stages(attempt):
+        raise ValueError('request has an uncertain record stage; make a new plan')
+    if not os.path.lexists(native_path(attempt / 'plan-intent.json')):
+        raise ValueError('request has no durable plan intent witness; make a new plan')
+    if not os.path.lexists(native_path(attempt / 'request-ready.json')):
+        raise ValueError('request has no durable ready witness; make a new plan')
+    intent = _read_preparation_witness(
+        attempt, 'plan-intent.json', 'recipe-capture-plan-intent',
+        fields={'format', 'attempt_id', 'id'},
+    )
+    ready = _read_preparation_witness(
+        attempt, 'request-ready.json', 'recipe-capture-request-ready',
+        fields={'format', 'attempt_id', 'request_id', 'request_sha256',
+                'request_size', 'intent_id', 'id'},
+    )
+    if (request_raw != storage.canonical(request) + b'\n'
+            or intent['format'] != PLAN_INTENT or intent['attempt_id'] != attempt.name
+            or ready['format'] != REQUEST_READY or ready['attempt_id'] != attempt.name
+            or ready['request_id'] != request['id'] or ready['intent_id'] != intent['id']
+            or ready['request_sha256'] != sha256(request_raw).hexdigest()
+            or ready['request_size'] != len(request_raw)):
+        raise ValueError('retained request witness does not bind the planned capture')
 
 
 def _verify_prepared_ready(attempt, request, prepared, prepared_raw, *, check_stages=True):
@@ -309,6 +355,12 @@ def plan(root, *, source, runtime=None, java_home=None, profile, heap_mib, cance
     attempt = managed_attempts().allocate(
         ATTEMPT_FAMILY, ATTEMPT_PREFIX, requested_root=root, workspace=source,
     ).path
+    intent = storage.seal('recipe-capture-plan-intent', {
+        'format': PLAN_INTENT, 'attempt_id': attempt.name,
+    })
+    publish_commit_witness_bytes(attempt / 'plan-intent.json',
+                                 storage.canonical(intent) + b'\n',
+                                 byte_limit=_WITNESS_BYTE_LIMIT)
     execution_root = java_execution_path(attempt)
     stage_candidate(inputs, attempt / 'source')
     if observe_source(source) != inputs.observation:
@@ -324,7 +376,18 @@ def plan(root, *, source, runtime=None, java_home=None, profile, heap_mib, cance
             'state': 'planned', 'native_executed': False,
             'eula_acceptance': 'required-as-explicit-run-argument',
             'retention': 'Failed attempts and complete process/capture evidence are retained in Core storage.'}
-    return _record(attempt, 'request.json', 'recipe-capture-request', body)
+    request = _write_request_record(attempt, body)
+    request_raw = _request_raw(attempt, request)
+    _source(attempt, request, cancelled=cancel.is_set)
+    ready = storage.seal('recipe-capture-request-ready', {
+        'format': REQUEST_READY, 'attempt_id': attempt.name,
+        'request_id': request['id'], 'request_sha256': sha256(request_raw).hexdigest(),
+        'request_size': len(request_raw), 'intent_id': intent['id'],
+    })
+    publish_commit_witness_bytes(attempt / 'request-ready.json',
+                                 storage.canonical(ready) + b'\n',
+                                 byte_limit=_WITNESS_BYTE_LIMIT)
+    return request
 
 
 def load(root, identity):
@@ -335,9 +398,7 @@ def load(root, identity):
         requested_root=root, legacy_basename='recipe-captures',
     )
     attempt = reference.path
-    request = _read(attempt, 'request.json', 'recipe-capture-request')
-    if request.get('format') != REQUEST or request.get('attempt_id') != identity:
-        raise ValueError('unsupported capture request or changed attempt identity')
+    request, _ = _read_request_record(attempt)
     return reference, request
 
 
@@ -383,17 +444,19 @@ def _fail(attempt, filename, kind, request, stage, exc):
 
 
 def prepare(root, identity, confirm, *, cancelled):
-    reference, request = load(root, identity)
+    reference, _ = load(root, identity)
     attempt = reference.path
-    if confirm != request['id']:
-        raise ValueError('preparation requires the exact reviewed plan ID')
     with managed_attempts().execution(reference):
+        request, request_raw = _read_request_record(attempt)
+        if confirm != request['id']:
+            raise ValueError('preparation requires the exact reviewed plan ID')
         if any(os.path.lexists(native_path(attempt / name)) for name in (
                 'prepare-intent.json', 'prepare-started.json', 'prepared.json',
                 'prepare-ready.json', 'prepare-failed.json')):
             raise ValueError('this preparation was already attempted; make a new plan')
         if _uncertain_prepare_stages(attempt):
             raise ValueError('this preparation has an uncertain record stage; make a new plan')
+        _verify_request_ready(attempt, request, request_raw, check_stages=False)
         cancel = Cancellation(cancelled, reference)
         cancel.check()
         owner = _current(attempt, request)
@@ -486,6 +549,10 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
             raise ValueError('this preparation failed; make a new plan')
         if _uncertain_prepare_stages(attempt):
             raise ValueError('preparation has an uncertain record stage; make a new plan')
+        if (os.path.lexists(native_path(attempt / 'plan-intent.json'))
+                or os.path.lexists(native_path(attempt / 'request-ready.json'))):
+            _verify_request_ready(attempt, request, _request_raw(attempt, request),
+                                  check_stages=False)
         prepared, prepared_raw = _read_prepared_record(attempt, request_id=request['id'])
         if prepared.get('format') != PREPARED or confirm != prepared['id']:
             raise ValueError('execution requires the exact prepared capture ID')
@@ -588,6 +655,12 @@ def show(root, identity, *, cancelled=None):
     reference, request = load(root, identity)
     attempt = reference.path
     _source(attempt, request, cancelled=cancel.is_set)
+    has_plan_intent = os.path.lexists(native_path(attempt / 'plan-intent.json'))
+    has_request_ready = os.path.lexists(native_path(attempt / 'request-ready.json'))
+    if ((attempt / 'result.json').exists() or os.path.lexists(native_path(attempt / 'prepare-failed.json'))):
+        if has_plan_intent or has_request_ready:
+            _verify_request_ready(attempt, request, _request_raw(attempt, request),
+                                  check_stages=False)
     if (attempt / 'result.json').exists():
         result = _read_result_record(attempt, request_id=request['id'])
         if result['state'] == 'complete':
@@ -638,15 +711,22 @@ def show(root, identity, *, cancelled=None):
     if os.path.lexists(native_path(attempt / 'prepared.json')):
         prepared, prepared_raw = _read_prepared_record(attempt, request_id=request['id'])
         if (attempt / 'run-started.json').exists():
+            if has_plan_intent or has_request_ready:
+                _verify_request_ready(attempt, request, _request_raw(attempt, request),
+                                      check_stages=False)
             return {'format': RESULT, 'attempt_id': identity,
                     'state': 'running' if managed_attempts().active(reference) else 'interrupted',
                     'prepared': prepared}
         has_intent = os.path.lexists(native_path(attempt / 'prepare-intent.json'))
         has_ready = os.path.lexists(native_path(attempt / 'prepare-ready.json'))
-        if _uncertain_prepare_stages(attempt) or has_intent != has_ready:
+        if (_uncertain_prepare_stages(attempt) or has_intent != has_ready
+                or has_plan_intent != has_request_ready):
             return {'format': RESULT, 'attempt_id': identity,
                     'state': 'preparing' if managed_attempts().active(reference) else 'interrupted',
                     'prepared': prepared}
+        if has_plan_intent:
+            _verify_request_ready(attempt, request, _request_raw(attempt, request),
+                                  check_stages=False)
         if has_intent:
             _verify_prepared_ready(attempt, request, prepared, prepared_raw)
         # A historical V1 prepared record remains readable. Without the new
@@ -655,8 +735,12 @@ def show(root, identity, *, cancelled=None):
     if (os.path.lexists(native_path(attempt / 'prepare-intent.json'))
             or os.path.lexists(native_path(attempt / 'prepare-started.json'))
             or os.path.lexists(native_path(attempt / 'prepare-ready.json'))
+            or has_plan_intent != has_request_ready
             or _uncertain_prepare_stages(attempt)):
         return {'format': RESULT, 'attempt_id': identity, 'state': 'preparing' if managed_attempts().active(reference) else 'interrupted', 'request': request}
+    if has_plan_intent:
+        _verify_request_ready(attempt, request, _request_raw(attempt, request),
+                              check_stages=False)
     return request
 
 
