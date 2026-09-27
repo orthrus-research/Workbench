@@ -560,6 +560,178 @@ AtlasObservationSearchScreen #atlas-observation-search {
     overflow-y: auto;
 }
 
+/* The registry triage route keeps the current finding and its exact record
+   within one terminal page.  Lists take the remaining rows at 64 x 22. */
+AxiomFindingsScreen #axiom-findings-hint {
+    height: auto;
+    max-height: 2;
+    padding: 0 1;
+    color: $metadata;
+}
+
+AxiomFindingDetailScreen #axiom-finding-hint {
+    height: 1;
+    padding: 0 1;
+    color: $metadata;
+}
+
+AxiomFindingsScreen #axiom-findings-summary {
+    height: auto;
+    max-height: 3;
+    padding: 0 1;
+    color: $description;
+    text-style: bold;
+}
+
+AxiomFindingsScreen #axiom-findings-list {
+    height: 1fr;
+    min-height: 4;
+    margin: 0 1;
+}
+
+AxiomFindingsScreen #axiom-findings-selected {
+    height: 3;
+    min-height: 3;
+    padding: 0 1;
+    border-top: solid $secondary;
+    overflow-y: auto;
+}
+
+AxiomFindingsScreen #axiom-findings-status,
+AxiomFindingDetailScreen #axiom-finding-status {
+    height: auto;
+    max-height: 2;
+    padding: 0 1;
+    color: $description;
+    overflow-y: auto;
+}
+
+AxiomFindingsScreen #axiom-findings-actions,
+AxiomFindingDetailScreen #axiom-finding-actions {
+    height: 1;
+    min-height: 1;
+    margin: 0 1;
+}
+
+AxiomFindingsScreen #axiom-findings-actions Button,
+AxiomFindingDetailScreen #axiom-finding-actions Button {
+    margin: 0 1 0 0;
+}
+
+AxiomFindingDetailScreen #axiom-finding-detail {
+    height: 1fr;
+    min-height: 4;
+    margin: 0 1;
+    padding: 0 1;
+    border: solid $secondary;
+    background: $background;
+    overflow-x: hidden;
+}
+
+/* Static material identity candidates share the same compact read/inspect
+   shape, with the checkout and query kept on single terminal rows. */
+MaterialIdentityScreen #material-scope {
+    height: auto;
+    max-height: 2;
+    padding: 0 1;
+    color: $description;
+    overflow-y: auto;
+}
+
+MaterialIdentityScreen #material-path-row,
+MaterialIdentityScreen #material-query-row {
+    height: 1;
+    min-height: 1;
+    margin: 0 1;
+}
+
+MaterialIdentityScreen #material-path-row .field-label,
+MaterialIdentityScreen #material-query-row .field-label {
+    width: auto;
+    height: 1;
+    margin: 0;
+    color: $description;
+}
+
+MaterialIdentityScreen #material-source,
+MaterialIdentityScreen #material-query {
+    width: 1fr;
+    min-width: 0;
+}
+
+MaterialIdentityScreen #material-scan {
+    width: auto;
+    margin-left: 1;
+}
+
+MaterialIdentityScreen #material-summary {
+    height: 2;
+    min-height: 2;
+    padding: 0 1;
+    color: $metadata;
+    overflow-y: auto;
+}
+
+MaterialIdentityScreen #material-findings {
+    height: 1fr;
+    min-height: 4;
+    margin: 0 1;
+}
+
+MaterialIdentityScreen #material-detail {
+    height: 5;
+    min-height: 5;
+    margin: 0 1;
+    padding: 0 1;
+    border-top: solid $secondary;
+    overflow-x: hidden;
+}
+
+MaterialIdentityScreen #material-actions {
+    height: 1;
+    min-height: 1;
+    margin: 0 1;
+}
+
+MaterialIdentityScreen #material-actions Button {
+    margin: 0 1 0 0;
+}
+
+MaterialIdentityDetailScreen #material-detail-log {
+    height: 1fr;
+    min-height: 4;
+    margin: 0 1;
+    padding: 0 1;
+    border: solid $secondary;
+    background: $background;
+    overflow-x: hidden;
+}
+
+MaterialIdentityDetailScreen #material-detail-scope {
+    height: 1;
+    padding: 0 1;
+    color: $description;
+}
+
+MaterialIdentityDetailScreen #material-detail-actions {
+    height: 1;
+    min-height: 1;
+    margin: 0 1;
+}
+
+MaterialIdentityDetailScreen #material-detail-actions Button {
+    margin: 0 1 0 0;
+}
+
+/* These screens spell out every local shortcut above the content.  Textual's
+   default footer duplicates them and clips halfway through labels at 64 cols. */
+AxiomFindingsScreen.-narrow Footer,
+AxiomFindingDetailScreen.-narrow Footer,
+MaterialIdentityScreen.-narrow Footer,
+MaterialIdentityDetailScreen.-narrow Footer {
+    display: none;
+}
+
 ReviewModal, ReleaseUpdateModal, InstancePathPicker, CatalogInputsScreen, CatalogValueScreen {
     align: center middle;
     background: $background 65%;

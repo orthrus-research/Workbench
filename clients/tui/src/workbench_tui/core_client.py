@@ -1462,7 +1462,8 @@ class CoreClient:
         """Run a native-check owner action bound to a Core developer session."""
         if re.fullmatch(r"work-session-v2-[0-9a-f]{32}", session_id) is None:
             raise CoreClientError("invalid developer session")
-        if action not in {"setup-status", "setup", "run", "history", "show", "diagnostics"}:
+        if action not in {"setup-status", "setup", "run", "history", "show", "diagnostics",
+                          "diagnostic", "source"}:
             raise CoreClientError("unsupported native-check action")
         timeout = 3600 if action in {"setup", "run"} else 120
         record = await self.json_record(

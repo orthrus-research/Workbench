@@ -59,6 +59,36 @@ class WorkflowInteractionTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.05)
         self.fail("Textual did not reach the expected state")
 
+    async def test_registry_review_is_runnable_from_workflows(self) -> None:
+        from workbench_tui.material_identity import MaterialIdentityScreen
+
+        core = catalog_core()
+        core.modules = AsyncMock(return_value=[
+            {"id": "pack-program-studio", "state": "available"},
+        ])
+        core.profiles = AsyncMock(return_value=[
+            {"id": "supersymmetry", "state": "available"},
+        ])
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(64, 22)) as pilot:
+            await self._settle(pilot, lambda: app.view.catalog is not None
+                               and app.view.modules_loaded and app.view.profiles_loaded)
+            app.open_workflows()
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkflowsScreen)
+                               and bool(app.screen.query("#workflow-brief")))
+            screen = app.screen
+            action_id = "pack-program.material-identity-journey"
+            self.assertIn(action_id, {item["command_id"] for item in screen._actions()})
+            screen.query_one("#workflow-search", Input).value = "registry"
+            await self._settle(pilot, lambda: screen.selected is not None
+                               and screen.selected.get("command_id") == action_id)
+            self.assertFalse(screen.query_one("#workflow-run", Button).disabled)
+            screen.query_one("#workflow-list", OptionList).focus()
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, MaterialIdentityScreen))
+            self.assertEqual(app.view.workspace, app.screen.workspace)
+            core.command_review.assert_not_awaited()
+
     async def test_executable_action_needs_separate_review_and_document_does_not(self) -> None:
         core = catalog_core()
         app = WorkbenchApp(core)

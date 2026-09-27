@@ -494,6 +494,36 @@ class PackProgramStudioTests(unittest.TestCase):
             self.assertEqual(2, second)
             self.assertIn("already exists", error.getvalue())
 
+    def test_cli_identity_summary_preserves_owner_collision_and_declaration_facts(self) -> None:
+        output = StringIO()
+        error = StringIO()
+        full_reports: list[dict] = []
+        code = cli_run(
+            ["dev", "--profile", "supersymmetry", "--source", str(CANDIDATE),
+             "--identity-summary-json"],
+            root=ROOT, output=output, error=error,
+            result_callback=full_reports.append,
+        )
+        self.assertEqual(0, code, error.getvalue())
+        summary = json.loads(output.getvalue())
+        full = full_reports[0]
+        self.assertEqual("workbench-groovy-identity-summary-v1", summary["format"])
+        self.assertEqual(full["report_id"], summary["report_id"])
+        self.assertEqual(full["summary"], summary["summary"])
+        self.assertEqual(full["candidate"]["binding"], summary["binding"])
+        self.assertEqual(full["candidate"]["collisions"], summary["collisions"])
+        rules = {"gtceu-material-definition", "supersymmetry-metaitem-definition",
+                 "groovyscript-crafting-registration"}
+        expected = [effect for effect in full["candidate"]["effects"]
+                    if effect["rule_id"] in rules]
+        self.assertEqual(len(expected), summary["identity_declaration_count"])
+        for actual, source in zip(summary["identity_declarations"], expected):
+            for key in ("effect_id", "rule_id", "kind", "identity", "fields",
+                        "field_states", "expression"):
+                self.assertEqual(source[key], actual[key])
+            self.assertEqual(source["source"]["path"], actual["source"]["path"])
+        self.assertLess(len(output.getvalue()), len(json.dumps(full)))
+
     def test_profile_rejects_unknown_named_adapter_and_unsafe_source_path(self) -> None:
         output = StringIO()
         error = StringIO()

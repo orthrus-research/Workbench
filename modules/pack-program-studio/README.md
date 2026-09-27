@@ -33,6 +33,12 @@ workbench groovy dev \
   --profile supersymmetry \
   --source /path/to/Supersymmetry
 
+# A compact source identity inventory for Textual or other clients:
+workbench groovy dev \
+  --profile supersymmetry \
+  --source /path/to/Supersymmetry \
+  --identity-summary-json
+
 workbench groovy dev \
   --profile supersymmetry \
   --baseline /path/to/baseline \
@@ -47,6 +53,11 @@ side, pack mode, Git context when available, and optional runtime evidence. It
 provides loader order, dependency and cycle information, conservative call and
 effect candidates, bounded material/recipe projections, baseline differences,
 and reload/restart/save-risk guidance.
+
+`--identity-summary-json` keeps the same owner-classified collision candidates
+and source identity declarations in a smaller response. It preserves source
+locations and profile/source binding for interactive review. The full report
+remains available through `--json` or `--output`.
 
 Static findings remain `static-candidate` or `static-possible`. The analyzer
 does not execute Groovy, observe registries, or expand arbitrary closures,

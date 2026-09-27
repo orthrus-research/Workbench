@@ -199,6 +199,20 @@ file and must be supplied again on import without managed acquisition.
   setup selection, or an executable selected in the TUI. Native outcome,
   coverage, findings and original messages remain visible even when the check
   fails. Prepare and Run each show their effects before execution.
+- **Registry source review:** Home and Workflows open a source-only review of a
+  selected Supersymmetry checkout. A scan through Core's compact Groovy identity
+  report shows duplicate literal material and metaitem IDs and names, crafting
+  recipe IDs, unresolved identity fields, and parsed declarations with source
+  locations. Scanning a large checkout can take several minutes. Search narrows
+  these source records;
+  no match does not establish that a runtime registration is missing. The
+  selected record and its full owner data are available in the TUI.
+- **Axiom findings:** A completed or retained native check can browse every
+  saved findings page through Core. Arrow keys select a finding, Enter opens
+  its exact native diagnostic, and a located finding can open its retained
+  source. Group and page controls use the saved index where available. These
+  findings describe the selected Axiom check and its captured context; they
+  do not audit every registry in an installed pack.
 - **Axiom to Atlas:** A completed Axiom result with a retained snapshot offers
   **Open in Atlas** when the installed Atlas import action is available. Core
   reviews the exact original attempt and a new graph folder before Atlas

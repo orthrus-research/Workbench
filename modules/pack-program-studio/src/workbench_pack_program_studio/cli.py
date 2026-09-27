@@ -114,6 +114,11 @@ def build_parser(*, prog: str = "workbench groovy") -> argparse.ArgumentParser:
         help="emit the complete source-linked V1 JSON report",
     )
     dev.add_argument(
+        "--identity-summary-json",
+        action="store_true",
+        help="emit a compact source identity inventory for interactive review",
+    )
+    dev.add_argument(
         "--recipe-review",
         action="store_true",
         help=argparse.SUPPRESS,
@@ -378,6 +383,57 @@ def build_parser(*, prog: str = "workbench groovy") -> argparse.ArgumentParser:
     return parser
 
 
+_IDENTITY_RULES = frozenset({
+    "gtceu-material-definition",
+    "supersymmetry-metaitem-definition",
+    "groovyscript-crafting-registration",
+})
+
+
+def identity_summary(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Project owner-classified identity evidence without changing the full report."""
+
+    candidate = report["candidate"]
+    declarations = []
+    for effect in candidate["effects"]:
+        if effect["rule_id"] not in _IDENTITY_RULES:
+            continue
+        source = effect["source"]
+        declarations.append({
+            "effect_id": effect["effect_id"],
+            "rule_id": effect["rule_id"],
+            "kind": effect["kind"],
+            "identity": effect["identity"],
+            "fields": effect["fields"],
+            "field_states": effect["field_states"],
+            "expression": effect["expression"],
+            "source": {
+                key: source[key]
+                for key in ("path", "line", "column", "snippet")
+                if key in source
+            },
+            "lifecycle": {
+                key: effect["lifecycle"][key]
+                for key in ("stage", "execution_state")
+                if key in effect["lifecycle"]
+            },
+        })
+    return {
+        "format": "workbench-groovy-identity-summary-v1",
+        "schema_version": 1,
+        "report_id": report["report_id"],
+        "summary": report["summary"],
+        "binding": candidate["binding"],
+        "collisions": candidate["collisions"],
+        "identity_declarations": declarations,
+        "identity_declaration_count": len(declarations),
+        "limitations": [
+            "Source identity candidates are not an observed runtime registry.",
+            "Dynamic or unresolved identities may be absent from this inventory.",
+        ],
+    }
+
+
 def run(
     argv: list[str],
     *,
@@ -396,6 +452,8 @@ def run(
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.operation == "dev" and args.json and args.identity_summary_json:
+            raise PackProgramError("choose either --json or --identity-summary-json")
         if args.operation == "session" and session_custody is None:
             raise PackProgramError("managed sessions require a Core working allocation")
         if args.operation == "proxy":
@@ -536,7 +594,10 @@ def run(
         written = None
         if args.output is not None:
             written = _write_fresh_json(args.output, value)
-        if args.json:
+        if args.operation == "dev" and args.identity_summary_json:
+            json.dump(identity_summary(value), output, ensure_ascii=False, separators=(",", ":"))
+            output.write("\n")
+        elif args.json:
             # Full owner reports can contain hundreds of thousands of static
             # rows. Stream the unchanged JSON shape instead of allocating a
             # second whole-report string before writing it.

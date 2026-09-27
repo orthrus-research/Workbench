@@ -1685,16 +1685,19 @@ class AnalysisResultScreen(Screen[None]):
     BINDINGS = [
         ("escape", "back", "Back"),
         ("r", "toggle_raw", "Full record"),
+        Binding("f", "browse_findings", "Findings", show=False),
         Binding("i", "import_atlas", "Open in Atlas", show=False),
         Binding("s", "search_graph", "Search graph", show=False),
     ]
 
-    def __init__(self, heading: str, owner: str, record: Mapping[str, Any]) -> None:
+    def __init__(self, heading: str, owner: str, record: Mapping[str, Any],
+                 *, session_id: str | None = None) -> None:
         super().__init__()
         self.heading = heading
         self.sub_title = heading
         self.owner = owner
         self.record = record
+        self.session_id = session_id
         self.raw = False
 
     def _can_import_atlas(self) -> bool:
@@ -1706,10 +1709,19 @@ class AnalysisResultScreen(Screen[None]):
                 and _atlas_read_action(self.app.view.catalog,
                                        "atlas.observations-search") is not None)
 
+    def _can_browse_findings(self) -> bool:
+        result = self.record.get("result")
+        return (self.owner == "axiom" and bool(self.session_id)
+                and isinstance(result, dict)
+                and isinstance(result.get("attempt_id"), str)
+                and bool(result["attempt_id"]))
+
     def compose(self) -> ComposeResult:
         yield Header(icon="W")
         yield Static(self.heading, classes="screen-heading")
         hint = "↑/↓ Scroll · R Full"
+        if self._can_browse_findings():
+            hint += " · F Findings"
         if self._can_import_atlas():
             hint += " · I Open in Atlas"
         if self._can_search_graph():
@@ -1718,6 +1730,8 @@ class AnalysisResultScreen(Screen[None]):
         yield RichLog(id="result-log", min_width=1, wrap=True, highlight=False, markup=False,
                       auto_scroll=False)
         with Horizontal(classes="button-row"):
+            if self._can_browse_findings():
+                yield Button("Browse findings", id="analysis-findings")
             if self._can_import_atlas():
                 yield Button("Open in Atlas", id="analysis-import-atlas")
             if self._can_search_graph():
@@ -1764,9 +1778,20 @@ class AnalysisResultScreen(Screen[None]):
                 self.app.view.catalog, root
             ))
 
+    def action_browse_findings(self) -> None:
+        if not self._can_browse_findings():
+            return
+        from .axiom_findings import AxiomFindingsScreen
+        result = self.record["result"]
+        self.app.push_screen(AxiomFindingsScreen(
+            self.session_id, result["attempt_id"]
+        ))
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "analysis-import-atlas":
             self.action_import_atlas()
+        elif event.button.id == "analysis-findings":
+            self.action_browse_findings()
         elif event.button.id == "analysis-search-graph":
             self.action_search_graph()
         elif event.button.id == "analysis-raw":
@@ -2491,7 +2516,9 @@ class AxiomHistoryScreen(Screen[None]):
             record = await self.core.developer_materials_action(
                 self.session_id, "show", self.selected
             )
-            self.app.push_screen(AnalysisResultScreen("Axiom retained check", "axiom", record))
+            self.app.push_screen(AnalysisResultScreen(
+                "Axiom retained check", "axiom", record, session_id=self.session_id
+            ))
         except (CoreClientError, TimeoutError) as exc:
             self.app.push_screen(ResultScreen("Could not open check", _axiom_problem(exc)))
 
@@ -2508,9 +2535,10 @@ class AxiomJourneyScreen(KeyboardFormScreen):
         "axiom-history", "axiom-back",
     )
 
-    def __init__(self, view: EnvironmentView) -> None:
+    def __init__(self, view: EnvironmentView, initial_workspace: str = "") -> None:
         super().__init__()
         self.view = view
+        self.initial_workspace = initial_workspace
         self.session_id: str | None = None
         self.session_pack = ""
         self.setup_ready = False
@@ -2531,7 +2559,8 @@ class AxiomJourneyScreen(KeyboardFormScreen):
         with VerticalScroll(id="axiom-journey-body"):
             yield Static("Supersymmetry source checkout", classes="field-label")
             with Horizontal(classes="axiom-path-row"):
-                yield Input(value=self.view.workspace, placeholder="Choose a checkout containing pack source",
+                yield Input(value=self.initial_workspace or self.view.workspace,
+                            placeholder="Choose a checkout containing pack source",
                             id="axiom-pack")
                 yield Button("Browse", id="axiom-pack-browse")
             yield Static("Axiom engine", classes="field-label")
@@ -2811,7 +2840,9 @@ class AxiomJourneyScreen(KeyboardFormScreen):
                 except (CoreClientError, TimeoutError):
                     pass  # The run record remains available if saved detail cannot reopen.
             self._status(f"Check {result.get('state', 'finished')}. Open History to revisit this attempt.")
-            self.app.push_screen(AnalysisResultScreen("Axiom native check", "axiom", display_record))
+            self.app.push_screen(AnalysisResultScreen(
+                "Axiom native check", "axiom", display_record, session_id=session
+            ))
         except (CoreClientError, TimeoutError) as exc:
             self._status(_axiom_problem(exc))
         finally:
@@ -4280,6 +4311,20 @@ class WorkflowsScreen(Screen[None]):
                 "options": [],
                 "document": None,
             })
+        if "pack-program-studio" in enabled and "supersymmetry" in profiles:
+            actions.append({
+                "command_id": "pack-program.material-identity-journey",
+                "title": "Review registry IDs",
+                "summary": "Find source ID and registry-name collision candidates with exact file locations.",
+                "suite_id": "pack-program",
+                "authority": "Pack Program Studio source analysis",
+                "risk": "guided",
+                "preview": "none",
+                "availability": "experimental",
+                "options": [],
+                "document": None,
+                "limitations": ["Source findings are candidates, not observed registrations."],
+            })
         return actions
 
     @staticmethod
@@ -4396,11 +4441,15 @@ class WorkflowsScreen(Screen[None]):
         self.query_one("#workflow-run", Button).label = (
             "Open document" if action.get("document") else
             "Open check" if action.get("command_id") == "axiom.native-check-journey" else
+            "Review IDs" if action.get("command_id") == "pack-program.material-identity-journey" else
             "Run action"
         )
 
     def _launchable(self, action: Mapping[str, Any]) -> bool:
-        return (action.get("command_id") == "axiom.native-check-journey"
+        return (action.get("command_id") in {
+                    "axiom.native-check-journey",
+                    "pack-program.material-identity-journey",
+                }
                 or _runnable_catalog_action(action))
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -4435,7 +4484,11 @@ class WorkflowsScreen(Screen[None]):
         if not action or not catalog or not self._launchable(action):
             return
         if action.get("command_id") == "axiom.native-check-journey":
-            self.app.push_screen(AxiomJourneyScreen(self.view))
+            self.app.open_axiom_check()  # type: ignore[attr-defined]
+            return
+        if action.get("command_id") == "pack-program.material-identity-journey":
+            from .material_identity import MaterialIdentityScreen
+            self.app.push_screen(MaterialIdentityScreen(self.view.workspace))
             return
         values: dict[str, Any] = {}
         if (self.view.workspace and Path(self.view.workspace).is_dir()
@@ -4517,6 +4570,7 @@ _HOME_ACTION_HELP = {
     "workspace-choices": "Save a workspace and prepare its Java runtime.",
     "pack-release": "View or verify the published archive. Game files are installed separately.",
     "workflows": "Run available Workbench actions.",
+    "material-ids": "Find source ID and registry-name candidates; runtime checks are separate.",
     "modules": "Inspect installed Workbench modules.",
     "home": "Open details for the selected workspace.",
     "migrate": "Import settings from an earlier Workbench install.",
@@ -4587,6 +4641,7 @@ class WorkbenchApp(App[None]):
                         Option("Choose workspace and Java", id="workspace-choices", disabled=True),
                         Option("View published pack archive", id="pack-release", disabled=True),
                         Option("Browse and run workflows", id="workflows", disabled=True),
+                        Option("Review registry IDs", id="material-ids", disabled=True),
                         Option("Explore installed modules", id="modules", disabled=True),
                         Option("Open workspace summary", id="home", disabled=True),
                         Option("Import earlier settings", id="migrate", disabled=True),
@@ -4658,6 +4713,8 @@ class WorkbenchApp(App[None]):
         yield SystemCommand("Set up Supersymmetry instance", "Choose an instance source and installation", self.open_pack_instance)
         yield SystemCommand("Explore modules", "Show installed modules and profiles", self.open_modules)
         yield SystemCommand("Browse workflows", "Search the installed action catalog", self.open_workflows)
+        yield SystemCommand("Review registry IDs", "Review source identity candidates", self.open_material_identity)
+        yield SystemCommand("Check native registrations", "Run Axiom on saved source", self.open_axiom_check)
         yield SystemCommand(
             "Import earlier configuration",
             "Review and import earlier Workbench user records",
@@ -4777,6 +4834,29 @@ class WorkbenchApp(App[None]):
             self.notify("Waiting for command catalog", severity="warning")
             return
         self.push_screen(WorkflowsScreen(self.view))
+
+    def open_material_identity(self) -> None:
+        enabled = {row.get("id") for row in self.view.modules
+                   if row.get("state") == "available"}
+        profiles = {row.get("id") for row in self.view.profiles
+                    if row.get("state") == "available"}
+        if "pack-program-studio" not in enabled or "supersymmetry" not in profiles:
+            self.notify("Install Pack Program Studio and the Supersymmetry profile first.",
+                        severity="warning")
+            return
+        from .material_identity import MaterialIdentityScreen
+        self.push_screen(MaterialIdentityScreen(self.view.workspace))
+
+    def open_axiom_check(self, workspace: str | None = None) -> None:
+        enabled = {row.get("id") for row in self.view.modules
+                   if row.get("state") == "available"}
+        profiles = {row.get("id") for row in self.view.profiles
+                    if row.get("state") == "available"}
+        if "axiom" not in enabled or not {"supersymmetry", "cleanroom"} <= profiles:
+            self.notify("Install Axiom and the pack and platform profiles first.",
+                        severity="warning")
+            return
+        self.push_screen(AxiomJourneyScreen(self.view, initial_workspace=workspace or ""))
 
     def open_config_migration(self) -> None:
         if self.view.version is None:
@@ -4940,6 +5020,10 @@ class WorkbenchApp(App[None]):
             ("pack-instance", view.version is not None),
             ("modules", view.modules_loaded and view.profiles_loaded),
             ("workflows", view.catalog is not None),
+            ("material-ids", any(row.get("id") == "pack-program-studio"
+                                 and row.get("state") == "available" for row in view.modules)
+             and any(row.get("id") == "supersymmetry"
+                     and row.get("state") == "available" for row in view.profiles)),
             ("home", view.home is not None),
             ("migrate", view.version is not None and not self._migration_busy),
         ):
@@ -5059,6 +5143,8 @@ class WorkbenchApp(App[None]):
             self.open_modules()
         elif action == "workflows":
             self.open_workflows()
+        elif action == "material-ids":
+            self.open_material_identity()
         elif action == "home":
             if self.view.home:
                 self.push_screen(

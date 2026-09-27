@@ -337,6 +337,7 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
                 await self._settle(pilot, lambda: isinstance(app.screen, AnalysisResultScreen))
                 self.assertIn("Native status: rejected",
                               _analysis_summary("axiom", app.screen.record))
+                self.assertTrue(app.screen.query("#analysis-findings"))
                 self.assertIn("Material registration failed in native run",
                               _analysis_summary("axiom", app.screen.record))
                 self.assertEqual(["setup-status", "run", "show"], [
