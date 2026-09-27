@@ -156,6 +156,16 @@ identity. A plan does not extract or install the client; publication requires
 the inputs to share one Core catalog. It does not prove the CurseForge origin
 of external files or qualify the Forge-declared ZIP for Cleanroom runtime.
 
+Core can retain the reviewed `overrides/` bytes separately with
+`plan_release_override_custody` and `apply_release_override_custody`. The
+result is an exact private managed tree containing every override file and a
+sealed source lock. `reopen_release_override_custody` checks the tree without
+the release ZIP. If a validated publication was interrupted, the explicit
+`reconcile_release_override_custody` operation can finish that same Core
+intent; an unvalidated stage remains blocked for review. These operations do
+not merge the mod and resource-pack trees, install a Minecraft instance, or
+establish the external files' origin or runtime compatibility.
+
 ## Contents
 
 - `source-locks/`: exact upstream source and binary provenance.

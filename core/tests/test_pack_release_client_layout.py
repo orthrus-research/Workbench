@@ -183,6 +183,42 @@ class PackReleaseClientLayoutTests(unittest.TestCase):
             rp_reopen.assert_called_once()
             return plan
 
+    def _override_plan(self, *, check_cancelled=lambda: None) -> dict:
+        authority = type("Authority", (), {
+            "minecraft_version": "1.12.2", "mod_loader": "forge-14.23.5.2860",
+        })()
+        with patch.object(layout, "load_authority", return_value=authority):
+            return layout.plan_release_override_custody(
+                self.input_plan, archive_path=self.archive_path,
+                archive_state_root=self.archive_state, authority_path=self.authority,
+                layout_policy_path=self.layout_policy, state_root=self.mod_state,
+                config_home=self.mod_config, check_cancelled=check_cancelled,
+            )
+
+    def _apply_overrides(self, plan: dict, *, check_cancelled=lambda: None) -> dict:
+        authority = type("Authority", (), {
+            "minecraft_version": "1.12.2", "mod_loader": "forge-14.23.5.2860",
+        })()
+        with patch.object(layout, "load_authority", return_value=authority):
+            return layout.apply_release_override_custody(
+                self.input_plan, archive_path=self.archive_path,
+                archive_state_root=self.archive_state, authority_path=self.authority,
+                layout_policy_path=self.layout_policy, state_root=self.mod_state,
+                config_home=self.mod_config, expected_plan_id=plan["plan_id"],
+                check_cancelled=check_cancelled,
+            )
+
+    def _reopen_overrides(self, plan: dict) -> dict:
+        return layout.reopen_release_override_custody(
+            self.input_plan, expected_plan_id=plan["plan_id"],
+            layout_policy_path=self.layout_policy, state_root=self.mod_state,
+            config_home=self.mod_config,
+        )
+
+    def _override_target(self, plan: dict) -> Path:
+        return (self.mod_state / "pack-release-overrides"
+                / plan["plan_id"].rsplit(":", 1)[-1] / "snapshot")
+
     def test_exact_selected_inputs_produce_path_free_blocked_plan(self) -> None:
         plan = self._plan()
         self.assertEqual(plan["state"], "blocked")
@@ -238,10 +274,134 @@ class PackReleaseClientLayoutTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unsafe relative member path"):
                     self._plan()
 
+    def test_oversized_override_member_path_is_rejected_before_staging(self) -> None:
+        for name in ("config/" + "a" * 256 + ".cfg",
+                     "/".join(["a" * 200] * 21) + "/config.cfg"):
+            with self.subTest(length=len(name)):
+                self._archive({name: b"unsafe"})
+                with self.assertRaisesRegex(ValueError, "unsafe relative member path"):
+                    self._override_plan()
+
     def test_nonempty_override_directory_entry_is_rejected(self) -> None:
         self._archive({"config/": b"hidden", "config/client.cfg": b"ordinary"})
         with self.assertRaisesRegex(ValueError, "nonempty override directory"):
             self._plan()
+
+    def test_empty_override_directory_is_rejected_before_custody(self) -> None:
+        self._archive({"config/client.cfg": b"test", "unused/": b""})
+        with self.assertRaisesRegex(ValueError, "empty override directory"):
+            self._plan()
+        with self.assertRaisesRegex(ValueError, "empty override directory"):
+            self._override_plan()
+
+    def test_override_custody_retains_zero_byte_files_and_reopens_without_zip(self) -> None:
+        self._archive({"config/client.cfg": b"test", "config/empty.txt": b""})
+        plan = self._override_plan()
+        self.assertEqual("acquire", plan["action"])
+        self.assertEqual(2, plan["override_file_count"])
+        self.assertEqual(4, plan["override_total_bytes"])
+        self.assertNotIn(str(self.root), json.dumps(plan))
+        retained = self._apply_overrides(plan)
+        self.assertEqual("retained", retained["outcome"])
+        target = self._override_target(plan)
+        self.assertEqual(b"test", (target / "overrides/config/client.cfg").read_bytes())
+        self.assertEqual(b"", (target / "overrides/config/empty.txt").read_bytes())
+        self.archive_path.rename(self.root / "former-release.zip")
+        reopened = self._reopen_overrides(plan)
+        self.assertEqual("reopened", reopened["outcome"])
+        self.assertEqual(retained["tree_id"], reopened["tree_id"])
+        self.assertNotIn(str(self.root), json.dumps(reopened))
+
+    def test_override_custody_reuses_same_exact_tree(self) -> None:
+        plan = self._override_plan()
+        retained = self._apply_overrides(plan)
+        next_plan = self._override_plan()
+        self.assertEqual("reuse", next_plan["action"])
+        self.assertEqual(retained["tree_id"], next_plan["tree_id"])
+        reused = self._apply_overrides(next_plan)
+        self.assertEqual("reused", reused["outcome"])
+        self.assertEqual(retained["tree_content_sha256"], reused["tree_content_sha256"])
+
+    def test_override_custody_rejects_changed_tree_without_source_zip(self) -> None:
+        plan = self._override_plan()
+        self._apply_overrides(plan)
+        self.archive_path.rename(self.root / "former-release.zip")
+        (self._override_target(plan) / "overrides/config/client.cfg").write_bytes(b"changed")
+        with self.assertRaises((ValueError, layout.ManagedTreeError)):
+            self._reopen_overrides(plan)
+        with self.assertRaisesRegex(ValueError, "not prepared"):
+            layout.reconcile_release_override_custody(
+                self.input_plan, expected_plan_id=plan["plan_id"],
+                layout_policy_path=self.layout_policy, state_root=self.mod_state,
+                config_home=self.mod_config,
+            )
+
+    def test_override_custody_rejects_corrupt_crc(self) -> None:
+        self._archive({"config/client.cfg": b"test"}, corrupt=True)
+        with self.assertRaisesRegex(ValueError, "CRC"):
+            self._override_plan()
+
+    def test_override_custody_cancellation_leaves_uncertain_stage_unreused(self) -> None:
+        self._archive({"config/client.cfg": b"test", "config/other.cfg": b"next"})
+        plan = self._override_plan()
+
+        class Cancelled(Exception):
+            pass
+
+        def check_cancelled() -> None:
+            parent = self._override_target(plan).parent
+            if any(parent.glob(".workbench-tree-*.pending/payload/overrides/config/client.cfg")):
+                raise Cancelled("cancelled during copy")
+
+        with self.assertRaisesRegex(Cancelled, "cancelled during copy"):
+            self._apply_overrides(plan, check_cancelled=check_cancelled)
+        self.assertFalse(self._override_target(plan).exists())
+        with self.assertRaisesRegex(ValueError, "incomplete stage"):
+            self._override_plan()
+        with self.assertRaisesRegex(ValueError, "not prepared"):
+            layout.reconcile_release_override_custody(
+                self.input_plan, expected_plan_id=plan["plan_id"],
+                layout_policy_path=self.layout_policy, state_root=self.mod_state,
+                config_home=self.mod_config,
+            )
+
+    def test_override_reservation_without_intent_cannot_start_duplicate_attempt(self) -> None:
+        plan = self._override_plan()
+        host, _ = layout._override_host(
+            self.mod_state, self.mod_config, plan["layout_policy_id"],
+        )
+        target = self._override_target(plan)
+        with host.stage("artifacts", target.name, requested_path=target):
+            with self.assertRaisesRegex(ValueError, "incomplete stage.*allocated"):
+                self._override_plan()
+            with self.assertRaisesRegex(ValueError, "not prepared"):
+                layout.reconcile_release_override_custody(
+                    self.input_plan, expected_plan_id=plan["plan_id"],
+                    layout_policy_path=self.layout_policy, state_root=self.mod_state,
+                    config_home=self.mod_config,
+                )
+        with self.assertRaisesRegex(ValueError, "incomplete stage.*failed"):
+            self._override_plan()
+
+    def test_override_published_without_commit_requires_explicit_core_reconcile(self) -> None:
+        plan = self._override_plan()
+        retained = self._apply_overrides(plan)
+        host, _ = layout._override_host(
+            self.mod_state, self.mod_config, plan["layout_policy_id"],
+        )
+        nonce = retained["tree_id"].rsplit(":", 1)[-1]
+        host.catalog.trees._path("commits", nonce).unlink()
+        with self.assertRaisesRegex(ValueError, "incomplete stage.*published-uncommitted"):
+            self._override_plan()
+        self.archive_path.rename(self.root / "former-release.zip")
+        reconciled = layout.reconcile_release_override_custody(
+            self.input_plan, expected_plan_id=plan["plan_id"],
+            layout_policy_path=self.layout_policy, state_root=self.mod_state,
+            config_home=self.mod_config,
+        )
+        self.assertEqual("reconciled", reconciled["outcome"])
+        self.assertEqual(retained["tree_id"], reconciled["tree_id"])
+        self.assertEqual("reopened", self._reopen_overrides(plan)["outcome"])
 
 
 if __name__ == "__main__":
