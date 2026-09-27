@@ -1,9 +1,12 @@
 """Reused native assemblies retain exact wheels and selected dependencies."""
+from contextlib import redirect_stdout
+import io
 import json
 from pathlib import Path
 import platform
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -11,6 +14,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 import native_distribution as distribution
+import build_native_distribution as cli
 from build_tree_custody import publish_build_tree
 from verify_wheelhouse import WheelhouseError
 
@@ -43,10 +47,14 @@ class NativeReuseTests(unittest.TestCase):
         distribution._write_assembly(directory, manifest, root=ROOT)
         return manifest
 
-    def derive(self, source, output):
+    def derive(self, source, output, *, staged=False):
         selected = (["workbench-core"], [{"id": "workbench-core", "version": "0.1.0"}, {"id": "workbench-api", "version": "0.1.0"}])
         with patch.object(distribution, "source_identity", return_value="a" * 64), patch.object(distribution, "selected_components", return_value=selected), patch.object(distribution, "_run", side_effect=AssertionError("reuse must never build/download")):
-            return distribution.derive(source, output)
+            if staged:
+                return distribution._derive(source, output)
+            return distribution.derive(
+                source, output, configuration_home=source.parent / "core-home",
+            )
 
     def test_reuse_selects_metadata_closure_and_preserves_every_hash(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -59,6 +67,19 @@ class NativeReuseTests(unittest.TestCase):
             self.assertEqual(result, distribution.verify(output))
             for row in result["wheels"]:
                 self.assertEqual((source / "wheels" / row["filename"]).read_bytes(), (output / "wheels" / row["filename"]).read_bytes())
+            from workbench_core.storage.registered import ResourceCatalog
+            catalog = ResourceCatalog(source.parent / "core-home")
+            trees = catalog.inventory(workspace=ROOT)["trees"]
+            self.assertEqual(
+                [("native-build", str(output))],
+                [(row["owner_id"], row["path"]) for row in trees],
+            )
+            reference = catalog.trees.describe(trees[0]["tree_id"], workspace=ROOT)
+            self.assertEqual(
+                "workbench-native-wheelhouse-v1:sha256:"
+                + distribution._digest(output / "wheelhouse.json"),
+                reference.domain_id,
+            )
 
     def test_corruption_missing_dependency_and_wrong_version_are_rejected(self):
         for requirement in ("missing>=1", "helper>=99", "helper @ https://example.invalid/helper.whl"):
@@ -107,6 +128,11 @@ class NativeReuseTests(unittest.TestCase):
             with patch.object(distribution.shutil, "copyfile", side_effect=corrupt):
                 with self.assertRaises(WheelhouseError):
                     self.derive(source, output)
+            self.assertFalse(output.exists())
+            self.assertTrue(list(Path(temporary).glob(
+                ".workbench-tree-*.pending/payload/wheels/*.whl"
+            )))
+            output.mkdir()
             retained = output / "retain.txt"
             retained.write_text("retain")
             with self.assertRaisesRegex(distribution.DistributionError, "new directory"):
@@ -120,7 +146,7 @@ class NativeReuseTests(unittest.TestCase):
             self.assembly(source)
             result, reference = publish_build_tree(
                 output,
-                lambda staged: self.derive(source, staged),
+                lambda staged: self.derive(source, staged, staged=True),
                 lambda path, expected: self.assertEqual(expected, distribution.verify(path)),
                 lambda path, _result: "workbench-native-wheelhouse-v1:sha256:" + distribution._digest(path / "wheelhouse.json"),
                 owner_id="native-build",
@@ -137,6 +163,40 @@ class NativeReuseTests(unittest.TestCase):
             (output / "requirements.lock").write_text("tampered\n")
             with self.assertRaises(WheelhouseError):
                 distribution.verify(output)
+
+    def test_native_derive_cli_uses_one_core_stage_producer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            source, output = base / "source", base / "native-output"
+            staged = base / "stage"
+            manifest = {
+                "format": distribution.FORMAT,
+                "selected_components": ["workbench-core"],
+                "source_sha256": "a" * 64,
+                "target": {},
+                "wheels": [],
+            }
+            reference = SimpleNamespace(tree_id="native-tree", path=output)
+
+            def publish(selected, produce):
+                self.assertEqual(output, selected)
+                self.assertEqual(manifest, produce(staged))
+                return manifest, reference
+
+            printed = io.StringIO()
+            with patch.object(cli, "publish_assembly", side_effect=publish), patch.object(
+                cli, "_derive", return_value=manifest,
+            ) as producer, redirect_stdout(printed):
+                self.assertEqual(0, cli.main([
+                    "--from-wheelhouse", str(source), "--output", str(output),
+                    "--diagnostics", str(base / "diagnostics"),
+                ]))
+            producer.assert_called_once_with(source, staged, None, suite=False)
+            self.assertEqual(
+                {**manifest, "artifact_tree_id": reference.tree_id,
+                 "artifact_path": str(reference.path)},
+                json.loads(printed.getvalue()),
+            )
 
     def test_failed_native_build_retains_staging_without_publishing_output(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -169,7 +229,7 @@ class NativeReuseTests(unittest.TestCase):
             for _ in range(2):
                 result, reference = publish_build_tree(
                     None,
-                    lambda staged: self.derive(source, staged),
+                    lambda staged: self.derive(source, staged, staged=True),
                     lambda path, expected: self.assertEqual(expected, distribution.verify(path)),
                     lambda path, _result: "workbench-native-wheelhouse-v1:sha256:"
                     + distribution._digest(path / "wheelhouse.json"),

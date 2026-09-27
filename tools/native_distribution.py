@@ -133,7 +133,7 @@ def _write_assembly(output, manifest, *, root):
         (output / name).write_bytes((root / name).read_bytes())
 
 
-def derive(wheelhouse: Path, output: Path, components=None, *, suite=False, root=ROOT):
+def _derive(wheelhouse: Path, output: Path, components=None, *, suite=False, root=ROOT):
     """Select an offline dependency closure from exact already-built wheels."""
     manifest = current_assembly(wheelhouse, root=root)
     requested, selected = selected_components(components, suite=suite, root=root)
@@ -178,6 +178,60 @@ def derive(wheelhouse: Path, output: Path, components=None, *, suite=False, root
     _write_assembly(output, result, root=root)
     if verify(output) != result or current_assembly(wheelhouse, root=root) != manifest:
         raise DistributionError("wheelhouse changed during closure derivation")
+    return result
+
+
+def publish_assembly(
+    output: Path | None,
+    produce,
+    *,
+    root: Path = ROOT,
+    configuration_home: Path | None = None,
+    default_output_root: Path | None = None,
+):
+    """Publish one exact native wheelhouse through source Core."""
+
+    from build_tree_custody import publish_build_tree
+
+    def validate(path, expected):
+        if verify(path) != expected:
+            raise DistributionError("native wheelhouse changed during Core publication")
+
+    return publish_build_tree(
+        output,
+        produce,
+        validate,
+        lambda path, _result: "workbench-native-wheelhouse-v1:sha256:"
+        + _digest(path / MANIFEST),
+        owner_id="native-build",
+        workspace=root,
+        configuration_home=configuration_home,
+        default_output_root=default_output_root,
+    )
+
+
+def derive(
+    wheelhouse: Path,
+    output: Path,
+    components=None,
+    *,
+    suite=False,
+    root=ROOT,
+    configuration_home: Path | None = None,
+    default_output_root: Path | None = None,
+):
+    """Derive a closure through Core while retaining the V1 manifest return."""
+
+    output = Path(output).absolute()
+    if output.exists() or output.is_symlink():
+        raise DistributionError("derived output must be a new directory")
+    result, _custody = publish_assembly(
+        output,
+        lambda staged: _derive(wheelhouse, staged, components, suite=suite, root=root),
+        root=root,
+        configuration_home=configuration_home,
+        default_output_root=default_output_root,
+    )
     return result
 
 

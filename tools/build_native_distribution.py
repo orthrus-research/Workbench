@@ -1,26 +1,10 @@
 #!/usr/bin/env python3
 """Build a hash-locked native wheelhouse for the current Python/OS target."""
 import argparse
-from hashlib import sha256
 import json
 from pathlib import Path
-from native_distribution import ROOT, build, derive, selected_components
-from native_distribution import DistributionError, verify
-from build_tree_custody import publish_build_tree
+from native_distribution import ROOT, _derive, build, publish_assembly, selected_components
 from validation_diagnostics import DiagnosticRun, default_directory
-
-
-def _managed_assembly(output, produce):
-    def validate(path, expected):
-        if verify(path) != expected:
-            raise DistributionError("native wheelhouse changed during Core publication")
-
-    return publish_build_tree(
-        output, produce, validate,
-        lambda path, _result: "workbench-native-wheelhouse-v1:sha256:"
-        + sha256((path / "wheelhouse.json").read_bytes()).hexdigest(),
-        owner_id="native-build",
-    )
 
 
 def main(argv=None):
@@ -39,12 +23,12 @@ def main(argv=None):
         with DiagnosticRun(args.diagnostics or default_directory(ROOT, "native-build"), "native-build", ("assembly",)) as diagnostics:
             with diagnostics.phase("assembly"):
                 if args.from_wheelhouse:
-                    result, custody = _managed_assembly(
+                    result, custody = publish_assembly(
                         args.output,
-                        lambda output: derive(args.from_wheelhouse, output, args.components, suite=args.suite),
+                        lambda output: _derive(args.from_wheelhouse, output, args.components, suite=args.suite),
                     )
                 else:
-                    result, custody = _managed_assembly(
+                    result, custody = publish_assembly(
                         args.output,
                         lambda output: build(output, args.components, suite=args.suite,
                                              command_runner=lambda command: diagnostics.command(command, cwd=ROOT, timeout=1200)),
