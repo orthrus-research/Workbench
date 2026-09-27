@@ -7,6 +7,7 @@ from io import BytesIO
 import json
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 from unittest import TestCase, skipIf
 from unittest.mock import patch
 from zipfile import ZipFile
@@ -95,17 +96,19 @@ class EnvironmentFixtureArtifactAdmissionTests(TestCase):
             return lock
         self.owner.validate_owner_lock = validate
 
-    def _start(self, *, exit_code: int = 0) -> None:
+    def _start(self, *, exit_code: int = 0, real_filesystem: bool = False) -> None:
         self._add_locked_properties()
         self._fake_gradle(f"#!/bin/sh\nexit {exit_code}\n".encode())
         self._ready()
         self.command_owner.portable_artifact_spec = fixture_artifact.artifact_spec
         self.command_owner.inspect_portable_artifact = fixture_artifact.inspect_artifact_bytes
-        for name, value in (
+        bindings = [
             ("profile_extension_identity", self.candidate["profile_fixture"]["owner_code"]),
             ("require_profile_extension", self.command_owner),
-            ("_qualified_filesystem", True),
-        ):
+        ]
+        if not real_filesystem:
+            bindings.append(("_qualified_filesystem", True))
+        for name, value in bindings:
             replacement = patch(
                 f"workbench_core.environment_fixture_artifact_admission.{name}",
                 return_value=value,
@@ -289,6 +292,49 @@ class EnvironmentFixtureArtifactAdmissionTests(TestCase):
             plan_fixture_artifact_admission(
                 self.suite, self.share, self.candidate, **self._args(),
             )
+
+
+@skipIf(not sys.platform.startswith("linux"), "fixture admission uses Linux/WSL custody")
+class EnvironmentFixtureArtifactExt4Tests(TestCase):
+    """Exercise the existing regular-file output on a qualified real mount."""
+
+    _refresh = EnvironmentFixtureArtifactAdmissionTests._refresh
+    _selection = EnvironmentFixtureArtifactAdmissionTests._selection
+    _retain_fixture_and_gradle = EnvironmentFixtureArtifactAdmissionTests._retain_fixture_and_gradle
+    _inputs = EnvironmentFixtureArtifactAdmissionTests._inputs
+    _arguments = EnvironmentFixtureArtifactAdmissionTests._arguments
+    _fake_gradle = EnvironmentFixtureArtifactAdmissionTests._fake_gradle
+    _ready = EnvironmentFixtureArtifactAdmissionTests._ready
+    _execution_kwargs = EnvironmentFixtureArtifactAdmissionTests._execution_kwargs
+    _add_locked_properties = EnvironmentFixtureArtifactAdmissionTests._add_locked_properties
+    _start = EnvironmentFixtureArtifactAdmissionTests._start
+    _args = EnvironmentFixtureArtifactAdmissionTests._args
+    _write_jar = EnvironmentFixtureArtifactAdmissionTests._write_jar
+
+    def setUp(self) -> None:
+        if not admission_module._qualified_filesystem(ROOT):
+            self.skipTest("test checkout is not on a qualified Linux filesystem")
+        private_tests = ROOT / ".workbench/test-tmp"
+        private_tests.mkdir(parents=True, exist_ok=True)
+        with patch("test_environment_input_candidates.TemporaryDirectory",
+                   new=lambda: TemporaryDirectory(dir=private_tests)):
+            EnvironmentFixtureArtifactAdmissionTests.setUp(self)
+
+    def test_regular_output_on_ext4_admits_without_filesystem_mock(self) -> None:
+        self._start(real_filesystem=True)
+        target = self._write_jar()
+        self.assertTrue(target.is_file())
+        self.assertTrue(admission_module._qualified_filesystem(target.parent))
+        self.assertFalse(admission_module._qualified_filesystem(target))
+        plan = plan_fixture_artifact_admission(
+            self.suite, self.share, self.candidate, **self._args(),
+        )
+        self.assertEqual("ready", plan["state"], plan["blockers"])
+        result = admit_fixture_artifact(
+            self.suite, self.share, self.candidate,
+            expected_plan_id=plan["plan_id"], **self._args(),
+        )
+        self.assertEqual("owner-artifact-snapshot-admitted", result["state"])
 
 
 if __name__ == "__main__":

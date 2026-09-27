@@ -144,7 +144,10 @@ def _context(
             or relative.name != spec["filename"]):
         raise ReconstructionError("fixture artifact owner returned another output path or byte bound")
     target = Path(projection["projection_root"]).joinpath(*relative.parts)
-    if not _tree_host_supported() or not _qualified_filesystem(target):
+    # The selected output is an existing regular JAR.  The filesystem probe
+    # qualifies its containing directory; passing the file itself always
+    # returns false because the shared helper requires a directory.
+    if not _tree_host_supported() or not _qualified_filesystem(target.parent):
         raise ReconstructionError("fixture artifact needs a qualified Linux/WSL private filesystem")
     return {
         "share": portable, "candidate": reviewed, "local": local, "values": values,
