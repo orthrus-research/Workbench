@@ -40,6 +40,9 @@ class ProcessCaptureTests(unittest.TestCase):
             self.assertEqual(bytes(range(256)), stream.read())
         record = process_capture.load(self.directory, binding=result.binding, expected_id=result.capture_id)
         self.assertEqual(result, process_capture.result(self.directory, record))
+        self.assertEqual(result, tool_process.read_capture(
+            self.directory, binding=result.binding, expected_id=result.capture_id,
+        ))
         self.assertEqual(0o700, self.directory.stat().st_mode & 0o777)
         self.assertTrue(all(path.stat().st_mode & 0o777 == 0o600 for path in self.directory.iterdir()))
 
@@ -109,7 +112,12 @@ for thread in threads: thread.join()
             directory = self.root / name
             with self.subTest(name=name), self.assertRaises(ProcessError):
                 self.capture(script, directory=directory, **options)
-            self.assertEqual("incomplete", process_capture.load(directory, binding="request:fixture")["state"])
+            record = process_capture.load(directory, binding="request:fixture")
+            self.assertEqual("incomplete", record["state"])
+            with self.assertRaisesRegex(ProcessError, 'incomplete'):
+                tool_process.read_capture(
+                    directory, binding='request:fixture', expected_id=record['id'],
+                )
 
     def test_disk_write_failure_is_not_successful_capture(self):
         original = process_capture.FileCapture.write_raw
@@ -134,6 +142,14 @@ for thread in threads: thread.join()
             process_capture.load(self.directory, binding="another-request")
         with self.assertRaisesRegex(ProcessError, "metadata changed"):
             process_capture.load(self.directory, binding=result.binding, expected_id="different-id")
+        with self.assertRaisesRegex(ProcessError, 'another owner'):
+            tool_process.read_capture(
+                self.directory, binding='another-request', expected_id=result.capture_id,
+            )
+        with self.assertRaisesRegex(ProcessError, 'metadata changed'):
+            tool_process.read_capture(
+                self.directory, binding=result.binding, expected_id='different-id',
+            )
 
     def test_same_size_corruption_truncation_and_changed_digest_refuse(self):
         result = self.capture("import sys; sys.stdout.write('value')")

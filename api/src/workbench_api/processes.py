@@ -83,6 +83,10 @@ class ProcessHost(Protocol):
 
     def open_output(self, output: ProcessOutput) -> ContextManager[ProcessOutputReader]: ...
 
+    def read_capture(
+        self, directory: Path, *, binding: str, expected_id: str,
+    ) -> CapturedProcessResult: ...
+
     def execute_logged(
         self, argv: Sequence[str], *, cwd: Path, log_path: Path,
         environment: Mapping[str, str], cancelled: Event,
@@ -157,6 +161,20 @@ def open_process_output(output: ProcessOutput) -> ContextManager[ProcessOutputRe
     if _host is None or not callable(getattr(_host, "open_output", None)):
         raise ProcessError("process host does not implement captured output reads")
     return _host.open_output(output)
+
+
+def read_captured_process(
+    directory: Path, *, binding: str, expected_id: str,
+) -> CapturedProcessResult:
+    """Reopen a complete historical capture through Core's owner-bound reader."""
+
+    if (_host is None or not callable(getattr(_host, "read_capture", None))):
+        raise ProcessError("process host does not implement captured process reads")
+    if (not isinstance(directory, Path) or not directory.is_absolute()
+            or type(binding) is not str or not binding.strip()
+            or type(expected_id) is not str or not expected_id.strip()):
+        raise ProcessError("captured process requires an absolute path, owner binding and exact ID")
+    return _host.read_capture(directory, binding=binding, expected_id=expected_id)
 
 
 def execute_logged_process(

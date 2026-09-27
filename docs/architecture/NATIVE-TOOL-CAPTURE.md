@@ -19,6 +19,10 @@ truncation, changed content and symbolic/hard links. The capture manifest uses
 relative stream paths so evidence can move with its containing attempt. Reopening
 files does not execute another worker or establish current-source validity.
 
+`read_captured_process` reopens a complete capture by its exact owner binding and
+manifest ID before returning those stream references. An incomplete or foreign
+capture cannot supply a completed result.
+
 Cancellation and process failure leave explicitly incomplete evidence under the
 same owner. A killed publisher or physical storage failure may leave files without
 a committed manifest; those files cannot supply a complete response reference.

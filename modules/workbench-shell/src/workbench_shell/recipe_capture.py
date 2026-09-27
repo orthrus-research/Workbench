@@ -9,12 +9,11 @@ from pathlib import Path
 import re
 from threading import Event
 
-from workbench_api.processes import capture_process, ProcessError, open_process_output
+from workbench_api.processes import capture_process, ProcessError, open_process_output, read_captured_process
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
 from workbench_api.managed_attempts import managed_attempts
 from workbench_api.fixture_selections import fixture_selections
 from workbench_core import check_storage as storage, capture_workspace as workspace_storage
-from workbench_core import process_capture
 from workbench_core.filesystem_paths import native_path
 from workbench_core.runtime_java import probe_java, java_execution_path
 from workbench_project_intelligence.working_tree import capture_source_inputs, observe_source
@@ -440,8 +439,10 @@ def show(root, identity, *, cancelled=None):
                     or result['input_manifest'] != result['custody']['input-manifest.json']
                     or result['audit'] != result['custody']['audit.json']):
                 raise ValueError('retained capture evidence chain differs')
-            captured = process_capture.load(attempt / 'process', binding=result['launch_id'], expected_id=result['process']['id'])
-            process = process_capture.result(attempt / 'process', captured)
+            process = read_captured_process(
+                attempt / 'process', binding=result['launch_id'],
+                expected_id=result['process']['id'],
+            )
             if process.reference != result['process'] or process.exit_code != 0:
                 raise ValueError('retained process result differs')
             for output in (process.stdout, process.stderr):

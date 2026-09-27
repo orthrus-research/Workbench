@@ -20,7 +20,7 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api import ExecutionContext
-from workbench_api.processes import ProcessError
+from workbench_api.processes import ProcessError, read_captured_process as api_read_captured_process
 from workbench_api.managed_attempts import managed_attempts_scope
 from workbench_api.fixture_selections import fixture_selections_scope
 from workbench_atlas_categorical_graph import CategoricalGraphBundleBuilder, edge_record, node_record
@@ -187,6 +187,9 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         # Do not change global host bindings for other tests in the owner suite.
         self.native = self.stack.enter_context(patch.object(capture, 'capture_process', side_effect=tool_process.capture))
         self.stack.enter_context(patch.object(capture, 'open_process_output', side_effect=tool_process.open_output))
+        self.capture_reader = self.stack.enter_context(patch.object(
+            capture, 'read_captured_process', side_effect=tool_process.read_capture,
+        ))
 
     def git(self, *arguments):
         return subprocess.check_output(['git', '-C', str(self.source), *arguments], stderr=subprocess.PIPE)
@@ -574,8 +577,13 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.assertEqual(b'eula=false\n', (self.runtime / 'eula.txt').read_bytes())
         (self.source / 'groovy/recipes.groovy').write_bytes(b'next saved edit')
         capture.cancel(self.state, result['attempt_id'])
-        with patch.object(capture, 'require_profile_extension', side_effect=ValueError('profile removed')):
+        with (patch.object(capture, 'require_profile_extension', side_effect=ValueError('profile removed')),
+              patch.object(capture, 'read_captured_process', wraps=api_read_captured_process) as reader):
             self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+        reader.assert_called_once_with(
+            attempt / 'process', binding=result['launch_id'],
+            expected_id=result['process']['id'],
+        )
         self.assertEqual(1, self.native.call_count)
         with self.assertRaisesRegex(ValueError, 'already attempted'):
             self.run_capture({'attempt_id': result['attempt_id'], 'id': result['prepared_id']})

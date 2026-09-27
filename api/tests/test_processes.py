@@ -39,6 +39,32 @@ class ProcessPortTests(unittest.TestCase):
                 processes.capture_process(['/bin/true'], **arguments)
             with self.assertRaisesRegex(processes.ProcessError, 'output reads'):
                 processes.open_process_output(None)
+            with self.assertRaisesRegex(processes.ProcessError, 'captured process reads'):
+                processes.read_captured_process(Path('/owned/capture'), binding='request', expected_id='exact-id')
+
+    def test_complete_capture_readback_requires_exact_owner_identity(self):
+        directory = Path('/owned/capture')
+        expected = processes.CapturedProcessResult(
+            0, 'exact-id', 'request',
+            processes.ProcessOutput(directory / 'stdout.raw', 3, 'a' * 64),
+            processes.ProcessOutput(directory / 'stderr.raw', 0, 'b' * 64),
+        )
+        with patch.object(processes, '_host', Mock()) as host:
+            host.read_capture.return_value = expected
+            self.assertIs(expected, processes.read_captured_process(
+                directory, binding='request', expected_id='exact-id',
+            ))
+            host.read_capture.assert_called_once_with(
+                directory, binding='request', expected_id='exact-id',
+            )
+            for path, binding, identity in (
+                (Path('relative'), 'request', 'exact-id'),
+                (directory, '', 'exact-id'),
+                (directory, 'request', ''),
+            ):
+                with self.assertRaisesRegex(processes.ProcessError, 'exact ID'):
+                    processes.read_captured_process(path, binding=binding, expected_id=identity)
+            host.read_capture.assert_called_once()
 
     def test_merged_capture_requires_support_and_preserves_raw_result(self):
         arguments = dict(cwd=Path.cwd(), stdin=b'', environment={'LANG': 'C'},
