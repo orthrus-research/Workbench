@@ -74,6 +74,10 @@ inventories remain historical diagnostics. Resource locks coordinate suites in
 one invocation. Separate validator invocations still need separate checkouts or
 external coordination for shared physical resources.
 
+Core serializes concurrent writes to a suite's shared latest timing report.
+The later publisher occupies that diagnostic path; each invocation keeps its
+own run evidence. A timing publication failure still fails validation.
+
 Full validation is appropriate for shared protocols, packaging, client
 integration, and large cross-module refactors. A reversible local experiment
 does not need release-depth checks merely because those checks exist.
@@ -144,6 +148,16 @@ shared checkout root, a redirected parent, an existing target or an uncertain
 write stage is refused. Core does not change an arbitrary parent’s permissions.
 Direct collections have a 32 MiB size bound. The fixed source-CI report names
 above use their dedicated CI route.
+
+A directly executed suite with `--report PATH`, `--run-id` and
+`--source-fingerprint` uses the same private-parent rule. Core checks both the
+selected report and its sibling `.inventory.json` before collection. It writes
+the V1 inventory once, waits for admission when requested, and writes the V3
+report once after execution only while that inventory retains its exact bytes.
+An existing report, inventory, or uncertain write stage requires a fresh path
+or review. This also protects a stale final report whose inventory is missing.
+Reports keep their existing JSON layouts and remain readable by the same
+validation tools.
 
 Measurements separate configuration/import/collection, module and class
 fixtures, test setup, bodies, teardown and cleanup. Nested phase measurements

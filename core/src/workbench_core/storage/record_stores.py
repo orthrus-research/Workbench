@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import re
 import stat
 from contextlib import contextmanager
 from typing import Iterator
@@ -207,6 +208,35 @@ class CoreRecordStores:
             target, family="validation-collection-explicit-v1",
         )
 
+    def open_validation_suite_target(self, target: Path) -> RecordStoreReference:
+        """Register a direct executing suite's inventory and report parent."""
+
+        return self._open_explicit_validation_target(
+            target, family="validation-suite-explicit-v1",
+        )
+
+    def publish_validation_timing(self, suite_name: str, data: bytes) -> Path:
+        """Serialize writers of the historical per-suite latest timing report."""
+
+        if (self.owner_id != "validation" or type(suite_name) is not str
+                or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", suite_name) is None
+                or type(data) is not bytes):
+            raise DurableResourceError("resource.policy", "validation timing selection or bytes are invalid")
+        from ..durable_records import replace_private_bytes
+
+        store = self.open("validation-timings-v1", self.workspace)
+        target = store.root / f"{suite_name}.json"
+        if target.exists() or target.is_symlink():
+            visible = target.lstat()
+            if not stat.S_ISREG(visible.st_mode) or visible.st_nlink != 1:
+                raise OSError("historical validation timing report is not an ordinary file")
+        replace_private_bytes(
+            target, data, byte_limit=len(data),
+            wait_for_writer=True, bound_existing_at_lock=True,
+            secure_existing_at_lock=True,
+        )
+        return target
+
     def _open_explicit_validation_target(
         self, target: Path, *, family: str,
     ) -> RecordStoreReference:
@@ -292,6 +322,86 @@ class CoreRecordStores:
         after = store.root.lstat()
         if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
             raise DurableResourceError("resource.changed", "collection report parent changed during publication")
+        return store
+
+    def _validation_suite_targets(self, report: Path) -> tuple[Path, Path]:
+        selected = self._select_explicit_validation_target(report)
+        inventory = selected.with_suffix(".inventory.json")
+        if inventory == selected:
+            raise DurableResourceError("resource.policy", "suite inventory and report paths overlap")
+        return selected, inventory
+
+    @staticmethod
+    def _require_unused_suite_target(target: Path) -> None:
+        if target.exists() or target.is_symlink():
+            raise DurableResourceError("resource.changed", f"suite record already exists: {target}")
+        if count_interrupted_create_once_stages(target):
+            raise DurableResourceError("resource.incomplete", f"suite record has an uncertain stage: {target}")
+
+    def prepare_validation_suite_target(self, report: Path) -> None:
+        """Refuse stale inventory or report before recording a new direct run."""
+
+        selected, inventory = self._validation_suite_targets(report)
+        self._require_unused_suite_target(inventory)
+        self._require_unused_suite_target(selected)
+
+    def publish_validation_suite_inventory(
+        self, report: Path, data: bytes,
+    ) -> RecordStoreReference:
+        """Create one V1 inventory after checking both direct-suite targets."""
+
+        if type(data) is not bytes or not data:
+            raise DurableResourceError("resource.policy", "suite inventory requires exact nonempty bytes")
+        selected, inventory = self._validation_suite_targets(report)
+        self.prepare_validation_suite_target(selected)
+        before = selected.parent.lstat()
+        store = self.open_validation_suite_target(selected)
+        admitted = store.root.lstat()
+        if (before.st_dev, before.st_ino) != (admitted.st_dev, admitted.st_ino):
+            raise DurableResourceError("resource.changed", "suite parent changed during registration")
+        self._require_unused_suite_target(inventory)
+        self._require_unused_suite_target(selected)
+        publish_create_once_bytes(inventory, data, byte_limit=len(data))
+        if read_private_single_link_bytes(inventory, byte_limit=len(data)) != data:
+            raise DurableResourceError("resource.changed", "suite inventory changed after publication")
+        return store
+
+    def publish_validation_suite_report(
+        self, report: Path, data: bytes, *, expected_inventory: bytes,
+    ) -> RecordStoreReference:
+        """Create the final V3 report only beside its unchanged V1 inventory."""
+
+        if (type(data) is not bytes or not data or type(expected_inventory) is not bytes
+                or not expected_inventory):
+            raise DurableResourceError("resource.policy", "suite report requires exact inventory and report bytes")
+        selected, inventory = self._validation_suite_targets(report)
+        self._require_unused_suite_target(selected)
+        if count_interrupted_create_once_stages(inventory):
+            raise DurableResourceError("resource.incomplete", "suite inventory has an uncertain stage")
+        inventory_before = inventory.lstat()
+        if read_private_single_link_bytes(inventory, byte_limit=len(expected_inventory)) != expected_inventory:
+            raise DurableResourceError("resource.changed", "suite inventory changed before report publication")
+        before = selected.parent.lstat()
+        store = self.open_validation_suite_target(selected)
+        admitted = store.root.lstat()
+        if (before.st_dev, before.st_ino) != (admitted.st_dev, admitted.st_ino):
+            raise DurableResourceError("resource.changed", "suite parent changed during registration")
+        self._require_unused_suite_target(selected)
+        if count_interrupted_create_once_stages(inventory):
+            raise DurableResourceError("resource.incomplete", "suite inventory has an uncertain stage")
+        inventory_after = inventory.lstat()
+        if (inventory_before.st_dev, inventory_before.st_ino) != (inventory_after.st_dev, inventory_after.st_ino):
+            raise DurableResourceError("resource.changed", "suite inventory changed during report publication")
+        if read_private_single_link_bytes(inventory, byte_limit=len(expected_inventory)) != expected_inventory:
+            raise DurableResourceError("resource.changed", "suite inventory changed during report publication")
+        publish_create_once_bytes(selected, data, byte_limit=len(data))
+        if read_private_single_link_bytes(selected, byte_limit=len(data)) != data:
+            raise DurableResourceError("resource.changed", "suite report changed after publication")
+        inventory_after = inventory.lstat()
+        if (inventory_before.st_dev, inventory_before.st_ino) != (inventory_after.st_dev, inventory_after.st_ino):
+            raise DurableResourceError("resource.changed", "suite inventory changed after report publication")
+        if read_private_single_link_bytes(inventory, byte_limit=len(expected_inventory)) != expected_inventory:
+            raise DurableResourceError("resource.changed", "suite inventory changed after report publication")
         return store
 
     def publish_review_artifact(

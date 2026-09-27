@@ -187,9 +187,10 @@ def _write_report(
     state: str | None = None,
     core_allocation_id: str | None = None,
     core_configuration_home: Path | None = None,
+    standalone_configuration_home: Path | None = None,
 ) -> Path:
     target = report if report is not None else REPORT_ROOT / f"{name}.json"
-    if core_allocation_id is None:
+    if core_allocation_id is None and standalone_configuration_home is None:
         target.parent.mkdir(parents=True, exist_ok=True)
     rows = list(result.timings)
     if collected_ids is not None:
@@ -219,7 +220,20 @@ def _write_report(
         "collected_ids": list(collected_ids) if collected_ids is not None else sorted(row["test"] for row in rows),
     }
     document["inventory_digest"] = inventory_digest(document["collected_ids"])
-    if core_allocation_id is None:
+    if standalone_configuration_home is not None:
+        if core_allocation_id is not None or collected_ids is None:
+            raise ValueError("direct suite report needs its collected inventory")
+        from core_run_custody import publish_standalone_suite_report
+
+        publish_standalone_suite_report(
+            ROOT, name, _json_bytes(document),
+            expected_inventory=_json_bytes(_inventory_document(
+                name, collected_ids, run_id=run_id,
+                source_fingerprint=source_fingerprint,
+            )),
+            selected_path=target, configuration_home=standalone_configuration_home,
+        )
+    elif core_allocation_id is None:
         _write_json(target, document)
     else:
         from core_run_custody import publish_validation_run_record
@@ -252,18 +266,11 @@ def _write_json(target: Path, document: dict) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _write_inventory(
-    name: str, test_ids: tuple[str, ...], report: Path, *,
-    run_id: str, source_fingerprint: str, core_allocation_id: str | None = None,
-    core_configuration_home: Path | None = None,
-) -> Path:
-    """Seal the collection before invoking tests, separate from terminal rows."""
-    if len(set(test_ids)) != len(test_ids):
-        raise ValueError("suite collection repeats a test ID")
-    target = report.with_suffix(".inventory.json")
-    if target.exists() or target.is_symlink():
-        raise ValueError(f"refusing to replace a previously admitted inventory: {target}")
-    document = {
+def _inventory_document(
+    name: str, test_ids: tuple[str, ...], *, run_id: str,
+    source_fingerprint: str,
+) -> dict:
+    return {
         "format": "workbench-python-test-inventory-v1",
         "suite": name,
         "authority": SUITES_BY_NAME[name].authority,
@@ -272,7 +279,33 @@ def _write_inventory(
         "test_ids": sorted(test_ids),
         "inventory_digest": inventory_digest(test_ids),
     }
-    if core_allocation_id is None:
+
+
+def _write_inventory(
+    name: str, test_ids: tuple[str, ...], report: Path, *,
+    run_id: str, source_fingerprint: str, core_allocation_id: str | None = None,
+    core_configuration_home: Path | None = None,
+    standalone_configuration_home: Path | None = None,
+) -> Path:
+    """Seal the collection before invoking tests, separate from terminal rows."""
+    if len(set(test_ids)) != len(test_ids):
+        raise ValueError("suite collection repeats a test ID")
+    target = report.with_suffix(".inventory.json")
+    if target.exists() or target.is_symlink():
+        raise ValueError(f"refusing to replace a previously admitted inventory: {target}")
+    document = _inventory_document(
+        name, test_ids, run_id=run_id, source_fingerprint=source_fingerprint,
+    )
+    if standalone_configuration_home is not None:
+        if core_allocation_id is not None:
+            raise ValueError("direct suite inventory cannot use a run allocation")
+        from core_run_custody import publish_standalone_suite_inventory
+
+        publish_standalone_suite_inventory(
+            ROOT, name, _json_bytes(document), selected_path=report,
+            configuration_home=standalone_configuration_home,
+        )
+    elif core_allocation_id is None:
         _write_json(target, document)
     else:
         from core_run_custody import publish_validation_run_record
@@ -386,12 +419,22 @@ def main() -> int:
         report=args.report,
         temporary_root=args.temporary_root,
     )
-    collection_home = None
-    if args.collect_only and args.report is not None and not args.core_ci_collection:
+    direct_home = None
+    selected = SUITES_BY_NAME[args.suite]
+    if args.report is not None and args.core_allocation_id is None and not args.core_ci_collection:
         from core_run_custody import selected_core_configuration_home
 
-        collection_home = selected_core_configuration_home()
-    selected = SUITES_BY_NAME[args.suite]
+        direct_home = selected_core_configuration_home()
+        if not args.collect_only:
+            from core_run_custody import prepare_standalone_suite_target
+
+            try:
+                prepare_standalone_suite_target(
+                    ROOT, selected.name, selected_path=args.report,
+                    configuration_home=direct_home,
+                )
+            except (OSError, ValueError) as exc:
+                parser.error(str(exc))
     phases = PhaseClock()
     try:
         with phases.span("configuration"):
@@ -439,10 +482,10 @@ def main() -> int:
             else:
                 from core_run_custody import publish_standalone_collection
 
-                assert collection_home is not None
+                assert direct_home is not None
                 publish_standalone_collection(
                     ROOT, selected.name, _json_bytes(document),
-                    selected_path=args.report, configuration_home=collection_home,
+                    selected_path=args.report, configuration_home=direct_home,
                 )
         print(f"[{selected.name}] collected {count} tests without import errors.")
         return 0
@@ -463,7 +506,8 @@ def main() -> int:
     _write_inventory(selected.name, collected_ids, target,
                      run_id=args.run_id, source_fingerprint=args.source_fingerprint,
                      core_allocation_id=core_allocation_id,
-                     core_configuration_home=core_configuration_home)
+                     core_configuration_home=core_configuration_home,
+                     standalone_configuration_home=direct_home)
     if args.admission_file is not None:
         _await_admission(args.admission_file, test_ids=collected_ids,
                          run_id=args.run_id, source_fingerprint=args.source_fingerprint)
@@ -500,6 +544,7 @@ def main() -> int:
         state="interrupted" if interrupted else None,
         core_allocation_id=core_allocation_id,
         core_configuration_home=core_configuration_home,
+        standalone_configuration_home=direct_home,
     )
     slow = sorted(
         (

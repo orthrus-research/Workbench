@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import replace
 import json
 import os
@@ -277,6 +278,60 @@ class ParallelValidationSchedulerTests(unittest.TestCase):
             self.assertEqual(1, len(rows))
             self.assertEqual("validation-timings-v1", rows[0]["family"])
             self.assertEqual(str(old.parent), rows[0]["path"])
+
+    def test_concurrent_latest_timing_publishers_wait_and_keep_last_finisher(self) -> None:
+        from workbench_core import durable_records
+        from workbench_core.storage.registered import ResourceCatalog
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / ".workbench/validation/test-timings/alpha.json"
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b'{"run_id":"legacy"}\n')
+            target.chmod(0o644)
+            first = {"run_id": "first", "suite": "alpha", "more": "x" * 128}
+            second = {"run_id": "second", "suite": "alpha"}
+            first_inside = threading.Event()
+            second_entered = threading.Event()
+            release_first = threading.Event()
+            original_prepared = durable_records._prepared
+            original_replace = durable_records.replace_private_bytes
+
+            @contextmanager
+            def pause_first(path, data, **kwargs):
+                with original_prepared(path, data, **kwargs) as staged:
+                    if path == target and b'"first"' in data:
+                        first_inside.set()
+                        if not release_first.wait(5):
+                            raise AssertionError("first publisher was not released")
+                    yield staged
+
+            def observe_second(path, data, **kwargs):
+                if path == target and b'"second"' in data:
+                    second_entered.set()
+                return original_replace(path, data, **kwargs)
+
+            with patch.object(scheduler, "ROOT", root), \
+                    patch.object(durable_records, "_prepared", side_effect=pause_first), \
+                    patch.object(durable_records, "replace_private_bytes", side_effect=observe_second), \
+                    ThreadPoolExecutor(max_workers=2) as pool:
+                first_future = pool.submit(scheduler._publish_timing_report, first, "alpha")
+                try:
+                    self.assertTrue(first_inside.wait(5))
+                    second_future = pool.submit(scheduler._publish_timing_report, second, "alpha")
+                    self.assertTrue(second_entered.wait(5))
+                    self.assertFalse(second_future.done())
+                finally:
+                    release_first.set()
+                first_future.result(timeout=5)
+                second_future.result(timeout=5)
+            self.assertEqual(second, json.loads(target.read_bytes()))
+            self.assertEqual(0o600, target.stat().st_mode & 0o777)
+            rows = ResourceCatalog(self.configuration_home).inventory(workspace=root)["record_stores"]
+            self.assertEqual(
+                [("validation-timings-v1", str(target.parent))],
+                [(row["family"], row["path"]) for row in rows],
+            )
 
     def test_timing_report_refuses_historical_hardlink(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

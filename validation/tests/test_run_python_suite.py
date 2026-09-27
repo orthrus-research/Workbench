@@ -32,13 +32,15 @@ from run_python_suite import (  # noqa: E402
 from orchestration import OrchestrationFailure, load_suite_report, load_test_inventory
 from core_run_custody import (
     allocate_validation_run, publish_standalone_collection,
+    prepare_standalone_suite_target, publish_standalone_suite_inventory,
+    publish_standalone_suite_report,
     publish_validation_run_record,
 )
 from orchestration import create_run_paths
 from workbench_api.working_allocations import WorkingAllocationError
 from workbench_api.host_filesystem import DurableRecordError
 from suite_measurement import PhaseClock, measure_tests
-from suite_catalog import PythonTestSuite  # noqa: E402
+from suite_catalog import PythonTestSuite, SUITES_BY_NAME  # noqa: E402
 
 
 class PythonSuiteIsolationTests(unittest.TestCase):
@@ -282,6 +284,161 @@ class PythonSuiteIsolationTests(unittest.TestCase):
             rows = ResourceCatalog(config).inventory(workspace=root)["record_stores"]
             self.assertEqual(["validation-collection-explicit-v1"], [row["family"] for row in rows])
             self.assertFalse((base / "foreign-config").exists())
+
+    def test_direct_executing_report_keeps_v1_inventory_and_v3_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "checkout"
+            root.mkdir()
+            config = base / "config"
+            parent = base / "private-reports"
+            parent.mkdir(mode=0o700)
+            report = parent / "timing.json"
+
+            def collect(_selected):
+                return unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])
+
+            arguments = [
+                "run_python_suite.py", "validation", "--report", str(report),
+                "--run-id", "direct-explicit", "--source-fingerprint", "source:one",
+            ]
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(config)}), \
+                    patch("run_python_suite.ROOT", root), \
+                    patch("run_python_suite._configure_suite"), \
+                    patch("run_python_suite._discover_tests", side_effect=collect), \
+                    patch.object(sys, "argv", arguments), \
+                    patch("sys.stdout", new_callable=StringIO), \
+                    patch("sys.stderr", new_callable=StringIO) as stderr:
+                self.assertEqual(0, suite_main())
+                inventory = report.with_suffix(".inventory.json")
+                inventory_raw, report_raw = inventory.read_bytes(), report.read_bytes()
+                inventory_doc, report_doc = json.loads(inventory_raw), json.loads(report_raw)
+                for raw, document in ((inventory_raw, inventory_doc), (report_raw, report_doc)):
+                    self.assertEqual((json.dumps(document, indent=2, sort_keys=True) + "\n").encode(), raw)
+                self.assertEqual("workbench-python-test-inventory-v1", inventory_doc["format"])
+                self.assertEqual("workbench-python-test-timing-v3", report_doc["format"])
+                self.assertEqual("direct-explicit", inventory_doc["run_id"])
+                self.assertEqual("direct-explicit", report_doc["run_id"])
+                self.assertEqual("source:one", inventory_doc["source_fingerprint"])
+                self.assertEqual("source:one", report_doc["source_fingerprint"])
+                self.assertEqual(inventory_doc["inventory_digest"], report_doc["inventory_digest"])
+                self.assertEqual(0o600, inventory.stat().st_mode & 0o777)
+                self.assertEqual(0o600, report.stat().st_mode & 0o777)
+                from workbench_core.storage.registered import ResourceCatalog
+                rows = ResourceCatalog(config).inventory(workspace=root)["record_stores"]
+                self.assertEqual(
+                    [("validation-suite-explicit-v1", str(parent))],
+                    [(row["family"], row["path"]) for row in rows],
+                )
+                admitted_ids = load_test_inventory(
+                    inventory, expected_suite="validation", expected_run_id="direct-explicit",
+                    expected_source_fingerprint="source:one",
+                    expected_authority=SUITES_BY_NAME["validation"].authority,
+                )
+                self.assertEqual(
+                    list(admitted_ids),
+                    [test.test for test in load_suite_report(
+                        report, expected_suite="validation", expected_run_id="direct-explicit",
+                        expected_source_fingerprint="source:one",
+                        expected_test_ids=admitted_ids,
+                    ).tests],
+                )
+                with self.assertRaises(SystemExit) as refusal:
+                    suite_main()
+                self.assertEqual(2, refusal.exception.code)
+                self.assertIn("suite record already exists", stderr.getvalue())
+                self.assertEqual((inventory_raw, report_raw), (inventory.read_bytes(), report.read_bytes()))
+
+    def test_direct_executing_report_refuses_stale_final_before_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "checkout"
+            root.mkdir()
+            config = base / "config"
+            report = base / "timing.json"
+            report.write_bytes(b"historic final\n")
+            arguments = [
+                "run_python_suite.py", "validation", "--report", str(report),
+                "--run-id", "direct-stale", "--source-fingerprint", "source:one",
+            ]
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(config)}), \
+                    patch("run_python_suite.ROOT", root), \
+                    patch.object(sys, "argv", arguments), \
+                    patch("sys.stderr", new_callable=StringIO) as stderr:
+                with self.assertRaises(SystemExit) as refusal:
+                    suite_main()
+            self.assertEqual(2, refusal.exception.code)
+            self.assertIn("suite record already exists", stderr.getvalue())
+            self.assertEqual(b"historic final\n", report.read_bytes())
+            self.assertFalse(report.with_suffix(".inventory.json").exists())
+            self.assertFalse(config.exists())
+
+    def test_direct_executing_report_refuses_stages_and_unsafe_parents(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "checkout"
+            root.mkdir()
+            config = base / "config"
+            for name in (".timing.json.interrupted.tmp", ".timing.inventory.json.interrupted.tmp"):
+                stage = base / name
+                stage.write_bytes(b"unfinished")
+                with self.assertRaisesRegex(ValueError, "uncertain stage"):
+                    prepare_standalone_suite_target(
+                        root, "validation", selected_path=base / "timing.json",
+                        configuration_home=config,
+                    )
+                self.assertEqual(b"unfinished", stage.read_bytes())
+                stage.unlink()
+            shared = base / "shared"
+            shared.mkdir(mode=0o755)
+            redirected = base / "redirected"
+            redirected.symlink_to(shared, target_is_directory=True)
+            for target in (shared / "timing.json", redirected / "timing.json",
+                           config / "timing.json",
+                           root / ".workbench/validation/runs/foreign.json"):
+                with self.subTest(target=target):
+                    with self.assertRaises((OSError, ValueError)):
+                        prepare_standalone_suite_target(
+                            root, "validation", selected_path=target,
+                            configuration_home=config,
+                        )
+                    self.assertFalse(target.exists())
+            self.assertEqual(0o755, shared.stat().st_mode & 0o777)
+            self.assertFalse(config.exists())
+
+    def test_direct_executing_report_rechecks_inventory_before_final(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "checkout"
+            root.mkdir()
+            config = base / "config"
+            report = base / "timing.json"
+            inventory = report.with_suffix(".inventory.json")
+            expected = b'{"run_id":"direct"}\n'
+            publish_standalone_suite_inventory(
+                root, "validation", expected, selected_path=report,
+                configuration_home=config,
+            )
+            stage = base / ".timing.json.interrupted.tmp"
+            stage.write_bytes(b"unfinished final")
+            with self.assertRaisesRegex(ValueError, "uncertain stage"):
+                publish_standalone_suite_report(
+                    root, "validation", b'{"state":"passed"}\n',
+                    expected_inventory=expected, selected_path=report,
+                    configuration_home=config,
+                )
+            self.assertEqual(b"unfinished final", stage.read_bytes())
+            self.assertFalse(report.exists())
+            stage.unlink()
+            inventory.write_bytes(b'{"run_id":"change"}\n')
+            with self.assertRaisesRegex(ValueError, "inventory changed"):
+                publish_standalone_suite_report(
+                    root, "validation", b'{"state":"passed"}\n',
+                    expected_inventory=expected, selected_path=report,
+                    configuration_home=config,
+                )
+            self.assertFalse(report.exists())
+            self.assertEqual(b'{"run_id":"change"}\n', inventory.read_bytes())
 
     def test_core_ci_collection_flag_rejects_generic_or_foreign_targets_before_collection(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

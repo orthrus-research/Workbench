@@ -467,6 +467,16 @@ class DurableRecordTests(unittest.TestCase):
             self.assertFalse(thread.is_alive())
         self.assertEqual(["busy"], [error.code for error in errors])
 
+    def test_private_replacement_keeps_default_nonwaiting_lease(self) -> None:
+        lock = self.root / ".current.json.record.lock"
+        with private_record_lock(lock):
+            with self.assertRaises(DurableRecordError) as busy:
+                durable_records.replace_private_bytes(
+                    self.path, b"new\n", byte_limit=4,
+                )
+        self.assertEqual("busy", busy.exception.code)
+        self.assertFalse(self.path.exists())
+
     def test_exclusive_marker_excludes_legacy_writer_and_releases_exact_path(self) -> None:
         marker = self.root / "interface.lock"
         with private_exclusive_marker(marker):

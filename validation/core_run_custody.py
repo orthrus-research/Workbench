@@ -282,28 +282,16 @@ def publish_validation_timing(root: Path, suite_name: str, payload: bytes) -> Pa
     if type(payload) is not bytes:
         raise ValueError("validation timing report must be exact bytes")
     _source_core()
-    from workbench_core.host_filesystem import replace_private_bytes, secure_private_path
     from workbench_core.storage.record_stores import CoreRecordStores
     from workbench_core.user_config_home import default_user_config_home
 
     selected_root = Path(root).resolve(strict=True)
-    store = CoreRecordStores(
+    provider = CoreRecordStores(
         workspace=selected_root,
         configuration_home=default_user_config_home(),
         owner_id="validation",
-    ).open("validation-timings-v1", selected_root)
-    target = store.root / f"{suite_name}.json"
-    # Existing V1 timing reports preceded Core registration and may be 0644.
-    # Core upgrades an ordinary historical report before replacing it.
-    previous_size = 0
-    if target.exists() or target.is_symlink():
-        visible = target.lstat()
-        if not stat.S_ISREG(visible.st_mode) or visible.st_nlink != 1:
-            raise OSError("historical validation timing report is not an ordinary file")
-        previous_size = visible.st_size
-        secure_private_path(target, directory=False)
-    replace_private_bytes(target, payload, byte_limit=max(len(payload), previous_size))
-    return target
+    )
+    return provider.publish_validation_timing(suite_name, payload)
 
 
 def _source_ci_collection_target(root: Path, suite_name: str, selected_path: Path):
@@ -317,17 +305,13 @@ def _source_ci_collection_target(root: Path, suite_name: str, selected_path: Pat
     return selected_root, target
 
 
-def publish_standalone_collection(
-    root: Path, suite_name: str, payload: bytes, *, selected_path: Path,
-    configuration_home: Path,
-) -> Path:
-    """Publish one direct collection at its exact V1 path through Core."""
-
+def _explicit_validation_store(
+    root: Path, suite_name: str, selected_path: Path, configuration_home: Path,
+):
     if (type(suite_name) is not str or _SUITE_NAME.fullmatch(suite_name) is None
-            or suite_name in {".", ".."} or type(payload) is not bytes
-            or not 0 < len(payload) <= _MAX_DIRECT_COLLECTION
-            or not isinstance(selected_path, Path) or ".." in selected_path.parts):
-        raise ValueError("direct collection selection or payload is invalid")
+            or suite_name in {".", ".."} or not isinstance(selected_path, Path)
+            or ".." in selected_path.parts):
+        raise ValueError("direct validation report selection is invalid")
     selected_root = Path(root).resolve(strict=True)
     target = Path(os.path.abspath(selected_path.expanduser()))
     if target in {
@@ -345,8 +329,62 @@ def publish_standalone_collection(
         workspace=selected_root, configuration_home=configuration_home,
         owner_id="validation",
     )
+    return provider, target
+
+
+def publish_standalone_collection(
+    root: Path, suite_name: str, payload: bytes, *, selected_path: Path,
+    configuration_home: Path,
+) -> Path:
+    """Publish one direct collection at its exact V1 path through Core."""
+
+    if type(payload) is not bytes or not 0 < len(payload) <= _MAX_DIRECT_COLLECTION:
+        raise ValueError("direct collection payload is invalid")
+    provider, target = _explicit_validation_store(
+        root, suite_name, selected_path, configuration_home,
+    )
     provider.publish_validation_collection_target(
         target, payload, byte_limit=_MAX_DIRECT_COLLECTION,
+    )
+    return selected_path
+
+
+def prepare_standalone_suite_target(
+    root: Path, suite_name: str, *, selected_path: Path,
+    configuration_home: Path,
+) -> None:
+    """Check both direct-suite targets before an inventory can be emitted."""
+
+    provider, target = _explicit_validation_store(
+        root, suite_name, selected_path, configuration_home,
+    )
+    provider.prepare_validation_suite_target(target)
+
+
+def publish_standalone_suite_inventory(
+    root: Path, suite_name: str, payload: bytes, *, selected_path: Path,
+    configuration_home: Path,
+) -> Path:
+    """Publish the exact direct-suite V1 inventory through Core."""
+
+    provider, target = _explicit_validation_store(
+        root, suite_name, selected_path, configuration_home,
+    )
+    provider.publish_validation_suite_inventory(target, payload)
+    return target.with_suffix(".inventory.json")
+
+
+def publish_standalone_suite_report(
+    root: Path, suite_name: str, payload: bytes, *, expected_inventory: bytes,
+    selected_path: Path, configuration_home: Path,
+) -> Path:
+    """Publish the direct-suite V3 report beside its unchanged V1 inventory."""
+
+    provider, target = _explicit_validation_store(
+        root, suite_name, selected_path, configuration_home,
+    )
+    provider.publish_validation_suite_report(
+        target, payload, expected_inventory=expected_inventory,
     )
     return selected_path
 
@@ -718,6 +756,8 @@ def publish_ci_plan(
 __all__ = [
     "allocate_validation_run", "allocate_validation_scratch", "publish_ci_plan",
     "selected_core_configuration_home", "publish_standalone_collection",
+    "prepare_standalone_suite_target", "publish_standalone_suite_inventory",
+    "publish_standalone_suite_report",
     "publish_validation_timing", "open_validation_invocation", "allocate_ide_toolchain_stage",
     "reject_existing_ide_toolchain_stage",
     "review_ide_toolchain_stages_on_reuse",

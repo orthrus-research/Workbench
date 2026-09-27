@@ -741,16 +741,18 @@ def private_exclusive_marker(path: Path) -> Iterator[None]:
 
 
 @contextmanager
-def _record_lock(path: Path) -> Iterator[None]:
+def _record_lock(path: Path, *, wait: bool = False) -> Iterator[None]:
     # Setup's historical .<name>.lock may already be held while Core saves
     # preferences. Keep this lease distinct until that outer transaction moves.
-    with private_record_lock(path.parent / f".{path.name}.record.lock"):
+    with private_record_lock(path.parent / f".{path.name}.record.lock", wait=wait):
         yield
 
 
 def replace_private_bytes(
     path: Path, data: bytes, *, byte_limit: int,
     expected_sha256: str | None = None, require_absent: bool = False,
+    wait_for_writer: bool = False, bound_existing_at_lock: bool = False,
+    secure_existing_at_lock: bool = False,
 ) -> None:
     _parent(path)
     _check_data(data, byte_limit)
@@ -758,22 +760,37 @@ def replace_private_bytes(
         raise DurableRecordError("bounds", "expected private record digest is invalid")
     if expected_sha256 is not None and require_absent:
         raise DurableRecordError("bounds", "choose an expected digest or an absent target")
-    with _record_lock(path):
+    if (type(wait_for_writer) is not bool or type(bound_existing_at_lock) is not bool
+            or type(secure_existing_at_lock) is not bool):
+        raise DurableRecordError("bounds", "private record replacement options are invalid")
+    with _record_lock(path, wait=wait_for_writer):
         if require_absent and (path.exists() or path.is_symlink()):
             raise DurableRecordError("stale", "private record appeared after review")
+        effective_limit = byte_limit
+        if bound_existing_at_lock and (path.exists() or path.is_symlink()):
+            effective_limit = max(effective_limit, path.lstat().st_size)
+        if secure_existing_at_lock and (path.exists() or path.is_symlink()):
+            previous = _ordinary(path, byte_limit=effective_limit, private=False, single_link=True)
+            try:
+                secure_private_path(path, directory=False)
+            except HostFilesystemError as exc:
+                raise DurableRecordError("unsafe", "cannot secure historical private record") from exc
+            secured = _ordinary(path, byte_limit=effective_limit, single_link=True)
+            if _identity(previous) != _identity(secured):
+                raise DurableRecordError("changed", "historical private record changed while secured")
         if expected_sha256 is not None:
-            observed = read_private_bytes(path, byte_limit=byte_limit)
+            observed = read_private_bytes(path, byte_limit=effective_limit)
             if "sha256:" + sha256(observed).hexdigest() != expected_sha256:
                 raise DurableRecordError("stale", "private record changed after review")
         elif path.exists() or path.is_symlink():
-            _ordinary(path, byte_limit=byte_limit)
+            _ordinary(path, byte_limit=effective_limit)
         with _prepared(path, data) as (temporary, secured):
             try:
                 os.replace(temporary, path)
             except OSError as exc:
                 raise DurableRecordError("write", f"cannot replace private record: {exc}") from exc
-            published = _ordinary(path, byte_limit=byte_limit)
-            if _identity(published) != _identity(secured) or read_private_bytes(path, byte_limit=byte_limit) != data:
+            published = _ordinary(path, byte_limit=effective_limit)
+            if _identity(published) != _identity(secured) or read_private_bytes(path, byte_limit=effective_limit) != data:
                 raise DurableRecordError("changed", "replaced private record changed")
         fsync_directory(path.parent)
 
