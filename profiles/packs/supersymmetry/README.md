@@ -39,6 +39,14 @@ pack release. A developer source selection must not silently replace a saved
 release choice. The release descriptor does not create a Cleanroom source lock
 or resolve the released pack's CurseForge dependencies.
 
+After preparing the selected client archive, `workbench pack release inputs
+--profile supersymmetry --json` asks Core for a read-only
+[input plan](../../../core/src/workbench_core/schemas/workbench-pack-release-input-plan-v1.schema.json).
+Core rechecks the saved archive's exact bytes and lists the manifest's
+CurseForge project/file IDs, required flags and archive member counts. The plan
+has a content identity but no download URLs or verified mod bytes. It does not
+install the client or substitute the release for a Cleanroom source lock.
+
 ## Contents
 
 - `source-locks/`: exact upstream source and binary provenance.

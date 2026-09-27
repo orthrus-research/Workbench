@@ -14,6 +14,8 @@ import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
 
+from jsonschema import validate as validate_json_schema
+
 from workbench_core.artifact_store import fetch_verified_artifact
 from workbench_core.cli import _dispatch
 from workbench_core.pack_release import PackReleaseService, ReleaseUnavailable, fetch_latest_release, load_authority, main
@@ -24,10 +26,12 @@ AUTHORITY_PATH = (Path(__file__).resolve().parents[2]
                   / "profiles/packs/supersymmetry/release-authority-v1.json")
 
 
-def _client_zip(path: Path, version: str, *, loader: str = "forge-14.23.5.2860") -> None:
+def _client_zip(path: Path, version: str, *, loader: str = "forge-14.23.5.2860",
+                files: list[dict] | None = None) -> None:
     manifest = {
         "manifestType": "minecraftModpack", "manifestVersion": 1,
-        "version": version, "name": "Supersymmetry", "files": [],
+        "version": version, "name": "Supersymmetry", "files": [] if files is None else files,
+        "overrides": "overrides",
         "minecraft": {"version": "1.12.2", "modLoaders": [
             {"id": loader, "primary": True},
         ]},
@@ -35,6 +39,7 @@ def _client_zip(path: Path, version: str, *, loader: str = "forge-14.23.5.2860")
     with ZipFile(path, "w") as archive:
         archive.writestr("manifest.json", json.dumps(manifest))
         archive.writestr("overrides/", b"")
+        archive.writestr("overrides/config/example.cfg", b"example")
 
 
 def _release(version: str, asset: Path, *, release_number: int = 17,
@@ -154,6 +159,8 @@ class PackReleaseTests(unittest.TestCase):
         self.assertEqual("verified", self.service.show()["artifact_state"])
         self.assertEqual(1, self.downloads)
         self.assertTrue(self.service.choice_path.is_file())
+        self.assertEqual("client-install-policy-unresolved",
+                         self.service.inputs()["input_plan"]["acquisition_state"])
 
     def test_prepare_refuses_changed_baseline_digest(self) -> None:
         _client_zip(self.source, "0.1.16.16")
@@ -221,6 +228,83 @@ class PackReleaseTests(unittest.TestCase):
         self.assertNotEqual(old_artifact, Path(prepared["artifact_path"]))
         self.assertEqual("verified", second.show()["artifact_state"])
         self.assertEqual(self.source.read_bytes(), old_artifact.read_bytes())
+
+    def test_inputs_plan_inventories_exact_unresolved_external_ids(self) -> None:
+        _client_zip(self.source, "0.1.16.17", files=[
+            {"projectID": 32, "fileID": 2, "required": False},
+            {"projectID": 10, "fileID": 8, "required": True},
+        ])
+        self.latest = _release("0.1.16.17", self.source)
+        identity = self.service.check()["candidate"]["release_id"]
+        self.assertEqual("accepted", self.service.accept(identity)["status"])
+        before = self.service.choice_path.read_bytes()
+        observed = self.service.inputs()
+        self.assertEqual("planned", observed["status"])
+        self.assertEqual("verified", observed["artifact_state"])
+        plan = observed["input_plan"]
+        self.assertEqual(identity, plan["release_id"])
+        self.assertEqual("published-client-archive", plan["source_kind"])
+        self.assertEqual("external-file-bytes-unresolved", plan["acquisition_state"])
+        self.assertEqual(3, plan["archive_member_count"])
+        self.assertEqual(1, plan["override_file_count"])
+        self.assertEqual(0, plan["other_file_count"])
+        self.assertEqual([
+            {"project_id": 10, "file_id": 8, "required": True},
+            {"project_id": 32, "file_id": 2, "required": False},
+        ], plan["external_files"])
+        schema = json.loads((Path(__file__).resolve().parents[1]
+                             / "src/workbench_core/schemas/workbench-pack-release-input-plan-v1.schema.json")
+                            .read_text(encoding="utf-8"))
+        validate_json_schema(plan, schema)
+        self.assertEqual(plan, self.service.inputs()["input_plan"])
+        self.assertEqual(before, self.service.choice_path.read_bytes())
+        self.assertEqual(1, self.downloads)
+
+    def test_inputs_refuses_unprepared_changed_and_invalid_external_declarations(self) -> None:
+        unprepared = self.service.inputs()
+        self.assertEqual("unavailable", unprepared["status"])
+        self.assertEqual("none", unprepared["artifact_state"])
+        self.assertIsNone(unprepared["input_plan"])
+        self.assertFalse(self.service.choice_path.exists())
+
+        _client_zip(self.source, "0.1.16.17", files=[
+            {"projectID": 10, "fileID": 8, "required": True},
+            {"projectID": 10, "fileID": 8, "required": True},
+        ])
+        self.latest = _release("0.1.16.17", self.source)
+        identity = self.service.check()["candidate"]["release_id"]
+        self.assertEqual("accepted", self.service.accept(identity)["status"])
+        invalid = self.service.inputs()
+        self.assertEqual("unavailable", invalid["status"])
+        self.assertEqual("verified", invalid["artifact_state"])
+        self.assertIn("repeats", invalid["reason"])
+        self.assertIsNone(invalid["input_plan"])
+        self.assertEqual("0.1.16.17", self.service.show()["selected_version"])
+
+        Path(self.service.show()["selected"]["artifact_path"]).write_bytes(b"changed")
+        changed = self.service.inputs()
+        self.assertEqual("unavailable", changed["status"])
+        self.assertEqual("changed", changed["artifact_state"])
+        self.assertIsNone(changed["input_plan"])
+
+    def test_core_dispatch_reports_prepared_release_inputs_offline(self) -> None:
+        identity = self.service.check()["candidate"]["release_id"]
+        self.assertEqual("accepted", self.service.accept(identity)["status"])
+        output = StringIO()
+        with (patch("workbench_core.pack_release.profile_resources",
+                    return_value={"supersymmetry": AUTHORITY_PATH}),
+              patch("workbench_core.pack_release.default_user_config_home",
+                    return_value=self.root / ".workbench"),
+              patch("workbench_core.pack_release.default_runtime_state_root",
+                    return_value=self.root / "state"),
+              redirect_stdout(output)):
+            self.assertEqual(0, _dispatch(["pack", "release", "inputs", "--profile",
+                                           "supersymmetry", "--json"], AUTHORITY_PATH.parents[3]))
+        response = json.loads(output.getvalue())
+        self.assertEqual("planned", response["status"])
+        self.assertEqual(identity, response["input_plan"]["release_id"])
+        self.assertEqual("verified", response["artifact_state"])
+        self.assertEqual(1, self.downloads)
 
     def test_failed_digest_or_manifest_keeps_previous_choice(self) -> None:
         identity = self.service.check()["candidate"]["release_id"]

@@ -11,13 +11,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import re
 import stat
-from typing import Any, Callable, Sequence
+from typing import Any, BinaryIO, Callable, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from zipfile import BadZipFile, ZipFile
+from zipfile import BadZipFile, ZipFile, ZipInfo
 
 from packaging.version import Version
 from workbench_api.host_filesystem import DurableRecordError
@@ -31,6 +32,7 @@ from .user_config_home import default_user_config_home
 
 
 SCHEMA = "workbench.pack-release.v1"
+INPUT_PLAN_FORMAT = "workbench-pack-release-input-plan-v1"
 CHOICE_FORMAT = "workbench-pack-release-choice-v1"
 AUTHORITY_FORMAT = "workbench-supersymmetry-release-authority-v1"
 REPOSITORY = "SymmetricDevs/Supersymmetry"
@@ -42,6 +44,7 @@ MAX_ASSET_BYTES = 2 * 1024 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 10_000
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 4 * 1024 * 1024 * 1024
 MAX_MANIFEST_BYTES = 512 * 1024
+MAX_EXTERNAL_FILES = 10_000
 _TAG = re.compile(r"[0-9]+(?:\.[0-9]+){3}\Z")
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _RELEASE_ID = re.compile(r"github-release:sha256:[0-9a-f]{64}\Z")
@@ -254,11 +257,13 @@ def _candidate(authority: ReleaseAuthority, release: dict[str, Any]) -> dict[str
     }
 
 
-def _verify_client_archive(path: Path, authority: ReleaseAuthority, version: str) -> None:
+def _verify_client_archive(
+    source: Path | BinaryIO, authority: ReleaseAuthority, version: str,
+) -> tuple[dict[str, Any], bytes, list[ZipInfo]]:
     """Inspect the manifest without extracting or trusting archive paths."""
 
     try:
-        with ZipFile(path) as archive:
+        with ZipFile(source) as archive:
             entries = archive.infolist()
             if not 1 <= len(entries) <= MAX_ARCHIVE_ENTRIES:
                 raise ValueError("client ZIP has an invalid entry count")
@@ -300,6 +305,56 @@ def _verify_client_archive(path: Path, authority: ReleaseAuthority, version: str
                        and row.get("primary") is True for row in loaders)
             or type(manifest.get("files")) is not list):
         raise ValueError("client ZIP manifest does not match the declared pack format")
+    return manifest, raw, entries
+
+
+def _input_plan(
+    selected: dict[str, Any], manifest: dict[str, Any], manifest_raw: bytes,
+    entries: list[ZipInfo],
+) -> dict[str, Any]:
+    """Describe exact external identifiers without treating them as acquired bytes."""
+
+    files = manifest["files"]
+    if manifest.get("overrides") != "overrides" or len(files) > MAX_EXTERNAL_FILES:
+        raise ValueError("client ZIP manifest has unsupported external input declarations")
+    external = []
+    seen: set[tuple[int, int]] = set()
+    for row in files:
+        if (type(row) is not dict or set(row) != {"projectID", "fileID", "required"}
+                or type(row["projectID"]) is not int
+                or type(row["fileID"]) is not int
+                or not 0 < row["projectID"] < 2**63
+                or not 0 < row["fileID"] < 2**63
+                or type(row["required"]) is not bool):
+            raise ValueError("client ZIP manifest has an invalid external file declaration")
+        key = (row["projectID"], row["fileID"])
+        if key in seen:
+            raise ValueError("client ZIP manifest repeats an external file declaration")
+        seen.add(key)
+        external.append({"project_id": key[0], "file_id": key[1],
+                         "required": row["required"]})
+    external.sort(key=lambda row: (row["project_id"], row["file_id"]))
+    overrides = sum(entry.filename.startswith("overrides/") and not entry.is_dir()
+                    for entry in entries)
+    other_files = sum(not entry.is_dir()
+                      and entry.filename != "manifest.json"
+                      and not entry.filename.startswith("overrides/") for entry in entries)
+    body = {
+        "format": INPUT_PLAN_FORMAT, "schema_version": 1,
+        "profile": PROFILE, "source_kind": "published-client-archive",
+        "release_id": selected["release_id"], "version": selected["version"],
+        "asset_sha256": selected["asset_sha256"], "asset_size": selected["asset_size"],
+        "manifest_sha256": "sha256:" + sha256(manifest_raw).hexdigest(),
+        "archive_member_count": len(entries),
+        "override_file_count": overrides, "other_file_count": other_files,
+        "external_files": external,
+        "acquisition_state": (
+            "external-file-bytes-unresolved" if external
+            else "client-install-policy-unresolved"
+        ),
+    }
+    return {**body, "plan_id": "workbench-pack-release-input-plan:sha256:"
+            + sha256(_json_bytes(body)).hexdigest()}
 
 
 class PackReleaseService:
@@ -444,6 +499,59 @@ class PackReleaseService:
         result["artifact_state"] = state
         return result
 
+    def inputs(self) -> dict[str, Any]:
+        """Review a verified selected archive's unresolved acquisition inputs."""
+
+        shown = self.show()
+        choice = self._read_choice()
+        state = shown["artifact_state"]
+        if state != "verified":
+            result = self._result("inputs", "unavailable", choice, None,
+                                  f"selected client archive is {state}")
+            return {**result, "artifact_state": state, "input_plan": None}
+        selected = choice["selected"]
+        if selected != shown["selected"]:
+            result = self._result("inputs", "stale", choice, None,
+                                  "selected pack release changed during review")
+            return {**result, "artifact_state": state, "input_plan": None}
+        try:
+            with Path(selected["artifact_path"]).open("rb") as source:
+                before = os.fstat(source.fileno())
+                if not stat.S_ISREG(before.st_mode):
+                    raise ValueError("selected client archive is not a regular file")
+                manifest, raw, entries = _verify_client_archive(
+                    source, self.authority, selected["version"],
+                )
+                source.seek(0)
+                digest = sha256()
+                size = 0
+                while chunk := source.read(1024 * 1024):
+                    digest.update(chunk)
+                    size += len(chunk)
+                after = os.fstat(source.fileno())
+                if (before.st_dev, before.st_ino, before.st_size,
+                        before.st_mtime_ns, before.st_ctime_ns) != (
+                        after.st_dev, after.st_ino, after.st_size,
+                        after.st_mtime_ns, after.st_ctime_ns):
+                    raise ValueError("selected client archive changed during review")
+                if ("sha256:" + digest.hexdigest() != selected["asset_sha256"]
+                        or size != selected["asset_size"]):
+                    raise ValueError("selected client archive changed after preparation")
+            plan = _input_plan(selected, manifest, raw, entries)
+        except (OSError, ValueError) as exc:
+            observed = self.show()
+            result = self._result("inputs", "unavailable", self._read_choice(), None,
+                                  str(exc))
+            return {**result, "artifact_state": observed["artifact_state"],
+                    "input_plan": None}
+        current = self._read_choice()
+        if current != choice:
+            result = self._result("inputs", "stale", current, None,
+                                  "selected pack release changed during review")
+            return {**result, "artifact_state": "verified", "input_plan": None}
+        result = self._result("inputs", "planned", choice, None)
+        return {**result, "artifact_state": "verified", "input_plan": plan}
+
     def check(self) -> dict[str, Any]:
         choice = self._read_choice()
         try:
@@ -573,13 +681,13 @@ class PackReleaseService:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="workbench pack release")
-    parser.add_argument("action", choices=("show", "check", "accept", "ignore", "prepare"))
+    parser.add_argument("action", choices=("show", "check", "accept", "ignore", "prepare", "inputs"))
     parser.add_argument("--profile", required=True, choices=(PROFILE,))
     parser.add_argument("--expected-release-id")
     parser.add_argument("--json", action="store_true")
     selected = parser.parse_args(argv)
-    if selected.action in {"show", "check"} and selected.expected_release_id is not None:
-        parser.error("show and check do not accept an expected release ID")
+    if selected.action in {"show", "check", "inputs"} and selected.expected_release_id is not None:
+        parser.error("show, check, and inputs do not accept an expected release ID")
     if selected.action in {"accept", "ignore", "prepare"} and selected.expected_release_id is None:
         parser.error("accept, ignore, and prepare require --expected-release-id")
     resources = profile_resources("release-authority")
@@ -592,6 +700,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     result = (service.show() if selected.action == "show" else
               service.check() if selected.action == "check" else
+              service.inputs() if selected.action == "inputs" else
               service.accept(selected.expected_release_id) if selected.action == "accept" else
               service.ignore(selected.expected_release_id) if selected.action == "ignore" else
               service.prepare(selected.expected_release_id))
@@ -606,6 +715,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"  Reason: {result['reason']}")
         if result.get("artifact_path"):
             print(f"  Verified client ZIP: {result['artifact_path']}")
+        if result.get("input_plan") is not None:
+            plan = result["input_plan"]
+            print(f"  External files awaiting acquisition: {len(plan['external_files'])}")
+            print(f"  Override files in archive: {plan['override_file_count']}")
     return 0 if result["status"] not in {"unavailable", "stale"} or selected.action == "check" else 2
 
 

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Workbench selected pack release external input plan V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format", "schema_version", "profile", "source_kind", "release_id",
+    "version", "asset_sha256", "asset_size", "manifest_sha256",
+    "archive_member_count", "override_file_count", "other_file_count",
+    "external_files", "acquisition_state", "plan_id"
+  ],
+  "properties": {
+    "format": {"const": "workbench-pack-release-input-plan-v1"},
+    "schema_version": {"const": 1},
+    "profile": {"const": "supersymmetry"},
+    "source_kind": {"const": "published-client-archive"},
+    "release_id": {"type": "string", "pattern": "^(github-release|profile-release):sha256:[0-9a-f]{64}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]+){3}$"},
+    "asset_sha256": {"$ref": "#/$defs/digest"},
+    "asset_size": {"type": "integer", "minimum": 1, "maximum": 2147483648},
+    "manifest_sha256": {"$ref": "#/$defs/digest"},
+    "archive_member_count": {"type": "integer", "minimum": 1, "maximum": 10000},
+    "override_file_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+    "other_file_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+    "external_files": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["project_id", "file_id", "required"],
+        "properties": {
+          "project_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+          "file_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+          "required": {"type": "boolean"}
+        }
+      }
+    },
+    "acquisition_state": {
+      "enum": ["external-file-bytes-unresolved", "client-install-policy-unresolved"]
+    },
+    "plan_id": {"type": "string", "pattern": "^workbench-pack-release-input-plan:sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
