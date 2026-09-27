@@ -67,6 +67,76 @@ class ParallelValidationSchedulerTests(unittest.TestCase):
             )
             self.assertNotEqual(self.configuration_home, request.temporary_root / "environment/config")
 
+    def test_core_run_manifest_revisions_preserve_changed_and_interrupted_evidence(self) -> None:
+        from core_run_custody import allocate_validation_run, publish_validation_run_manifest
+        from workbench_api.host_filesystem import DurableRecordError
+        from workbench_api.working_allocations import WorkingAllocationError
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _, allocation = allocate_validation_run(root, "manifest-run")
+            paths = create_run_paths(
+                root / ".workbench/validation/runs", "manifest-run",
+                allocated_root=allocation.path,
+            )
+            target = paths.root / "run.json"
+            writer = scheduler._CoreRunManifestWriter(
+                root, paths, allocation.allocation_id, self.configuration_home,
+            )
+            options = dict(
+                tier="quick", jobs=1, source_fingerprint="source:one",
+                selected_suites=(), reports={}, failures=[],
+                started_at="2026-09-27T00:00:00Z", writer=writer,
+            )
+            stage = paths.root / ".run.json.interrupted.tmp"
+            stage.write_bytes(b"incomplete")
+            with self.assertRaisesRegex(OSError, "interrupted Core run manifest stage"):
+                scheduler._write_run_manifest(paths, state="running", **options)
+            self.assertFalse(target.exists())
+            self.assertIsNone(writer.previous_sha256)
+            stage.unlink()
+
+            with self.assertRaises(WorkingAllocationError):
+                publish_validation_run_manifest(
+                    root, paths.run_id, allocation.allocation_id, b"foreign\n",
+                    selected_path=target, configuration_home=root / "foreign-config",
+                )
+            with self.assertRaisesRegex(ValueError, "path differs"):
+                publish_validation_run_manifest(
+                    root, paths.run_id, allocation.allocation_id, b"foreign\n",
+                    selected_path=paths.root / "foreign.json",
+                    configuration_home=self.configuration_home,
+                )
+            self.assertFalse(target.exists())
+
+            scheduler._write_run_manifest(paths, state="running", **options)
+            first = target.read_bytes()
+            self.assertEqual("running", json.loads(first)["state"])
+            self.assertEqual(0, target.stat().st_mode & 0o077)
+            stage.write_bytes(b"interrupted after link")
+            with self.assertRaisesRegex(OSError, "interrupted Core run manifest stage"):
+                scheduler._write_run_manifest(paths, state="failed", **options)
+            self.assertEqual(first, target.read_bytes())
+            stage.unlink()
+            scheduler._write_run_manifest(paths, state="failed", **options)
+            self.assertEqual("failed", json.loads(target.read_bytes())["state"])
+            self.assertNotEqual(first, target.read_bytes())
+
+            target.write_bytes(b'{"state":"competing"}\n')
+            with self.assertRaisesRegex(DurableRecordError, "changed after review"):
+                scheduler._write_run_manifest(paths, state="passed", **options)
+            self.assertEqual(b'{"state":"competing"}\n', target.read_bytes())
+            interruption = KeyboardInterrupt("interrupted")
+            with patch.object(scheduler, "_cleanup_run_temporary", return_value=[]):
+                scheduler._terminalize_abnormal_run(
+                    paths, error=interruption, tier="quick", jobs=1,
+                    source_fingerprint="source:one", selected_suites=(), reports={},
+                    failures=[], started_at="2026-09-27T00:00:00Z",
+                    scratch=(None, ()), drained=lambda: True, writer=writer,
+                )
+            self.assertEqual(b'{"state":"competing"}\n', target.read_bytes())
+            self.assertIn("could not write its failed terminal manifest", " ".join(interruption.__notes__))
+
     def test_fresh_core_run_preserves_historical_tree_and_secures_parent(self) -> None:
         from core_run_custody import allocate_validation_run
 

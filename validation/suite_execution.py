@@ -37,7 +37,8 @@ from orchestration import (
 )
 from core_run_custody import (
     allocate_validation_run, allocate_validation_scratch,
-    publish_validation_run_record, publish_validation_timing,
+    publish_validation_run_manifest, publish_validation_run_record,
+    publish_validation_timing,
 )
 from suite_measurement import environment_provenance, inventory_digest
 from suite_catalog import (
@@ -119,8 +120,36 @@ def _atomic_write_bytes(path: Path, raw: bytes) -> None:
 def _atomic_write_json(path: Path, value: object) -> None:
     _atomic_write_bytes(
         path,
-        (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        _json_bytes(value),
     )
+
+
+def _json_bytes(value: object) -> bytes:
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+class _CoreRunManifestWriter:
+    """Keep the last accepted V1 bytes as the next Core compare token."""
+
+    def __init__(
+        self, workspace: Path, paths: ValidationRunPaths, allocation_id: str,
+        configuration_home: Path,
+    ) -> None:
+        self.workspace = workspace
+        self.paths = paths
+        self.allocation_id = allocation_id
+        self.configuration_home = configuration_home
+        self.previous_sha256: str | None = None
+
+    def write(self, document: dict) -> None:
+        payload = _json_bytes(document)
+        publish_validation_run_manifest(
+            self.workspace, self.paths.run_id, self.allocation_id, payload,
+            selected_path=self.paths.root / "run.json",
+            expected_sha256=self.previous_sha256,
+            configuration_home=self.configuration_home,
+        )
+        self.previous_sha256 = "sha256:" + sha256(payload).hexdigest()
 
 
 def _timing_estimate(suite: PythonTestSuite, source_fingerprint: str, environment: dict) -> float:
@@ -444,38 +473,40 @@ def _write_run_manifest(
     failures: list[str],
     started_at: str,
     details: dict | None = None,
+    writer: _CoreRunManifestWriter | None = None,
 ) -> None:
-    _atomic_write_json(
-        paths.root / "run.json",
-        {
-            "format": "workbench-validation-run-v1",
-            "run_id": paths.run_id,
-            "state": state,
-            "tier": tier,
-            "jobs": jobs,
-            "source_fingerprint": source_fingerprint,
-            "started_at": started_at,
-            "updated_at": _utc_timestamp(),
-            "selected_suites": [suite.name for suite in selected_suites],
-            "completed_suites": [
-                {
-                    "name": suite.name,
-                    "tests": reports[suite.name].executed_tests,
-                    "seconds": reports[suite.name].seconds,
-                    "report": paths.report_for(suite.name)
-                    .relative_to(paths.root)
-                    .as_posix(),
-                    "log": paths.log_for(suite.name)
-                    .relative_to(paths.root)
-                    .as_posix(),
-                }
-                for suite in selected_suites
-                if suite.name in reports
-            ],
-            "failures": failures,
-            **(details or {}),
-        },
-    )
+    document = {
+        "format": "workbench-validation-run-v1",
+        "run_id": paths.run_id,
+        "state": state,
+        "tier": tier,
+        "jobs": jobs,
+        "source_fingerprint": source_fingerprint,
+        "started_at": started_at,
+        "updated_at": _utc_timestamp(),
+        "selected_suites": [suite.name for suite in selected_suites],
+        "completed_suites": [
+            {
+                "name": suite.name,
+                "tests": reports[suite.name].executed_tests,
+                "seconds": reports[suite.name].seconds,
+                "report": paths.report_for(suite.name)
+                .relative_to(paths.root)
+                .as_posix(),
+                "log": paths.log_for(suite.name)
+                .relative_to(paths.root)
+                .as_posix(),
+            }
+            for suite in selected_suites
+            if suite.name in reports
+        ],
+        "failures": failures,
+        **(details or {}),
+    }
+    if writer is None:
+        _atomic_write_json(paths.root / "run.json", document)
+    else:
+        writer.write(document)
 
 
 def _terminalize_abnormal_run(
@@ -492,6 +523,7 @@ def _terminalize_abnormal_run(
     scratch: tuple[Any, tuple[Any, Any]],
     drained: Callable[[], bool],
     details: dict | None = None,
+    writer: _CoreRunManifestWriter | None = None,
 ) -> None:
     """Best-effort terminalization that preserves the original exception."""
 
@@ -522,6 +554,7 @@ def _terminalize_abnormal_run(
             failures=failures,
             started_at=started_at,
             details=details,
+            writer=writer,
         )
     except Exception as terminalization_error:
         error.add_note(
@@ -544,6 +577,7 @@ def _finish_run(
     scratch: tuple[Any, tuple[Any, Any]],
     drained: Callable[[], bool],
     details: dict | None = None,
+    writer: _CoreRunManifestWriter | None = None,
 ) -> ValidationRunPaths:
     """Verify, clean, and terminalize a normally drained validation run."""
 
@@ -598,6 +632,7 @@ def _finish_run(
             failures=failures,
             started_at=started_at,
             details=details,
+            writer=writer,
         )
         raise SuiteExecutionFailure(
             "Python suite validation failed; run artifacts retained at "
@@ -615,6 +650,7 @@ def _finish_run(
         failures=failures,
         started_at=started_at,
         details=details,
+        writer=writer,
     )
 
     print("Python suite summary:")
@@ -660,6 +696,11 @@ def _run_python_suites_at_paths(
         source_fingerprint=source_fingerprint,
         core_allocation_id=core_allocation_id,
         core_configuration_home=core_configuration_home,
+    )
+    writer = (
+        _CoreRunManifestWriter(ROOT, run_paths, core_allocation_id, core_configuration_home)
+        if core_allocation_id is not None and core_configuration_home is not None
+        else None
     )
     request_by_name = {request.suite.name: request for request in requests}
     pending = list(requests)
@@ -716,6 +757,7 @@ def _run_python_suites_at_paths(
         failures=failures,
         started_at=started_at,
         details=details,
+        writer=writer,
     )
     print(
         f"Python validation run {run_paths.run_id}: {len(suites)} suites, "
@@ -765,6 +807,7 @@ def _run_python_suites_at_paths(
                     run_paths, state="running", tier=tier, jobs=effective_jobs,
                     source_fingerprint=source_fingerprint, selected_suites=suites,
                     reports=reports, failures=failures, started_at=started_at, details=details,
+                    writer=writer,
                 )
             if not active:
                 if pending and not failures:
@@ -841,6 +884,7 @@ def _run_python_suites_at_paths(
                 run_paths, state="running", tier=tier, jobs=effective_jobs,
                 source_fingerprint=source_fingerprint, selected_suites=suites,
                 reports=reports, failures=failures, started_at=started_at, details=details,
+                writer=writer,
             )
         # A failed suite stops admission of new work, but already-running suites
         # are drained so their own descendant cleanup and timing writes finish.
@@ -866,6 +910,7 @@ def _run_python_suites_at_paths(
             scratch=scratch,
             drained=drained,
             details=details,
+            writer=writer,
         )
         raise
     finally:
@@ -886,6 +931,7 @@ def _run_python_suites_at_paths(
             repository_files=repository_files,
             scratch=scratch,
             drained=drained,
+            writer=writer,
         )
     except SuiteExecutionFailure:
         raise
@@ -903,6 +949,7 @@ def _run_python_suites_at_paths(
             scratch=scratch,
             drained=drained,
             details=details,
+            writer=writer,
         )
         raise
 

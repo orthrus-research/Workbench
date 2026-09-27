@@ -65,33 +65,14 @@ def allocate_validation_run(root: Path, run_id: str):
     return host, allocation
 
 
-def publish_validation_run_record(
-    root: Path, run_id: str, allocation_id: str, suite_name: str,
-    kind: str, payload: bytes, *, selected_path: Path,
-    expected_sha256: str | None = None,
-    configuration_home: Path | None = None,
+def _opened_validation_run(
+    root: Path, run_id: str, allocation_id: str,
+    configuration_home: Path | None,
 ) -> Path:
-    """Publish or compare-and-replace one V1 suite record in its Core run.
-
-    The child and scheduler independently reopen the same allocation before
-    writing. A create-once stage left by an interruption blocks fresh writes;
-    the caller must choose a new run rather than infer what the old stage meant.
-    """
-
-    if (
-        type(run_id) is not str or _SUITE_NAME.fullmatch(run_id) is None
-        or run_id in {".", ".."}
-        or type(suite_name) is not str or _SUITE_NAME.fullmatch(suite_name) is None
-        or suite_name in {".", ".."}
-        or kind not in _RUN_RECORD_SUFFIX or type(payload) is not bytes
-        or (expected_sha256 is not None and kind != "report")
-    ):
-        raise ValueError("validation run record selection is invalid")
+    if (type(run_id) is not str or _SUITE_NAME.fullmatch(run_id) is None
+            or run_id in {".", ".."}):
+        raise ValueError("validation run ID is invalid")
     _source_core()
-    from workbench_core.host_filesystem import (
-        count_interrupted_create_once_stages, publish_create_once_bytes,
-        read_private_single_link_bytes, replace_private_bytes,
-    )
     from workbench_core.user_config_home import default_user_config_home
     from workbench_core.working_allocations import CoreWorkingAllocations
 
@@ -115,12 +96,23 @@ def publish_validation_run_record(
         or allocation.path != run_root
     ):
         raise ValueError("suite record does not belong to the selected Core validation run")
-    target = run_root / "reports" / f"{suite_name}{_RUN_RECORD_SUFFIX[kind]}"
-    if Path(os.path.abspath(selected_path)) != target:
-        raise ValueError("suite record path differs from the selected Core run")
+    return run_root
+
+
+def _publish_validation_run_bytes(
+    target: Path, payload: bytes, *, expected_sha256: str | None,
+    label: str,
+) -> None:
+    from workbench_core.host_filesystem import (
+        count_interrupted_create_once_stages, publish_create_once_bytes,
+        read_private_single_link_bytes, replace_private_bytes,
+    )
+
+    if type(payload) is not bytes:
+        raise ValueError("validation run record must be exact bytes")
+    if count_interrupted_create_once_stages(target):
+        raise OSError(f"interrupted Core {label} stage requires review")
     if expected_sha256 is None:
-        if count_interrupted_create_once_stages(target):
-            raise OSError("interrupted Core suite record stage requires review")
         publish_create_once_bytes(target, payload, byte_limit=len(payload))
     else:
         prior_size = target.lstat().st_size
@@ -129,7 +121,55 @@ def publish_validation_run_record(
             expected_sha256=expected_sha256,
         )
     if read_private_single_link_bytes(target, byte_limit=len(payload)) != payload:
-        raise OSError("Core suite record changed after publication")
+        raise OSError(f"Core {label} changed after publication")
+
+
+def publish_validation_run_record(
+    root: Path, run_id: str, allocation_id: str, suite_name: str,
+    kind: str, payload: bytes, *, selected_path: Path,
+    expected_sha256: str | None = None,
+    configuration_home: Path | None = None,
+) -> Path:
+    """Publish or compare-and-replace one V1 suite record in its Core run.
+
+    The child and scheduler independently reopen the same allocation before
+    writing. A create-once stage left by an interruption blocks fresh writes;
+    the caller must choose a new run rather than infer what the old stage meant.
+    """
+
+    if (
+        type(suite_name) is not str or _SUITE_NAME.fullmatch(suite_name) is None
+        or suite_name in {".", ".."}
+        or kind not in _RUN_RECORD_SUFFIX or type(payload) is not bytes
+        or (expected_sha256 is not None and kind != "report")
+    ):
+        raise ValueError("validation run record selection is invalid")
+    run_root = _opened_validation_run(root, run_id, allocation_id, configuration_home)
+    target = run_root / "reports" / f"{suite_name}{_RUN_RECORD_SUFFIX[kind]}"
+    if Path(os.path.abspath(selected_path)) != target:
+        raise ValueError("suite record path differs from the selected Core run")
+    _publish_validation_run_bytes(
+        target, payload, expected_sha256=expected_sha256,
+        label="suite record",
+    )
+    return target
+
+
+def publish_validation_run_manifest(
+    root: Path, run_id: str, allocation_id: str, payload: bytes, *,
+    selected_path: Path, expected_sha256: str | None = None,
+    configuration_home: Path | None = None,
+) -> Path:
+    """Publish the V1 run manifest once, then compare every revision."""
+
+    run_root = _opened_validation_run(root, run_id, allocation_id, configuration_home)
+    target = run_root / "run.json"
+    if Path(os.path.abspath(selected_path)) != target:
+        raise ValueError("run manifest path differs from the selected Core run")
+    _publish_validation_run_bytes(
+        target, payload, expected_sha256=expected_sha256,
+        label="run manifest",
+    )
     return target
 
 
