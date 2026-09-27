@@ -1631,6 +1631,7 @@ def _groovy_managed_session_command() -> CommandSpec:
             _f("runtime_root", "Receipt-bound disposable client .minecraft root.", flags=("--runtime-root",), kind="path", required=True),
             _f("launch_receipt", "Completed Workbench runtime-launch V3 receipt.", flags=("--launch-receipt",), kind="path", required=True),
             _f("session_storage", "Retained language-session storage root.", flags=("--session-storage",), kind="path"),
+            _f("require_restartable_process_custody", "Require Core to prove restartable process custody before overlay mutation.", flags=("--require-restartable-process-custody",), kind="boolean"),
             _f("port", "Explicit free loopback port; otherwise reserve one randomly.", flags=("--port",), kind="integer"),
             _f("packmode", "Effective packmode override.", flags=("--packmode",)),
             _f("debug_state", "Effective GroovyScript debug state.", flags=("--debug-state",), kind="choice", choices=("auto", "on", "off"), default="auto"),

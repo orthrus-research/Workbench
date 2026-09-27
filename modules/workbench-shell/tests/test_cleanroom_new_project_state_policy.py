@@ -148,7 +148,7 @@ class CleanroomNewProjectStatePolicyTests(unittest.TestCase):
 
 
 class CleanroomNewProjectCoreRouteTests(unittest.TestCase):
-    def test_shell_apply_and_interrupted_recover_keep_v2_state_paths(self) -> None:
+    def test_shell_apply_and_interrupted_core_git_recovery_retains_v2_state(self) -> None:
         bind_host_filesystem(host_filesystem)
         with TemporaryDirectory() as temporary:
             home = Path(temporary)
@@ -197,13 +197,20 @@ class CleanroomNewProjectCoreRouteTests(unittest.TestCase):
                     interrupted, reviewed["target_observation"],
                     recovery_state, plan_id=reviewed["id"],
                 )
-                recovered = invoke(
-                    "recover", str(interrupted_plan),
-                    "--state-root", str(recovery_state),
+                output, error = StringIO(), StringIO()
+                status = new_project_main(
+                    ["cleanroom-mod", "recover", str(interrupted_plan),
+                     "--state-root", str(recovery_state), "--json"],
+                    root=ROOT, output=output, error=error,
                 )
-                self.assertEqual("restored", recovered["state"])
-                self.assertFalse(interrupted.exists())
-                self.assertFalse((recovery_state / "fresh-bootstrap-v2.json").exists())
+                self.assertEqual(status, 2)
+                self.assertIn("Core Git initialization", error.getvalue())
+                self.assertEqual("", output.getvalue())
+                self.assertTrue(interrupted.is_dir())
+                self.assertTrue((recovery_state / "fresh-bootstrap-v2.json").is_file())
+                self.assertTrue(GIT_BOOTSTRAP_HOST.has_init_attempt(
+                    recovery_state, plan_id=reviewed["id"],
+                ))
 
 
 if __name__ == "__main__":
