@@ -1,0 +1,21 @@
+{
+  "format": "workbench-supersymmetry-release-client-layout-policy-v1",
+  "schema_version": 1,
+  "profile": "supersymmetry",
+  "input_plan_format": "workbench-pack-release-input-plan-v1",
+  "input_plan_id": "workbench-pack-release-input-plan:sha256:8c188e58c33556c6dae0a5d7de8a069054bc0f45d3bccb6607adca9850673f0f",
+  "release_id": "profile-release:sha256:4b881312a29cf0fa1464be1b4531690c755306350bc9ecfec01682cbb2bf92c1",
+  "version": "0.1.16.16",
+  "asset_sha256": "sha256:01ac9d96f703e23411dd836c3bca50b39de274e7979faf9e05c66db0029b0f50",
+  "manifest_sha256": "sha256:a4d67c7961e281c6ba9ecfffa58c9de2d14f3a424c9498537166dd6687b04d7d",
+  "override_source_root": "overrides/",
+  "destination_root": "minecraft-root",
+  "override_file_count": 4168,
+  "override_total_bytes": 122288244,
+  "optional_selected": [
+    {"project_id": 1214490, "file_id": 8754029}
+  ],
+  "collision_policy": "reject",
+  "installation_state": "not-installed",
+  "runtime_qualification_state": "not-qualified"
+}

@@ -10,6 +10,7 @@ def profile():
         'registration-source': 'src/workbench_profile_supersymmetry/__init__.py',
         'acquisition': 'acquisition-v1.json',
         'release-authority': 'release-authority-v1.json',
+        'release-client-layout-policy': 'runtime/release-client-layout-policy-v1.json',
         'release-local-input-policy': 'runtime/release-local-input-policy-v1.json',
         'release-resourcepack-input-policy': 'runtime/release-resourcepack-input-policy-v1.json',
         'release-mod-augmentation-policy': 'runtime/release-mod-augmentation-policy-v1.json',

@@ -75,6 +75,37 @@ class ReleaseAuthorityTests(unittest.TestCase):
         self.assertIn("runtime/release-local-input-policy-v1.json", bundled)
         self.assertIn("schemas/workbench-supersymmetry-release-local-input-policy-v1.schema.json", bundled)
 
+    def test_selected_release_client_layout_is_pack_owned_and_packaged(self) -> None:
+        owner = profile()
+        policy_path = owner.resource("release-client-layout-policy")
+        self.assertEqual("release-client-layout-policy-v1.json", policy_path.name)
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        schema = json.loads(
+            (owner.root / "schemas/workbench-supersymmetry-release-client-layout-policy-v1.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(policy)
+        authority = json.loads(owner.resource("release-authority").read_text(encoding="utf-8"))
+        asset = authority["baseline_release"]["client_asset"]
+        self.assertEqual(authority["baseline_release"]["tag"], policy["version"])
+        self.assertEqual(asset["sha256"], policy["asset_sha256"])
+        self.assertEqual("overrides/", policy["override_source_root"])
+        self.assertEqual("minecraft-root", policy["destination_root"])
+        self.assertEqual((4168, 122288244),
+                         (policy["override_file_count"], policy["override_total_bytes"]))
+        self.assertEqual([{"project_id": 1214490, "file_id": 8754029}],
+                         policy["optional_selected"])
+        self.assertEqual("reject", policy["collision_policy"])
+        self.assertEqual("not-installed", policy["installation_state"])
+        self.assertEqual("not-qualified", policy["runtime_qualification_state"])
+        self.assertNotIn("prior_tree_id", policy)
+        self.assertNotIn("mods_tree_id", policy)
+        self.assertNotIn("resourcepacks_tree_id", policy)
+        bundled = tomllib.loads((owner.root / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]["workbench_resources.profiles.packs.supersymmetry"]
+        self.assertIn("runtime/release-client-layout-policy-v1.json", bundled)
+        self.assertIn("schemas/workbench-supersymmetry-release-client-layout-policy-v1.schema.json", bundled)
+
     def test_resourcepack_placement_is_exact_selected_release_and_packaged(self) -> None:
         owner = profile()
         policy_path = owner.resource("release-resourcepack-input-policy")

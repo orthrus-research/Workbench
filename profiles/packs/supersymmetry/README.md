@@ -141,6 +141,21 @@ observation. Its local sidecars and hashes do not establish CurseForge file-ID
 provenance, and this candidate import does not install the resource packs or
 qualify the released client.
 
+The [selected client layout policy](runtime/release-client-layout-policy-v1.json)
+maps all 4,168 files under the verified release ZIP's `overrides/` directory
+to the Minecraft payload root. It pins the ZIP and manifest identities, exact
+122,288,244-byte expanded override set, and the explicit selection of the
+optional Cleanroom Relauncher file ID `1214490/8754029`. The ten override files
+under `mods/OpenSecurity/` are sound assets, not mod JARs. The archive's root
+`manifest.json` and `modlist.html` are not payload files. Core rejects any
+override path collision with the separately retained mod and resource-pack
+trees when `plan_release_client_layout` reviews the selected client. That Core
+API reopens the retained trees, streams the exact ZIP overrides, and returns a
+path-free content-sealed layout plan. The policy contains no local tree or path
+identity. A plan does not extract or install the client; publication requires
+the inputs to share one Core catalog. It does not prove the CurseForge origin
+of external files or qualify the Forge-declared ZIP for Cleanroom runtime.
+
 ## Contents
 
 - `source-locks/`: exact upstream source and binary provenance.
