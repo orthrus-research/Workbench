@@ -364,7 +364,7 @@ class SimulationTest(unittest.TestCase):
         self.assertEqual("observed-unqualified", observation["status"])
         self.assertEqual("failed", observation["gate_status"])
         self.assertEqual("retained-process-absence-unproven", observation["scratch_disposition"])
-        self.assertEqual("initial-process-group-only", observation["sandbox_supervision"])
+        self.assertEqual("core-original-group-only", observation["sandbox_supervision"])
         evidence = simulation.SimulationEvidenceStore(self.evidence_root).read_v2(
             result["evidence_locator_v2"]
         )
@@ -372,6 +372,8 @@ class SimulationTest(unittest.TestCase):
         self.assertEqual("core-original-group-only", observation["git_supervision"])
         self.assertEqual("core-original-group-only", evidence["git_supervision"])
         self.assertGreater(len(evidence["git_captures"]), 0)
+        self.assertEqual("core-original-group-only", evidence["sandbox_supervision"])
+        self.assertEqual([], evidence["sandbox_captures"])
         self.assertEqual("BPX128_COMMAND_FAILED", next(
             row["reason_code"] for row in evidence["gates"]
             if row["stage_id"] == "isolated-compilation"
@@ -444,6 +446,119 @@ class SimulationTest(unittest.TestCase):
             {row["attempt"] for row in evidence["git_captures"]},
             {item.name for item in (Path(rows[0]["path"]) / "git-captures").iterdir()},
         )
+
+    def test_v2_real_bubblewrap_commands_retain_exact_core_attempts(self) -> None:
+        self.workspace_root = (
+            self.repository / ".workbench/blueprints/simulation-test/simulation-workspaces"
+        )
+        self.environment["limits"] = {
+            "command_timeout_seconds": 3600,
+            "max_output_bytes": 16 * 1024 * 1024,
+        }
+        host = CoreSimulationScratch(
+            workspace=self.repository, configuration_home=self.configuration_home,
+        )
+        with simulation_scratch_scope(host):
+            result = self._simulator().execute(
+                self.planning_result, intake=self.intake, target_manifest=self.target,
+                planning_evidence=self.planning_evidence,
+                environment_lock=self.environment, custody_mode="retained-v2",
+            )
+        observation = result["observation_v2"]
+        self.assertEqual("observed-unqualified", observation["status"])
+        self.assertEqual("core-original-group-only", observation["sandbox_supervision"])
+        evidence = simulation.SimulationEvidenceStore(self.evidence_root).read_v2(
+            result["evidence_locator_v2"]
+        )
+        captures = evidence["sandbox_captures"]
+        self.assertGreaterEqual(len(captures), 2)
+        self.assertEqual(len(captures), len({row["attempt"] for row in captures}))
+        gate_by_stage = {row["stage_id"]: row for row in evidence["gates"]}
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.repository,
+        )
+        self.assertEqual("retained-unproven", rows[0]["status"])
+        capture_root = Path(rows[0]["path"]) / "sandbox-captures"
+        self.assertEqual(
+            {row["attempt"] for row in captures},
+            {path.name for path in capture_root.iterdir()},
+        )
+        for capture in captures:
+            self.assertEqual(
+                capture["command_sha256"],
+                gate_by_stage[capture["stage_id"]]["command_sha256"],
+            )
+            attempt = capture_root / capture["attempt"]
+            started = json.loads((attempt / "started.json").read_text(encoding="utf-8"))
+            process_capture.retained_files(
+                attempt, binding=started["binding"],
+                expected_id=capture["capture_id"], verify=True,
+            )
+
+    def test_v2_zero_output_lock_retains_core_overflow_witness(self) -> None:
+        self.workspace_root = (
+            self.repository / ".workbench/blueprints/simulation-test/simulation-workspaces"
+        )
+        self.tools["synthetic-compile"] = b"#!/bin/sh\nprintf 'overflow'\n"
+        self.environment = self._environment()
+        self.environment["limits"]["max_output_bytes"] = 0
+        host = CoreSimulationScratch(
+            workspace=self.repository, configuration_home=self.configuration_home,
+        )
+        with simulation_scratch_scope(host):
+            result = self._simulator().execute(
+                self.planning_result, intake=self.intake, target_manifest=self.target,
+                planning_evidence=self.planning_evidence,
+                environment_lock=self.environment, custody_mode="retained-v2",
+            )
+        evidence = simulation.SimulationEvidenceStore(self.evidence_root).read_v2(
+            result["evidence_locator_v2"]
+        )
+        gate = next(row for row in evidence["gates"] if row["stage_id"] == "isolated-compilation")
+        self.assertEqual("BPX114_OUTPUT_LIMIT", gate["reason_code"])
+        self.assertEqual(simulation.EMPTY_SHA256, gate["stdout_sha256"])
+        self.assertEqual("output-limited", evidence["sandbox_captures"][0]["outcome"])
+        self.assertEqual("observed-unqualified", result["observation_v2"]["status"])
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.repository,
+        )
+        attempt = Path(rows[0]["path"]) / "sandbox-captures" / evidence["sandbox_captures"][0]["attempt"]
+        started = json.loads((attempt / "started.json").read_text(encoding="utf-8"))
+        record = process_capture.load(attempt, binding=started["binding"])
+        self.assertEqual("incomplete", record["state"])
+        self.assertEqual(1, record["streams"]["stdout"]["bytes"])
+
+    def test_v2_command_timeout_retains_core_attempt_witness(self) -> None:
+        self.workspace_root = (
+            self.repository / ".workbench/blueprints/simulation-test/simulation-workspaces"
+        )
+        self.tools["synthetic-compile"] = b"#!/bin/sh\nsleep 5\n"
+        self.environment = self._environment()
+        self.environment["limits"]["command_timeout_seconds"] = 1
+        host = CoreSimulationScratch(
+            workspace=self.repository, configuration_home=self.configuration_home,
+        )
+        with simulation_scratch_scope(host):
+            result = self._simulator().execute(
+                self.planning_result, intake=self.intake, target_manifest=self.target,
+                planning_evidence=self.planning_evidence,
+                environment_lock=self.environment, custody_mode="retained-v2",
+            )
+        evidence = simulation.SimulationEvidenceStore(self.evidence_root).read_v2(
+            result["evidence_locator_v2"]
+        )
+        gate = next(row for row in evidence["gates"] if row["stage_id"] == "isolated-compilation")
+        self.assertEqual("BPX127_COMMAND_TIMEOUT", gate["reason_code"])
+        self.assertTrue(gate["timed_out"])
+        self.assertEqual("timed-out", evidence["sandbox_captures"][0]["outcome"])
+        self.assertEqual("observed-unqualified", result["observation_v2"]["status"])
+        rows = CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.repository,
+        )
+        attempt = Path(rows[0]["path"]) / "sandbox-captures" / evidence["sandbox_captures"][0]["attempt"]
+        started = json.loads((attempt / "started.json").read_text(encoding="utf-8"))
+        record = process_capture.load(attempt, binding=started["binding"])
+        self.assertEqual("incomplete", record["state"])
 
     def test_v2_requires_core_scratch_binding_before_scratch_creation(self) -> None:
         self.workspace_root = (
@@ -846,6 +961,29 @@ class SimulationEvidenceCustodyTests(unittest.TestCase):
                 with self.assertRaises(simulation.SimulationDiagnostic) as duplicated:
                     store.read_v2(store.put_v2(duplicate))
                 self.assertEqual("BPX155_GIT_CAPTURE", duplicated.exception.code)
+                sandboxed = copy.deepcopy(captured)
+                sandboxed["gates"][0] = simulation.Simulator._private_gate(
+                    0, sandboxed["gates"][0]["stage_id"], "passed", "BPX000_PASSED",
+                    {"command_sha256": "a" * 64, "exit_code": 0},
+                )
+                sandboxed["sandbox_supervision"] = "core-original-group-only"
+                sandboxed["sandbox_captures"] = [{
+                    "stage_id": sandboxed["gates"][0]["stage_id"],
+                    "command_sha256": "a" * 64,
+                    "attempt": "b" * 32,
+                    "capture_id": "process-capture:sha256:" + "c" * 64,
+                    "outcome": "exited",
+                }]
+                self.assertEqual(sandboxed, store.read_v2(store.put_v2(sandboxed)))
+                missing_sandbox = copy.deepcopy(sandboxed)
+                missing_sandbox.pop("sandbox_captures")
+                with self.assertRaises(simulation.SimulationDiagnostic):
+                    store.put_v2(missing_sandbox)
+                mismatched_sandbox = copy.deepcopy(sandboxed)
+                mismatched_sandbox["sandbox_captures"][0]["command_sha256"] = "f" * 64
+                with self.assertRaises(simulation.SimulationDiagnostic) as mismatched:
+                    store.read_v2(store.put_v2(mismatched_sandbox))
+                self.assertEqual("BPX159_SANDBOX_CAPTURE", mismatched.exception.code)
                 captured["git_captures"][0]["capture_id"] = "invalid"
                 with self.assertRaises(simulation.SimulationDiagnostic):
                     store.put_v2(captured)

@@ -28,6 +28,17 @@ class SimulationGitCapture:
     attempt_name: str
 
 
+@dataclass(frozen=True, slots=True)
+class SimulationSandboxCapture:
+    exit_code: int | None
+    timed_out: bool
+    output_limited: bool
+    stdout_sha256: str
+    stderr_sha256: str
+    capture_id: str
+    attempt_name: str
+
+
 class SimulationScratchHost(Protocol):
     def allocate(self, *, parent: Path, plan_id: str) -> ContextManager[SimulationScratchReference]: ...
     def capture_git(
@@ -35,12 +46,20 @@ class SimulationScratchHost(Protocol):
         cwd: Path, stdin: bytes,
     ) -> SimulationGitCapture: ...
 
+    def capture_sandbox(
+        self, reference: SimulationScratchReference, argv: Sequence[str], *,
+        cwd: Path, timeout_seconds: int, max_output_bytes: int,
+    ) -> SimulationSandboxCapture: ...
+
 
 _bound: ContextVar[SimulationScratchHost | None] = ContextVar(
     "workbench_simulation_scratch", default=None,
 )
 _git_capture: ContextVar[tuple[SimulationScratchReference, list[dict[str, str]]] | None] = ContextVar(
     "workbench_simulation_git_capture", default=None,
+)
+_sandbox_capture: ContextVar[tuple[SimulationScratchReference, list[dict[str, str]]] | None] = ContextVar(
+    "workbench_simulation_sandbox_capture", default=None,
 )
 
 
@@ -99,8 +118,53 @@ def capture_simulation_git(
     return captured
 
 
+@contextmanager
+def simulation_sandbox_capture_scope(
+    reference: SimulationScratchReference, captures: list[dict[str, str]],
+) -> Iterator[None]:
+    """Route only opted-in V2 Bubblewrap children through Core."""
+
+    token = _sandbox_capture.set((reference, captures))
+    try:
+        yield
+    finally:
+        _sandbox_capture.reset(token)
+
+
+def simulation_sandbox_capture_active() -> bool:
+    return _sandbox_capture.get() is not None
+
+
+def capture_simulation_sandbox(
+    argv: Sequence[str], *, cwd: Path, timeout_seconds: int,
+    max_output_bytes: int, stage_id: str, command_sha256: str,
+) -> SimulationSandboxCapture:
+    active = _sandbox_capture.get()
+    host = _bound.get()
+    if active is None or host is None or not callable(getattr(host, "capture_sandbox", None)):
+        raise SimulationScratchError("Blueprints V2 Bubblewrap capture requires its Core lease host")
+    reference, captures = active
+    captured = host.capture_sandbox(
+        reference, tuple(argv), cwd=cwd,
+        timeout_seconds=timeout_seconds, max_output_bytes=max_output_bytes,
+    )
+    if not isinstance(captured, SimulationSandboxCapture):
+        raise SimulationScratchError("Core returned an invalid Bubblewrap capture")
+    captures.append({
+        "stage_id": stage_id, "command_sha256": command_sha256,
+        "attempt": captured.attempt_name, "capture_id": captured.capture_id,
+        "outcome": (
+            "timed-out" if captured.timed_out else
+            "output-limited" if captured.output_limited else "exited"
+        ),
+    })
+    return captured
+
+
 __all__ = [
     "SimulationScratchError", "SimulationScratchHost", "SimulationScratchReference",
     "SimulationGitCapture", "allocate_simulation_scratch", "simulation_scratch_scope",
     "simulation_git_capture_scope", "simulation_git_capture_active", "capture_simulation_git",
+    "SimulationSandboxCapture", "simulation_sandbox_capture_scope",
+    "simulation_sandbox_capture_active", "capture_simulation_sandbox",
 ]

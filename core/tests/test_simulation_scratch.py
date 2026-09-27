@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 import json
 import sys
@@ -116,6 +117,78 @@ class SimulationScratchTests(unittest.TestCase):
         self.assertEqual("retained-unproven", CoreTemporaryLeases.inventory_catalog(
             self.configuration_home, workspace=self.workspace,
         )[0]["status"])
+
+    def test_sandbox_capture_accepts_full_lock_range_and_reopens_exact_streams(self) -> None:
+        with simulation_scratch_scope(self.host):
+            with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as reference:
+                result = self.host.capture_sandbox(
+                    reference,
+                    [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'captured')"],
+                    cwd=reference.path, timeout_seconds=3600,
+                    max_output_bytes=16 * 1024 * 1024,
+                )
+        self.assertEqual(0, result.exit_code)
+        self.assertFalse(result.timed_out)
+        self.assertFalse(result.output_limited)
+        self.assertEqual(sha256(b"captured").hexdigest(), result.stdout_sha256)
+        attempt = reference.path / "sandbox-captures" / result.attempt_name
+        started = json.loads((attempt / "started.json").read_text(encoding="utf-8"))
+        process_capture.retained_files(
+            attempt, binding=started["binding"], expected_id=result.capture_id, verify=True,
+        )
+        self.assertEqual("retained-unproven", CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.workspace,
+        )[0]["status"])
+
+    def test_sandbox_capture_zero_limit_and_overflow_retain_exact_prefix(self) -> None:
+        with simulation_scratch_scope(self.host):
+            with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as reference:
+                zero = self.host.capture_sandbox(
+                    reference,
+                    [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'x')"],
+                    cwd=reference.path, timeout_seconds=2, max_output_bytes=0,
+                )
+                overflow = self.host.capture_sandbox(
+                    reference,
+                    [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'abcdef')"],
+                    cwd=reference.path, timeout_seconds=2, max_output_bytes=3,
+                )
+        self.assertTrue(zero.output_limited)
+        self.assertEqual(sha256(b"").hexdigest(), zero.stdout_sha256)
+        self.assertTrue(overflow.output_limited)
+        self.assertEqual(sha256(b"abc").hexdigest(), overflow.stdout_sha256)
+        attempt = reference.path / "sandbox-captures" / overflow.attempt_name
+        started = json.loads((attempt / "started.json").read_text(encoding="utf-8"))
+        record = process_capture.load(attempt, binding=started["binding"])
+        self.assertEqual(overflow.capture_id, record["id"])
+        self.assertEqual(4, record["streams"]["stdout"]["bytes"])
+        self.assertEqual("incomplete", record["state"])
+
+    def test_sandbox_capture_timeout_retains_incomplete_attempt(self) -> None:
+        with simulation_scratch_scope(self.host):
+            with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as reference:
+                result = self.host.capture_sandbox(
+                    reference, [sys.executable, "-c", "import time; time.sleep(5)"],
+                    cwd=reference.path, timeout_seconds=1, max_output_bytes=16,
+                )
+        self.assertTrue(result.timed_out)
+        self.assertFalse(result.output_limited)
+        attempt = reference.path / "sandbox-captures" / result.attempt_name
+        started = json.loads((attempt / "started.json").read_text(encoding="utf-8"))
+        record = process_capture.load(attempt, binding=started["binding"])
+        self.assertEqual(result.capture_id, record["id"])
+        self.assertEqual("incomplete", record["state"])
+
+    def test_sandbox_capture_rejects_out_of_policy_lock_before_attempt(self) -> None:
+        with simulation_scratch_scope(self.host):
+            with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as reference:
+                for timeout, limit in ((3601, 0), (1, 16 * 1024 * 1024 + 1)):
+                    with self.subTest(timeout=timeout, limit=limit), self.assertRaises(SimulationScratchError):
+                        self.host.capture_sandbox(
+                            reference, [sys.executable, "-c", "pass"], cwd=reference.path,
+                            timeout_seconds=timeout, max_output_bytes=limit,
+                        )
+                self.assertFalse((reference.path / "sandbox-captures").exists())
 
     def test_parent_outside_selected_workspace_is_refused(self) -> None:
         outside = self.workspace.parent / "elsewhere"

@@ -29,7 +29,9 @@ from workbench_api.host_filesystem import (
 from workbench_api.record_stores import open_record_store
 from workbench_api.simulation_scratch import (
     SimulationScratchError, allocate_simulation_scratch, capture_simulation_git,
-    simulation_git_capture_active, simulation_git_capture_scope,
+    capture_simulation_sandbox, simulation_git_capture_active,
+    simulation_git_capture_scope, simulation_sandbox_capture_active,
+    simulation_sandbox_capture_scope,
 )
 from workbench_blueprints import planner, standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
@@ -562,6 +564,21 @@ class SimulationEvidenceStore:
         captures = evidence.get("git_captures", [])
         if len({row["attempt"] for row in captures}) != len(captures):
             _fail("BPX155_GIT_CAPTURE", locator, "V2 Git attempt identity is duplicated")
+        sandbox_captures = evidence.get("sandbox_captures", [])
+        if (len({row["attempt"] for row in sandbox_captures}) != len(sandbox_captures)
+                or len({row["stage_id"] for row in sandbox_captures}) != len(sandbox_captures)):
+            _fail("BPX159_SANDBOX_CAPTURE", locator, "V2 Bubblewrap attempt identity is duplicated")
+        gates_by_stage = {row["stage_id"]: row for row in evidence["gates"]}
+        for capture in sandbox_captures:
+            gate = gates_by_stage.get(capture["stage_id"])
+            if (gate is None or gate["command_sha256"] != capture["command_sha256"]
+                    or capture["outcome"] == "timed-out" and (
+                        not gate["timed_out"] or gate["reason_code"] != "BPX127_COMMAND_TIMEOUT"
+                    )
+                    or capture["outcome"] == "output-limited" and (
+                        gate["reason_code"] != "BPX114_OUTPUT_LIMIT"
+                    )):
+                _fail("BPX159_SANDBOX_CAPTURE", locator, "V2 Bubblewrap attempt differs from its gate")
         for row in evidence["gates"]:
             projected = dict(row)
             observed = projected.pop("evidence_sha256")
@@ -879,6 +896,7 @@ def _command_result(
     dependencies: dict[str, Path],
     *,
     hook: Path | None = None,
+    stage_id: str,
 ) -> dict[str, Any]:
     isolator = lock["isolation"]["executable"]
     arguments = [
@@ -936,6 +954,21 @@ def _command_result(
         resolved = ["/bin/sh", "/blueprints-hook"]
     arguments.extend(["--", *resolved])
     limit = lock["limits"]["max_output_bytes"]
+    if simulation_sandbox_capture_active():
+        captured = capture_simulation_sandbox(
+            arguments, cwd=worktree,
+            timeout_seconds=lock["limits"]["command_timeout_seconds"],
+            max_output_bytes=limit, stage_id=stage_id,
+            command_sha256=_digest_json(argv),
+        )
+        return {
+            "exit_code": captured.exit_code,
+            "timed_out": captured.timed_out,
+            "output_limited": captured.output_limited,
+            "stdout_sha256": captured.stdout_sha256,
+            "stderr_sha256": captured.stderr_sha256,
+            "command_sha256": _digest_json(argv),
+        }
     with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
         process = subprocess.Popen(
             arguments,
@@ -1124,6 +1157,7 @@ class Simulator:
         argv: list[str],
         dependency_ids: list[str],
         *,
+        stage_id: str,
         hook: Path | None = None,
     ) -> tuple[str, str, dict[str, Any]]:
         if compile_environment_lock(lock) != lock:
@@ -1134,7 +1168,7 @@ class Simulator:
             )
         dependencies = self._locked_dependencies(lock, dependency_ids)
         result = _command_result(
-            lock, worktree, argv, dependencies, hook=hook
+            lock, worktree, argv, dependencies, hook=hook, stage_id=stage_id,
         )
         if result["timed_out"]:
             return "failed", "BPX127_COMMAND_TIMEOUT", result
@@ -1234,6 +1268,7 @@ class Simulator:
         scratch_context = None
         scratch_reference = None
         git_captures: list[dict[str, str]] = []
+        sandbox_captures: list[dict[str, str]] = []
         if custody_mode == "retained-v2":
             try:
                 scratch_context = allocate_simulation_scratch(
@@ -1274,8 +1309,14 @@ class Simulator:
             simulation_git_capture_scope(scratch_reference, git_captures)
             if scratch_reference is not None else None
         )
+        sandbox_scope = (
+            simulation_sandbox_capture_scope(scratch_reference, sandbox_captures)
+            if scratch_reference is not None else None
+        )
         if git_scope is not None:
             git_scope.__enter__()
+        if sandbox_scope is not None:
+            sandbox_scope.__enter__()
         try:
             for stage in plan["validation_stages"]:
                 ordinal = stage["ordinal"]
@@ -1418,6 +1459,7 @@ class Simulator:
                             primary_workspace,
                             command["argv"],
                             command["dependency_ids"],
+                            stage_id=stage_id,
                         )
                     elif stage_id == "generated-invariant-tests":
                         if (
@@ -1529,6 +1571,7 @@ class Simulator:
                                 primary_workspace,
                                 test["command"],
                                 [test["command"][0]],
+                                stage_id=stage_id,
                             )
                         else:
                             hook = next(
@@ -1555,6 +1598,7 @@ class Simulator:
                                 primary_workspace,
                                 [hook["id"]],
                                 [],
+                                stage_id=stage_id,
                                 hook=hook_path,
                             )
                 except (SimulationDiagnostic, planner.PlannerDiagnostic) as exc:
@@ -1584,14 +1628,18 @@ class Simulator:
         finally:
             completion = sys.exc_info()
             try:
-                if git_scope is not None:
-                    git_scope.__exit__(*completion)
+                if sandbox_scope is not None:
+                    sandbox_scope.__exit__(*completion)
             finally:
-                if scratch_context is not None:
-                    scratch_context.__exit__(*completion)
-                else:
-                    assert temporary is not None
-                    temporary.cleanup()
+                try:
+                    if git_scope is not None:
+                        git_scope.__exit__(*completion)
+                finally:
+                    if scratch_context is not None:
+                        scratch_context.__exit__(*completion)
+                    else:
+                        assert temporary is not None
+                        temporary.cleanup()
 
         if scratch_reference is not None:
             with simulation_git_capture_scope(scratch_reference, git_captures):
@@ -1651,7 +1699,8 @@ class Simulator:
                 "scratch_disposition": "retained-process-absence-unproven",
                 "git_supervision": "core-original-group-only",
                 "git_captures": git_captures,
-                "sandbox_supervision": "initial-process-group-only",
+                "sandbox_supervision": "core-original-group-only",
+                "sandbox_captures": sandbox_captures,
                 "descendant_absence": "unproven",
             })
             evidence_locator = self.evidence_store.put_v2(evidence)
@@ -1684,7 +1733,7 @@ class Simulator:
                 "scratch_lease_id": scratch_reference.lease_id,
                 "scratch_disposition": "retained-process-absence-unproven",
                 "git_supervision": "core-original-group-only",
-                "sandbox_supervision": "initial-process-group-only",
+                "sandbox_supervision": "core-original-group-only",
                 "descendant_absence": "unproven",
             }
             observation["observation_id"] = (

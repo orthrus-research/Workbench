@@ -19,6 +19,14 @@
     {
       "if": {"properties": {"git_supervision": {"const": "direct-child-wait-only"}}},
       "then": {"not": {"required": ["git_captures"]}}
+    },
+    {
+      "if": {"properties": {"sandbox_supervision": {"const": "core-original-group-only"}}},
+      "then": {"required": ["sandbox_captures"]}
+    },
+    {
+      "if": {"properties": {"sandbox_supervision": {"const": "initial-process-group-only"}}},
+      "then": {"not": {"required": ["sandbox_captures"]}}
     }
   ],
   "properties": {
@@ -80,7 +88,24 @@
         }
       }
     },
-    "sandbox_supervision": {"const": "initial-process-group-only"},
+    "sandbox_supervision": {"enum": ["initial-process-group-only", "core-original-group-only"]},
+    "sandbox_captures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stage_id", "command_sha256", "attempt", "capture_id", "outcome"],
+        "additionalProperties": false,
+        "properties": {
+          "stage_id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+          "command_sha256": {"$ref": "#/$defs/sha256"},
+          "attempt": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+          "capture_id": {
+            "type": "string", "pattern": "^process-capture:sha256:[0-9a-f]{64}$"
+          },
+          "outcome": {"enum": ["exited", "timed-out", "output-limited"]}
+        }
+      }
+    },
     "descendant_absence": {"const": "unproven"}
   },
   "$defs": {
