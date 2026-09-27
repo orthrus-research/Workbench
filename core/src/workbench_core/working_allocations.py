@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 import re
 import stat
-from typing import Callable, Iterator, Mapping
+from typing import BinaryIO, Callable, Iterator, Mapping
 from uuid import uuid4
 
 from workbench_api.host_filesystem import DurableRecordError
@@ -486,6 +486,83 @@ class CoreWorkingAllocations:
 
     def open(self, allocation_id: str) -> WorkingAllocationReference:
         return self._checked(self.catalog.reference(allocation_id))
+
+    @contextmanager
+    def create_once_stream(
+        self, allocation: WorkingAllocationReference, selected_path: Path, *,
+        expected_family: str,
+    ) -> Iterator[BinaryIO]:
+        """Stream into a fresh private child file of an exact working allocation.
+
+        The owner chooses an existing immediate child directory and final name.
+        Core rechecks the allocation and opens the file exclusively, so a failed
+        or interrupted writer leaves its partial bytes at the original path.
+        """
+
+        selected = self._checked(allocation)
+        if selected.family != expected_family:
+            raise WorkingAllocationError("working.policy", "working stream belongs to another allocation family")
+        if self.catalog.terminal(selected.allocation_id) is not None:
+            raise WorkingAllocationError("working.finished", "working allocation is already terminal")
+        if not isinstance(selected_path, Path) or not selected_path.is_absolute():
+            raise WorkingAllocationError("working.path", "working stream path must be absolute")
+        try:
+            parts = selected_path.relative_to(selected.path).parts
+        except ValueError as exc:
+            raise WorkingAllocationError("working.path", "working stream is outside its allocation") from exc
+        if len(parts) != 2:
+            raise WorkingAllocationError("working.path", "working stream needs an immediate child directory")
+        for part in parts:
+            _safe_name(part, label="stream path")
+        parent = check_storage.ordinary(selected_path.parent, directory=True)
+        if not private_path(parent, directory=True):
+            raise WorkingAllocationError("working.unsafe", "working stream parent is not owner-private")
+        parent_info = parent.stat()
+        flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                 | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
+        if os.name == "posix" and os.open in os.supports_dir_fd:
+            parent_fd = os.open(
+                parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+            )
+            try:
+                opened_parent = os.fstat(parent_fd)
+                if (opened_parent.st_dev, opened_parent.st_ino) != (parent_info.st_dev, parent_info.st_ino):
+                    raise WorkingAllocationError("working.changed", "working stream parent changed before creation")
+                descriptor = os.open(selected_path.name, flags, 0o600, dir_fd=parent_fd)
+            finally:
+                os.close(parent_fd)
+        else:
+            descriptor = os.open(selected_path, flags, 0o600)
+        with os.fdopen(descriptor, "wb", buffering=0) as stream:
+            opened = os.fstat(stream.fileno())
+            if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1:
+                raise WorkingAllocationError("working.changed", "working stream is not an independent file")
+            if os.name == "nt":
+                secure_private_path(selected_path, directory=False)
+            else:
+                os.fchmod(stream.fileno(), 0o600)
+
+            def check_visible() -> None:
+                visible = selected_path.lstat()
+                current_parent = check_storage.ordinary(parent, directory=True).stat()
+                if (not stat.S_ISREG(visible.st_mode) or visible.st_nlink != 1
+                        or (visible.st_dev, visible.st_ino) != (opened.st_dev, opened.st_ino)
+                        or (current_parent.st_dev, current_parent.st_ino)
+                        != (parent_info.st_dev, parent_info.st_ino)
+                        or not private_path(selected_path, directory=False)
+                        or not private_path(parent, directory=True)):
+                    raise WorkingAllocationError("working.changed", "working stream path changed custody")
+
+            check_visible()
+            fsync_directory(parent)
+            try:
+                yield stream
+            finally:
+                stream.flush()
+                os.fsync(stream.fileno())
+                check_visible()
+                self._checked(selected)
 
     def describe(self, allocation_id: str) -> WorkingAllocationDescription:
         result = self.catalog.describe(allocation_id)

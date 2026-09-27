@@ -67,6 +67,102 @@ class ParallelValidationSchedulerTests(unittest.TestCase):
             )
             self.assertNotEqual(self.configuration_home, request.temporary_root / "environment/config")
 
+    def test_registered_suite_log_streams_at_historical_path(self) -> None:
+        from core_run_custody import allocate_validation_run
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            host, allocation = allocate_validation_run(root, "live-run")
+            paths = create_run_paths(
+                root / ".workbench/validation/runs", "live-run",
+                allocated_root=allocation.path,
+            )
+            release = root / "release"
+            script = (
+                "import pathlib, sys, time\n"
+                "print('first', flush=True)\n"
+                "release = pathlib.Path(sys.argv[1])\n"
+                "deadline = time.monotonic() + 5\n"
+                "while not release.exists() and time.monotonic() < deadline: time.sleep(.01)\n"
+                "print('second', flush=True)\n"
+            )
+            with patch.object(scheduler, "ROOT", root):
+                request = scheduler._suite_requests(
+                    (self._suite("alpha"),), paths=paths,
+                    source_fingerprint="source:one",
+                    core_allocation_id=allocation.allocation_id,
+                    core_configuration_home=self.configuration_home,
+                )[0]
+                request = replace(request, command=(
+                    sys.executable, "-c", script, str(release),
+                ))
+                with host.execution(allocation), ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(
+                        scheduler._run_suite_process, request,
+                        process_registry={}, process_lock=threading.Lock(),
+                        interruption_event=threading.Event(),
+                    )
+                    try:
+                        deadline = time.monotonic() + 5
+                        while time.monotonic() < deadline:
+                            if request.log_path.exists() and b"first\n" in request.log_path.read_bytes():
+                                break
+                            time.sleep(.01)
+                        self.assertEqual(b"first\n", request.log_path.read_bytes())
+                        self.assertFalse(future.done())
+                    finally:
+                        release.write_bytes(b"go")
+                    result = future.result(timeout=5)
+            self.assertEqual(0, result.outcome.returncode)
+            self.assertEqual(b"first\nsecond\n", request.log_path.read_bytes())
+            self.assertEqual(0, request.log_path.stat().st_mode & 0o077)
+
+    def test_registered_suite_log_refuses_foreign_run_and_existing_output(self) -> None:
+        from core_run_custody import allocate_validation_run, open_validation_run_log
+        from workbench_api.working_allocations import WorkingAllocationError
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _, allocation = allocate_validation_run(root, "log-run")
+            paths = create_run_paths(
+                root / ".workbench/validation/runs", "log-run",
+                allocated_root=allocation.path,
+            )
+            log = paths.log_for("alpha")
+            options = dict(
+                selected_path=log, configuration_home=self.configuration_home,
+            )
+            with self.assertRaisesRegex(ValueError, "selected Core validation run"):
+                with open_validation_run_log(
+                    root, "other-run", allocation.allocation_id, "alpha", **options,
+                ):
+                    pass
+            with self.assertRaises(WorkingAllocationError):
+                with open_validation_run_log(
+                    root, "log-run", allocation.allocation_id, "alpha",
+                    selected_path=log, configuration_home=root / "foreign-home",
+                ):
+                    pass
+            with self.assertRaisesRegex(ValueError, "path differs"):
+                with open_validation_run_log(
+                    root, "log-run", allocation.allocation_id, "alpha",
+                    selected_path=root / "elsewhere.log",
+                    configuration_home=self.configuration_home,
+                ):
+                    pass
+            self.assertFalse(log.exists())
+            with open_validation_run_log(
+                root, "log-run", allocation.allocation_id, "alpha", **options,
+            ) as stream:
+                stream.write(b"partial log\n")
+                self.assertEqual(b"partial log\n", log.read_bytes())
+            with self.assertRaises(FileExistsError):
+                with open_validation_run_log(
+                    root, "log-run", allocation.allocation_id, "alpha", **options,
+                ):
+                    pass
+            self.assertEqual(b"partial log\n", log.read_bytes())
+
     def test_core_run_manifest_revisions_preserve_changed_and_interrupted_evidence(self) -> None:
         from core_run_custody import allocate_validation_run, publish_validation_run_manifest
         from workbench_api.host_filesystem import DurableRecordError
@@ -145,11 +241,15 @@ class ParallelValidationSchedulerTests(unittest.TestCase):
             historic = root / ".workbench/validation/runs/old-run/run.json"
             historic.parent.mkdir(parents=True)
             historic.write_bytes(b'{"legacy":true}\n')
+            historic_log = historic.parent / "logs/alpha.log"
+            historic_log.parent.mkdir()
+            historic_log.write_bytes(b"historical suite output\n")
             historic.parent.parent.chmod(0o755)
             host, current = allocate_validation_run(root, "new-run")
             from workbench_api.working_allocations import WorkingAllocationError
             self.assertEqual(root / ".workbench/validation/runs/new-run", current.path)
             self.assertEqual(b'{"legacy":true}\n', historic.read_bytes())
+            self.assertEqual(b"historical suite output\n", historic_log.read_bytes())
             self.assertEqual("incomplete", host.describe(current.allocation_id).status)
             self.assertEqual("new-run", self._registered_run(root, "new-run")["label"])
             self.assertEqual(1, len(host.inventory()), "legacy run must not be silently adopted")

@@ -116,6 +116,80 @@ class WorkingAllocationTests(unittest.TestCase):
         self.assertEqual(first, self.host.open(first.allocation_id))
         self.assertEqual(1, len(self.host.inventory()))
 
+    def test_create_once_stream_reopens_allocation_and_preserves_live_bytes(self) -> None:
+        allocation = self.host.allocate("worldgen-iteration", "trial")
+        logs = allocation.path / "logs"
+        logs.mkdir(mode=0o700)
+        target = logs / "suite.log"
+        reopened = self._host()
+        selected = reopened.open(allocation.allocation_id)
+        with reopened.create_once_stream(
+            selected, target, expected_family="worldgen-iteration",
+        ) as stream:
+            stream.write(b"first\n")
+            self.assertEqual(b"first\n", target.read_bytes())
+            stream.write(b"second\n")
+        self.assertEqual(b"first\nsecond\n", target.read_bytes())
+        if os.name == "posix":
+            self.assertEqual(0o600, target.stat().st_mode & 0o777)
+        with self.assertRaises(FileExistsError):
+            with reopened.create_once_stream(
+                selected, target, expected_family="worldgen-iteration",
+            ):
+                pass
+        self.assertEqual(b"first\nsecond\n", target.read_bytes())
+
+    def test_create_once_stream_refuses_foreign_and_redirected_paths(self) -> None:
+        allocation = self.host.allocate("worldgen-iteration", "trial")
+        logs = allocation.path / "logs"
+        logs.mkdir(mode=0o700)
+        target = logs / "suite.log"
+        with self.assertRaisesRegex(WorkingAllocationError, "another allocation family"):
+            with self.host.create_once_stream(
+                allocation, target, expected_family="python-suite-run",
+            ):
+                pass
+        with self.assertRaisesRegex(WorkingAllocationError, "outside its allocation"):
+            with self.host.create_once_stream(
+                allocation, self.home / "other.log", expected_family="worldgen-iteration",
+            ):
+                pass
+        foreign = CoreWorkingAllocations(
+            workspace=self.workspace, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="validation",
+        )
+        with self.assertRaisesRegex(WorkingAllocationError, "outside this Core host"):
+            with foreign.create_once_stream(
+                allocation, target, expected_family="worldgen-iteration",
+            ):
+                pass
+        other = self.home / "other.log"
+        other.write_bytes(b"untouched\n")
+        os.link(other, target)
+        with self.assertRaises(FileExistsError):
+            with self.host.create_once_stream(
+                allocation, target, expected_family="worldgen-iteration",
+            ):
+                pass
+        self.assertEqual(b"untouched\n", other.read_bytes())
+        target.unlink()
+        if os.name == "posix":
+            target.symlink_to(other)
+            with self.assertRaises(FileExistsError):
+                with self.host.create_once_stream(
+                    allocation, target, expected_family="worldgen-iteration",
+                ):
+                    pass
+            self.assertEqual(b"untouched\n", other.read_bytes())
+            target.unlink()
+        logs.chmod(0o755)
+        with self.assertRaisesRegex(WorkingAllocationError, "not owner-private"):
+            with self.host.create_once_stream(
+                allocation, target, expected_family="worldgen-iteration",
+            ):
+                pass
+        self.assertFalse(target.exists())
+
     def test_failed_and_abandoned_allocations_remain_discoverable(self) -> None:
         failed = self.host.allocate("worldgen-iteration", "failed")
         partial = failed.path / "iteration-report-v1.json"

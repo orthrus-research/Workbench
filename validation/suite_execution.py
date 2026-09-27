@@ -37,6 +37,7 @@ from orchestration import (
 )
 from core_run_custody import (
     allocate_validation_run, allocate_validation_scratch,
+    open_validation_run_log,
     publish_validation_run_manifest, publish_validation_run_record,
     publish_validation_timing,
 )
@@ -77,6 +78,7 @@ def _validation_temporary_storage() -> Path:
 @dataclass(frozen=True)
 class _SuiteRequest:
     suite: PythonTestSuite
+    run_id: str
     scheduling: SchedulingItem
     report_path: Path
     log_path: Path
@@ -231,6 +233,7 @@ def _suite_requests(
         requests.append(
             _SuiteRequest(
                 suite=suite,
+                run_id=paths.run_id,
                 scheduling=SchedulingItem(
                     name=suite.name,
                     order=schedule_order,
@@ -326,8 +329,16 @@ def _run_suite_process(
 ) -> _SuiteProcessResult:
     started = time.perf_counter()
     started_at = _utc_timestamp()
-    request.log_path.parent.mkdir(parents=True, exist_ok=True)
-    with request.log_path.open("wb") as log:
+    if request.core_allocation_id is None:
+        request.log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_stream = request.log_path.open("wb")
+    else:
+        log_stream = open_validation_run_log(
+            ROOT, request.run_id, request.core_allocation_id,
+            request.suite.name, selected_path=request.log_path,
+            configuration_home=request.core_configuration_home,
+        )
+    with log_stream as log:
         arguments: dict[str, Any] = {
             "cwd": ROOT,
             "stdout": log,

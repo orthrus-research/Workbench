@@ -65,10 +65,10 @@ def allocate_validation_run(root: Path, run_id: str):
     return host, allocation
 
 
-def _opened_validation_run(
+def _validation_run_allocation(
     root: Path, run_id: str, allocation_id: str,
     configuration_home: Path | None,
-) -> Path:
+):
     if (type(run_id) is not str or _SUITE_NAME.fullmatch(run_id) is None
             or run_id in {".", ".."}):
         raise ValueError("validation run ID is invalid")
@@ -96,7 +96,36 @@ def _opened_validation_run(
         or allocation.path != run_root
     ):
         raise ValueError("suite record does not belong to the selected Core validation run")
-    return run_root
+    return host, allocation, run_root
+
+
+def _opened_validation_run(
+    root: Path, run_id: str, allocation_id: str,
+    configuration_home: Path | None,
+) -> Path:
+    return _validation_run_allocation(root, run_id, allocation_id, configuration_home)[2]
+
+
+@contextmanager
+def open_validation_run_log(
+    root: Path, run_id: str, allocation_id: str, suite_name: str, *,
+    selected_path: Path, configuration_home: Path | None = None,
+):
+    """Open a live suite log once inside the exact Core validation run."""
+
+    if (type(suite_name) is not str or _SUITE_NAME.fullmatch(suite_name) is None
+            or suite_name in {".", ".."}):
+        raise ValueError("validation suite name is not a portable log key")
+    host, allocation, run_root = _validation_run_allocation(
+        root, run_id, allocation_id, configuration_home,
+    )
+    target = run_root / "logs" / f"{suite_name}.log"
+    if Path(os.path.abspath(selected_path)) != target:
+        raise ValueError("suite log path differs from the selected Core run")
+    with host.create_once_stream(
+        allocation, target, expected_family="python-suite-run",
+    ) as stream:
+        yield stream
 
 
 def _publish_validation_run_bytes(
