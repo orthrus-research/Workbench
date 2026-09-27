@@ -5,12 +5,15 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock
 
+from textual.widgets import OptionList
+
 from test_setup_screen import fake_core
-from workbench_tui.app import ReleaseUpdateModal, ResultScreen, WorkbenchApp
+from workbench_tui.app import ReleaseUpdateModal, ResultScreen, ReviewModal, WorkbenchApp
 from workbench_tui.core_client import CoreClient, CoreClientError
 
 
 RELEASE_ID = "github-release:sha256:" + "a" * 64
+BASELINE_ID = "profile-release:sha256:" + "b" * 64
 
 
 def _candidate() -> dict:
@@ -22,6 +25,13 @@ def _candidate() -> dict:
         "asset_size": 113125809,
         "release_url": "https://github.com/SymmetricDevs/Supersymmetry/releases/tag/0.1.16.17",
         "published_at": "2026-09-27T00:00:00Z",
+    }
+
+
+def _baseline_candidate() -> dict:
+    return {
+        **_candidate(), "release_id": BASELINE_ID, "version": "0.1.16.16",
+        "tag": "0.1.16.16", "asset_name": "supersymmetry-0.1.16.16.zip",
     }
 
 
@@ -37,6 +47,32 @@ def _check(status: str = "update_available") -> dict:
 
 
 class PackReleaseClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_offline_choice_and_explicit_prepare_stay_in_core(self) -> None:
+        client = CoreClient(("workbench",))
+        client.json_record = AsyncMock(side_effect=[
+            {"schema": "workbench.pack-release.v1", "action": "show",
+             "status": "selected", "selected_version": "0.1.16.16",
+             "selected": {"version": "0.1.16.16", "release_id": BASELINE_ID,
+                          "asset_size": 113125809, "artifact_path": None},
+             "artifact_state": "none", "candidate": None},
+            {**_check(), "action": "prepare", "status": "prepared",
+             "candidate": _baseline_candidate(), "selected_version": "0.1.16.16",
+             "artifact_path": "/stable/artifacts/sha256/abc", "artifact_state": "recorded"},
+        ])
+        selected = await client.pack_release_show()
+        self.assertEqual("none", selected["artifact_state"])
+        prepared = await client.pack_release_prepare(BASELINE_ID)
+        self.assertEqual("prepared", prepared["status"])
+        self.assertEqual(
+            ("pack", "release", "show", "--profile", "supersymmetry", "--json"),
+            client.json_record.await_args_list[0].args,
+        )
+        self.assertEqual(
+            ("pack", "release", "prepare", "--profile", "supersymmetry",
+             "--expected-release-id", BASELINE_ID, "--json"),
+            client.json_record.await_args_list[1].args,
+        )
+
     async def test_check_and_exact_accept_use_core_json_interface(self) -> None:
         client = CoreClient(("workbench",))
         client.json_record = AsyncMock(side_effect=[
@@ -79,6 +115,62 @@ class PackReleaseInteractionTests(unittest.IsolatedAsyncioTestCase):
                 return
             await pilot.pause(0.05)
         self.fail("Textual did not reach the expected release state")
+
+    async def _choose_pack_action(self, app: WorkbenchApp, pilot) -> None:
+        await self._settle(pilot, lambda: app.view.version is not None)
+        actions = app.screen_stack[0].query_one("#home-actions", OptionList)
+        index = next(
+            index for index in range(actions.option_count)
+            if actions.get_option_at_index(index).id == "pack-release"
+        )
+        self.assertFalse(actions.get_option_at_index(index).disabled)
+        actions.focus()
+        actions.highlighted = index
+        await pilot.press("enter")
+
+    async def test_home_prepares_saved_baseline_only_after_review(self) -> None:
+        core = fake_core("/tmp/workbench-test-workspace")
+        core.pack_release_check = AsyncMock(return_value=_check("current"))
+        core.pack_release_show = AsyncMock(return_value={
+            "schema": "workbench.pack-release.v1", "action": "show",
+            "status": "selected", "selected_version": "0.1.16.16",
+            "selected": {"version": "0.1.16.16", "release_id": BASELINE_ID,
+                         "asset_size": 113125809, "artifact_path": None},
+            "candidate": None, "artifact_state": "none",
+        })
+        core.pack_release_prepare = AsyncMock(return_value={
+            **_check(), "action": "prepare", "status": "prepared",
+            "candidate": _baseline_candidate(), "selected_version": "0.1.16.16",
+            "artifact_path": "/stable/artifacts/sha256/abc",
+        })
+        app = WorkbenchApp(core)
+        async with app.run_test() as pilot:
+            await self._choose_pack_action(app, pilot)
+            await self._settle(pilot, lambda: isinstance(app.screen, ReviewModal)
+                               and bool(app.screen.query("#review-confirm")))
+            core.pack_release_prepare.assert_not_awaited()
+            await pilot.click("#review-confirm")
+            await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
+            core.pack_release_prepare.assert_awaited_once_with(BASELINE_ID)
+            self.assertIn("/stable/artifacts/sha256/abc", app.screen.output)
+
+    async def test_changed_saved_archive_is_preserved_for_review(self) -> None:
+        core = fake_core("/tmp/workbench-test-workspace")
+        core.pack_release_check = AsyncMock(return_value=_check("current"))
+        core.pack_release_show = AsyncMock(return_value={
+            "schema": "workbench.pack-release.v1", "action": "show",
+            "status": "selected", "selected_version": "0.1.16.16",
+            "selected": {"version": "0.1.16.16", "release_id": BASELINE_ID,
+                         "asset_size": 113125809, "artifact_path": None},
+            "candidate": None, "artifact_state": "changed",
+        })
+        core.pack_release_prepare = AsyncMock()
+        app = WorkbenchApp(core)
+        async with app.run_test() as pilot:
+            await self._choose_pack_action(app, pilot)
+            await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
+            self.assertIn("will not replace it automatically", app.screen.output)
+            core.pack_release_prepare.assert_not_awaited()
 
     async def test_startup_prompt_accepts_exact_release_and_shows_verified_archive(self) -> None:
         core = fake_core("/tmp/workbench-test-workspace")

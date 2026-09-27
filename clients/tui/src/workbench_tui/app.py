@@ -1343,6 +1343,7 @@ class WorkbenchApp(App[None]):
                     yield OptionList(
                         Option("Set up or repair environment", id="setup", disabled=True),
                         Option("Choose workspace profile and Java", id="workspace-choices", disabled=True),
+                        Option("View or prepare Supersymmetry pack", id="pack-release", disabled=True),
                         Option("Explore installed modules", id="modules", disabled=True),
                         Option("Browse and run workflows", id="workflows", disabled=True),
                         Option("Open Workspace Home", id="home", disabled=True),
@@ -1420,6 +1421,7 @@ class WorkbenchApp(App[None]):
         yield from super().get_system_commands(screen)
         yield SystemCommand("Set up Workbench", "Open the setup wizard", self.open_setup)
         yield SystemCommand("Workspace choices", "Choose a saved workspace profile and Java", self.open_workspace_choices)
+        yield SystemCommand("Supersymmetry pack", "View or prepare the saved release", self.open_pack_release)
         yield SystemCommand("Explore modules", "Show installed modules and profiles", self.open_modules)
         yield SystemCommand("Browse workflows", "Search the installed action catalog", self.open_workflows)
         yield SystemCommand(
@@ -1451,6 +1453,60 @@ class WorkbenchApp(App[None]):
             self.push_screen(ResultScreen("Workspace choices unavailable", str(exc)))
             return
         self.push_screen(WorkspaceChoicesScreen(choices))
+
+    @work(exclusive=True, group="pack-release-choice")
+    async def open_pack_release(self) -> None:
+        if self.view.version is None:
+            self.notify("Waiting for Workbench Core", severity="warning")
+            return
+        try:
+            choice = await self.core.pack_release_show()
+        except (CoreClientError, TimeoutError) as exc:
+            self.push_screen(ResultScreen("Pack choice unavailable", str(exc)))
+            return
+        selected = choice["selected"]
+        version = selected["version"]
+        if choice["artifact_state"] == "verified":
+            self.push_screen(ResultScreen(
+                "Supersymmetry pack ready",
+                f"Saved release: {version}\n"
+                f"Verified archive: {selected['artifact_path']}\n\n"
+                "Your workspace files are unchanged.",
+            ))
+            return
+        if choice["artifact_state"] == "changed":
+            self.push_screen(ResultScreen(
+                "Supersymmetry archive needs review",
+                f"Saved release: {version}\n\n"
+                "The retained archive no longer matches the saved release. Core has "
+                "preserved it and will not replace it automatically. Review the "
+                "stable artifact store before trying to prepare this release again.",
+            ))
+            return
+        approved = await self.push_screen_wait(ReviewModal(
+            f"Prepare Supersymmetry {version}?",
+            f"Core will download and verify the saved published client archive "
+            f"({selected['asset_size'] / (1024 * 1024):.1f} MiB), then retain it "
+            "in Workbench's stable artifact store. Your workspace files will not change.",
+            confirm_label="Prepare verified archive",
+        ))
+        if not approved:
+            return
+        self.notify("Core is verifying and preparing the Supersymmetry release archive…")
+        try:
+            result = await self.core.pack_release_prepare(selected["release_id"])
+        except (CoreClientError, TimeoutError) as exc:
+            self.push_screen(ResultScreen(
+                "Supersymmetry pack could not be prepared",
+                f"{exc}\n\nReturn Home to review the saved pack choice again.",
+            ))
+            return
+        self.push_screen(ResultScreen(
+            "Supersymmetry pack prepared",
+            f"Saved release: {result['selected_version']}\n"
+            f"Verified archive: {result['artifact_path']}\n\n"
+            "Your workspace files were not changed.",
+        ))
 
     def open_modules(self) -> None:
         if not (self.view.modules_loaded and self.view.profiles_loaded):
@@ -1570,7 +1626,7 @@ class WorkbenchApp(App[None]):
         except (CoreClientError, TimeoutError):
             # Startup and offline use remain available when GitHub cannot be reached.
             return
-        if check["status"] != "update_available":
+        if not isinstance(check, dict) or check.get("status") != "update_available":
             return
         choice = await self.push_screen_wait(ReleaseUpdateModal(check))
         release_id = check["candidate"]["release_id"]
@@ -1609,6 +1665,7 @@ class WorkbenchApp(App[None]):
         for option_id, ready in (
             ("setup", view.setup is not None),
             ("workspace-choices", view.version is not None),
+            ("pack-release", view.version is not None),
             ("modules", view.modules_loaded and view.profiles_loaded),
             ("workflows", view.catalog is not None),
             ("home", view.home is not None),
@@ -1697,6 +1754,8 @@ class WorkbenchApp(App[None]):
             self.open_setup()
         elif action == "workspace-choices":
             self.open_workspace_choices()
+        elif action == "pack-release":
+            self.open_pack_release()
         elif action == "modules":
             self.open_modules()
         elif action == "workflows":

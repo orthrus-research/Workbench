@@ -26,7 +26,8 @@ _MIGRATION_STATES = {"ready", "conflict", "nothing-to-import", "explicit-config-
 _MIGRATION_FILE_STATES = {"copy", "already-present", "conflict", "copied"}
 _WORKSPACE_FORMATS = {"workbench-user-workspaces-v1", "workbench-user-workspaces-v2", "workbench-user-workspaces-v3"}
 _PACK_RELEASE_SCHEMA = "workbench.pack-release.v1"
-_PACK_RELEASE_ID = re.compile(r"github-release:sha256:[0-9a-f]{64}\Z")
+_GITHUB_RELEASE_ID = re.compile(r"github-release:sha256:[0-9a-f]{64}\Z")
+_SAVED_RELEASE_ID = re.compile(r"(?:github|profile)-release:sha256:[0-9a-f]{64}\Z")
 
 
 class CoreClientError(RuntimeError):
@@ -221,9 +222,11 @@ class CoreClient:
     @staticmethod
     def _pack_release_record(record: Any, *, action: str) -> Mapping[str, Any]:
         statuses = {
+            "show": {"selected"},
             "check": {"update_available", "current", "ignored", "unavailable"},
             "accept": {"accepted"},
             "ignore": {"ignored"},
+            "prepare": {"prepared"},
         }
         if (
             not isinstance(record, dict)
@@ -234,11 +237,11 @@ class CoreClient:
         ):
             raise CoreClientError("Core returned an unsupported pack release result")
         candidate = record.get("candidate")
-        if record["status"] == "update_available" or action in {"accept", "ignore"}:
+        if record["status"] == "update_available" or action in {"accept", "ignore", "prepare"}:
             if (
                 not isinstance(candidate, dict)
                 or not isinstance(candidate.get("release_id"), str)
-                or _PACK_RELEASE_ID.fullmatch(candidate["release_id"]) is None
+                or (_SAVED_RELEASE_ID if action == "prepare" else _GITHUB_RELEASE_ID).fullmatch(candidate["release_id"]) is None
                 or not isinstance(candidate.get("version"), str)
                 or not isinstance(candidate.get("tag"), str)
                 or not isinstance(candidate.get("asset_name"), str)
@@ -248,9 +251,30 @@ class CoreClient:
                 raise CoreClientError("Core returned an incomplete pack release candidate")
         elif candidate is not None and not isinstance(candidate, dict):
             raise CoreClientError("Core returned an invalid pack release candidate")
-        if action == "accept" and not isinstance(record.get("artifact_path"), str):
+        if action in {"accept", "prepare"} and not isinstance(record.get("artifact_path"), str):
             raise CoreClientError("Core did not report the verified pack archive")
+        if action == "show":
+            selected = record.get("selected")
+            if (
+                not isinstance(selected, dict)
+                or selected.get("version") != record["selected_version"]
+                or not isinstance(selected.get("release_id"), str)
+                or _SAVED_RELEASE_ID.fullmatch(selected["release_id"]) is None
+                or type(selected.get("asset_size")) is not int
+                or selected["asset_size"] <= 0
+                or record.get("artifact_state") not in {"none", "verified", "missing", "changed"}
+                or (record["artifact_state"] == "verified"
+                    and not isinstance(selected.get("artifact_path"), str))
+            ):
+                raise CoreClientError("Core returned an incomplete saved pack choice")
         return record
+
+    async def pack_release_show(self) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "release", "show", "--profile", "supersymmetry", "--json",
+            timeout=15,
+        )
+        return self._pack_release_record(record, action="show")
 
     async def pack_release_check(self) -> Mapping[str, Any]:
         record = await self.json_record(
@@ -260,7 +284,7 @@ class CoreClient:
         return self._pack_release_record(record, action="check")
 
     async def pack_release_accept(self, release_id: str) -> Mapping[str, Any]:
-        if _PACK_RELEASE_ID.fullmatch(release_id) is None:
+        if _GITHUB_RELEASE_ID.fullmatch(release_id) is None:
             raise CoreClientError("select the exact release offered by Core")
         record = await self.json_record(
             "pack", "release", "accept", "--profile", "supersymmetry",
@@ -272,7 +296,7 @@ class CoreClient:
         return result
 
     async def pack_release_ignore(self, release_id: str) -> Mapping[str, Any]:
-        if _PACK_RELEASE_ID.fullmatch(release_id) is None:
+        if _GITHUB_RELEASE_ID.fullmatch(release_id) is None:
             raise CoreClientError("select the exact release offered by Core")
         record = await self.json_record(
             "pack", "release", "ignore", "--profile", "supersymmetry",
@@ -281,6 +305,18 @@ class CoreClient:
         result = self._pack_release_record(record, action="ignore")
         if result["candidate"]["release_id"] != release_id:
             raise CoreClientError("Core ignored a different pack release")
+        return result
+
+    async def pack_release_prepare(self, release_id: str) -> Mapping[str, Any]:
+        if _SAVED_RELEASE_ID.fullmatch(release_id) is None:
+            raise CoreClientError("select the exact release offered by Core")
+        record = await self.json_record(
+            "pack", "release", "prepare", "--profile", "supersymmetry",
+            "--expected-release-id", release_id, "--json", timeout=600,
+        )
+        result = self._pack_release_record(record, action="prepare")
+        if result["candidate"]["release_id"] != release_id:
+            raise CoreClientError("Core prepared a different pack release")
         return result
 
     @staticmethod
