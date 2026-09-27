@@ -81,6 +81,10 @@ def _catalog_editable_fields(action: Mapping[str, Any]) -> list[dict[str, Any]]:
             and not (field.get("key") == "json" and field.get("flags") == ["--json"])]
 
 
+_DESCRIPTION_COLOR = "#D7BC72"
+_METADATA_COLOR = "#70C8C0"
+
+
 _WORKBENCH_THEME = Theme(
     name="workbench-dark",
     primary="#f2f2f2",
@@ -94,7 +98,12 @@ _WORKBENCH_THEME = Theme(
     error="#f2f2f2",
     success="#c4c4c4",
     dark=True,
-    variables={"foreground-muted": "#adadad", "footer-key-foreground": "#ffffff"},
+    variables={
+        "foreground-muted": "#adadad",
+        "description": _DESCRIPTION_COLOR,
+        "metadata": _METADATA_COLOR,
+        "footer-key-foreground": "#ffffff",
+    },
 )
 
 
@@ -2781,6 +2790,12 @@ class WorkflowsScreen(Screen[None]):
         self._filter("")
         self.query_one("#workflow-list", OptionList).focus()
 
+    def on_resize(self, event: events.Resize) -> None:
+        if self.is_mounted:
+            self.call_after_refresh(
+                self._filter, self.query_one("#workflow-search", Input).value
+            )
+
     def on_screen_resume(self, event: events.ScreenResume) -> None:
         self.query_one("#workflow-list", OptionList).focus()
 
@@ -2805,7 +2820,25 @@ class WorkflowsScreen(Screen[None]):
             if isinstance(item, dict) and _runnable_catalog_action(item)
         )
 
+    @staticmethod
+    def _option_prompt(action: Mapping[str, Any], width: int) -> Text:
+        """Keep action and suite in the same columns for every list row."""
+        width = max(24, width)
+        suite_width = min(20, max(11, width - 32))
+        title_width = max(11, width - suite_width - 2)
+        title = Text(str(action.get("title", "?")), no_wrap=True)
+        title.truncate(title_width, overflow="ellipsis", pad=True)
+        suite = Text(str(action.get("suite_id", "?")), no_wrap=True)
+        suite.truncate(suite_width, overflow="ellipsis")
+        prompt = Text(no_wrap=True)
+        prompt.append_text(title)
+        prompt.append("  ")
+        prompt.append_text(suite)
+        return prompt
+
     def _filter(self, query: str) -> None:
+        listing = self.query_one("#workflow-list", OptionList)
+        previous_id = self.selected.get("command_id") if self.selected else None
         words = query.casefold().split()
         matches = []
         for action in self._actions():
@@ -2814,20 +2847,13 @@ class WorkflowsScreen(Screen[None]):
             ).casefold()
             if all(word in haystack for word in words):
                 matches.append(action)
+        width = listing.content_size.width or listing.region.width - 2 or self.app.size.width - 8
         options = []
         for item in matches[:200]:
-            suite = str(item.get("suite_id", "?"))
-            if len(suite) > 21:
-                suite = suite[:20] + "…"
-            title = str(item.get("title", "?"))
-            title_width = 48 - len(suite) - 5
-            if len(title) > title_width:
-                title = title[:title_width - 1] + "…"
             options.append(Option(
-                Text(f"{title}  ·  {suite}", no_wrap=True),
+                self._option_prompt(item, width),
                 id=str(item.get("command_id")),
             ))
-        listing = self.query_one("#workflow-list", OptionList)
         listing.set_options(options)
         self.selected = None
         self.query_one("#workflow-run", Button).disabled = True
@@ -2841,8 +2867,12 @@ class WorkflowsScreen(Screen[None]):
         self.query_one("#workflow-detail", Static).update(Text(message))
         self.query_one("#workflow-brief", Static).update(Text(message))
         if options:
-            listing.highlighted = 0
-            self._select(options[0].id)
+            selected_index = next(
+                (index for index, option in enumerate(options) if option.id == previous_id),
+                0,
+            )
+            listing.highlighted = selected_index
+            self._select(options[selected_index].id)
 
     def _select(self, command_id: str | None) -> None:
         self.selected = next(
@@ -2854,31 +2884,38 @@ class WorkflowsScreen(Screen[None]):
             self.query_one("#workflow-run", Button).disabled = True
             self.query_one("#workflow-brief", Static).update("Select an action")
             return
+        description_style = _DESCRIPTION_COLOR if self.app.current_theme.dark else ""
+        metadata_style = _METADATA_COLOR if self.app.current_theme.dark else ""
         brief = Text()
         brief.append(str(action.get("title", command_id)), style="bold")
-        brief.append("\n")
+        summary = str(action.get("summary") or "")
+        if summary:
+            brief.append("\n" + summary, style=description_style)
         brief.append(
+            "\n"
             f"{str(action.get('availability', 'available')).capitalize()}"
             f" · {str(action.get('suite_id', '?'))}"
             f" · {str(action.get('risk', '?')).replace('-', ' ')}",
-            style="dim",
+            style=metadata_style,
         )
-        summary = str(action.get("summary") or "")
-        if summary:
-            brief.append("\n" + summary)
         self.query_one("#workflow-brief", Static).update(brief)
         detail = Text()
         detail.append(str(action.get("title", command_id)), style="bold")
-        detail.append("\n\n" + str(action.get("summary") or ""))
+        if summary:
+            detail.append("\n\n" + summary, style=description_style)
+        detail.append(
+            "\n\n"
+            f"{str(action.get('availability', 'available')).capitalize()}"
+            f" · {str(action.get('risk', '?')).replace('-', ' ')}",
+            style=metadata_style,
+        )
         for label, key in (
-            ("ID", "command_id"),
-            ("Suite", "suite_id"),
+            ("Module", "suite_id"),
             ("Owner", "authority"),
-            ("Availability", "availability"),
-            ("Risk", "risk"),
+            ("ID", "command_id"),
         ):
             detail.append("\n")
-            detail.append_text(_line(label, action.get(key, "?")))
+            detail.append(f"{label}:  {action.get(key, '?')}", style=metadata_style)
         if action.get("limitations"):
             detail.append("\n\nLimits\n", style="bold underline")
             for item in action["limitations"]:

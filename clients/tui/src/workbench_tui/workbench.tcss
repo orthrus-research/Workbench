@@ -1,3 +1,6 @@
+$description: #D7BC72;
+$metadata: #70C8C0;
+
 Screen {
     background: $background;
     color: $foreground;
@@ -48,7 +51,7 @@ Screen.narrow-brand #actions-panel {
 
 #home-subtitle {
     height: auto;
-    color: $foreground;
+    color: $description;
 }
 
 #home-panels {
@@ -83,7 +86,7 @@ Screen.narrow-brand #actions-panel {
 
 #home-keyboard-hint {
     height: 1;
-    color: $foreground-muted;
+    color: $metadata;
 }
 
 #environment-summary,
@@ -118,7 +121,7 @@ Screen.narrow-brand #actions-panel {
     height: auto;
     min-height: 1;
     padding: 0 1 1 1;
-    color: $foreground-muted;
+    color: $description;
 }
 
 .field-label {
@@ -130,7 +133,7 @@ Screen.narrow-brand #actions-panel {
 
 .keyboard-hint {
     height: auto;
-    color: $foreground-muted;
+    color: $metadata;
     padding: 0 1;
 }
 
@@ -195,8 +198,25 @@ Select.keyboard-selected > SelectCurrent .arrow {
 #pack-source-note,
 #pack-java-note {
     height: auto;
-    color: $foreground-muted;
+    color: $description;
     padding: 0 1;
+}
+
+#choice-java-hint {
+    color: $description;
+}
+
+.-light-mode #home-subtitle,
+.-light-mode .screen-intro,
+.-light-mode #pack-source-note,
+.-light-mode #pack-java-note,
+.-light-mode #choice-java-hint {
+    color: #785B21;
+}
+
+.-light-mode #home-keyboard-hint,
+.-light-mode .keyboard-hint {
+    color: #006C66;
 }
 
 #pack-scroll {
@@ -498,9 +518,9 @@ Screen.-narrow #workflow-list {
 
 Screen.-narrow .inventory-detail-panel,
 Screen.-narrow #workflow-detail-panel {
-    height: 40%;
-    min-height: 4;
-    max-height: 7;
+    height: 50%;
+    min-height: 5;
+    max-height: 8;
     padding: 0 1;
 }
 
@@ -511,7 +531,7 @@ Screen.-narrow #workflow-detail {
 Screen.-narrow #workflow-brief {
     display: block;
     height: 1fr;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 Screen.-narrow #workflow-search {

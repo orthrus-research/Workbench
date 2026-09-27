@@ -186,12 +186,34 @@ class WorkflowInteractionTests(unittest.IsolatedAsyncioTestCase):
             brief = screen.query_one("#workflow-brief")
             self.assertEqual(len(listing.options), 14)
             self.assertTrue(all("\n" not in option.prompt.plain for option in listing.options))
+            suite_starts = [
+                listing.options[index].prompt.plain.index(suite)
+                for index, suite in ((0, "shell"), (1, "manuals"), (2, "developer-"))
+            ]
+            self.assertEqual(len(set(suite_starts)), 1)
+            self.assertTrue(all(
+                len(option.prompt.plain) <= listing.content_size.width
+                for option in listing.options
+            ))
             self.assertGreaterEqual(listing.region.height, 8)
-            self.assertLessEqual(detail.region.height, 7)
+            self.assertLessEqual(detail.region.height, 8)
             self.assertLess(screen.query_one("#workflow-run", Button).region.bottom, 23)
             self.assertIn("Available", str(brief.render()))
             self.assertIn("read only", str(brief.render()))
-            await pilot.press("down", "enter")
+            self.assertIn("Inspect setup", str(brief.render()))
+            await pilot.press("down")
+            self.assertEqual(screen.selected["command_id"], "manuals.overview")
+            await pilot.resize_terminal(40, 18)
+            await pilot.pause()
+            self.assertEqual(screen.selected["command_id"], "manuals.overview")
+            narrow_starts = [
+                listing.options[index].prompt.plain.index(suite)
+                for index, suite in ((0, "shell"), (1, "manuals"))
+            ]
+            self.assertEqual(len(set(narrow_starts)), 1)
+            await pilot.resize_terminal(58, 24)
+            await pilot.pause()
+            await pilot.press("enter")
             await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
             core.open_document.assert_awaited_once()
 

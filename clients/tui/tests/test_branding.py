@@ -14,11 +14,13 @@ class _UnavailableCore:
 
 
 class BrandingTests(unittest.IsolatedAsyncioTestCase):
-    async def test_default_palette_is_black_grey_and_white(self) -> None:
+    async def test_default_controls_are_monochrome_with_straw_and_teal_text(self) -> None:
         app = WorkbenchApp(_UnavailableCore())
         theme = app.get_theme("workbench-dark")
         self.assertEqual("#f2f2f2", theme.primary)
         self.assertEqual(theme.primary, theme.accent)
+        self.assertEqual("#D7BC72", theme.variables["description"])
+        self.assertEqual("#70C8C0", theme.variables["metadata"])
         for name in (
             "primary", "secondary", "accent", "foreground", "background",
             "surface", "panel", "warning", "error", "success",
@@ -84,3 +86,12 @@ class BrandingTests(unittest.IsolatedAsyncioTestCase):
             details = str(home.query_one("#environment-dependencies", Static).content)
             self.assertIn("Review mode is ready", details)
             self.assertNotIn("Pixi", details)
+
+    async def test_description_accent_remains_readable_when_switching_to_light_theme(self) -> None:
+        app = WorkbenchApp(_UnavailableCore())
+        async with app.run_test(size=(80, 24)) as pilot:
+            subtitle = app.screen.query_one("#home-subtitle", Static)
+            self.assertEqual((215, 188, 114), subtitle.styles.color.rgb)
+            app.theme = "textual-light"
+            await pilot.pause()
+            self.assertEqual((120, 91, 33), subtitle.styles.color.rgb)
