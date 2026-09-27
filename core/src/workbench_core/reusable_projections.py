@@ -24,7 +24,7 @@ from .durable_records import (
     private_record_lock, publish_immutable_bytes, read_bounded_bytes, read_private_bytes,
     read_private_single_link_bytes,
 )
-from .host_filesystem import fsync_directory, private_path, secure_private_path
+from .host_filesystem import file_lease, fsync_directory, private_path, secure_private_path
 from .output_routing import _private_directory
 from .source_checkouts import _rename_noreplace
 from .storage.registered import ResourceCatalog
@@ -56,6 +56,64 @@ def _ordinary_directory(path: Path) -> os.stat_result:
     if not stat.S_ISDIR(info.st_mode) or getattr(path, "is_junction", lambda: False)():
         _fail("unsafe", f"projection contains a redirect or non-directory: {path}")
     return info
+
+
+@contextmanager
+def _read_existing_lease(path: Path) -> Iterator[None]:
+    """Share an existing projection lease without creating or repairing it."""
+
+    descriptor = -1
+    try:
+        CoreReusableProjections._inventory_directory(path.parent)
+        before = path.lstat()
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or before.st_size != 0 or not private_path(path, directory=False)):
+            _fail("changed", "projection inspection lease is unsafe")
+        descriptor = os.open(
+            path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0),
+        )
+        opened = os.fstat(descriptor)
+        if (not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+                or opened.st_size != 0
+                or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)):
+            _fail("changed", "projection inspection lease changed before acquisition")
+        lease = file_lease(descriptor, exclusive=False)
+        lease.__enter__()
+    except ReusableProjectionError:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise
+    except BlockingIOError as exc:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise ReusableProjectionError("projection.busy", "projection is held by a writer") from exc
+    except FileNotFoundError as exc:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise ReusableProjectionError("projection.unavailable", "projection inspection lease is absent") from exc
+    except (OSError, ValueError) as exc:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise ReusableProjectionError("projection.changed", "projection inspection lease is unavailable or changed") from exc
+    try:
+        yield
+    finally:
+        try:
+            try:
+                after = path.lstat()
+                if (not stat.S_ISREG(after.st_mode) or after.st_nlink != 1
+                        or after.st_size != 0
+                        or (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino)):
+                    _fail("changed", "projection inspection lease changed during readback")
+            except OSError as exc:
+                raise ReusableProjectionError(
+                    "projection.changed", "projection inspection lease changed during readback",
+                ) from exc
+        finally:
+            try:
+                lease.__exit__(None, None, None)
+            finally:
+                os.close(descriptor)
 
 
 def _relative(value: Path) -> str:
@@ -648,6 +706,61 @@ class CoreReusableProjections:
             yield ReusableProjectionReference(
                 projection_id, root, project, str(row["source_digest"]), self.owner_id, self.workspace,
             )
+
+    def inspect_current(
+        self, projection_id: str, *, validate: Callable[[Path], object],
+    ) -> dict[str, object]:
+        """Read one retained projection with its owner, without Core publication.
+
+        The supplied owner validator must be read-only. This is a present-day
+        candidate check, not historical coverage or cleanup authorization.
+        """
+
+        if self.catalog.verify_root() != "ready-unproven":
+            _fail("unavailable", "projection catalog root is not currently bound")
+        path = self._record_path(projection_id)
+        with _read_existing_lease(self.root / "leases" / f"{path.stem}.lock"):
+            matches = [
+                entry for entry in self.inventory_catalog(
+                    self.catalog.configuration_home, workspace=self.workspace,
+                ) if entry["projection_id"] == projection_id
+            ]
+            if len(matches) != 1 or matches[0]["owner_id"] != self.owner_id:
+                _fail("changed", "projection is absent from the current catalog")
+            row = self._record(projection_id)
+            record_before = path.lstat()
+            root = Path(str(row["path"]))
+            project = root / str(row["project_relative"])
+            rows = _source_rows(tuple(row["source_files"]))
+            generated = _generated(tuple(row["generated_parts"]))
+            suffixes = _suffixes(tuple(row["generated_suffixes"]))
+            roots = _generated_roots(tuple(Path(value) for value in row.get("generated_roots", ())))
+            root_info, parent_info = _scan(root, project, rows, generated, suffixes, validate, roots)
+            if ((root_info.st_dev, root_info.st_ino) != (row["device"], row["inode"])
+                    or (parent_info.st_dev, parent_info.st_ino) != (
+                        row["parent_device"], row["parent_inode"],
+                    )):
+                _fail("changed", "projection directory was replaced after adoption")
+            if self._record(projection_id) != row:
+                _fail("changed", "projection record changed during inspection")
+            record_after = path.lstat()
+            if (
+                record_before.st_dev, record_before.st_ino, record_before.st_size,
+                record_before.st_mtime_ns, record_before.st_ctime_ns,
+            ) != (
+                record_after.st_dev, record_after.st_ino, record_after.st_size,
+                record_after.st_mtime_ns, record_after.st_ctime_ns,
+            ):
+                _fail("changed", "projection record changed during inspection")
+            if self.catalog.verify_root() != "ready-unproven":
+                _fail("changed", "projection catalog root changed during inspection")
+            return {
+                "projection_id": projection_id,
+                "workspace": str(self.workspace), "owner_id": self.owner_id,
+                "path": str(root), "status": "current-owner-validated",
+                "physical_source": "verified", "generated_state": "unqualified",
+                "historical_completeness": "unproven", "cleanup_authority": "none",
+            }
 
 
 __all__ = ["CoreReusableProjections"]

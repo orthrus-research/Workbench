@@ -12,6 +12,7 @@ from unittest.mock import patch
 from workbench_api.durable_resources import DurableResourceError
 from workbench_api.reusable_projections import ReusableProjectionError
 from workbench_core import check_storage
+from workbench_core.durable_records import private_record_lock
 from workbench_core.host_filesystem import HostFilesystemError
 from workbench_core.reusable_projections import CoreReusableProjections
 from workbench_core.storage.registered import ResourceCatalog
@@ -169,6 +170,75 @@ class ReusableProjectionTests(unittest.TestCase):
         self.assertEqual(reference.projection_id, after["reusable_projections"][0]["projection_id"])
         self.assertEqual("absent", after["reusable_projections"][0]["parent_store_registration"])
         self.assertIsNone(after["reusable_projections"][0]["parent_store_id"])
+
+    def test_current_owner_inspection_reads_original_source_without_catalog_writes(self) -> None:
+        reference = self._create()
+        config = self.home / "config"
+        before = {
+            str(path.relative_to(config)): path.read_bytes()
+            for path in config.rglob("*") if path.is_file()
+        }
+        inspected = self.host.inspect_current(
+            reference.projection_id,
+            validate=lambda project: self.assertEqual(self.content, (project / "build.gradle").read_bytes()),
+        )
+        after = {
+            str(path.relative_to(config)): path.read_bytes()
+            for path in config.rglob("*") if path.is_file()
+        }
+        self.assertEqual(before, after)
+        self.assertEqual("current-owner-validated", inspected["status"])
+        self.assertEqual(str(self.root), inspected["path"])
+        self.assertEqual("verified", inspected["physical_source"])
+        self.assertEqual("unqualified", inspected["generated_state"])
+        self.assertEqual("unproven", inspected["historical_completeness"])
+        self.assertEqual("none", inspected["cleanup_authority"])
+        self.assertEqual("ready-unproven", self.host.catalog.verify_root())
+
+    def test_current_owner_inspection_refuses_missing_lease_without_recreation(self) -> None:
+        reference = self._adopt()
+        nonce = reference.projection_id.rsplit(":", 1)[1]
+        lease = self.host.root / "leases" / f"{nonce}.lock"
+        lease.unlink()
+        with self.assertRaises(ReusableProjectionError) as caught:
+            self.host.inspect_current(reference.projection_id, validate=lambda _: None)
+        self.assertEqual("projection.unavailable", caught.exception.code)
+        self.assertFalse(lease.exists())
+        self.assertEqual("ready-unproven", self.host.catalog.verify_root())
+
+    def test_current_owner_inspection_refuses_active_writer(self) -> None:
+        reference = self._adopt()
+        nonce = reference.projection_id.rsplit(":", 1)[1]
+        lease = self.host.root / "leases" / f"{nonce}.lock"
+        with private_record_lock(lease, wait=True):
+            with self.assertRaises(ReusableProjectionError) as caught:
+                self.host.inspect_current(reference.projection_id, validate=lambda _: None)
+        self.assertEqual("projection.busy", caught.exception.code)
+        self.assertEqual("current-owner-validated", self.host.inspect_current(
+            reference.projection_id, validate=lambda _: None,
+        )["status"])
+
+    def test_current_owner_inspection_refuses_changed_physical_source(self) -> None:
+        reference = self._adopt()
+        self.source.write_bytes(b"changed source")
+        with self.assertRaises(ReusableProjectionError) as caught:
+            self.host.inspect_current(reference.projection_id, validate=lambda _: None)
+        self.assertEqual("projection.changed", caught.exception.code)
+        self.assertEqual("ready-unproven", self.host.catalog.verify_root())
+
+    def test_current_owner_inspection_cannot_infer_lost_catalog_from_tree(self) -> None:
+        reference = self._adopt()
+        config = self.home / "config"
+        retained = self.home / "config-retained"
+        config.rename(retained)
+        try:
+            with self.assertRaises(ReusableProjectionError) as caught:
+                self.host.inspect_current(reference.projection_id, validate=lambda _: None)
+            self.assertEqual("projection.unavailable", caught.exception.code)
+            self.assertFalse(config.exists())
+            self.assertEqual(self.content, self.source.read_bytes())
+        finally:
+            retained.rename(config)
 
     def test_resource_catalog_preserves_pre_record_locks_and_refuses_unknown_children(self) -> None:
         selected = self._adopt()
