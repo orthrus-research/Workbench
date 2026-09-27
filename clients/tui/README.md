@@ -100,8 +100,9 @@ download and verify the published client archive, then saves that release as
 the user's pack choice in the stable configuration home. It does not replace
 files in the current workspace. **Ignore this release** remembers the exact
 release and asks again only when a newer one appears; **Later** changes
-nothing. Refresh can retry a check. An unavailable GitHub response does not
-block local use. The published client archive is a CurseForge distribution;
+nothing. The offer waits until Home is active if another screen is open.
+Refresh can retry a check. An unavailable GitHub response does not block local
+use. The published client archive is a CurseForge distribution;
 developers can still explicitly choose a source branch for their own work.
 The archive by itself does not establish a runnable Cleanroom fixture.
 Home's **View or prepare Supersymmetry pack** action reads the saved choice
@@ -109,6 +110,8 @@ offline and asks before Core downloads an unprepared selection. It can prepare
 the pinned default or a deliberately retained older release without changing
 the selected version. If the retained archive changes, Textual shows a review
 state and Core preserves those bytes rather than replacing them automatically.
+If the state root changes, Textual can prepare a verified copy in the newly
+selected root after review.
 
 **Export environment** asks Core to publish a small, path-free selection file
 for the saved workspace. **Import environment** takes that file, a local

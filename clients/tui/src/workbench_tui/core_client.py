@@ -262,7 +262,7 @@ class CoreClient:
                 or _SAVED_RELEASE_ID.fullmatch(selected["release_id"]) is None
                 or type(selected.get("asset_size")) is not int
                 or selected["asset_size"] <= 0
-                or record.get("artifact_state") not in {"none", "verified", "missing", "changed"}
+                or record.get("artifact_state") not in {"none", "verified", "missing", "changed", "other_root"}
                 or (record["artifact_state"] == "verified"
                     and not isinstance(selected.get("artifact_path"), str))
             ):

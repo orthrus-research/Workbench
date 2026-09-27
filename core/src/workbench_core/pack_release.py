@@ -415,7 +415,10 @@ class PackReleaseService:
             path = Path(path_value)
             expected = (self.state_root.expanduser().resolve() / "artifacts" / "sha256"
                         / selected["asset_sha256"].removeprefix("sha256:"))
-            if path != expected or path.is_symlink():
+            if path != expected:
+                state = "other_root"
+                selected["artifact_path"] = None
+            elif path.is_symlink():
                 state = "changed"
                 selected["artifact_path"] = None
             elif not path.exists():

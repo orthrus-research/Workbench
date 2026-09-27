@@ -1283,6 +1283,9 @@ class HomeScreen(Screen[None]):
     def on_resize(self, event: events.Resize) -> None:
         self.app._size_brand()  # type: ignore[attr-defined]
 
+    def on_screen_resume(self, event: events.ScreenResume) -> None:
+        self.app._present_pending_pack_release()  # type: ignore[attr-defined]
+
 
 class WorkbenchApp(App[None]):
     CSS_PATH = "workbench.tcss"
@@ -1320,6 +1323,7 @@ class WorkbenchApp(App[None]):
         self.view = EnvironmentView()
         self._migration_busy = False
         self._pack_release_checked = False
+        self._pending_pack_release: Mapping[str, Any] | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=self.preferences.show_clock, icon="W", id="home-header")
@@ -1485,7 +1489,10 @@ class WorkbenchApp(App[None]):
             return
         approved = await self.push_screen_wait(ReviewModal(
             f"Prepare Supersymmetry {version}?",
-            f"Core will download and verify the saved published client archive "
+            ("The saved archive belongs to another Workbench state root. "
+             "Core will prepare a verified copy in the current state root.\n\n"
+             if choice["artifact_state"] == "other_root" else "")
+            + f"Core will download and verify the saved published client archive "
             f"({selected['asset_size'] / (1024 * 1024):.1f} MiB), then retain it "
             "in Workbench's stable artifact store. Your workspace files will not change.",
             confirm_label="Prepare verified archive",
@@ -1628,6 +1635,19 @@ class WorkbenchApp(App[None]):
             return
         if not isinstance(check, dict) or check.get("status") != "update_available":
             return
+        self._pending_pack_release = check
+        self._present_pending_pack_release()
+
+    def _present_pending_pack_release(self) -> None:
+        if self._pending_pack_release is not None and isinstance(self.screen, HomeScreen):
+            self._offer_pending_pack_release()
+
+    @work(exclusive=True, group="pack-release-offer")
+    async def _offer_pending_pack_release(self) -> None:
+        if not isinstance(self.screen, HomeScreen) or self._pending_pack_release is None:
+            return
+        check = self._pending_pack_release
+        self._pending_pack_release = None
         choice = await self.push_screen_wait(ReleaseUpdateModal(check))
         release_id = check["candidate"]["release_id"]
         if choice == "later":

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import unittest
 from unittest.mock import AsyncMock
 
 from textual.widgets import OptionList
 
 from test_setup_screen import fake_core
-from workbench_tui.app import ReleaseUpdateModal, ResultScreen, ReviewModal, WorkbenchApp
+from workbench_tui.app import ReleaseUpdateModal, ResultScreen, ReviewModal, SetupScreen, WorkbenchApp
 from workbench_tui.core_client import CoreClient, CoreClientError
 
 
@@ -171,6 +172,51 @@ class PackReleaseInteractionTests(unittest.IsolatedAsyncioTestCase):
             await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
             self.assertIn("will not replace it automatically", app.screen.output)
             core.pack_release_prepare.assert_not_awaited()
+
+    async def test_other_state_root_can_prepare_a_verified_copy(self) -> None:
+        core = fake_core("/tmp/workbench-test-workspace")
+        core.pack_release_check = AsyncMock(return_value=_check("current"))
+        core.pack_release_show = AsyncMock(return_value={
+            "schema": "workbench.pack-release.v1", "action": "show",
+            "status": "selected", "selected_version": "0.1.16.16",
+            "selected": {"version": "0.1.16.16", "release_id": BASELINE_ID,
+                         "asset_size": 113125809, "artifact_path": None},
+            "candidate": None, "artifact_state": "other_root",
+        })
+        core.pack_release_prepare = AsyncMock(return_value={
+            **_check(), "action": "prepare", "status": "prepared",
+            "candidate": _baseline_candidate(), "selected_version": "0.1.16.16",
+            "artifact_path": "/new-state/artifacts/sha256/abc",
+        })
+        app = WorkbenchApp(core)
+        async with app.run_test() as pilot:
+            await self._choose_pack_action(app, pilot)
+            await self._settle(pilot, lambda: isinstance(app.screen, ReviewModal))
+            self.assertIn("another Workbench state root", app.screen.body)
+            await pilot.click("#review-confirm")
+            await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
+            core.pack_release_prepare.assert_awaited_once_with(BASELINE_ID)
+
+    async def test_startup_offer_waits_for_home_when_setup_is_open(self) -> None:
+        core = fake_core("/tmp/workbench-test-workspace")
+        release_ready = asyncio.Event()
+
+        async def delayed_check() -> dict:
+            await release_ready.wait()
+            return _check()
+
+        core.pack_release_check = AsyncMock(side_effect=delayed_check)
+        app = WorkbenchApp(core)
+        async with app.run_test() as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.open_setup()
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen))
+            release_ready.set()
+            await self._settle(pilot, lambda: core.pack_release_check.await_count == 1)
+            await pilot.pause(0.1)
+            self.assertIsInstance(app.screen, SetupScreen)
+            app.pop_screen()
+            await self._settle(pilot, lambda: isinstance(app.screen, ReleaseUpdateModal))
 
     async def test_startup_prompt_accepts_exact_release_and_shows_verified_archive(self) -> None:
         core = fake_core("/tmp/workbench-test-workspace")

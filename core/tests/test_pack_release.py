@@ -204,6 +204,24 @@ class PackReleaseTests(unittest.TestCase):
         self.assertEqual("unavailable", refused["status"])
         self.assertEqual("changed", self.service.show()["artifact_state"])
 
+    def test_state_root_change_preserves_old_archive_and_can_prepare_new_store(self) -> None:
+        identity = self.service.check()["candidate"]["release_id"]
+        accepted = self.service.accept(identity)
+        old_artifact = Path(accepted["artifact_path"])
+        second = PackReleaseService(
+            self.authority, config_home=self.root / ".workbench",
+            state_root=self.root / "second-state", latest_fetcher=self._latest,
+            artifact_fetcher=self._download,
+        )
+        shown = second.show()
+        self.assertEqual("other_root", shown["artifact_state"])
+        self.assertIsNone(shown["selected"]["artifact_path"])
+        prepared = second.prepare(shown["selected"]["release_id"])
+        self.assertEqual("prepared", prepared["status"])
+        self.assertNotEqual(old_artifact, Path(prepared["artifact_path"]))
+        self.assertEqual("verified", second.show()["artifact_state"])
+        self.assertEqual(self.source.read_bytes(), old_artifact.read_bytes())
+
     def test_failed_digest_or_manifest_keeps_previous_choice(self) -> None:
         identity = self.service.check()["candidate"]["release_id"]
         self.source.write_bytes(b"changed after GitHub metadata")
