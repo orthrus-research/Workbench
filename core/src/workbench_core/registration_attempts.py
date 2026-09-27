@@ -14,7 +14,6 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
-import shutil
 import stat
 from typing import Iterator
 from uuid import uuid4
@@ -27,7 +26,7 @@ from workbench_api.source_transactions import SourceImage, SourceTransactionErro
 from . import check_storage
 from .durable_records import (
     private_record_lock, publish_immutable_bytes, read_private_bytes,
-    replace_private_bytes,
+    read_private_single_link_bytes, replace_private_bytes,
 )
 from .host_filesystem import fsync_directory, private_path, secure_private_path
 from .output_routing import _private_directory
@@ -149,6 +148,10 @@ class _Attempt:
         self._promoted = False
         self._stages: set[int] = set()
         self._attempts: set[int] = set()
+        # Only this live attempt may discard these exact physical members.
+        # Reopened attempts deliberately have no in-process deletion proof.
+        self._owned_files: dict[Path, tuple[int, int, int, int, bytes]] = {}
+        self._owned_directories: dict[Path, tuple[int, int]] = {}
         self._root_identities = {
             "state": _identity(state_root), "workspace": _identity(workspace),
             "payload": _identity(payload), "registrations": _identity(self.root),
@@ -168,6 +171,50 @@ class _Attempt:
             _fail("changed", "registration state, target, or payload root was replaced")
         if not private_path(self.state_root, directory=True) or not private_path(self.root, directory=True):
             _fail("unsafe", "registration state root lost private custody")
+
+    def _remember_file(self, path: Path, raw: bytes) -> None:
+        if self._stage_identity is None or not path.is_relative_to(self.path):
+            _fail("state", "registration file has no live attempt owner")
+        if _identity(self.path) != self._stage_identity:
+            _fail("changed", "registration attempt stage changed after publication")
+        parent = path.parent
+        while parent != self.path:
+            identity = _identity(parent)
+            if not private_path(parent, directory=True):
+                _fail("unsafe", "registration attempt directory lost private custody")
+            previous = self._owned_directories.setdefault(parent, identity)
+            if previous != identity:
+                _fail("changed", "registration attempt directory changed after publication")
+            parent = parent.parent
+        info = path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            _fail("unsafe", "registration attempt file is not independent")
+        if read_private_single_link_bytes(path, byte_limit=len(raw)) != raw:
+            _fail("changed", "registration attempt file changed after publication")
+        self._owned_files[path] = (
+            info.st_dev, info.st_ino, stat.S_IMODE(info.st_mode),
+            len(raw), sha256(raw).digest(),
+        )
+
+    def _write_owned_file(self, path: Path, raw: bytes, *, limit: int) -> None:
+        _write_file(path, raw, limit=limit)
+        self._remember_file(path, raw)
+
+    def _verify_owned_file(self, path: Path) -> None:
+        expected = self._owned_files[path]
+        info = path.lstat()
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or (info.st_dev, info.st_ino, stat.S_IMODE(info.st_mode), info.st_size)
+                != expected[:4]):
+            _fail("changed", "registration attempt file changed before cleanup")
+        raw = read_private_single_link_bytes(path, byte_limit=expected[3])
+        if sha256(raw).digest() != expected[4]:
+            _fail("changed", "registration attempt file bytes changed before cleanup")
+
+    def _verify_owned_directory(self, path: Path) -> None:
+        if (_identity(path) != self._owned_directories[path]
+                or not private_path(path, directory=True)):
+            _fail("changed", "registration attempt directory changed before cleanup")
 
     def prepare(self, images: tuple[RegistrationImage, ...], receipt: bytes) -> None:
         self._check_roots()
@@ -218,11 +265,11 @@ class _Attempt:
             "root_identities": self._root_identities, "operations": rows,
             "prepared_receipt_sha256": sha256(receipt).hexdigest(),
         })
-        _write_file(self.path / "attempt.json", _canonical(manifest), limit=32 * 1024)
+        self._write_owned_file(self.path / "attempt.json", _canonical(manifest), limit=32 * 1024)
         for image in images:
-            _write_file(self.path / "backups" / image.path, image.before, limit=_MAX_FILE)
-            _write_file(self.path / "after" / image.path, image.after, limit=_MAX_FILE)
-        _write_file(self.path / "receipt.json", receipt, limit=_MAX_RECEIPT)
+            self._write_owned_file(self.path / "backups" / image.path, image.before, limit=_MAX_FILE)
+            self._write_owned_file(self.path / "after" / image.path, image.after, limit=_MAX_FILE)
+        self._write_owned_file(self.path / "receipt.json", receipt, limit=_MAX_RECEIPT)
         self._rows = rows
         self._prepared = True
         fsync_directory(self.path)
@@ -705,7 +752,7 @@ class _Attempt:
             "path": self._rows[ordinal]["path"], "staged_relative": staged_relative,
             "staging_token": self.staging_token,
         }
-        _write_file(self.path / "stages" / f"{ordinal:03d}.json", _canonical(body), limit=4096)
+        self._write_owned_file(self.path / "stages" / f"{ordinal:03d}.json", _canonical(body), limit=4096)
         self._stages.add(ordinal)
 
     def mark_attempted(self, ordinal: int) -> None:
@@ -718,7 +765,7 @@ class _Attempt:
             "format": "workbench-registration-source-attempt-v1", "ordinal": ordinal,
             "path": self._rows[ordinal]["path"], "staging_token": self.staging_token,
         }
-        _write_file(self.path / "attempts" / f"{ordinal:03d}.json", _canonical(body), limit=4096)
+        self._write_owned_file(self.path / "attempts" / f"{ordinal:03d}.json", _canonical(body), limit=4096)
         self._attempts.add(ordinal)
 
     def publish_applied(self, receipt: bytes) -> None:
@@ -735,6 +782,7 @@ class _Attempt:
         )
         if read_private_bytes(path, byte_limit=_MAX_RECEIPT) != receipt:
             _fail("changed", "applied registration receipt did not reopen exactly")
+        self._remember_file(path, receipt)
 
     def restore_prepared(self, receipt: bytes) -> None:
         """Downgrade only this attempt's exact applied receipt after failure."""
@@ -752,6 +800,8 @@ class _Attempt:
         )
         if read_private_bytes(path, byte_limit=_MAX_RECEIPT) != receipt:
             _fail("changed", "prepared registration receipt did not reopen exactly")
+        if not self._promoted:
+            self._remember_file(path, receipt)
 
     def promote(self) -> None:
         self._check_roots()
@@ -786,13 +836,35 @@ class _Attempt:
         self._check_roots()
         if _identity(self.path) != self._stage_identity:
             _fail("changed", "registration attempt stage changed before cleanup")
+        observed_files: set[Path] = set()
+        observed_directories: set[Path] = set()
         for parent, directories, files in os.walk(self.path, followlinks=False):
+            directory = Path(parent)
+            if directory != self.path:
+                if directory not in self._owned_directories:
+                    _fail("unsafe", "registration attempt has an unowned directory; cleanup is protected")
+                self._verify_owned_directory(directory)
+                observed_directories.add(directory)
             for name in directories + files:
-                member = Path(parent) / name
-                info = member.lstat()
-                if stat.S_ISLNK(info.st_mode) or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
-                    _fail("unsafe", "registration attempt has an unsafe member; cleanup is protected")
-        shutil.rmtree(self.path)
+                member = directory / name
+                if member in self._owned_directories:
+                    self._verify_owned_directory(member)
+                elif member in self._owned_files:
+                    self._verify_owned_file(member)
+                    observed_files.add(member)
+                else:
+                    _fail("unsafe", "registration attempt has an unowned member; cleanup is protected")
+        if observed_files != self._owned_files.keys() or observed_directories != self._owned_directories.keys():
+            _fail("changed", "registration attempt lost a Core-created member before cleanup")
+        for member in sorted(self._owned_files, key=lambda path: len(path.parts), reverse=True):
+            self._verify_owned_file(member)
+            member.unlink()
+        for member in sorted(self._owned_directories, key=lambda path: len(path.parts), reverse=True):
+            self._verify_owned_directory(member)
+            member.rmdir()
+        if _identity(self.path) != self._stage_identity:
+            _fail("changed", "registration attempt stage changed during cleanup")
+        self.path.rmdir()
         fsync_directory(self.root)
 
 

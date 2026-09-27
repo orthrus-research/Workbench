@@ -1136,6 +1136,53 @@ class RegistrationWizardTest(unittest.TestCase):
             for relative, raw in originals.items():
                 self.assertEqual(raw, (payload / relative).read_bytes())
 
+    def test_failed_apply_preserves_unowned_or_replaced_attempt_member(self) -> None:
+        for condition in ("injected-member", "replaced-member", "edited-member"):
+            with self.subTest(condition=condition), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                project = _project(root)
+                instance, payload = _instance(root)
+                state = root / "state"
+                initialize_active_instance(SUITE_ROOT, project, instance, state_root=state)
+                answers = {"name": "Pilot Coolant", "color": "0x425d73"}
+                plan = plan_active_registration(
+                    SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                    answers=answers, state_root=state,
+                )
+                originals = {
+                    row["path"]: (payload / row["path"]).read_bytes()
+                    for row in plan["operations"]
+                }
+
+                def interrupt_with_changed_attempt(attempt, _receipt):
+                    if condition == "injected-member":
+                        (attempt.path / "foreign.txt").write_bytes(b"not Core-owned\n")
+                    elif condition == "replaced-member":
+                        receipt = attempt.path / "receipt.json"
+                        replacement = attempt.path / "receipt.swap"
+                        replacement.write_bytes(receipt.read_bytes())
+                        replacement.chmod(0o600)
+                        os.replace(replacement, receipt)
+                    else:
+                        after = attempt.path / "after" / attempt._rows[0]["path"]
+                        raw = after.read_bytes()
+                        after.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
+                    raise OSError("injected receipt failure")
+
+                with patch.object(_Attempt, "publish_applied", interrupt_with_changed_attempt):
+                    with self.assertRaisesRegex(RegistrationWizardError, "cleanup is protected|changed before cleanup"):
+                        apply_active_registration(
+                            SUITE_ROOT, project, pattern_key="material-backed-fluid",
+                            answers=answers, state_root=state,
+                        )
+                retained = state / "registrations" / (
+                    ".apply-" + plan["plan_id"].removeprefix("sha256:")
+                )
+                self.assertTrue((retained / "attempt.json").is_file())
+                self.assertEqual((retained / "foreign.txt").exists(), condition == "injected-member")
+                for relative, raw in originals.items():
+                    self.assertEqual(raw, (payload / relative).read_bytes())
+
     def test_uncertain_promotion_keeps_prepared_receipt_and_restored_sources(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
