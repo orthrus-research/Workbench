@@ -87,6 +87,11 @@ exact plan with `--apply PLAN_ID`; an interactive terminal instead asks for a
 short plan-specific confirmation. Acquisition authority is the pack-owned
 [`acquisition-v1.json`](../../profiles/packs/supersymmetry/acquisition-v1.json),
 not a universal Supersymmetry assumption in the shell.
+Here `latest` names the moving `master-ceu` source branch. The published client
+pack is described separately by the pack-owned
+[`release authority`](../../profiles/packs/supersymmetry/release-authority-v1.json)
+and must be selected through the release workflow; a branch checkout is an
+explicit developer source choice.
 
 Acquisition Plan V1 remains verbatim for compatibility callers and still
 requires an existing regular destination parent. The public command uses the

@@ -1,0 +1,33 @@
+{
+  "format": "workbench-supersymmetry-release-authority-v1",
+  "schema_version": 1,
+  "profile_id": "workbench-pack:supersymmetry",
+  "repository": {
+    "kind": "github",
+    "name": "SymmetricDevs/Supersymmetry",
+    "latest_release_api": "https://api.github.com/repos/SymmetricDevs/Supersymmetry/releases/latest"
+  },
+  "release_policy": {
+    "client_asset_name_pattern": "^supersymmetry-(?P<tag>[0-9]+(?:\\.[0-9]+){3})\\.zip$"
+  },
+  "baseline_release": {
+    "tag": "0.1.16.16",
+    "published_at": "2026-09-16T16:25:18Z",
+    "release_url": "https://github.com/SymmetricDevs/Supersymmetry/releases/tag/0.1.16.16",
+    "tag_commit": "a0565d8328fe37b9c3b5a6a1ce93880d4e867c4c",
+    "tag_tree": "bd351cb5d5d0179ce2ae815479868c44bb2b1f75",
+    "client_asset": {
+      "name": "supersymmetry-0.1.16.16.zip",
+      "url": "https://github.com/SymmetricDevs/Supersymmetry/releases/download/0.1.16.16/supersymmetry-0.1.16.16.zip",
+      "size": 113125809,
+      "sha256": "sha256:01ac9d96f703e23411dd836c3bca50b39de274e7979faf9e05c66db0029b0f50",
+      "archive_format": "curseforge-client-manifest-v1",
+      "minecraft_version": "1.12.2",
+      "mod_loader": "forge-14.23.5.2860"
+    }
+  },
+  "developer_source": {
+    "selection": "explicit",
+    "acquisition_profile": "acquisition-v1.json"
+  }
+}

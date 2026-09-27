@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workbench.cleanroommc.dev/schemas/workbench-supersymmetry-release-authority-v1.schema.json",
+  "title": "Workbench Supersymmetry release authority V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile_id", "repository", "release_policy", "baseline_release", "developer_source"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-release-authority-v1"},
+    "schema_version": {"const": 1},
+    "profile_id": {"const": "workbench-pack:supersymmetry"},
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "latest_release_api"],
+      "properties": {
+        "kind": {"const": "github"},
+        "name": {"const": "SymmetricDevs/Supersymmetry"},
+        "latest_release_api": {"const": "https://api.github.com/repos/SymmetricDevs/Supersymmetry/releases/latest"}
+      }
+    },
+    "release_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["client_asset_name_pattern"],
+      "properties": {
+        "client_asset_name_pattern": {"const": "^supersymmetry-(?P<tag>[0-9]+(?:\\.[0-9]+){3})\\.zip$"}
+      }
+    },
+    "baseline_release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "published_at", "release_url", "tag_commit", "tag_tree", "client_asset"],
+      "properties": {
+        "tag": {"pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$", "type": "string"},
+        "published_at": {"format": "date-time", "type": "string"},
+        "release_url": {"pattern": "^https://github\\.com/SymmetricDevs/Supersymmetry/releases/tag/[A-Za-z0-9._-]+$", "type": "string"},
+        "tag_commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+        "tag_tree": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+        "client_asset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "url", "size", "sha256", "archive_format", "minecraft_version", "mod_loader"],
+          "properties": {
+            "name": {"pattern": "^supersymmetry-[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.zip$", "type": "string"},
+            "url": {"pattern": "^https://github\\.com/SymmetricDevs/Supersymmetry/releases/download/[A-Za-z0-9._-]+/supersymmetry-[A-Za-z0-9._-]+\\.zip$", "type": "string"},
+            "size": {"minimum": 1, "type": "integer"},
+            "sha256": {"pattern": "^sha256:[0-9a-f]{64}$", "type": "string"},
+            "archive_format": {"const": "curseforge-client-manifest-v1"},
+            "minecraft_version": {"pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$", "type": "string"},
+            "mod_loader": {"pattern": "^forge-[A-Za-z0-9._-]+$", "type": "string"}
+          }
+        }
+      }
+    },
+    "developer_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selection", "acquisition_profile"],
+      "properties": {
+        "selection": {"const": "explicit"},
+        "acquisition_profile": {"const": "acquisition-v1.json"}
+      }
+    }
+  }
+}

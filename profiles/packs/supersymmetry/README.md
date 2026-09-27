@@ -22,6 +22,23 @@ records remain available by explicit path.
 Historical Forge evidence is valid only for the locked historical target. It
 must not be presented as current Cleanroom runtime behavior.
 
+## Published pack and developer sources
+
+[`release-authority-v1.json`](release-authority-v1.json) identifies the
+Supersymmetry GitHub releases feed and pins the reviewed 0.1.16.16 client
+download by exact size and SHA-256. The pinned ZIP contains a CurseForge
+manifest for Minecraft 1.12.2 and Forge 14.23.5.2860 with pack overrides. Its
+tag commit and tree identify the release's repository provenance; the tag
+checkout is not itself a prepared Packwiz project. A future release choice
+must use the GitHub release asset and verify its bytes before Core retains it.
+
+Developers can explicitly select their own checkout or branch through the
+separate [`acquisition-v1.json`](acquisition-v1.json) Git source workflow. Its
+`latest` channel is the moving `master-ceu` branch, not the latest published
+pack release. A developer source selection must not silently replace a saved
+release choice. The release descriptor does not create a Cleanroom source lock
+or resolve the released pack's CurseForge dependencies.
+
 ## Contents
 
 - `source-locks/`: exact upstream source and binary provenance.
