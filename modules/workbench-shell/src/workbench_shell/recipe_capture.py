@@ -629,9 +629,8 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
                                   'explicit_eula_acceptance': True})
         stage = 'execution-preparation'
         try:
-            execution = attempt / 'execution'
-            storage.copy_manifest(attempt / 'runtime', execution, prepared['runtime_files'], cancelled=cancel.is_set)
             execution_workspace = capture_execution_workspace(reference)
+            execution = execution_workspace.copy_runtime(prepared['runtime_files'], cancelled=cancel.is_set)
             current_settings = execution_workspace.read_optional('server.properties')
             raw = current_settings if current_settings is not None else b''
             execution_workspace.replace_file(

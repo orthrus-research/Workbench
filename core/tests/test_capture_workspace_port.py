@@ -73,15 +73,67 @@ class CaptureWorkspacePortTests(unittest.TestCase):
             self.assertEqual(original_inventory, reopened.inventory())
             self.assertEqual(capture_workspace.inventory(self.execution), reopened.inventory())
 
+    def test_runtime_copy_uses_exact_attempt_child_and_reopens_historical_tree(self) -> None:
+        self.execution.rmdir()
+        runtime = self.reference.path / "runtime"
+        (runtime / "groovy").mkdir(parents=True)
+        (runtime / "groovy/recipe.groovy").write_bytes(b"selected recipe\n")
+        (runtime / "tool").write_bytes(b"selected executable\n")
+        (runtime / "tool").chmod(0o755)
+        rows = capture_workspace.inventory(runtime)
+        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST)):
+            workspace = self._open()
+            with patch.object(check_storage, "copy_manifest", wraps=check_storage.copy_manifest) as copied:
+                execution = workspace.copy_runtime(rows)
+            copied.assert_called_once()
+            self.assertEqual((runtime, self.execution, rows), copied.call_args.args)
+            self.assertEqual(self.execution, execution)
+            self.assertEqual(rows, workspace.inventory())
+        reopened_attempts = self._attempts("workbench-shell")
+        with (managed_attempts_scope(reopened_attempts), patch.object(port, "_host", HOST)):
+            reopened = port.capture_execution_workspace(
+                reopened_attempts.open("recipe-capture-v1", "recipe-capture", self.reference.attempt_id),
+            )
+            self.assertEqual(rows, reopened.inventory())
+            for row in rows:
+                self.assertEqual((runtime / row["path"]).read_bytes(),
+                                 reopened.read_optional(row["path"]))
+
+    def test_cancelled_runtime_copy_retains_partial_execution_tree(self) -> None:
+        self.execution.rmdir()
+        runtime = self.reference.path / "runtime"
+        runtime.mkdir()
+        (runtime / "one.txt").write_bytes(b"first file\n")
+        (runtime / "two.txt").write_bytes(b"second file\n")
+        rows = capture_workspace.inventory(runtime)
+        polls = 0
+
+        def cancel_after_first_file() -> bool:
+            nonlocal polls
+            polls += 1
+            return polls >= 3
+
+        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST)):
+            with self.assertRaisesRegex(check_storage.CheckStorageError,
+                                        "managed copy cancelled; partial files retained"):
+                self._open().copy_runtime(rows, cancelled=cancel_after_first_file)
+        self.assertEqual(b"first file\n", (self.execution / "one.txt").read_bytes())
+        self.assertFalse((self.execution / "two.txt").exists())
+        self.assertEqual(b"second file\n", (runtime / "two.txt").read_bytes())
+
     def test_foreign_or_retargeted_attempt_refuses_before_write(self) -> None:
         foreign_attempts = self._attempts("other-owner")
         foreign = foreign_attempts.allocate("recipe-capture-v1", "recipe-capture")
         (foreign.path / "execution").mkdir(mode=0o700)
-        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST)):
+        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST),
+              patch.object(check_storage, "copy_manifest") as copied):
             with self.assertRaises(ManagedAttemptError):
-                port.capture_execution_workspace(foreign)
+                port.capture_execution_workspace(foreign).copy_runtime([])
             with self.assertRaises(ManagedAttemptError):
-                port.capture_execution_workspace(replace(self.reference, path=foreign.path))
+                port.capture_execution_workspace(
+                    replace(self.reference, path=foreign.path),
+                ).copy_runtime([])
+            copied.assert_not_called()
         self.assertEqual([], list((foreign.path / "execution").iterdir()))
 
 

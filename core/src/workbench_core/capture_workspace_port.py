@@ -17,13 +17,25 @@ class _ExecutionWorkspace:
     def __init__(self, attempts: CoreManagedAttempts, reference: ManagedAttemptReference):
         self._attempts = attempts
         self._reference = reference
-        self._root()
+        self._attempt_path()
+
+    def _attempt_path(self) -> Path:
+        return self._attempts._verified_path(self._reference)
 
     def _root(self) -> Path:
         # Reopen the exact cataloged attempt on every operation. The caller
         # cannot retarget this capability to another directory or attempt.
-        attempt = self._attempts._verified_path(self._reference)
-        return check_storage.ordinary(attempt / "execution", directory=True)
+        return check_storage.ordinary(self._attempt_path() / "execution", directory=True)
+
+    def copy_runtime(
+        self, rows: list[dict], *, cancelled: Callable[[], bool] = lambda: False,
+    ) -> Path:
+        attempt = self._attempt_path()
+        target = attempt / "execution"
+        # Preserve V1 member modes, cancellation and partial-copy behavior by
+        # delegating to the same Core copier at the fixed attempt-relative URI.
+        check_storage.copy_manifest(attempt / "runtime", target, rows, cancelled=cancelled)
+        return target
 
     def read_optional(self, relative: str) -> bytes | None:
         root = self._root()

@@ -1344,14 +1344,21 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
                           'sha256': sha256(raw).hexdigest()}, receipt)
 
     def test_execution_overrides_use_attempt_bound_core_workspace(self):
+        prepared = self.prepare()
         with patch.object(capture, 'capture_execution_workspace',
-                          wraps=capture.capture_execution_workspace) as selected:
-            result = self.run_capture()
+                          wraps=capture.capture_execution_workspace) as selected, \
+             patch.object(check_storage, 'copy_manifest',
+                          wraps=check_storage.copy_manifest) as copied:
+            result = self.run_capture(prepared)
         selected.assert_called_once()
         attempt = self.attempt(result)
         self.assertEqual(attempt, selected.call_args.args[0].path)
         self.assertEqual(capture.ATTEMPT_FAMILY, selected.call_args.args[0].family)
         execution = attempt / 'execution'
+        copied.assert_called_once()
+        self.assertEqual((attempt / 'runtime', execution,
+                          json.loads((attempt / 'prepared.json').read_bytes())['runtime_files']),
+                         copied.call_args.args)
         self.assertEqual(b'fixture-only=true\n', (execution / 'server.properties').read_bytes())
         self.assertEqual(b'eula=true\n', (execution / 'eula.txt').read_bytes())
         rows = json.loads((attempt / 'runtime-lock.json').read_bytes())['runtime_files']
@@ -1360,6 +1367,30 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             self.assertIn({'path': name, 'size': path.stat().st_size,
                            'sha256': sha256(path.read_bytes()).hexdigest(), 'mode': 0o644}, rows)
         self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_partial_runtime_copy_retains_tree_and_blocks_native_replay(self):
+        prepared = self.prepare()
+        attempt = self.attempt(prepared)
+        execution = attempt / 'execution'
+        original_copy = check_storage.copy_manifest
+
+        def interrupt_after_first_file(source, destination, rows, **kwargs):
+            original_copy(source, destination, rows[:1], **kwargs)
+            raise check_storage.CheckStorageError('synthetic partial runtime copy')
+
+        with patch.object(check_storage, 'copy_manifest', side_effect=interrupt_after_first_file):
+            with self.assertRaisesRegex(check_storage.CheckStorageError,
+                                        'synthetic partial runtime copy'):
+                self.run_capture(prepared)
+        first = prepared['runtime_files'][0]
+        self.assertEqual((attempt / 'runtime' / first['path']).read_bytes(),
+                         (execution / first['path']).read_bytes())
+        self.assertEqual([first], core_capture_workspace.inventory(execution))
+        self.assertTrue((attempt / 'run-started.json').is_file())
+        self.assertEqual('failed', capture.show(self.state, prepared['attempt_id'])['state'])
+        with self.assertRaisesRegex(ValueError, 'already attempted'):
+            self.run_capture(prepared)
+        self.native.assert_not_called()
 
     def test_execution_override_link_faults_preserve_v1_stages_and_block_replay(self):
         original_link = core_capture_workspace.os.link

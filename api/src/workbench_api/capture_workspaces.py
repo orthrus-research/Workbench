@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable, Protocol
 
 from .managed_attempts import ManagedAttemptReference
@@ -12,6 +13,10 @@ class CaptureWorkspaceHostError(OSError):
 
 
 class CaptureExecutionWorkspace(Protocol):
+    def copy_runtime(
+        self, rows: list[dict], *, cancelled: Callable[[], bool] = lambda: False,
+    ) -> Path: ...
+
     def read_optional(self, relative: str) -> bytes | None: ...
 
     def replace_file(
