@@ -5,6 +5,7 @@ from copy import deepcopy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import shlex
 import sys
@@ -606,9 +607,9 @@ class ManagedRunProfileTests(unittest.TestCase):
         for flag in ("--show", "--json"):
             output = io.StringIO()
             errors = io.StringIO()
-            with patch(
-                "workbench_core.dispatch_setup._activate_user_setup",
-                return_value=True,
+            with patch.dict(
+                os.environ,
+                {"WORKBENCH_CONFIG_HOME": str(Path(self.temporary.name) / "config")},
             ), patch.object(
                 workbench_shell,
                 "_worldgen_doctor_report",
@@ -625,7 +626,7 @@ class ManagedRunProfileTests(unittest.TestCase):
                         flag,
                     ]
                 )
-            self.assertEqual(0, code)
+            self.assertEqual(0, code, errors.getvalue())
             self.assertEqual("", errors.getvalue())
             self.assertEqual(1, doctor.call_count)
             if flag == "--json":
@@ -638,9 +639,9 @@ class ManagedRunProfileTests(unittest.TestCase):
         label = f"managed-shell-execute-{uuid.uuid4().hex}"
         output = io.StringIO()
         errors = io.StringIO()
-        with patch(
-            "workbench_core.dispatch_setup._activate_user_setup",
-            return_value=True,
+        with patch.dict(
+            os.environ,
+            {"WORKBENCH_CONFIG_HOME": str(Path(self.temporary.name) / "config")},
         ), patch.object(
             workbench_shell,
             "_worldgen_doctor_report",
@@ -660,7 +661,7 @@ class ManagedRunProfileTests(unittest.TestCase):
                     label,
                 ]
             )
-        self.assertEqual(19, code)
+        self.assertEqual(19, code, errors.getvalue())
         self.assertEqual("", errors.getvalue())
         self.assertEqual(2, doctor.call_count)
         self.assertEqual(1, execute.call_count)
