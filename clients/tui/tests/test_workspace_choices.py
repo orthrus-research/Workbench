@@ -313,6 +313,23 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
             await pilot.pause(0.05)
         self.fail("Textual did not reach the expected state")
 
+    async def test_import_form_uses_arrows_and_enter_for_paths(self) -> None:
+        app = WorkbenchApp(_core())
+        async with app.run_test(size=(110, 40)) as pilot:
+            app.push_screen(EnvironmentImportScreen())
+            await self._settle(pilot, lambda: isinstance(app.screen, EnvironmentImportScreen)
+                               and bool(app.screen.query("#import-share"))
+                               and app.screen.query_one("#import-share", Input).has_class(
+                                   "keyboard-selected"))
+            screen = app.screen
+            await pilot.press("enter")
+            self.assertIs(app.focused, screen.query_one("#import-share", Input))
+            screen.query_one("#import-share", Input).value = "/share.json"
+            await pilot.press("enter", "down")
+            self.assertIsNone(app.focused)
+            self.assertTrue(screen.query_one("#import-name", Input).has_class(
+                "keyboard-selected"))
+
     async def test_empty_choices_can_register_a_workspace_in_textual(self) -> None:
         core = _core()
         empty = {"format": "workbench-user-workspaces-v2", "schema_version": 2,

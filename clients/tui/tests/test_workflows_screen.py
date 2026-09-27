@@ -5,9 +5,17 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, Mock
 
-from textual.widgets import Button
+from textual.widgets import Button, Input, OptionList
 
-from workbench_tui.app import ResultScreen, ReviewModal, WorkbenchApp, WorkflowsScreen
+from workbench_tui.app import (
+    CatalogInputsScreen,
+    CatalogValueScreen,
+    ResultScreen,
+    ReviewModal,
+    WorkbenchApp,
+    WorkflowsScreen,
+    _runnable_catalog_action,
+)
 from workbench_tui.core_client import CommandOutput, CoreClient
 
 
@@ -77,3 +85,95 @@ class WorkflowInteractionTests(unittest.IsolatedAsyncioTestCase):
             await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
             core.open_document.assert_awaited_once()
             core.run_reviewed_command.assert_not_awaited()
+
+    async def test_read_only_action_collects_required_input_before_review(self) -> None:
+        core = catalog_core()
+        action = {
+            "command_id": "atlas.recipes-context",
+            "title": "Open captured recipes",
+            "summary": "Inspect one exact captured recipe graph",
+            "suite_id": "atlas",
+            "authority": "Atlas",
+            "risk": "read-only",
+            "preview": "none",
+            "availability": "experimental",
+            "action_digest": DIGEST,
+            "options": [{
+                "key": "path", "label": "Recipe graph", "help": "Select an existing graph.",
+                "kind": "path", "required": True, "nargs": "one", "repeat": False,
+                "required_group": False,
+            }],
+            "document": None,
+        }
+        core.catalog.return_value["commands"].append(action)
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(100, 35)) as pilot:
+            await self._settle(pilot, lambda: app.view.catalog is not None)
+            app.open_workflows()
+            await self._settle(
+                pilot,
+                lambda: isinstance(app.screen, WorkflowsScreen)
+                and bool(app.screen.query("#workflow-detail")),
+            )
+            screen = app.screen
+            self.assertEqual({item["command_id"] for item in screen._actions()}, {
+                "environment.status", "manuals.overview", "atlas.recipes-context",
+            })
+            self.assertEqual(app.focused.id, "workflow-list")
+            await pilot.press("/")
+            self.assertEqual(app.focused.id, "workflow-search")
+            await pilot.press("escape")
+            self.assertEqual(app.focused.id, "workflow-list")
+            screen._select("atlas.recipes-context")
+            screen.query_one("#workflow-run", Button).press()
+            await self._settle(pilot, lambda: isinstance(app.screen, CatalogInputsScreen))
+            form = app.screen
+            form._submit()
+            self.assertIn("Recipe graph", str(form.query_one("#catalog-inputs-error").render()))
+            fields = form.query_one("#catalog-fields", OptionList)
+            fields.highlighted = 0
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, CatalogValueScreen))
+            value_input = app.screen.query_one("#catalog-value-input", Input)
+            value_input.value = "/tmp/recipe-graph.sqlite"
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: app.screen is form)
+            form._submit()
+            await self._settle(pilot, lambda: isinstance(app.screen, ReviewModal))
+            self.assertEqual(core.command_review.await_args.args[2], {
+                "path": "/tmp/recipe-graph.sqlite",
+            })
+            core.run_reviewed_command.assert_not_awaited()
+            await pilot.click("#review-confirm")
+            await self._settle(pilot, lambda: isinstance(app.screen, ResultScreen))
+            self.assertEqual(core.run_reviewed_command.await_args.args[2], {
+                "path": "/tmp/recipe-graph.sqlite",
+            })
+
+    async def test_escape_returns_from_actions_to_home(self) -> None:
+        app = WorkbenchApp(catalog_core())
+        async with app.run_test(size=(100, 35)) as pilot:
+            await self._settle(pilot, lambda: app.view.catalog is not None)
+            app.open_workflows()
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkflowsScreen)
+                               and bool(app.screen.query("#workflow-list")))
+            await pilot.press("escape")
+            self.assertNotIsInstance(app.screen, WorkflowsScreen)
+
+
+class CatalogAdmissionTests(unittest.TestCase):
+    def test_unsupported_catalog_entries_are_not_offered_to_run(self) -> None:
+        base = {
+            "risk": "read-only", "preview": "none", "availability": "experimental",
+            "document": None, "options": [],
+        }
+        self.assertTrue(_runnable_catalog_action(base))
+        self.assertFalse(_runnable_catalog_action({**base, "risk": "mutating"}))
+        self.assertFalse(_runnable_catalog_action({**base, "preview": "inert-only"}))
+        self.assertFalse(_runnable_catalog_action({**base, "availability": "unavailable"}))
+        self.assertFalse(_runnable_catalog_action({**base, "options": [{
+            "key": "paths", "kind": "path", "nargs": "one", "repeat": True,
+        }]}))
+        self.assertTrue(_runnable_catalog_action({**base, "options": [{
+            "key": "path", "kind": "path", "nargs": "one", "repeat": False,
+        }]}))

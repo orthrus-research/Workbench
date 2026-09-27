@@ -43,6 +43,11 @@ class ResponsiveLayoutTests(unittest.IsolatedAsyncioTestCase):
                                     "title": f"Action {index}",
                                     "summary": "Show environment data",
                                     "suite_id": "core",
+                                    "risk": "read-only",
+                                    "preview": "none",
+                                    "availability": "available",
+                                    "options": [],
+                                    "document": None,
                                 }
                                 for index in range(10)
                             ]
@@ -86,7 +91,7 @@ class ResponsiveLayoutTests(unittest.IsolatedAsyncioTestCase):
                         listing.focus()
                         await pilot.press("down")
                         await pilot.pause()
-                        self.assertEqual("action-00", app.screen.selected["command_id"])
+                        self.assertEqual("action-01", app.screen.selected["command_id"])
                         app.pop_screen()
                         await pilot.pause()
 

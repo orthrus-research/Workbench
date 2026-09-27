@@ -97,6 +97,15 @@ check and remains unverified until a consuming operation uses it. Core saves
 each workspace's choice in the stable `workspaces.json` record. Selecting
 Java 8 does not establish Cleanroom compatibility.
 
+The main setup, workspace and instance forms start in keyboard navigation:
+Up and Down move the highlighted field, Enter opens a choice or text field,
+and Enter in a text field saves that value and returns to navigation. Escape
+restores the field's previous value while editing or returns to the previous
+screen from navigation. Review prompts start on Cancel; Left and Right move
+between decisions. The Home and Workflows
+action lists also start focused for arrow and Enter navigation; `/` moves to
+Workflows search. Mouse and Tab controls remain available.
+
 At startup, Textual asks Core to check the latest published Supersymmetry
 release. When a newer release is available, **Version up** asks Core to
 download and verify the published client archive, then saves that release as
@@ -147,18 +156,25 @@ file and must be supplied again on import without managed acquisition.
   Java path, or save and acquire managed Java in one action. Core's versioned
   user registry holds the choice. Export or import a Core-reviewed environment
   selection separately.
+- **Supersymmetry instance:** Browse a tree of user folders for a complete
+  Prism instance ZIP or an existing Prism data folder. The tree includes
+  hidden folders, supports arrows, Space to expand, Backspace for the parent,
+  and Ctrl+G to jump to an absolute folder. In WSL, Windows drives can be
+  reached under `/mnt`. A new Prism folder can still be typed directly.
 - **Modules:** Tabs, tables, and a detail panel compare installed module and
   profile records. Highlighting a row reveals its capabilities or resources;
   missing or unavailable components retain their reported reason.
-- **Workflows:** Search the installed command catalog and inspect an action's
-  owner, risk, availability, fields, and limits. A small allowlist of read-only
-  actions can be reviewed and launched with Core's catalog, action, and review
-  digests. Runs use plain output and do not retain console sessions. The
-  Manuals overview uses Core's document path with catalog and action binding.
+- **Workflows:** Search actions that Textual can open or run. Read-only actions
+  with ordinary path, text, number, yes/no, and choice fields collect their
+  inputs in a keyboard-driven list, then run through Core's exact review.
+  Documents open through Core's catalog binding. Actions requiring repeated
+  inputs or changes to local files stay out of this runnable list until their
+  interaction is implemented. Core also marks actions unavailable when their
+  installed command or document is absent. Runs use plain output and do not
+  retain console sessions.
 
 Core remains responsible for environment mutation, command construction, and
-owner policy. Catalog actions that need input forms or other document handling
-are shown for discovery without a launch button. Core's current JSON setup
+owner policy. Core's current JSON setup
 interface cannot clear a saved profile configuration, so switching an existing
 full developer setup to review-only is not offered. The wizard does not
 configure launchers or qualify a pack; those are separate owner paths. The TUI

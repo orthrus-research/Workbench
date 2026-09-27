@@ -193,8 +193,9 @@ class CommandSpec:
         }
 
     def render_template(self, root: Path) -> str:
-        tokens: list[str] = []
-        for token in self.argv_template:
+        core_route = self.argv_template[:2] == ("{python}", "{workbench}")
+        tokens: list[str] = ["workbench"] if core_route else []
+        for token in self.argv_template[2:] if core_route else self.argv_template:
             match = _PLACEHOLDER_RE.fullmatch(token)
             if match:
                 placement = int(match.group(1))
@@ -277,6 +278,9 @@ class CommandSpec:
             )
         argv: list[str] = []
         for token in self.argv_template:
+            if token == "{workbench}":
+                argv.extend(_workbench_route(root))
+                continue
             match = _PLACEHOLDER_RE.fullmatch(token)
             if match:
                 argv.extend(rendered.get(int(match.group(1)), []))
@@ -605,6 +609,13 @@ def _resolve_token(token: str, root: Path) -> str:
     )
 
 
+def _workbench_route(root: Path) -> list[str]:
+    """Use the source dispatcher in a checkout and installed Core in a wheel."""
+    if (root / "workbench.toml").is_file() and (root / "tools/workbench.py").is_file():
+        return [str(root / "tools/workbench.py")]
+    return ["-m", "workbench_core"]
+
+
 def _f(
     key: str,
     help: str,
@@ -647,7 +658,7 @@ def _f(
 
 
 def _workbench_template(*tokens: str) -> tuple[str, ...]:
-    return ("{python}", "{root}/tools/workbench.py", *tokens, "{options:0}")
+    return ("{python}", "{workbench}", *tokens, "{options:0}")
 
 
 def _public_commands(root: Path) -> list[CommandSpec]:
@@ -1663,7 +1674,7 @@ def _recipe_invalidations_command() -> CommandSpec:
         "none",
         (
             "{python}",
-            "{root}/tools/workbench.py",
+            "{workbench}",
             "runtime-diagnose",
             "{options:0}",
             "--recipe-invalidations",
@@ -2069,7 +2080,7 @@ def _subsurface_commands() -> list[CommandSpec]:
     doc = "docs/architecture/GTCEU-SUBSURFACE-STUDIO.md"
     template = (
         "{python}",
-        "{root}/tools/workbench.py",
+        "{workbench}",
         "subsurface",
         "{options:0}",
     )
@@ -2837,6 +2848,12 @@ def _shell_commands() -> list[CommandSpec]:
         _f("launcher", "Disposable client launcher family.", flags=("--launcher",), kind="choice", choices=("prism", "multimc"), default="prism"),
     )
     return [
+        CommandSpec(
+            "shell.overview", "shell", "Workbench Shell guide",
+            "Read the installed guide to setup, command discovery, and developer workflows.",
+            "Workbench Shell documentation", "read-only", "none",
+            document="modules/workbench-shell/README.md",
+        ),
         CommandSpec(
             "shell.live-console",
             "shell",
@@ -4269,12 +4286,44 @@ def build_catalog(root: Path) -> Catalog:
         *_expert_commands(),
         *_manual_commands(root),
     ]
-    return Catalog(root=root, suites=suites, commands=tuple(_admit_command(command, profile_ids, profile_requirements) for command in commands))
+    return Catalog(root=root, suites=suites, commands=tuple(
+        _admit_command(command, profile_ids, profile_requirements, root=root)
+        for command in commands
+    ))
 
 
-def _admit_command(command: CommandSpec, profile_ids: frozenset[str], requirements: tuple) -> CommandSpec:
-    """Make missing profile choices explicit without disabling unrelated tools."""
-    if command.argv_template[:2] == ("{python}", "{root}/tools/workbench.py"):
+def _admit_command(
+    command: CommandSpec, profile_ids: frozenset[str], requirements: tuple,
+    *, root: Path,
+) -> CommandSpec:
+    """Admit only the profile inputs and packaged files a route requires."""
+    optional_owner = (
+        "blueprints" if command.command_id.startswith("developer-features.")
+        else "worldgen-cockpit" if command.command_id.startswith("world-studio.cockpit-")
+        else "worldgen-qualifier" if command.command_id.startswith("world-studio.qualifier-")
+        else None
+    )
+    if optional_owner is not None and not (root / "modules" / optional_owner / "pyproject.toml").is_file():
+        command = replace(
+            command, availability="unavailable",
+            limitations=(*command.limitations, "Required component is not installed: " + optional_owner),
+        )
+    resource = None
+    if command.document is not None:
+        resource = command.document
+    elif (len(command.argv_template) >= 2
+          and command.argv_template[0] == "{python}"
+          and command.argv_template[1].startswith("{root}/")):
+        resource = command.argv_template[1].removeprefix("{root}/")
+    if resource is not None:
+        candidate = (root / resource).resolve()
+        if not candidate.is_relative_to(root) or not candidate.is_file():
+            command = replace(
+                command, availability="unavailable",
+                limitations=(*command.limitations,
+                             "Required installed file is missing: " + resource),
+            )
+    if command.argv_template[:2] == ("{python}", "{workbench}"):
         tokens = command.argv_template[2:]
         selected = next((capability for capability in requirements if tokens[:len(capability.command)] == capability.command), None)
         missing = () if selected is None else tuple(sorted(set(selected.requires_profiles) - profile_ids))

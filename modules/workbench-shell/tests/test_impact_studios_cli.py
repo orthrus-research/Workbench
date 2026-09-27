@@ -323,9 +323,9 @@ class ImpactStudioCliTests(unittest.TestCase):
     def test_catalog_exposes_three_read_only_owner_preserving_routes(self) -> None:
         catalog = build_catalog(ROOT)
         expected = {
-            "machine-studio.inspect": ("machine-studio", "tools/workbench.py machine inspect"),
-            "asset-studio.check": ("asset-studio", "tools/workbench.py assets check"),
-            "evolution-studio.recipes": ("evolution-studio", "tools/workbench.py evolution recipes"),
+            "machine-studio.inspect": ("machine-studio", "workbench machine inspect"),
+            "asset-studio.check": ("asset-studio", "workbench assets check"),
+            "evolution-studio.recipes": ("evolution-studio", "workbench evolution recipes"),
         }
         for command_id, (suite_id, preview) in expected.items():
             with self.subTest(command=command_id):

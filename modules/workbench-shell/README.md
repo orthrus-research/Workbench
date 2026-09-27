@@ -173,6 +173,11 @@ without a shell. When an owner supplies a plan, execution requires explicit
 consent and the digest-bound review; the owning command still performs its own
 freshness and mutation checks.
 
+Core-backed catalog actions use the checkout dispatcher in a source tree and
+installed Core in a package. The displayed `workbench` command and action digest
+stay stable across those layouts. The catalog marks actions unavailable when
+their packaged script, document, or optional owning component is absent.
+
 ```bash
 workbench console run explorer.search --set query=example:machine
 workbench console run runs.managed \

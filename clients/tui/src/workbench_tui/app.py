@@ -16,6 +16,7 @@ from rich.text import Text
 from textual import work
 from textual import events
 from textual.app import App, ComposeResult, SystemCommand
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.theme import Theme
@@ -23,6 +24,7 @@ from textual.widgets import (
     Button,
     Checkbox,
     DataTable,
+    DirectoryTree,
     Footer,
     Header,
     Input,
@@ -37,6 +39,7 @@ from textual.widgets.option_list import Option
 
 from .brand import COMPACT_MARK, MARK
 from .core_client import CoreClient, CoreClientError, SetupInputs, CommandOutput
+from .keyboard_form import KeyboardFormScreen
 from .preferences import (
     PreferencesError,
     TuiPreferences,
@@ -45,16 +48,36 @@ from .preferences import (
 )
 
 
-# This first interaction slice uses actions whose read-only intent and input
-# binding can be shown without inventing an owner-specific form.
-_LAUNCHABLE_READ_ONLY = {
-    "environment.status",
-    "workspace.open",
-    "storage.list",
-    "diagnose.latest",
-    "manuals.overview",
-}
+_CATALOG_SCALAR_KINDS = {"text", "path", "integer", "boolean", "choice"}
 _HAS_PICKER = find_spec("textual_fspicker") is not None
+
+
+def _runnable_catalog_action(action: Mapping[str, Any]) -> bool:
+    """Admit only catalog actions this client can collect and execute."""
+    if (action.get("risk") != "read-only"
+            or action.get("preview") != "none"
+            or action.get("availability") not in {"available", "experimental"}):
+        return False
+    document = action.get("document")
+    if document is not None:
+        return isinstance(document, str) and bool(document)
+    fields = action.get("options")
+    return isinstance(fields, list) and all(
+        isinstance(field, dict)
+        and isinstance(field.get("key"), str)
+        and field.get("kind") in _CATALOG_SCALAR_KINDS
+        and field.get("nargs") in {"one", "optional"}
+        and not field.get("repeat")
+        and not field.get("required_group")
+        for field in fields
+    )
+
+
+def _catalog_editable_fields(action: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Leave output encoding to the client rather than asking for a JSON flag."""
+    return [field for field in action.get("options", [])
+            if isinstance(field, dict)
+            and not (field.get("key") == "json" and field.get("flags") == ["--json"])]
 
 
 def _supports_block_logo() -> bool:
@@ -163,9 +186,24 @@ class ReviewModal(ModalScreen[bool]):
             yield Static(self.heading, id="review-heading")
             with VerticalScroll(id="review-scroll"):
                 yield Static(Text(self.body), id="review-body")
+            yield Static("←/→ Choose  ·  Enter Confirm  ·  Esc Cancel", classes="keyboard-hint")
             with Horizontal(classes="button-row"):
                 yield Button("Cancel", id="review-cancel")
                 yield Button(self.confirm_label, id="review-confirm", variant="warning")
+
+    def on_mount(self) -> None:
+        self.query_one("#review-cancel", Button).focus()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key in {"right", "down"}:
+            self.query_one("#review-confirm", Button).focus()
+            event.stop()
+        elif event.key in {"left", "up"}:
+            self.query_one("#review-cancel", Button).focus()
+            event.stop()
+        elif event.key == "escape":
+            self.dismiss(False)
+            event.stop()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "review-confirm")
@@ -217,6 +255,13 @@ class ResourcepackMappingModal(ModalScreen[str | None]):
             with Horizontal(classes="button-row"):
                 yield Button("Cancel", id="pack-policy-cancel")
                 yield Button("Review mapping", id="pack-policy-confirm", variant="warning")
+
+    def on_mount(self) -> None:
+        self.query_one("#pack-policy-pairs", Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "pack-policy-pairs":
+            self.dismiss(event.value.strip())
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "pack-policy-cancel":
@@ -278,10 +323,26 @@ class InterruptedSetupModal(ModalScreen[str]):
                     "The retained files remain in your local Workbench state.",
                     id="review-body",
                 )
+            yield Static("←/→ Choose  ·  Enter Confirm  ·  Esc Cancel", classes="keyboard-hint")
             with Horizontal(classes="button-row"):
                 yield Button("Cancel", id="setup-recovery-cancel")
                 yield Button("Keep files and start over", id="setup-recovery-abandon")
                 yield Button("Resume setup", id="setup-recovery-reconcile", variant="warning")
+
+    def on_mount(self) -> None:
+        self.query_one("#setup-recovery-cancel", Button).focus()
+
+    def on_key(self, event: events.Key) -> None:
+        buttons = ["setup-recovery-cancel", "setup-recovery-abandon", "setup-recovery-reconcile"]
+        if event.key in {"right", "down", "left", "up"}:
+            current = next((index for index, name in enumerate(buttons)
+                            if self.query_one(f"#{name}", Button).has_focus), 0)
+            offset = 1 if event.key in {"right", "down"} else -1
+            self.query_one(f"#{buttons[(current + offset) % len(buttons)]}", Button).focus()
+            event.stop()
+        elif event.key == "escape":
+            self.dismiss("cancel")
+            event.stop()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         action = event.button.id.removeprefix("setup-recovery-")
@@ -342,10 +403,26 @@ class ReleaseUpdateModal(ModalScreen[str]):
             yield Static(self.heading, id="review-heading")
             with VerticalScroll(id="review-scroll"):
                 yield Static(Text(self.body), id="review-body")
+            yield Static("←/→ Choose  ·  Enter Confirm  ·  Esc Later", classes="keyboard-hint")
             with Horizontal(classes="button-row"):
                 yield Button("Later", id="release-later")
                 yield Button(self.ignore_label, id="release-ignore")
                 yield Button(self.accept_label, id="release-accept", variant="primary")
+
+    def on_mount(self) -> None:
+        self.query_one("#release-later", Button).focus()
+
+    def on_key(self, event: events.Key) -> None:
+        buttons = ["release-later", "release-ignore", "release-accept"]
+        if event.key in {"right", "down", "left", "up"}:
+            current = next((index for index, name in enumerate(buttons)
+                            if self.query_one(f"#{name}", Button).has_focus), 0)
+            offset = 1 if event.key in {"right", "down"} else -1
+            self.query_one(f"#{buttons[(current + offset) % len(buttons)]}", Button).focus()
+            event.stop()
+        elif event.key == "escape":
+            self.dismiss("later")
+            event.stop()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss({
@@ -355,8 +432,151 @@ class ReleaseUpdateModal(ModalScreen[str]):
         }[event.button.id])
 
 
-class PackInstanceScreen(Screen):
+class _InstancePathTree(DirectoryTree):
+    """Show only directories and, when requested, ZIP archives."""
+
+    def __init__(self, path: Path, *, include_zips: bool) -> None:
+        self.include_zips = include_zips
+        super().__init__(path, id="instance-path-tree")
+
+    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
+        for path in paths:
+            try:
+                if path.is_dir() or (self.include_zips and path.is_file()
+                                     and path.suffix.casefold() == ".zip"):
+                    yield path
+            except OSError:
+                continue
+
+
+class InstancePathPicker(ModalScreen[Path | None]):
+    """A keyboard-first file tree for a ZIP or an existing Prism folder."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("backspace", "parent_folder", "Parent folder"),
+        Binding("ctrl+g", "focus_location", "Go to folder"),
+    ]
+
+    def __init__(self, location: Path, *, choose_zip: bool) -> None:
+        super().__init__()
+        self.location = location
+        self.choose_zip = choose_zip
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="instance-path-dialog"):
+            yield Static(
+                "Choose a complete Prism ZIP" if self.choose_zip else
+                "Choose an existing Prism data folder",
+                id="instance-path-heading",
+            )
+            yield Static(
+                "↑↓ highlight · Space open folder · Enter choose ZIP · "
+                "Backspace parent · Ctrl+G go to folder · Esc cancel"
+                if self.choose_zip else
+                "↑↓ highlight · Space open folder · Enter choose folder · "
+                "Backspace parent · Ctrl+G go to folder · Esc cancel",
+                id="instance-path-hint",
+            )
+            yield Static("↑↓ Move  ·  Space Open  ·  Enter Choose",
+                         id="instance-path-hint-narrow")
+            yield _InstancePathTree(self.location, include_zips=self.choose_zip)
+            yield Input(value=str(self.location), placeholder="/path/to/folder",
+                        id="instance-path-location")
+            yield Static("", id="instance-path-status")
+            with Horizontal(classes="button-row"):
+                yield Button("Use highlighted path", id="instance-path-choose")
+                yield Button("Cancel", id="instance-path-cancel")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#instance-path-tree", _InstancePathTree).focus()
+
+    def _choose_path(self, path: Path) -> None:
+        if self.choose_zip:
+            if path.is_file() and path.suffix.casefold() == ".zip":
+                self.dismiss(path)
+            else:
+                self.query_one("#instance-path-status", Static).update(
+                    "Choose an existing ZIP file. Press Space to open a folder."
+                )
+        elif path.is_dir():
+            self.dismiss(path)
+        else:
+            self.query_one("#instance-path-status", Static).update(
+                "Choose an existing folder, or type a new path on the setup screen."
+            )
+
+    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        self._choose_path(event.path)
+
+    def on_directory_tree_directory_selected(self,
+                                              event: DirectoryTree.DirectorySelected) -> None:
+        if self.choose_zip:
+            event.node.expand()
+        else:
+            self._choose_path(event.path)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id != "instance-path-location":
+            return
+        candidate = Path(event.value).expanduser()
+        if not candidate.is_absolute():
+            self.query_one("#instance-path-status", Static).update(
+                "Enter an absolute Linux folder path. In WSL, Windows drives are under /mnt."
+            )
+            return
+        if candidate.is_dir():
+            tree = self.query_one("#instance-path-tree", _InstancePathTree)
+            tree.path = candidate
+            tree.focus()
+        elif self.choose_zip and candidate.is_file() and candidate.suffix.casefold() == ".zip":
+            self.dismiss(candidate)
+        else:
+            self.query_one("#instance-path-status", Static).update(
+                "That folder is unavailable. You can type a new Prism path on the setup screen."
+                if not self.choose_zip else "Choose an existing ZIP file or folder."
+            )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "instance-path-cancel":
+            self.dismiss(None)
+        elif event.button.id == "instance-path-choose":
+            node = self.query_one("#instance-path-tree", _InstancePathTree).cursor_node
+            if node is not None and node.data is not None:
+                self._choose_path(node.data.path)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_parent_folder(self) -> None:
+        tree = self.query_one("#instance-path-tree", _InstancePathTree)
+        node = tree.cursor_node
+        current = node.data.path if node is not None and node.data is not None else Path(tree.path)
+        parent = current.parent
+        tree.path = parent
+        self.query_one("#instance-path-location", Input).value = str(parent)
+        tree.focus()
+
+    def action_focus_location(self) -> None:
+        location = self.query_one("#instance-path-location", Input)
+        location.focus()
+        location.action_select_all()
+
+
+class PackInstanceScreen(KeyboardFormScreen):
     """Collect a complete Prism ZIP and install choices through Core."""
+
+    KEYBOARD_CANCEL = "pack-instance-back"
+
+    KEYBOARD_FIELDS = (
+        "pack-fresh-optional", "pack-zip-path", "pack-zip-browse",
+        "pack-prism-root", "pack-prism-browse", "pack-workspace",
+        "pack-workspace-register", "pack-java-choice", "pack-installed-choice",
+        "pack-fresh-download", "pack-zip-import", "pack-instance-install",
+        "pack-instance-save-location", "pack-instance-show",
+        "pack-instance-launch", "pack-instance-back",
+    )
 
     def __init__(self, choice: Mapping[str, Any], workspaces: Mapping[str, Any],
                  installations: list[Mapping[str, Any]] | None = None,
@@ -394,12 +614,21 @@ class PackInstanceScreen(Screen):
                 "Core retains its gameplay files and prepares a new Linux Prism instance.",
                 classes="screen-intro",
             )
+            yield Static(
+                "↑/↓ Move  ·  Enter Edit/Save  ·  Esc Cancel/Back",
+                classes="keyboard-hint",
+            )
             yield Checkbox("Include the pack's optional mod", value=True,
                            id="pack-fresh-optional")
             yield Static("Complete Prism instance ZIP", classes="field-label")
-            yield Input(placeholder="/absolute/path/to/Supersymmetry-instance.zip", id="pack-zip-path")
+            with Horizontal(classes="instance-path-row"):
+                yield Input(placeholder="/absolute/path/to/Supersymmetry-instance.zip",
+                            id="pack-zip-path")
+                yield Button("Browse ZIPs", id="pack-zip-browse")
             yield Static("Prism launcher data folder", classes="field-label")
-            yield Input(value=launcher, id="pack-prism-root")
+            with Horizontal(classes="instance-path-row"):
+                yield Input(value=launcher, id="pack-prism-root")
+                yield Button("Browse folders", id="pack-prism-browse")
             yield Static("Workspace and Java choice", classes="field-label")
             yield Select([(f"{row['name']} · {row['path']}", row["name"]) for row in entries]
                          or [("Add a workspace below to continue", "")],
@@ -447,6 +676,9 @@ class PackInstanceScreen(Screen):
             )
         yield Footer()
 
+    def on_mount(self) -> None:
+        self.start_keyboard_navigation()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "pack-instance-back":
             self.app.pop_screen()
@@ -454,6 +686,10 @@ class PackInstanceScreen(Screen):
             self.register_workspace()
         elif event.button.id == "pack-java-choice":
             self.open_java_choices()
+        elif event.button.id == "pack-zip-browse":
+            self.pick_instance_path("zip")
+        elif event.button.id == "pack-prism-browse":
+            self.pick_instance_path("prism")
         elif event.button.id == "pack-zip-import":
             self.import_zip()
         elif event.button.id == "pack-fresh-download":
@@ -465,11 +701,32 @@ class PackInstanceScreen(Screen):
         elif event.button.id in {"pack-instance-show", "pack-instance-launch"}:
             self.launch_selected("show" if event.button.id == "pack-instance-show" else "launch")
 
+    @work(exclusive=True, group="pack-instance-path-picker")
+    async def pick_instance_path(self, kind: str) -> None:
+        if self.busy:
+            return
+        input_id = "pack-zip-path" if kind == "zip" else "pack-prism-root"
+        raw = self.query_one(f"#{input_id}", Input).value.strip()
+        default = Path.home() / "Downloads" if kind == "zip" else Path.home()
+        location = Path(raw).expanduser().absolute() if raw else default
+        if kind == "zip" and location.suffix.casefold() == ".zip":
+            location = location.parent
+        while not location.is_dir() and location != location.parent:
+            location = location.parent
+        if not location.is_dir():
+            location = Path.home()
+        selected = await self.app.push_screen_wait(
+            InstancePathPicker(location, choose_zip=kind == "zip")
+        )
+        if selected is not None:
+            self.query_one(f"#{input_id}", Input).value = str(selected)
+
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "pack-installed-choice" and isinstance(event.value, str):
             self.install_plan_id = event.value
 
     def on_screen_resume(self, event: events.ScreenResume) -> None:
+        super().on_screen_resume(event)
         if self._returning_from_java_choices:
             self._returning_from_java_choices = False
             self.refresh_workspace_choices()
@@ -987,6 +1244,8 @@ class PackInstanceScreen(Screen):
 
 
 class ResultScreen(Screen[None]):
+    BINDINGS = [("escape", "back", "Back")]
+
     def __init__(self, heading: str, output: str) -> None:
         super().__init__()
         self.heading = heading
@@ -1005,14 +1264,25 @@ class ResultScreen(Screen[None]):
 
     def on_mount(self) -> None:
         self.query_one("#result-log", RichLog).write(self.output)
+        self.query_one("#result-back", Button).focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "result-back":
             self.app.pop_screen()
 
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
-class WorkspaceRegisterScreen(Screen[tuple[str, Mapping[str, Any]] | None]):
+
+class WorkspaceRegisterScreen(KeyboardFormScreen):
     """Register one named workspace through Core's revisioned user choices."""
+
+    KEYBOARD_CANCEL = "workspace-register-cancel"
+
+    KEYBOARD_FIELDS = (
+        "workspace-register-name", "workspace-register-path", "workspace-register-default",
+        "workspace-register-save", "workspace-register-cancel",
+    )
 
     def __init__(self, record: Mapping[str, Any], *, initial_path: str = "") -> None:
         super().__init__()
@@ -1033,6 +1303,7 @@ class WorkspaceRegisterScreen(Screen[tuple[str, Mapping[str, Any]] | None]):
                 "Core saves this choice for later setup; registration does not change the folder.",
                 classes="screen-intro",
             )
+            yield Static("↑/↓ Move  ·  Enter Edit/Save  ·  Esc Cancel/Back", classes="keyboard-hint")
             yield Static("Workspace name", classes="field-label")
             yield Input(placeholder="susy-dev", id="workspace-register-name")
             yield Static("Workspace folder", classes="field-label")
@@ -1046,6 +1317,9 @@ class WorkspaceRegisterScreen(Screen[tuple[str, Mapping[str, Any]] | None]):
                 yield Button("Cancel", id="workspace-register-cancel")
             yield Static("", id="workspace-register-status")
         yield Footer()
+
+    def on_mount(self) -> None:
+        self.start_keyboard_navigation()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "workspace-register-cancel":
@@ -1088,8 +1362,16 @@ class WorkspaceRegisterScreen(Screen[tuple[str, Mapping[str, Any]] | None]):
             self.query_one("#workspace-register-save", Button).disabled = False
 
 
-class WorkspaceChoicesScreen(Screen[None]):
+class WorkspaceChoicesScreen(KeyboardFormScreen):
     """Edit Core's local profile and Java candidates for one named workspace."""
+
+    KEYBOARD_CANCEL = "choice-back"
+
+    KEYBOARD_FIELDS = (
+        "choice-workspace", "choice-register", "choice-profile", "choice-java-mode", "choice-java",
+        "choice-bind-source-lock", "choice-bind-managed-tools", "choice-save", "choice-export",
+        "choice-import", "choice-back",
+    )
 
     def __init__(self, record: Mapping[str, Any], *, selected_name: str | None = None) -> None:
         super().__init__()
@@ -1117,6 +1399,7 @@ class WorkspaceChoicesScreen(Screen[None]):
                 "enter a path without a version check.",
                 classes="screen-intro",
             )
+            yield Static("↑/↓ Move  ·  Enter Edit/Save  ·  Esc Cancel/Back", classes="keyboard-hint")
             yield Static("Named workspace", classes="field-label")
             yield Select(options, value=self.selected_name, allow_blank=False, id="choice-workspace")
             yield Button("Add workspace", id="choice-register")
@@ -1152,6 +1435,7 @@ class WorkspaceChoicesScreen(Screen[None]):
     def on_mount(self) -> None:
         self._show_selected()
         self.find_java()
+        self.start_keyboard_navigation()
 
     def _java_mode(self) -> str:
         value = self.query_one("#choice-java-mode", Select).value
@@ -1190,7 +1474,7 @@ class WorkspaceChoicesScreen(Screen[None]):
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "choice-workspace" and isinstance(event.value, str):
-            if self.busy:
+            if self.busy or event.value == self.selected_name:
                 return
             self.selected_name = event.value
             self._show_selected()
@@ -1393,8 +1677,15 @@ class WorkspaceChoicesScreen(Screen[None]):
             self.query_one("#choice-export", Button).disabled = False
 
 
-class EnvironmentImportScreen(Screen[None]):
+class EnvironmentImportScreen(KeyboardFormScreen):
     """Present Core's read-only import plan before binding local choices."""
+
+    KEYBOARD_CANCEL = "import-back"
+
+    KEYBOARD_FIELDS = (
+        "import-share", "import-name", "import-workspace", "import-config", "import-java",
+        "import-acquire-java", "import-plan", "import-apply", "import-back",
+    )
 
     def __init__(self) -> None:
         super().__init__()
@@ -1416,6 +1707,7 @@ class EnvironmentImportScreen(Screen[None]):
                 "managed Java release; acquire project and other dependency bytes separately.",
                 classes="screen-intro",
             )
+            yield Static("↑/↓ Move  ·  Enter Edit/Save  ·  Esc Cancel/Back", classes="keyboard-hint")
             yield Static("Share file", classes="field-label")
             yield Input(placeholder="/path/to/environment-share.json", id="import-share")
             yield Static("Local workspace name", classes="field-label")
@@ -1434,6 +1726,9 @@ class EnvironmentImportScreen(Screen[None]):
             yield Static("", id="import-status")
             yield Static("", id="import-detail")
         yield Footer()
+
+    def on_mount(self) -> None:
+        self.start_keyboard_navigation()
 
     def _options(self) -> tuple[str, str, str, str, str, bool]:
         fields = tuple(
@@ -1584,6 +1879,8 @@ class EnvironmentImportScreen(Screen[None]):
 class ModulesScreen(Screen[None]):
     """Compare DataTable and tabs as module/profile presentation primitives."""
 
+    BINDINGS = [("escape", "back", "Back")]
+
     def __init__(self, view: EnvironmentView) -> None:
         super().__init__()
         self.view = view
@@ -1634,6 +1931,7 @@ class ModulesScreen(Screen[None]):
             self._show_module(str(self.view.modules[0].get("id", "?")))
         if self.view.profiles:
             self._show_profile(str(self.view.profiles[0].get("id", "?")))
+        modules.focus()
 
     def _show_module(self, module_id: str) -> None:
         item = next((row for row in self.view.modules if row.get("id") == module_id), None)
@@ -1682,9 +1980,21 @@ class ModulesScreen(Screen[None]):
         if event.button.id == "modules-back":
             self.app.pop_screen()
 
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
-class SetupScreen(Screen[None]):
+
+class SetupScreen(KeyboardFormScreen):
     """Guided Core check → plan → explicit apply, with one frozen option set."""
+
+    KEYBOARD_CANCEL = "setup-back"
+
+    KEYBOARD_FIELDS = (
+        "setup-mode", "setup-workspace", "setup-workspace-browse",
+        "setup-profile", "setup-profile-browse", "setup-state-root",
+        "setup-java-candidates", "setup-java", "setup-git", "setup-check",
+        "setup-plan", "setup-apply", "setup-workflows", "setup-back",
+    )
 
     def __init__(
         self,
@@ -1724,6 +2034,10 @@ class SetupScreen(Screen[None]):
                 "configuration. Core checks the selection and owns every change. "
                 "Repair keeps saved values when a field is blank; review the resulting selection.",
                 classes="screen-intro",
+            )
+            yield Static(
+                "↑/↓ Move  ·  Enter Edit/Save  ·  Esc Cancel/Back",
+                classes="keyboard-hint",
             )
             yield Static("Setup journey", classes="field-label")
             yield Select(modes, value=default_mode, allow_blank=False, id="setup-mode")
@@ -1781,6 +2095,7 @@ class SetupScreen(Screen[None]):
         if self.view.setup:
             self._show_dependencies(self.view.setup)
         self.find_java()
+        self.start_keyboard_navigation()
 
     def _update_mode(self) -> None:
         mode = self.query_one("#setup-mode", Select).value
@@ -2061,8 +2376,192 @@ class SetupScreen(Screen[None]):
             )
 
 
+class CatalogValueScreen(ModalScreen[tuple[bool, Any]]):
+    """Edit one catalog field, then return to the keyboard field list."""
+
+    def __init__(self, field: Mapping[str, Any], current: Any = None) -> None:
+        super().__init__()
+        self.field = field
+        self.current = current
+
+    def compose(self) -> ComposeResult:
+        field = self.field
+        kind = field["kind"]
+        required = bool(field.get("required"))
+        with Vertical(id="review-dialog"):
+            yield Static(str(field.get("label") or field["key"]), id="review-heading")
+            yield Static(str(field.get("help") or ""), id="review-body")
+            if kind in {"choice", "boolean"}:
+                if kind == "boolean":
+                    choices = [("Yes", "true"), ("No", "false")]
+                else:
+                    choices = [(str(value), f"choice-{index}") for index, value
+                               in enumerate(field.get("choices", []))]
+                if not required:
+                    choices.append(("Use the command default", "unset"))
+                yield OptionList(*(Option(label, id=value) for label, value in choices),
+                                 id="catalog-value-choices")
+            else:
+                yield Input(
+                    value="" if self.current is None else str(self.current),
+                    placeholder="Enter a value" if required else "Blank uses the command default",
+                    password=bool(field.get("sensitive")),
+                    id="catalog-value-input",
+                )
+            yield Static("", id="catalog-value-error")
+            with Horizontal(classes="button-row"):
+                yield Button("Cancel", id="catalog-value-cancel")
+                if kind not in {"choice", "boolean"}:
+                    yield Button("Save value", id="catalog-value-save", variant="primary")
+
+    def on_mount(self) -> None:
+        widget = self.query_one(
+            "#catalog-value-choices" if self.field["kind"] in {"choice", "boolean"}
+            else "#catalog-value-input"
+        )
+        widget.focus()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "escape":
+            self.dismiss((False, None))
+            event.stop()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id != "catalog-value-choices":
+            return
+        if event.option_id == "unset":
+            self.dismiss((True, None))
+        elif self.field["kind"] == "boolean":
+            self.dismiss((True, event.option_id == "true"))
+        elif event.option_id and event.option_id.startswith("choice-"):
+            index = int(event.option_id.removeprefix("choice-"))
+            self.dismiss((True, self.field["choices"][index]))
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "catalog-value-input":
+            self._save()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "catalog-value-cancel":
+            self.dismiss((False, None))
+        elif event.button.id == "catalog-value-save":
+            self._save()
+
+    def _save(self) -> None:
+        raw = self.query_one("#catalog-value-input", Input).value.strip()
+        if not raw:
+            if self.field.get("required"):
+                self.query_one("#catalog-value-error", Static).update("A value is required.")
+                return
+            self.dismiss((True, None))
+            return
+        if self.field["kind"] == "integer":
+            try:
+                value: Any = int(raw)
+            except ValueError:
+                self.query_one("#catalog-value-error", Static).update("Enter a whole number.")
+                return
+        else:
+            value = raw
+        self.dismiss((True, value))
+
+
+class CatalogInputsScreen(ModalScreen[dict[str, Any] | None]):
+    """Collect supported catalog inputs without composing downstream commands."""
+
+    def __init__(self, action: Mapping[str, Any], initial: Mapping[str, Any]) -> None:
+        super().__init__()
+        self.action = action
+        self.fields = _catalog_editable_fields(action)
+        self.values = dict(initial)
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="review-dialog"):
+            yield Static(str(self.action.get("title") or "Action inputs"), id="review-heading")
+            yield Static(
+                "Use ↑/↓ and Enter to edit a field. Return here to review the action.",
+                id="catalog-inputs-intro",
+            )
+            yield OptionList(id="catalog-fields")
+            yield Static("", id="catalog-inputs-error")
+            with Horizontal(classes="button-row"):
+                yield Button("Cancel", id="catalog-inputs-cancel")
+                yield Button("Review action", id="catalog-inputs-review", variant="primary")
+
+    def on_mount(self) -> None:
+        self._refresh_fields()
+        self.query_one("#catalog-fields", OptionList).focus()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "escape":
+            self.dismiss(None)
+            event.stop()
+
+    def _refresh_fields(self) -> None:
+        listing = self.query_one("#catalog-fields", OptionList)
+        previous = listing.highlighted or 0
+        options = []
+        for field in self.fields:
+            key = field["key"]
+            value = self.values.get(key)
+            display = (
+                "required" if field.get("required") else
+                f"default: {field['default']}" if "default" in field else
+                "command default"
+            ) if value is None else (
+                "Yes" if value is True else "No" if value is False else str(value)
+            )
+            if field.get("sensitive") and value is not None:
+                display = "••••"
+            options.append(Option(f"{field.get('label') or key}  ·  {display}", id=key))
+        options.append(Option("Review and run this action", id="review"))
+        listing.set_options(options)
+        listing.highlighted = min(previous, len(options) - 1)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id != "catalog-fields":
+            return
+        if event.option_id == "review":
+            self._submit()
+        elif event.option_id:
+            self._edit_field(event.option_id)
+
+    @work(exclusive=True, group="catalog-field-edit")
+    async def _edit_field(self, key: str) -> None:
+        field = next((item for item in self.fields if item["key"] == key), None)
+        if field is None:
+            return
+        changed, value = await self.app.push_screen_wait(
+            CatalogValueScreen(field, self.values.get(key))
+        )
+        if changed:
+            if value is None:
+                self.values.pop(key, None)
+            else:
+                self.values[key] = value
+            self._refresh_fields()
+            self.query_one("#catalog-inputs-error", Static).update("")
+        self.query_one("#catalog-fields", OptionList).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "catalog-inputs-cancel":
+            self.dismiss(None)
+        elif event.button.id == "catalog-inputs-review":
+            self._submit()
+
+    def _submit(self) -> None:
+        missing = [str(field.get("label") or field["key"]) for field in self.fields
+                   if field.get("required") and field["key"] not in self.values]
+        if missing:
+            self.query_one("#catalog-inputs-error", Static).update(
+                "Enter required fields: " + ", ".join(missing)
+            )
+            return
+        self.dismiss(dict(self.values))
+
+
 class WorkflowsScreen(Screen[None]):
-    """Explore the complete installed action catalog and run a bounded slice."""
+    """Present installed catalog actions this Textual client can run."""
 
     def __init__(self, view: EnvironmentView) -> None:
         super().__init__()
@@ -2077,10 +2576,11 @@ class WorkflowsScreen(Screen[None]):
         yield Header(icon="W")
         yield Static("Workbench workflows", classes="screen-heading")
         yield Static(
-            "Search the installed catalog. Every action retains its owner, "
-            "availability, risk, and declared inputs.",
+            "Choose an action to run. This list shows actions Textual can collect "
+            "and launch here.",
             classes="screen-intro",
         )
+        yield Static("↑/↓ Browse  ·  Enter Open  ·  / Search  ·  Esc Return", classes="keyboard-hint")
         yield Input(placeholder="Search actions, suites, and descriptions", id="workflow-search")
         with Horizontal(id="workflow-body"):
             yield OptionList(id="workflow-list")
@@ -2093,13 +2593,30 @@ class WorkflowsScreen(Screen[None]):
 
     def on_mount(self) -> None:
         self._filter("")
+        self.query_one("#workflow-list", OptionList).focus()
+
+    def on_screen_resume(self, event: events.ScreenResume) -> None:
+        self.query_one("#workflow-list", OptionList).focus()
+
+    def on_key(self, event: events.Key) -> None:
+        search = self.query_one("#workflow-search", Input)
+        if event.key in {"slash", "/"} and not search.has_focus:
+            search.focus()
+            event.stop()
+        elif event.key == "escape" and search.has_focus:
+            self.query_one("#workflow-list", OptionList).focus()
+            event.stop()
+        elif event.key == "escape":
+            self.app.pop_screen()
+            event.stop()
 
     def _actions(self) -> Iterable[Mapping[str, Any]]:
         catalog = self.view.catalog
         if not catalog:
             return ()
         return (
-            item for item in catalog.get("commands", []) if isinstance(item, dict)
+            item for item in catalog.get("commands", [])
+            if isinstance(item, dict) and _runnable_catalog_action(item)
         )
 
     def _filter(self, query: str) -> None:
@@ -2121,16 +2638,21 @@ class WorkflowsScreen(Screen[None]):
             )
             for item in matches[:200]
         ]
-        self.query_one("#workflow-list", OptionList).set_options(options)
+        listing = self.query_one("#workflow-list", OptionList)
+        listing.set_options(options)
         self.selected = None
         self.query_one("#workflow-run", Button).disabled = True
+        self.query_one("#workflow-run", Button).label = "Run action"
         if not options:
-            message = "No matching installed action. Try another search."
+            message = "No matching action can run here. Try another search."
         elif len(matches) > 200:
             message = f"Showing the first 200 of {len(matches)} actions. Refine your search."
         else:
-            message = "Select a workflow to inspect its owner, inputs, and limits."
+            message = "Highlight an action, then press Enter to open it."
         self.query_one("#workflow-detail", Static).update(Text(message))
+        if options:
+            listing.highlighted = 0
+            self._select(options[0].id)
 
     def _select(self, command_id: str | None) -> None:
         self.selected = next(
@@ -2139,6 +2661,7 @@ class WorkflowsScreen(Screen[None]):
         )
         action = self.selected
         if not action:
+            self.query_one("#workflow-run", Button).disabled = True
             return
         detail = Text()
         detail.append(str(action.get("title", command_id)), style="bold")
@@ -2165,35 +2688,22 @@ class WorkflowsScreen(Screen[None]):
                         f"• {option.get('label', option.get('key', '?'))} "
                         f"({option.get('kind', '?')}){suffix}\n"
                     )
-        launchable = self._launchable(action)
-        if not launchable:
-            detail.append(
-                "\nThis workflow needs a dedicated input or owner flow in the TUI.",
-                style="dim",
-            )
         self.query_one("#workflow-detail", Static).update(detail)
-        self.query_one("#workflow-run", Button).disabled = not launchable
+        self.query_one("#workflow-run", Button).disabled = False
         self.query_one("#workflow-run", Button).label = (
             "Open document" if action.get("document") else "Run action"
         )
 
     def _launchable(self, action: Mapping[str, Any]) -> bool:
-        if (
-            action.get("command_id") not in _LAUNCHABLE_READ_ONLY
-            or action.get("risk") != "read-only"
-            or action.get("preview") != "none"
-            or action.get("availability") not in {"available", "experimental"}
-        ):
-            return False
-        if action.get("document") is not None:
-            return action.get("command_id") == "manuals.overview"
-        if action.get("command_id") == "workspace.open":
-            return bool(self.view.workspace and Path(self.view.workspace).is_dir())
-        return True
+        return _runnable_catalog_action(action)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "workflow-search":
             self._filter(event.value)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "workflow-search":
+            self.query_one("#workflow-list", OptionList).focus()
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         if event.option_list.id == "workflow-list":
@@ -2202,6 +2712,8 @@ class WorkflowsScreen(Screen[None]):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_list.id == "workflow-list":
             self._select(event.option_id)
+            if self.selected is not None:
+                self.run_selected()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "workflow-back":
@@ -2215,11 +2727,11 @@ class WorkflowsScreen(Screen[None]):
         catalog = self.view.catalog
         if not action or not catalog or not self._launchable(action):
             return
-        values = (
-            {"workspace": self.view.workspace}
-            if action.get("command_id") == "workspace.open"
-            else {}
-        )
+        values: dict[str, Any] = {}
+        if (self.view.workspace and Path(self.view.workspace).is_dir()
+                and any(field.get("key") == "workspace"
+                        for field in action.get("options", []))):
+            values["workspace"] = self.view.workspace
         self.query_one("#workflow-run", Button).disabled = True
         try:
             if action.get("document"):
@@ -2228,6 +2740,13 @@ class WorkflowsScreen(Screen[None]):
                     ResultScreen(str(action.get("title", "Document")), output.stdout)
                 )
                 return
+            if _catalog_editable_fields(action):
+                collected = await self.app.push_screen_wait(
+                    CatalogInputsScreen(action, values)
+                )
+                if collected is None:
+                    return
+                values = collected
             review = await self.core.command_review(catalog, action, values)
             body = (
                 f"Owner: {action.get('authority', '?')}\n"
@@ -2301,6 +2820,7 @@ class WorkbenchApp(App[None]):
         self._migration_busy = False
         self._pack_release_checked = False
         self._pending_pack_release: Mapping[str, Any] | None = None
+        self._home_initial_choice_selected = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=self.preferences.show_clock, icon="W", id="home-header")
@@ -2345,6 +2865,7 @@ class WorkbenchApp(App[None]):
                 severity="warning",
             )
         self.refresh_environment()
+        self.call_after_refresh(lambda: self.query_one("#home-actions", OptionList).focus())
 
     def _size_brand(self) -> None:
         if not self.screen_stack:
@@ -2696,6 +3217,9 @@ class WorkbenchApp(App[None]):
                 actions.enable_option(option_id)
             else:
                 actions.disable_option(option_id)
+        if not self._home_initial_choice_selected and view.setup is not None:
+            self._home_initial_choice_selected = True
+            self.call_after_refresh(lambda: setattr(actions, "highlighted", 0))
         overview = Text()
         overview.append_text(_line("Core", (view.version or {}).get("version", "unavailable")))
         setup = view.setup or {}
@@ -2733,9 +3257,12 @@ class WorkbenchApp(App[None]):
         overview.append_text(_line("Profiles", profiles_status))
         overview.append("\n")
         commands = (view.catalog or {}).get("commands", [])
+        runnable_count = sum(
+            _runnable_catalog_action(item) for item in commands if isinstance(item, dict)
+        )
         catalog_status = (
             "loading catalog…" if view.catalog_loading
-            else f"{len(commands)} catalog actions" if view.catalog is not None
+            else f"{runnable_count} actions you can open here" if view.catalog is not None
             else "unavailable"
         )
         overview.append_text(_line("Workflows", catalog_status))

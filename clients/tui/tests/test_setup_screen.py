@@ -8,10 +8,11 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, Mock
 
-from textual.widgets import Button, Input, Select, Static
+from textual.widgets import Button, Input, OptionList, Select, Static
 
 from workbench_tui.app import ReviewModal, SetupScreen, WorkbenchApp
 from workbench_tui.core_client import CoreClient, CoreClientError
+from workbench_tui.keyboard_form import ChoicePicker
 
 
 PLAN_ID = "workbench-setup-plan-" + "a" * 64
@@ -66,6 +67,96 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
                 return
             await pilot.pause(0.05)
         self.fail("Textual did not reach the expected state")
+
+    async def test_home_actions_are_keyboard_ready_without_tab(self) -> None:
+        app = WorkbenchApp(fake_core("/home/test/workspace"))
+        async with app.run_test(size=(110, 38)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None
+                               and isinstance(app.focused, OptionList)
+                               and app.focused.id == "home-actions")
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen))
+
+    async def test_arrows_and_enter_edit_then_return_to_navigation(self) -> None:
+        core = fake_core("/home/test/workspace")
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.open_setup()
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                               and bool(app.screen.query("#setup-mode"))
+                               and app.screen.query_one("#setup-mode", Select).has_class("keyboard-selected"))
+            screen = app.screen
+            self.assertIsNone(app.focused)
+            await pilot.press("down", "enter")
+            workspace = screen.query_one("#setup-workspace", Input)
+            self.assertIs(app.focused, workspace)
+            self.assertEqual("setup-workspace", screen._keyboard_editing)
+            workspace.value = "/home/test/changed"
+            await pilot.press("enter")
+            self.assertIsNone(app.focused)
+            self.assertTrue(workspace.has_class("keyboard-selected"))
+            self.assertEqual("/home/test/changed", workspace.value)
+            await pilot.press("enter")
+            workspace.value = "/home/test/cancelled"
+            await pilot.press("escape")
+            self.assertEqual("/home/test/changed", workspace.value)
+            self.assertIsNone(app.focused)
+
+    async def test_enter_opens_keyboard_choice_and_returns_to_navigation(self) -> None:
+        core = fake_core("/home/test/workspace")
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.open_setup()
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                               and bool(app.screen.query("#setup-mode"))
+                               and app.screen.query_one("#setup-mode", Select).has_class("keyboard-selected"))
+            screen = app.screen
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, ChoicePicker))
+            await pilot.press("down", "enter")
+            await self._settle(pilot, lambda: app.screen is screen)
+            self.assertEqual("review", screen.query_one("#setup-mode", Select).value)
+            self.assertIsNone(app.focused)
+            self.assertTrue(screen.query_one("#setup-mode", Select).has_class("keyboard-selected"))
+
+    async def test_click_or_tab_focus_still_accepts_j_and_k_in_paths(self) -> None:
+        app = WorkbenchApp(fake_core("/home/test/workspace"))
+        async with app.run_test(size=(110, 38)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.open_setup()
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                               and bool(app.screen.query("#setup-workspace")))
+            field = app.screen.query_one("#setup-workspace", Input)
+            field.value = ""
+            field.focus()
+            await pilot.press("j", "d", "k", "enter")
+            self.assertEqual("jdk", field.value)
+            self.assertIsNone(app.focused)
+
+    async def test_review_modal_uses_arrows_and_enter(self) -> None:
+        app = WorkbenchApp(fake_core("/home/test/workspace"))
+        async with app.run_test(size=(110, 38)) as pilot:
+            modal = ReviewModal("Check action", "Review the effects", confirm_label="Proceed")
+            app.push_screen(modal)
+            await self._settle(pilot, lambda: app.screen is modal
+                               and bool(modal.query("#review-cancel")))
+            self.assertIs(app.focused, modal.query_one("#review-cancel", Button))
+            await pilot.press("right")
+            self.assertIs(app.focused, modal.query_one("#review-confirm", Button))
+            await pilot.press("enter")
+            await self._settle(pilot, lambda: app.screen is not modal)
+
+    async def test_escape_returns_from_setup_navigation(self) -> None:
+        app = WorkbenchApp(fake_core("/home/test/workspace"))
+        async with app.run_test(size=(110, 38)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.open_setup()
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                               and bool(app.screen.query("#setup-mode")))
+            await pilot.press("escape")
+            await self._settle(pilot, lambda: not isinstance(app.screen, SetupScreen))
 
     async def test_detected_jdk_fills_setup_java_and_is_checked_in_plan(self) -> None:
         core = fake_core("/home/test/workspace")

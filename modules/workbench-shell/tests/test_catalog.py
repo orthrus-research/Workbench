@@ -1973,7 +1973,39 @@ class CatalogTests(unittest.TestCase):
         preview = command.public_dict(root=relocated_root)["command_preview"]
         self.assertNotIn(str(relocated_root), preview)
         self.assertNotIn(sys.executable, preview)
-        self.assertTrue(preview.startswith("python "), preview)
+        self.assertTrue(preview.startswith("workbench "), preview)
+
+    def test_core_catalog_route_uses_installed_module_without_source_script(self) -> None:
+        command = self.catalog.command("environment.status")
+        source_argv, _ = command.build_argv({}, root=ROOT, execute=True)
+        self.assertEqual(source_argv[:2], [sys.executable, str(ROOT / "tools/workbench.py")])
+        with tempfile.TemporaryDirectory() as directory:
+            installed_root = Path(directory)
+            (installed_root / "core").mkdir()
+            (installed_root / "core/pyproject.toml").write_text("[project]\n")
+            installed_argv, _ = command.build_argv({}, root=installed_root, execute=True)
+            self.assertEqual(installed_argv[:3], [sys.executable, "-m", "workbench_core"])
+            self.assertEqual(installed_argv[3:], ["environment", "status"])
+            self.assertEqual(
+                command.action_digest(root=ROOT),
+                command.action_digest(root=installed_root),
+            )
+
+    def test_installed_catalog_marks_missing_scripts_and_documents_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            installed = build_catalog(Path(directory))
+        self.assertEqual(installed.command("environment.status").availability, "available")
+        self.assertEqual(installed.command("shell.live-console").availability, "unavailable")
+        self.assertEqual(installed.command("manuals.overview").availability, "unavailable")
+        self.assertEqual(installed.command("mixin.inspect-topology").availability, "unavailable")
+        self.assertEqual(installed.command("shell.overview").availability, "unavailable")
+        self.assertEqual(installed.command("developer-features.examples").availability, "unavailable")
+        self.assertEqual(installed.command("world-studio.cockpit-show").availability, "unavailable")
+        self.assertEqual(installed.command("world-studio.qualifier-show").availability, "unavailable")
+        self.assertFalse(any("Required component is not installed" in item
+                             for item in self.catalog.command("developer-features.examples").limitations))
+        self.assertNotEqual(self.catalog.command("world-studio.cockpit-show").availability, "unavailable")
+        self.assertNotEqual(self.catalog.command("world-studio.qualifier-show").availability, "unavailable")
 
     def test_sensitive_catalog_fields_are_digest_bound_and_redacted(self) -> None:
         for command_id in ("shell.material-fluid-run", "feature-studio.verify"):
@@ -2229,9 +2261,8 @@ class CatalogTests(unittest.TestCase):
         for command_id in command_ids:
             command = self.catalog.command(command_id)
             template = [
-                token.replace("{python}", sys.executable).replace(
-                    "{root}", str(ROOT)
-                )
+                (str(ROOT / "tools/workbench.py") if token == "{workbench}" else
+                 token.replace("{python}", sys.executable).replace("{root}", str(ROOT)))
                 for token in command.argv_template
             ]
             placeholder = next(

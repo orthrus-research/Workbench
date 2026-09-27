@@ -12,6 +12,7 @@ from workbench_tui.app import (
     InterruptedSetupModal, PackInstanceScreen, ResourcepackMappingModal,
     ReviewModal, WorkbenchApp, WorkspaceChoicesScreen, WorkspaceRegisterScreen,
 )
+from workbench_tui.keyboard_form import ChoicePicker
 
 
 SOURCE_ID = "workbench-pack-release-client-composition-plan:sha256:" + "a" * 64
@@ -29,6 +30,67 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
                 return
             await pilot.pause(0.05)
         self.fail("Textual did not reach the expected instance setup state")
+
+    async def test_keyboard_navigation_edits_zip_path_without_tab(self) -> None:
+        app = WorkbenchApp(fake_core("/home/test/workspace"))
+        choice = {"choice": {"source_plan_id": None, "launcher_root": None,
+                             "workspace_name": None}, "source_state": "none"}
+        workspaces = {"default": "dev", "entries": [
+            {"name": "dev", "path": "/home/test/workspace"},
+        ]}
+        async with app.run_test(size=(110, 40)) as pilot:
+            app.push_screen(PackInstanceScreen(choice, workspaces))
+            await self._settle(pilot, lambda: isinstance(app.screen, PackInstanceScreen)
+                               and bool(app.screen.query("#pack-fresh-optional"))
+                               and app.screen.query_one("#pack-fresh-optional").has_class(
+                                   "keyboard-selected"))
+            screen = app.screen
+            self.assertIsNone(app.focused)
+            await pilot.press("down", "enter")
+            zip_path = screen.query_one("#pack-zip-path", Input)
+            self.assertIs(app.focused, zip_path)
+            zip_path.value = "/home/test/Supersymmetry.zip"
+            await pilot.press("enter")
+            self.assertIsNone(app.focused)
+            self.assertEqual("/home/test/Supersymmetry.zip", zip_path.value)
+            self.assertTrue(zip_path.has_class("keyboard-selected"))
+
+    async def test_java_choice_uses_arrows_and_enter_without_tab(self) -> None:
+        core = fake_core("/home/test/workspace")
+        core.workspace_choices = AsyncMock(return_value={
+            "record_id": "workbench-user-workspaces:sha256:" + "e" * 64,
+            "default": "dev", "entries": [{"name": "dev", "path": "/home/test/workspace"}],
+        })
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 40)) as pilot:
+            await self._settle(pilot, lambda: app.view.version is not None)
+            app.open_workspace_choices()
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen)
+                               and app.screen.query_one("#choice-workspace", Select).has_class(
+                                   "keyboard-selected"))
+            screen = app.screen
+            await pilot.press("down", "down", "down", "enter")
+            await self._settle(pilot, lambda: isinstance(app.screen, ChoicePicker))
+            await pilot.press("down", "enter")
+            await self._settle(pilot, lambda: app.screen is screen)
+            self.assertEqual("managed-8", screen.query_one("#choice-java-mode", Select).value)
+            self.assertIsNone(app.focused)
+
+    async def test_register_workspace_edits_fields_without_tab(self) -> None:
+        app = WorkbenchApp(fake_core("/home/test/workspace"))
+        async with app.run_test(size=(110, 40)) as pilot:
+            screen = WorkspaceRegisterScreen({"record_id": "initial", "entries": []},
+                                             initial_path="/home/test/workspace")
+            app.push_screen(screen)
+            await self._settle(pilot, lambda: app.screen is screen
+                               and bool(screen.query("#workspace-register-name"))
+                               and screen.query_one("#workspace-register-name", Input).has_class(
+                                   "keyboard-selected"))
+            await pilot.press("enter", "s", "u", "s", "y", "enter")
+            self.assertIsNone(app.focused)
+            self.assertEqual("susy", screen.query_one("#workspace-register-name", Input).value)
+            await pilot.press("down", "enter")
+            self.assertIs(app.focused, screen.query_one("#workspace-register-path", Input))
 
     async def test_first_user_registers_workspace_without_leaving_textual(self) -> None:
         core = fake_core("/home/test/Supersymmetry")
@@ -66,7 +128,8 @@ class PackInstanceInteractionTests(unittest.IsolatedAsyncioTestCase):
                 "susy-dev", "/home/test/Supersymmetry", make_default=True,
                 expected_record_id=initial["record_id"],
             )
-            await self._settle(pilot, lambda: app.screen is pack)
+            await self._settle(pilot, lambda: app.screen is pack
+                               and pack.query_one("#pack-workspace", Select).value == "susy-dev")
             self.assertEqual("susy-dev", pack.query_one("#pack-workspace", Select).value)
             self.assertFalse(pack.query_one("#pack-fresh-download", Button).disabled)
             self.assertFalse(pack.query_one("#pack-zip-import", Button).disabled)

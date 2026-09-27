@@ -165,6 +165,26 @@ Screen.narrow-brand #actions-panel {
     color: $foreground-muted;
 }
 
+.keyboard-hint {
+    height: auto;
+    color: $foreground-muted;
+    padding: 0 1;
+}
+
+.keyboard-selected {
+    outline: round $primary;
+}
+
+.keyboard-editing {
+    outline: double $warning;
+}
+
+#keyboard-choice-list {
+    height: 1fr;
+    margin: 1 2;
+    border: round $primary;
+}
+
 #setup-scroll {
     padding: 0 2 1 2;
 }
@@ -183,6 +203,18 @@ Screen.narrow-brand #actions-panel {
 }
 
 .path-row Button {
+    margin-left: 1;
+}
+
+.instance-path-row {
+    height: auto;
+}
+
+.instance-path-row Input {
+    width: 1fr;
+}
+
+.instance-path-row Button {
     margin-left: 1;
 }
 
@@ -273,7 +305,7 @@ Screen.narrow-brand #actions-panel {
     background: $panel;
 }
 
-ReviewModal, ReleaseUpdateModal {
+ReviewModal, ReleaseUpdateModal, InstancePathPicker, CatalogInputsScreen, CatalogValueScreen {
     align: center middle;
     background: $background 65%;
 }
@@ -301,6 +333,76 @@ ReviewModal, ReleaseUpdateModal {
     height: auto;
 }
 
+#catalog-inputs-intro,
+#catalog-inputs-error,
+#catalog-value-error {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#catalog-fields,
+#catalog-value-choices {
+    height: 1fr;
+    border: round $secondary;
+}
+
+#catalog-value-input {
+    margin: 1 0;
+}
+
+#instance-path-dialog {
+    width: 86;
+    max-width: 96%;
+    height: 86%;
+    background: $panel;
+    border: round $secondary;
+    padding: 1 2;
+}
+
+#instance-path-heading {
+    height: 2;
+    text-style: bold;
+}
+
+#instance-path-hint,
+#instance-path-status {
+    height: auto;
+    min-height: 2;
+}
+
+#instance-path-hint-narrow {
+    display: none;
+}
+
+#instance-path-tree {
+    height: 1fr;
+    border: round $secondary;
+}
+
+#instance-path-location {
+    width: 100%;
+}
+
+InstancePathPicker.-narrow #instance-path-dialog {
+    height: 96%;
+    padding: 0 1;
+}
+
+InstancePathPicker.-narrow #instance-path-heading,
+InstancePathPicker.-narrow #instance-path-status {
+    height: 1;
+    min-height: 1;
+}
+
+InstancePathPicker.-narrow #instance-path-hint {
+    display: none;
+}
+
+InstancePathPicker.-narrow #instance-path-hint-narrow {
+    display: block;
+    height: 1;
+}
+
 /* A compact terminal needs the controls and their detail views in one column. */
 Screen.-narrow .screen-heading {
     height: 1;
@@ -325,13 +427,15 @@ Screen.-narrow #setup-scroll .field-label {
 }
 
 Screen.-narrow #setup-scroll .path-row,
-Screen.-narrow #setup-scroll .button-row {
+Screen.-narrow #setup-scroll .button-row,
+Screen.-narrow .instance-path-row {
     layout: vertical;
 }
 
 Screen.-narrow #setup-scroll .path-row Input,
 Screen.-narrow #setup-scroll .path-row Button,
-Screen.-narrow #setup-scroll .button-row Button {
+Screen.-narrow #setup-scroll .button-row Button,
+Screen.-narrow .instance-path-row Button {
     width: 100%;
     margin-left: 0;
     margin-right: 0;
@@ -384,18 +488,22 @@ Screen.-narrow #workflow-detail-panel .button-row Button {
     margin-right: 1;
 }
 
-ReviewModal.-narrow #review-dialog, ReleaseUpdateModal.-narrow #review-dialog {
+ReviewModal.-narrow #review-dialog, ReleaseUpdateModal.-narrow #review-dialog,
+CatalogInputsScreen.-narrow #review-dialog, CatalogValueScreen.-narrow #review-dialog {
     width: 95%;
     height: 90%;
     padding: 0 1;
 }
 
-ReviewModal.-narrow #review-dialog .button-row, ReleaseUpdateModal.-narrow #review-dialog .button-row {
+ReviewModal.-narrow #review-dialog .button-row, ReleaseUpdateModal.-narrow #review-dialog .button-row,
+CatalogInputsScreen.-narrow #review-dialog .button-row, CatalogValueScreen.-narrow #review-dialog .button-row {
     layout: vertical;
     margin: 0;
 }
 
-ReviewModal.-narrow #review-dialog .button-row Button, ReleaseUpdateModal.-narrow #review-dialog .button-row Button {
+ReviewModal.-narrow #review-dialog .button-row Button, ReleaseUpdateModal.-narrow #review-dialog .button-row Button,
+CatalogInputsScreen.-narrow #review-dialog .button-row Button,
+CatalogValueScreen.-narrow #review-dialog .button-row Button {
     width: 100%;
     margin-right: 0;
 }
