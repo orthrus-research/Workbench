@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 from pathlib import Path
 import stat
 from tempfile import TemporaryDirectory
@@ -10,8 +11,10 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
+from workbench_api.durable_resources import DurableResourceError
+from workbench_core import check_storage
 from workbench_core.ide_toolchain_admissions import (
-    CoreIdeToolchainAdmissions, IdeToolchainAdmissionError,
+    CoreIdeToolchainAdmissions, IdeToolchainAdmissionError, _record_path,
 )
 from workbench_core.storage.registered import ResourceCatalog
 from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
@@ -75,6 +78,7 @@ class IdeToolchainAdmissionTests(unittest.TestCase):
         self.assertEqual(1, len(inventory["ide_toolchain_admissions"]))
         self.assertEqual("catalog-only", inventory["ide_toolchain_admissions"][0]["status"])
         self.assertEqual("present", inventory["ide_toolchain_admissions"][0]["parent_store_registration"])
+        self.assertEqual("historical-unbound", inventory["ide_toolchain_admissions"][0]["source_stage_closure"])
 
     def test_original_stage_provenance_survives_later_reuse(self) -> None:
         stages = CoreTemporaryLeases(
@@ -85,13 +89,84 @@ class IdeToolchainAdmissionTests(unittest.TestCase):
         stage = stages.allocate("ide-toolchain", f"ide-{self.digest}-source")
         with stages.execution(stage):
             first = self.admit(stage_lease_id=stage.lease_id)
+            active = ResourceCatalog(self.host.configuration_home).inventory(
+                workspace=self.host.workspace,
+            )["ide_toolchain_admissions"][0]
+            self.assertEqual("active-incomplete", active["source_stage_closure"])
+            self.assertEqual("catalog-only", active["status"])
             stages.retain(stage, outcome="completed")
             with self.assertRaisesRegex(TemporaryLeaseError, "IDE toolchain source stage remains retained"):
                 stages.dispose(stage, drained=lambda: True)
         self.assertEqual(stage.lease_id, first["stage_lease_id"])
+        retained = ResourceCatalog(self.host.configuration_home).inventory(
+            workspace=self.host.workspace,
+        )["ide_toolchain_admissions"][0]
+        self.assertEqual("retained-catalog-only", retained["source_stage_closure"])
+        self.assertEqual("ready-unproven", ResourceCatalog(self.host.configuration_home).verify_root())
         self.assertEqual(first, self.admit())
         with self.assertRaisesRegex(IdeToolchainAdmissionError, "differs"):
             self.admit(stage_lease_id="workbench-temporary-lease-v1:" + "b" * 32)
+
+    def test_catalog_refuses_missing_or_wrong_stage_before_workspace_filter(self) -> None:
+        stages = CoreTemporaryLeases(
+            workspace=self.host.workspace,
+            configuration_home=self.host.configuration_home,
+            locations={"ide-toolchain": self.root}, owner_id="validation",
+        )
+        stage = stages.allocate("ide-toolchain", f"ide-{self.digest}-source")
+        with stages.execution(stage):
+            self.admit(stage_lease_id=stage.lease_id)
+            stages.retain(stage, outcome="completed")
+        other = CoreTemporaryLeases(
+            workspace=self.host.workspace,
+            configuration_home=self.host.configuration_home,
+            locations={"other-role": self.root}, owner_id="validation",
+        )
+        wrong = other.allocate("other-role", f"ide-{self.digest}-other")
+        with other.execution(wrong):
+            other.retain(wrong, outcome="completed")
+        record_path = self.record()
+        original = json.loads(record_path.read_bytes())
+        foreign = self.home / "foreign-workspace"
+        foreign.mkdir()
+        catalog = ResourceCatalog(self.host.configuration_home)
+        for stage_id in (
+            "workbench-temporary-lease-v1:" + "f" * 32,
+            wrong.lease_id,
+        ):
+            body = {key: value for key, value in original.items() if key != "id"}
+            body["stage_lease_id"] = stage_id
+            changed = check_storage.seal(body["format"], body)
+            record_path.write_bytes(check_storage.canonical(changed) + b"\n")
+            with self.assertRaises(DurableResourceError) as refused:
+                catalog.inventory(workspace=foreign)
+            self.assertEqual("resource.changed", refused.exception.code)
+            self.assertTrue(self.target.is_dir())
+
+    def test_catalog_refuses_two_admissions_claiming_one_stage(self) -> None:
+        stages = CoreTemporaryLeases(
+            workspace=self.host.workspace,
+            configuration_home=self.host.configuration_home,
+            locations={"ide-toolchain": self.root}, owner_id="validation",
+        )
+        stage = stages.allocate("ide-toolchain", f"ide-{self.digest}-source")
+        with stages.execution(stage):
+            self.admit(stage_lease_id=stage.lease_id)
+            stages.retain(stage, outcome="completed")
+        first = json.loads(self.record().read_bytes())
+        second_target = self.root / "second-tool"
+        second_body = {key: value for key, value in first.items() if key != "id"}
+        second_body["target"] = str(second_target)
+        second = check_storage.seal(second_body["format"], second_body)
+        second_record = _record_path(self.record().parent, second_target)
+        second_record.write_bytes(check_storage.canonical(second) + b"\n")
+        second_record.chmod(0o600)
+        with self.assertRaises(DurableResourceError) as refused:
+            ResourceCatalog(self.host.configuration_home).inventory(
+                workspace=self.host.workspace,
+            )
+        self.assertEqual("resource.changed", refused.exception.code)
+        self.assertTrue(self.target.is_dir())
 
     def test_lost_admission_with_retained_stage_cannot_be_reborn_as_historical(self) -> None:
         stages = CoreTemporaryLeases(

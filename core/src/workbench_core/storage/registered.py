@@ -1000,13 +1000,17 @@ class ResourceCatalog:
                     "resource.changed", "managed tree check reference is unavailable or changed",
                 ) from exc
         try:
-            temporary_leases = CoreTemporaryLeases.inventory_catalog(
-                self.configuration_home, workspace=workspace,
+            all_temporary_leases = CoreTemporaryLeases.inventory_catalog(
+                self.configuration_home,
             )
         except TemporaryLeaseError as exc:
             raise DurableResourceError(
                 "resource.changed", "temporary lease catalog is unavailable or changed",
             ) from exc
+        temporary_leases = [
+            lease for lease in all_temporary_leases
+            if workspace is None or lease["workspace"] == str(workspace)
+        ]
         try:
             transport_trees = CoreTransportTrees.inventory_catalog(
                 self.configuration_home, workspace=workspace,
@@ -1069,12 +1073,44 @@ class ResourceCatalog:
                             "retention": "protected-until-reviewed-policy",
                         })
                 rows = toolchains.inventory_catalog()
+                lease_by_id = {
+                    lease["lease_id"]: lease for lease in all_temporary_leases
+                }
+                claimed_stages: set[str] = set()
                 for row in rows:
                     if row["status"] == "catalog-only" and (
                         not ide_stores or row["store_id"] != ide_stores[0]["store_id"]
                     ):
                         raise IdeToolchainAdmissionError("IDE admission parent store differs")
                     row["parent_store_registration"] = "present" if ide_stores else "absent"
+                    if row["status"] == "catalog-only":
+                        stage_id = row["stage_lease_id"]
+                        if stage_id is None:
+                            row["source_stage_closure"] = "historical-unbound"
+                        else:
+                            stage = lease_by_id.get(stage_id)
+                            stage_path = Path(stage["path"]) if stage is not None else None
+                            if (
+                                stage_id in claimed_stages
+                                or stage is None
+                                or stage["workspace"] != str(toolchains.workspace)
+                                or stage["owner_id"] != "validation"
+                                or stage["role"] != "ide-toolchain"
+                                or stage_path.parent != toolchains.toolchain_root
+                                or not stage_path.name.startswith(f"ide-{row['archive_sha256']}-")
+                                or stage["status"] not in {
+                                    "active-or-abandoned", "retained-unproven",
+                                }
+                            ):
+                                raise IdeToolchainAdmissionError(
+                                    "IDE admission source stage catalog link changed"
+                                )
+                            claimed_stages.add(stage_id)
+                            row["source_stage_closure"] = (
+                                "retained-catalog-only"
+                                if stage["status"] == "retained-unproven"
+                                else "active-incomplete"
+                            )
                     if workspace is None or workspace == toolchains.workspace:
                         ide_toolchain_admissions.append(row)
                 if not ide_stores and (workspace is None or workspace == toolchains.workspace):
