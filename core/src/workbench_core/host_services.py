@@ -10,6 +10,7 @@ from workbench_api.temporary_leases import (
 )
 
 from workbench_api.host_filesystem import bind_host_filesystem
+from workbench_api.capture_workspaces import bind_capture_workspaces
 from workbench_api.git_bootstrap import bind_git_bootstrap
 from workbench_api.processes import bind_process_host
 from workbench_api.long_lived_processes import bind_long_lived_process_host
@@ -32,12 +33,14 @@ from .long_lived_processes import HOST as long_lived_process_host
 from .source_transactions import CoreSourceTransactions
 from .git_bootstrap import HOST as git_bootstrap_host
 from .source_checkouts import CoreSourceCheckouts
+from .capture_workspace_port import HOST as capture_workspace_host
 from .derived_indexes import CoreDerivedIndexes
 from .registration_attempts import CoreRegistrationAttempts
 
 
 def install_local_host_services() -> None:
     bind_host_filesystem(host_filesystem)
+    bind_capture_workspaces(capture_workspace_host)
     bind_git_bootstrap(git_bootstrap_host)
     bind_process_host(tool_process)
     bind_long_lived_process_host(long_lived_process_host)

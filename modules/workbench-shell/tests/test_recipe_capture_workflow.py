@@ -21,11 +21,14 @@ from unittest.mock import patch
 
 from workbench_api import ExecutionContext, processes as process_port
 from workbench_api import host_filesystem as filesystem_port
+from workbench_api import capture_workspaces as capture_workspace_port
 from workbench_api.processes import ProcessError, read_captured_process as api_read_captured_process
 from workbench_api.managed_attempts import managed_attempts_scope
 from workbench_api.fixture_selections import fixture_selections_scope
 from workbench_atlas_categorical_graph import CategoricalGraphBundleBuilder, edge_record, node_record
+from workbench_core import capture_workspace as core_capture_workspace
 from workbench_core import check_storage, durable_records, host_filesystem as core_filesystem, runtime_java, tool_process
+from workbench_core.capture_workspace_port import HOST as core_capture_workspace_host
 from workbench_core.fixture_selection_port import CoreFixtureSelections
 from workbench_core.managed_attempts import CoreManagedAttempts
 from workbench_core.storage.registered import ResourceCatalog
@@ -172,6 +175,7 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         # Exercise the actual public filesystem API with the real Core host,
         # scoped to this direct owner test instead of depending on suite order.
         self.stack.enter_context(patch.object(filesystem_port, '_host', core_filesystem))
+        self.stack.enter_context(patch.object(capture_workspace_port, '_host', core_capture_workspace_host))
         self.stack.enter_context(patch.object(process_port, '_host', tool_process))
         self.evidence = self.root / 'Selected evidence'
         self.config = self.root / 'User config'
@@ -246,16 +250,18 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.assertEqual(str(self.java), result['selection']['java_home'])
         self.assertTrue((self.config / 'recipe-fixtures-v1.json').is_file())
 
-    def test_direct_shell_entry_binds_core_filesystem_host(self):
+    def test_direct_shell_entry_binds_core_filesystem_and_capture_hosts(self):
         from workbench_api import host_filesystem as filesystem_port
         from workbench_core import host_filesystem as core_filesystem, host_services
         from workbench_shell import cli as shell_cli
 
         with (patch.object(host_services, 'install_local_host_services',
                            wraps=host_services.install_local_host_services) as install,
-              patch.object(sys, 'stdout', StringIO()),
-              self.assertRaises(SystemExit) as stopped):
-            shell_cli.main(['--help'])
+              patch.object(capture_workspace_port, '_host', None),
+              patch.object(sys, 'stdout', StringIO())):
+            with self.assertRaises(SystemExit) as stopped:
+                shell_cli.main(['--help'])
+            self.assertIs(core_capture_workspace_host, capture_workspace_port._host)
         self.assertEqual(0, stopped.exception.code)
         install.assert_called_once()
         self.assertIs(core_filesystem, filesystem_port._filesystem())
@@ -1336,6 +1342,87 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.assertTrue(all(0 < size <= 64 * 1024 for size in chunk_sizes))
         self.assertEqual({'path': str(attempt / 'audit.json'), 'size': len(raw),
                           'sha256': sha256(raw).hexdigest()}, receipt)
+
+    def test_execution_overrides_use_attempt_bound_core_workspace(self):
+        with patch.object(capture, 'capture_execution_workspace',
+                          wraps=capture.capture_execution_workspace) as selected:
+            result = self.run_capture()
+        selected.assert_called_once()
+        attempt = self.attempt(result)
+        self.assertEqual(attempt, selected.call_args.args[0].path)
+        self.assertEqual(capture.ATTEMPT_FAMILY, selected.call_args.args[0].family)
+        execution = attempt / 'execution'
+        self.assertEqual(b'fixture-only=true\n', (execution / 'server.properties').read_bytes())
+        self.assertEqual(b'eula=true\n', (execution / 'eula.txt').read_bytes())
+        rows = json.loads((attempt / 'runtime-lock.json').read_bytes())['runtime_files']
+        for name in ('server.properties', 'eula.txt'):
+            path = execution / name
+            self.assertIn({'path': name, 'size': path.stat().st_size,
+                           'sha256': sha256(path.read_bytes()).hexdigest(), 'mode': 0o644}, rows)
+        self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_execution_override_link_faults_preserve_v1_stages_and_block_replay(self):
+        original_link = core_capture_workspace.os.link
+        original_flush = check_storage.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                prepared = self.prepare()
+                attempt = self.attempt(prepared)
+                execution = attempt / 'execution'
+                eula = execution / 'eula.txt'
+                failed_once = False
+
+                def interrupt_link(source, destination, *args, **kwargs):
+                    if moment == 'before-link' and Path(destination) == eula:
+                        raise OSError('synthetic override link interruption')
+                    return original_link(source, destination, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    nonlocal failed_once
+                    if (moment == 'after-link-before-flush' and not failed_once
+                            and Path(directory) == execution and eula.exists()):
+                        failed_once = True
+                        raise OSError('synthetic override flush interruption')
+                    return original_flush(directory)
+
+                with (patch.object(core_capture_workspace.os, 'link', side_effect=interrupt_link),
+                      patch.object(check_storage, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaisesRegex(core_capture_workspace.CaptureWorkspaceError,
+                                                'temporary files retained'):
+                        self.run_capture(prepared)
+                self.assertTrue((attempt / 'run-started.json').is_file())
+                self.assertEqual(moment == 'after-link-before-flush', eula.exists())
+                self.assertEqual(1 if moment == 'before-link' else 0,
+                                 len(list(execution.glob('.capture-write-*'))))
+                self.assertEqual('failed', capture.show(self.state, prepared['attempt_id'])['state'])
+                with self.assertRaisesRegex(ValueError, 'already attempted'):
+                    self.run_capture(prepared)
+                self.native.assert_not_called()
+
+    def test_execution_override_replacement_fault_retains_reviewed_original(self):
+        (self.runtime / 'server.properties').write_bytes(b'baseline=true\n')
+        prepared = self.prepare()
+        attempt = self.attempt(prepared)
+        execution = attempt / 'execution'
+        settings = execution / 'server.properties'
+        original_replace = core_capture_workspace.os.replace
+
+        def interrupt_replace(source, destination, *args, **kwargs):
+            if Path(destination) == settings:
+                raise OSError('synthetic override replacement interruption')
+            return original_replace(source, destination, *args, **kwargs)
+
+        with patch.object(core_capture_workspace.os, 'replace', side_effect=interrupt_replace):
+            with self.assertRaisesRegex(core_capture_workspace.CaptureWorkspaceError,
+                                        'temporary files retained'):
+                self.run_capture(prepared)
+        self.assertEqual(b'baseline=true\n', settings.read_bytes())
+        self.assertEqual(1, len(list(execution.glob('.capture-write-*'))))
+        self.assertTrue((attempt / 'run-started.json').is_file())
+        self.assertEqual('failed', capture.show(self.state, prepared['attempt_id'])['state'])
+        with self.assertRaisesRegex(ValueError, 'already attempted'):
+            self.run_capture(prepared)
+        self.native.assert_not_called()
 
     def test_audit_interruption_retains_stage_and_blocks_native_replay(self):
         original_link = durable_records.os.link

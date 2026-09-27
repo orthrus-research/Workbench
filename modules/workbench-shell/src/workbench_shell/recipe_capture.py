@@ -18,6 +18,7 @@ from workbench_api.host_filesystem import (
 )
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
 from workbench_api.managed_attempts import managed_attempts
+from workbench_api.capture_workspaces import capture_execution_workspace
 from workbench_api.fixture_selections import fixture_selections
 from workbench_core import check_storage as storage, capture_workspace as workspace_storage
 from workbench_core.filesystem_paths import native_path
@@ -630,13 +631,15 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
         try:
             execution = attempt / 'execution'
             storage.copy_manifest(attempt / 'runtime', execution, prepared['runtime_files'], cancelled=cancel.is_set)
-            settings = execution / 'server.properties'
-            exists = native_path(settings).exists()
-            raw = storage.read_bytes(settings) if exists else b''
-            workspace_storage.replace_file(execution, 'server.properties', owner.prepare_server_properties(raw),
-                                           expected_sha256=sha256(raw).hexdigest() if exists else None)
-            workspace_storage.replace_file(execution, 'eula.txt', b'eula=true\n')
-            execution_files = workspace_storage.inventory(execution, cancelled=cancel.is_set)
+            execution_workspace = capture_execution_workspace(reference)
+            current_settings = execution_workspace.read_optional('server.properties')
+            raw = current_settings if current_settings is not None else b''
+            execution_workspace.replace_file(
+                'server.properties', owner.prepare_server_properties(raw),
+                expected_sha256=sha256(raw).hexdigest() if current_settings is not None else None,
+            )
+            execution_workspace.replace_file('eula.txt', b'eula=true\n')
+            execution_files = execution_workspace.inventory(cancelled=cancel.is_set)
             environment = _environment(execution_root)
             game_java = {**prepared['java'], 'path': str(java_execution_path(Path(prepared['java']['path'])))}
             dependency_lock = {'format': 'workbench-recipe-capture-runtime-lock-v1',
