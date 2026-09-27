@@ -221,25 +221,29 @@ or use `workbench capabilities`, for exact arguments.
 | `runtime-diagnose`, `runtime-worldgen-audit` | Read retained launch, log, artifact, and profile-selected world-generation evidence. |
 | `runtime-worldgen-fingerprint`, `runtime-worldgen-compare`, `runtime-worldgen-block-delta` | Compare identity-bound observations of stopped Anvil worlds. |
 
-`workbench dev launch-server --run ID --accept-minecraft-eula` keeps the
-existing `server-v2` template route. Add
-`--template-custody core-posix-exact-v1` to opt into Core staging, exact POSIX
-inventory, no-replace publication, and catalog-based reconciliation. This
-option uses a separate `server-core-posix-exact-v1` fixture directory. An
-existing target there is reusable only when its exact source-variant identity
-is present in Core's catalog and the V2 materialization receipt still verifies.
-The V2 receipt and source-variant meaning are unchanged. The option applies
-only to automatic `launch-server` materialization with EULA acceptance; an
-explicit `--server-template` or the other `dev` actions do not select it.
-Core's exact inventory limits this opt-in route to 100,000 files, 100,000
-directories, 2 GiB per file, and 32 GiB total, and rejects links and special
-files. A limit failure retains an aborted Core stage for inspection and does
-not fall back to the default route. A failed prior stage at the same exact
-target blocks automatic retry until its catalog history is reviewed; it is not
-silently discarded or adopted. Linux/WSL ext4 has focused source-fixture
-coverage. A bounded WSL2 DrvFs fixture refused Core staging because the path
-was not owner-private and published no target. Native installation remains
-unqualified.
+`workbench dev launch-server --run ID --accept-minecraft-eula` retains the
+historical `server-v2` template route. Its process-group and `/proc` checks do
+not prove that a detached descendant is absent, so this route is unqualified
+for process-safe publication or cleanup. The opt-in
+`--template-custody core-posix-exact-v1` now requires Core to reserve a
+restartable staged-tool process scope before tool acquisition or stage
+creation. The installed Core host cannot issue that scope on the current
+Linux/WSL or Windows hosts, so the opt-in route refuses before publication.
+It does not fall back to the historical process runner. Core's exact tree
+staging and reconciliation have focused source-fixture coverage, but tree
+custody alone does not establish descendant absence. A future contained
+launch must bind each exact stage and tool command, observe positive absence
+after execution and across restart, and retain unknown stages for review.
+The opt-in applies only to automatic `launch-server` materialization with
+EULA acceptance; an explicit `--server-template` or another `dev` action does
+not select it. It uses a separate `server-core-posix-exact-v1` fixture
+directory. Core's exact tree limits are 100,000 files, 100,000 directories,
+2 GiB per file and 32 GiB total, with links and special files refused.
+Existing exact targets require a matching Core catalog identity and a
+verifiable V2 receipt. Historical failed stages are retained for review.
+Earlier Linux/WSL ext4 fixture tests covered tree custody, and a bounded
+WSL2 DrvFs fixture refused an owner-private stage; neither qualifies native
+installation or the missing process scope.
 
 The installed Core route `workbench feature plan FAMILY WORKSPACE` retains its
 plan under that workspace's Core-selected `feature` state root. Without an
