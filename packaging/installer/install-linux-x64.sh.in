@@ -96,8 +96,10 @@ already_installed() {
         && [ -x "$destination/bin/workbench" ] \
         && [ -x "$destination/bin/workbench-tui" ] \
         && "$destination/bin/workbench" version --json >/dev/null 2>&1; then
-        printf 'Workbench %s is already installed.\nRun: %s/bin/workbench setup --check\n' \
-            "$RELEASE_TAG" "$destination"
+        printf 'Workbench %s is already installed.\n' "$RELEASE_TAG"
+        printf 'Open guided setup: %s/bin/workbench-tui\n' "$destination"
+        printf 'Check setup: %s/bin/workbench setup --check\n' "$destination"
+        printf 'Command shortcuts: %s/bin (add this directory to PATH if desired).\n' "$install_root"
         printf 'Axiom engine ZIP: %s\n' \
             "$retained_bundle"/axiom/workbench-axiom-engine-*.zip
         return 0
@@ -185,15 +187,16 @@ PY
         "$RELEASE_TAG" "$BUNDLE_SHA256" "$PYTHON_RUNTIME_ID" > "$hook_receipt"
     mv "$hook_receipt" "$destination/workbench-hook.json"
     printf '\nWorkbench %s installed.\n' "$RELEASE_TAG"
-    printf 'Start: %s/bin/workbench setup --check\n' "$destination"
     if [ -x "$destination/bin/workbench-tui" ]; then
-        printf 'Guided terminal: %s/bin/workbench-tui\n' "$destination"
+        printf 'Open guided setup: %s/bin/workbench-tui\n' "$destination"
     fi
+    printf 'Check setup: %s/bin/workbench setup --check\n' "$destination"
     if [ "$BUNDLE_EDITION" = supersymmetry-client ]; then
-        printf 'Next: open %s/bin/workbench-tui for guided Supersymmetry setup.\n' "$destination"
+        printf 'Choose Set up Supersymmetry instance in the guided terminal.\n'
     else
         printf 'IDE clients: %s/bundles/%s/clients\n' "$install_root" "$RELEASE_TAG"
     fi
+    printf 'Command shortcuts: %s/bin (add this directory to PATH if desired).\n' "$install_root"
     printf 'Axiom engine ZIP: %s\n' \
         "$install_root/bundles/$RELEASE_TAG"/axiom/workbench-axiom-engine-*.zip
     printf 'No shell profile or existing installation was changed.\n'

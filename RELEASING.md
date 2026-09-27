@@ -113,21 +113,25 @@ distribution or version. See [native assembly details](packaging/README.md).
 ## Prepare the one-command Linux bundle
 
 This is the next-bundle plan, not a claim about the published September 23
-preview. The public first-run entry point is one release-specific shell asset:
+preview. Serve the generated release-bound hook at the site's stable entry
+point after its exact bundle is published:
 
 ```sh
-curl -fsSLo workbench-install-linux-x64.sh "https://github.com/orthrus-research/Workbench/releases/download/<TAG>/workbench-install-linux-x64.sh" && sh workbench-install-linux-x64.sh
+curl -fsSL https://susy.work/install.sh | bash
 ```
 
-Use the exact reviewed tag in release notes after publication. Offer a
-download-and-inspect variant beside the one-line command. The hook contains the
-archive URL and SHA-256 and a separately pinned `python-build-standalone`
-runtime URL and SHA-256. It installs in the user's XDG data directory without
-sudo, Pixi, a source checkout, a system Python, or shell profile changes. It
-installs one named bundle edition. The full Suite edition retains the Axiom
-engine and IDE clients. The Supersymmetry client edition omits those independent
-artifacts. Only Linux x64 with GNU libc 2.28 or newer is admitted; qualify
-other targets with their own artifacts and hooks before advertising them.
+Use the exact reviewed tag and hook SHA-256 in release notes after publication.
+Offer a download-and-inspect variant beside the one-line command, which needs
+the caller's `pipefail` setting to report an initial `curl` failure reliably.
+The hook contains the archive URL and SHA-256, plus a separately pinned
+`python-build-standalone` runtime URL and SHA-256. It installs in the user's
+XDG data directory without sudo, Pixi, a source checkout, a system Python, or
+shell profile changes. It installs one named bundle edition. Both editions
+retain the matching Axiom
+engine; the full Suite edition also retains IDE clients. The Supersymmetry
+client edition omits those IDE clients. Only Linux x64 with GNU libc 2.28 or
+newer is admitted; qualify other targets with their own artifacts and hooks
+before advertising them.
 
 1. Freeze one clean reviewed commit. For the Supersymmetry client edition,
    build the Linux x64/Python 3.14 wheelhouse with six explicit roots. The

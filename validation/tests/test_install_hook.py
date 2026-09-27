@@ -268,7 +268,13 @@ class InstallHookTests(unittest.TestCase):
         result = self.invoke()
         self.assertEqual(0, result.returncode, result.stderr.decode())
         output = result.stdout.decode()
-        self.assertIn("guided Supersymmetry setup", output)
+        self.assertIn(
+            f"Open guided setup: {self.install_root}/installs/test-v1/bin/workbench-tui",
+            output,
+        )
+        self.assertLess(output.index("Open guided setup:"), output.index("Check setup:"))
+        self.assertIn("Choose Set up Supersymmetry instance", output)
+        self.assertIn(f"Command shortcuts: {self.install_root}/bin", output)
         self.assertNotIn("IDE clients:", output)
         self.assertIn(
             f"Axiom engine ZIP: {self.install_root}/bundles/test-v1/axiom/workbench-axiom-engine-0.1.0.zip",
@@ -329,6 +335,10 @@ class InstallHookTests(unittest.TestCase):
         second = self.invoke(TEST_CURL_FAIL="1")
         self.assertEqual(0, second.returncode, second.stderr.decode())
         self.assertIn("already installed", second.stdout.decode())
+        self.assertIn(
+            f"Open guided setup: {destination}/bin/workbench-tui",
+            second.stdout.decode(),
+        )
         self.assertIn(
             f"Axiom engine ZIP: {self.install_root}/bundles/test-v1/axiom/workbench-axiom-engine-0.1.0.zip",
             second.stdout.decode(),
