@@ -26,10 +26,10 @@ from workbench_core.artifact_store import (
     sha256_file,
 )
 from workbench_core.configuration import (
-    CONFIGURATION_PATH,
     ResolvedBindings,
     WorkbenchConfiguration,
     WorkbenchConfigurationError,
+    default_client_configuration_path,
     load_workbench_configuration,
 )
 from workbench_api.state_paths import default_suite_state_root
@@ -93,7 +93,7 @@ def load_java_runtime_policy(
     try:
         active_configuration = configuration or load_workbench_configuration(
             suite,
-            CONFIGURATION_PATH if config_path is None else config_path,
+            default_client_configuration_path(suite) if config_path is None else config_path,
         )
     except WorkbenchConfigurationError as exc:
         raise JavaRuntimeError(
@@ -1915,7 +1915,7 @@ def ensure_java_runtime(
     try:
         active_configuration = configuration or load_workbench_configuration(
             suite,
-            CONFIGURATION_PATH if config_path is None else config_path,
+            default_client_configuration_path(suite) if config_path is None else config_path,
         )
     except WorkbenchConfigurationError as exc:
         raise JavaRuntimeError(

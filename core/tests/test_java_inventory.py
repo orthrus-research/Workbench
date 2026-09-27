@@ -39,6 +39,29 @@ class JavaInventoryTests(unittest.TestCase):
         probe = {'runtime_version': '25.0.4+70', 'vendor': 'Eclipse Adoptium', 'os_arch': 'amd64'}
         self.assertIn('requires runtime', _probe_mismatch(probe, POLICY, HOST))
 
+    def test_java_8_jdk_is_offered_when_runtime_reports_nested_jre_home(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary) / 'jdk8'
+            (home / 'bin').mkdir(parents=True)
+            (home / 'bin/javac').touch()
+            reported = home / 'jre'
+            (reported / 'bin').mkdir(parents=True)
+            probe = {'runtime_version': '1.8.0_504-b01', 'java_version': '1.8.0_504',
+                     'vendor': 'Eclipse Adoptium', 'vendor_version': '', 'os_arch': 'amd64',
+                     'java_home': str(reported)}
+            with patch('workbench_core.java_inventory.probe_java', return_value=probe):
+                row = inspect_java_inventory(homes=[home], roots=[], environment={}, host=HOST)['candidates'][0]
+            self.assertTrue(row['jdk'])
+            self.assertEqual(str(home), row['java_home'])
+            self.assertEqual(str(reported), row['probe']['java_home'])
+            with patch('workbench_core.java_inventory.java_candidates',
+                       return_value=[('PATH', Path('/usr/bin/java'))]), patch(
+                           'workbench_core.java_inventory.probe_java', return_value=probe,
+                       ):
+                path_row = inspect_java_inventory(roots=[], environment={}, host=HOST)['candidates'][0]
+            self.assertTrue(path_row['jdk'])
+            self.assertEqual(str(home), path_row['java_home'])
+
     def test_native_windows_paths_and_explicit_candidates_are_preserved(self):
         host = {**HOST, 'os': 'windows'}
         rows = java_candidates(homes=[Path('JDK 21 é')], roots=[], environment={}, host=host)

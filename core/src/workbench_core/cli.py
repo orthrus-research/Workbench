@@ -19,7 +19,7 @@ from .environment_resolution import resolve_environment
 
 def source_root() -> Path:
     for parent in Path(__file__).resolve().parents:
-        if (parent / "core/pyproject.toml").is_file() and (parent / "workbench.toml").is_file() and Path(__file__).resolve().is_relative_to(parent / "core/src/workbench_core"):
+        if (parent / "core/pyproject.toml").is_file() and Path(__file__).resolve().is_relative_to(parent / "core/src/workbench_core"):
             return parent
     return Path(__file__).resolve().parent
 

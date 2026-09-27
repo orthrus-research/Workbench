@@ -227,6 +227,8 @@ class UserPreferencesTests(unittest.TestCase):
     def test_acquire_named_workspace_uses_core_managed_choice_and_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
+            resources = home / "site-packages/workbench_resources"
+            resources.mkdir(parents=True)
             environment = {"HOME": str(home), "WORKBENCH_CONFIG_HOME": str(home / "config")}
             register_workspace("chosen", str(home / "chosen"), environment=environment)
             saved = set_workspace_selection("chosen", managed_java_feature=8, environment=environment)
@@ -241,11 +243,32 @@ class UserPreferencesTests(unittest.TestCase):
                     self.assertEqual(0, settings_cli.main([
                         "workspace", "acquire", "chosen", "--expected-record-id",
                         saved["record_id"], "--json",
-                    ], suite_root=home))
+                    ], suite_root=resources))
             self.assertEqual(result, json.loads(output.getvalue()))
             self.assertEqual(8, core_java.call_args.kwargs["selection"].managed_java_feature)
             self.assertIsNone(core_java.call_args.kwargs["selection"].java_home)
-            self.assertEqual(home, core_java.return_value.ensure.call_args.args[0])
+            self.assertEqual(resources, core_java.return_value.ensure.call_args.args[0])
+            self.assertEqual(
+                Path(settings_cli.__file__).resolve().parent / "data/client-workbench.toml",
+                core_java.return_value.ensure.call_args.kwargs["config_path"],
+            )
+            selected_profile = home / "chosen-workbench.toml"
+            saved = set_workspace_selection(
+                "chosen", profile_config=str(selected_profile), environment=environment,
+            )
+            with patch.dict(os.environ, environment, clear=True), patch(
+                "workbench_core.managed_java.CoreManagedJava"
+            ) as explicit_java:
+                explicit_java.return_value.ensure.return_value = result
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(0, settings_cli.main([
+                        "workspace", "acquire", "chosen", "--expected-record-id",
+                        saved["record_id"], "--json",
+                    ], suite_root=resources))
+            self.assertEqual(
+                selected_profile,
+                explicit_java.return_value.ensure.call_args.kwargs["config_path"],
+            )
             with patch.dict(os.environ, environment, clear=True), patch(
                 "workbench_core.managed_java.CoreManagedJava.ensure"
             ) as acquire:
@@ -253,7 +276,7 @@ class UserPreferencesTests(unittest.TestCase):
                     with self.assertRaises(SystemExit):
                         settings_cli.main([
                             "workspace", "acquire", "chosen", "--expected-record-id", "stale",
-                        ], suite_root=home)
+                        ], suite_root=resources)
             acquire.assert_not_called()
             set_workspace_selection("chosen", java_home=str(home / "uninspected-jdk"),
                                     environment=environment)
@@ -262,7 +285,7 @@ class UserPreferencesTests(unittest.TestCase):
             ) as acquire:
                 with redirect_stderr(io.StringIO()):
                     with self.assertRaises(SystemExit):
-                        settings_cli.main(["workspace", "acquire", "chosen"], suite_root=home)
+                        settings_cli.main(["workspace", "acquire", "chosen"], suite_root=resources)
             acquire.assert_not_called()
 
     def test_versioned_schemas_accept_resolved_and_saved_records(self) -> None:

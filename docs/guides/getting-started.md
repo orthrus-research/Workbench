@@ -73,12 +73,17 @@ The examples below use `workbench` on `PATH`.
 
 Run `workbench-tui` for guided Supersymmetry setup. Choose **Set up
 Supersymmetry instance**, register a local workspace, and select the Java
-runtime in **Workspace choices**. Java 25 is the default; managed Java 8 or an
-explicit Java path can be selected for a different instance. The official
-release route downloads its selected files when Workbench's provider is
-available. For an existing setup, choose a complete Prism instance ZIP, then
-review the source, Linux Prism folder, and exact install destination. Open the
-installed instance in Prism to sign in before launching. On WSL2, put the
+runtime in **Workspace choices**. That screen scans for installed JDKs and
+offers them alongside the recommended managed Java 25 and optional managed
+Java 8. One action saves the choice and prepares a managed JDK, downloading it
+when needed. A detected JDK or a path you enter is saved as supplied without
+another compatibility check. Manually entered paths do not require inventory.
+On WSL2, the scan and managed downloads use Linux JDKs; Windows installations
+under `/mnt/c` are not scanned. The official release route downloads its
+selected files when Workbench's provider is available. For an existing setup,
+choose a complete Prism instance ZIP, then review the source, Linux Prism
+folder, and exact install destination. Open the installed instance in Prism to
+sign in before launching. On WSL2, put the
 Prism folder and Workbench state on the Linux filesystem; Textual can stage a
 ZIP from a Windows drive into Linux state after review.
 

@@ -6,9 +6,11 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -22,6 +24,14 @@ import render_install_hook as hook  # noqa: E402
 from component_versions import load_authority  # noqa: E402
 from release_track import artifact_filename  # noqa: E402
 from workbench_axiom.cli import ENGINE_NOTICES  # noqa: E402
+from workbench_core.configuration import (  # noqa: E402
+    default_client_configuration_path,
+    load_workbench_configuration,
+)
+from workbench_core.runtime_java import (  # noqa: E402
+    ensure_java_runtime,
+    load_java_runtime_policy,
+)
 
 
 SOURCE_SHA = "a" * 64
@@ -209,6 +219,67 @@ class InstallBundleTests(unittest.TestCase):
         wrong_descriptor.pop("edition")
         with self.assertRaisesRegex(bundle.BundleError, "edition differs"):
             bundle.verify_bundle_archive(archive, wrong_descriptor)
+
+    def test_installed_client_resources_resolve_linux_managed_java_before_network(self) -> None:
+        core_package = tomllib.loads((ROOT / "core/pyproject.toml").read_text(encoding="utf-8"))
+        cleanroom_package = tomllib.loads(
+            (ROOT / "profiles/platforms/cleanroom/pyproject.toml").read_text(encoding="utf-8")
+        )
+        supersymmetry_package = tomllib.loads(
+            (ROOT / "profiles/packs/supersymmetry/pyproject.toml").read_text(encoding="utf-8")
+        )
+        self.assertIn("data/*.toml", core_package["tool"]["setuptools"]["package-data"]["workbench_core"])
+        self.assertIn(
+            "provisional.yaml",
+            cleanroom_package["tool"]["setuptools"]["package-data"]["workbench_resources.profiles.platforms.cleanroom"],
+        )
+        self.assertIn(
+            "profile.yaml",
+            supersymmetry_package["tool"]["setuptools"]["package-data"]["workbench_resources.profiles.packs.supersymmetry"],
+        )
+        self.assertIn(
+            "workbench-profile-cleanroom",
+            {row["id"] for row in bundle.selected_components(bundle.CLIENT_ROOT_COMPONENTS)[1]},
+        )
+
+        resources = self.root / "site-packages/workbench_resources"
+        for relative in (
+            "profiles/packs/supersymmetry/profile.yaml",
+            "profiles/platforms/cleanroom/provisional.yaml",
+        ):
+            destination = resources / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, destination)
+        self.assertFalse((resources / "workbench.toml").exists())
+
+        manifest = default_client_configuration_path(resources)
+        configuration = load_workbench_configuration(resources, manifest)
+        policy = load_java_runtime_policy(resources, configuration=configuration)
+        self.assertEqual("jdk-25.0.4+7", policy["release_name"])
+
+        host = {
+            "os": "linux", "architecture": "x64", "system": "Linux", "machine": "x86_64",
+        }
+        for feature, release in ((None, "jdk-25.0.4+7"), (8, "jdk8u504-b01")):
+            with self.subTest(feature=feature), patch(
+                "workbench_core.runtime_java.resolve_temurin_asset",
+                return_value={"release_name": release},
+            ) as resolve, patch(
+                "workbench_core.runtime_java.materialize_temurin_runtime",
+                return_value={"outcome": "provisioned"},
+            ) as materialize:
+                result = ensure_java_runtime(
+                    resources,
+                    config_path=manifest,
+                    state_root=self.root / f"java-{feature or 25}",
+                    host=host,
+                    candidates=(),
+                    managed_feature_version=feature,
+                )
+            self.assertEqual("provisioned", result["outcome"])
+            self.assertEqual(release, resolve.call_args.args[0]["release_name"])
+            self.assertEqual(host, resolve.call_args.args[1])
+            self.assertEqual(release, materialize.call_args.args[2]["release_name"])
 
     def test_supersymmetry_client_rejects_extras_and_missing_tui(self) -> None:
         inputs = self._inputs(edition=bundle.CLIENT_EDITION)

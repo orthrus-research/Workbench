@@ -8,10 +8,10 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, Mock
 
-from textual.widgets import Button, Input
+from textual.widgets import Button, Input, Select, Static
 
 from workbench_tui.app import ReviewModal, SetupScreen, WorkbenchApp
-from workbench_tui.core_client import CoreClient
+from workbench_tui.core_client import CoreClient, CoreClientError
 
 
 PLAN_ID = "workbench-setup-plan-" + "a" * 64
@@ -66,6 +66,64 @@ class SetupScreenInteractionTests(unittest.IsolatedAsyncioTestCase):
                 return
             await pilot.pause(0.05)
         self.fail("Textual did not reach the expected state")
+
+    async def test_detected_jdk_fills_setup_java_and_is_checked_in_plan(self) -> None:
+        core = fake_core("/home/test/workspace")
+        core.java_inventory = AsyncMock(return_value={
+            "format": "workbench-java-inventory-v1", "candidates": [
+                {"state": "available", "jdk": True, "feature_version": 25,
+                 "probe": {"java_home": "/usr/lib/jvm/jdk-25"}},
+                {"state": "unavailable", "jdk": False, "feature_version": None,
+                 "probe": None},
+            ],
+        })
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            await self._settle(pilot, lambda: app.view.setup is not None)
+            app.open_setup()
+            await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                               and app.screen.detected_java.get("installed-0") == "/usr/lib/jvm/jdk-25")
+            screen = app.screen
+            core.java_inventory.assert_awaited_with()
+            self.assertFalse(screen.query_one("#setup-java-candidates", Select).disabled)
+            self.assertIn("Core checks", str(screen.query_one("#setup-java-hint", Static).render()))
+            screen.query_one("#setup-profile", Input).value = "/home/test/workbench.toml"
+            screen.query_one("#setup-java-candidates", Select).value = "installed-0"
+            await self._settle(pilot, lambda: screen.query_one("#setup-java", Input).value == "/usr/lib/jvm/jdk-25")
+            screen.query_one("#setup-plan", Button).press()
+            await self._settle(pilot, lambda: core.setup_plan.await_count == 1)
+            self.assertIn("--java-home", core.setup_plan.await_args.args[0])
+            self.assertIn("/usr/lib/jvm/jdk-25", core.setup_plan.await_args.args[0])
+
+    async def test_empty_or_failed_discovery_keeps_setup_path_editable(self) -> None:
+        for response in (
+            {"format": "workbench-java-inventory-v1", "candidates": []},
+            CoreClientError("inventory unavailable"),
+        ):
+            with self.subTest(response=response):
+                core = fake_core("/home/test/workspace")
+                core.java_inventory = AsyncMock(
+                    side_effect=response if isinstance(response, Exception) else None,
+                    return_value=response if isinstance(response, dict) else None,
+                )
+                app = WorkbenchApp(core)
+                async with app.run_test(size=(110, 38)) as pilot:
+                    await self._settle(pilot, lambda: app.view.setup is not None)
+                    app.open_setup()
+                    await self._settle(pilot, lambda: isinstance(app.screen, SetupScreen)
+                                       and core.java_inventory.await_count == 1)
+                    screen = app.screen
+                    await self._settle(pilot, lambda: "JDKs" in str(
+                        screen.query_one("#setup-java-hint", Static).render()
+                    ))
+                    self.assertTrue(screen.query_one("#setup-java-candidates", Select).disabled)
+                    self.assertFalse(screen.query_one("#setup-java", Input).disabled)
+                    self.assertFalse(bool(screen.query("#setup-java-list")))
+                    screen.query_one("#setup-profile", Input).value = "/home/test/workbench.toml"
+                    screen.query_one("#setup-java", Input).value = "/my/java"
+                    screen.query_one("#setup-plan", Button).press()
+                    await self._settle(pilot, lambda: core.setup_plan.await_count == 1)
+                    self.assertIn("/my/java", core.setup_plan.await_args.args[0])
 
     async def test_apply_requires_a_current_plan_and_separate_confirmation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

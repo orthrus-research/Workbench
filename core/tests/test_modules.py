@@ -105,6 +105,16 @@ class ModuleAdmissionTests(unittest.TestCase):
 
 
 class ModuleConfigurationTests(unittest.TestCase):
+    def test_source_core_stays_in_checkout_when_manifest_is_missing(self):
+        from workbench_core import cli
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "core/src/workbench_core").mkdir(parents=True)
+            (root / "core/pyproject.toml").touch()
+            source = root / "core/src/workbench_core/cli.py"
+            with patch.object(cli, "__file__", str(source)):
+                self.assertEqual(root, cli.source_root())
+
     def test_installed_core_does_not_adopt_enclosing_checkout(self):
         from workbench_core import cli
         with tempfile.TemporaryDirectory() as temporary:

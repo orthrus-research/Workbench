@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, Mock
 
@@ -9,7 +10,7 @@ from textual.widgets import Button, Checkbox, Input, Select
 
 from workbench_tui.app import (
     WorkbenchApp, WorkspaceChoicesScreen, WorkspaceRegisterScreen,
-    EnvironmentImportScreen,
+    EnvironmentImportScreen, _detected_jdk_options,
 )
 from workbench_tui.core_client import CoreClient, CoreClientError
 
@@ -76,6 +77,14 @@ def _core() -> Mock:
 
 
 class WorkspaceChoiceClientTests(IsolatedAsyncioTestCase):
+    def test_detected_java_8_uses_jdk_home_instead_of_nested_jre(self) -> None:
+        detected, options = _detected_jdk_options({"candidates": [
+            {"state": "available", "jdk": True, "feature_version": 8,
+             "java_home": "/jdk8", "probe": {"java_home": "/jdk8/jre"}},
+        ]})
+        self.assertEqual({"installed-0": "/jdk8"}, detected)
+        self.assertIn("/jdk8", options[0][0])
+
     async def test_client_registers_workspace_with_exact_revision(self) -> None:
         client = CoreClient(("workbench",))
         registered = _record(revision="after")
@@ -350,10 +359,11 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
             screen.query_one("#choice-workspace", Select).value = "beta"
             await self._settle(pilot, lambda: screen.query_one("#choice-profile", Input).value == "/profiles/beta.toml")
             self.assertEqual("", screen.query_one("#choice-java", Input).value)
-            screen.query_one("#choice-find-java", Button).press()
-            await self._settle(pilot, lambda: len(screen.query_one("#choice-java-candidates", Select)._options) == 2)
-            screen.query_one("#choice-java-candidates", Select).value = "/jdk/beta-25"
+            await self._settle(pilot, lambda: "installed-0" in screen.detected_java)
+            core.java_inventory.assert_awaited_with()
+            screen.query_one("#choice-java-mode", Select).value = "installed-0"
             await self._settle(pilot, lambda: screen.query_one("#choice-java", Input).value == "/jdk/beta-25")
+            self.assertTrue(screen.query_one("#choice-java", Input).disabled)
             screen.query_one("#choice-save", Button).press()
             await self._settle(pilot, lambda: core.save_workspace_choice.await_count == 1)
             core.save_workspace_choice.assert_awaited_with(
@@ -371,7 +381,7 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
             reopened.query_one("#choice-workspace", Select).value = "beta"
             await self._settle(pilot, lambda: reopened.query_one("#choice-java", Input).value == "/jdk/beta-25")
 
-    async def test_managed_java_8_is_saved_without_inventory_or_path(self) -> None:
+    async def test_managed_java_8_is_saved_and_acquired_with_one_action(self) -> None:
         core = _core()
         core.save_workspace_choice = AsyncMock(return_value=_record(revision="after", feature=8))
         app = WorkbenchApp(core)
@@ -383,21 +393,121 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
             screen.query_one("#choice-workspace", Select).value = "beta"
             await self._settle(pilot, lambda: screen.query_one("#choice-profile", Input).value == "/profiles/beta.toml")
             screen.query_one("#choice-java-mode", Select).value = "managed-8"
+            await self._settle(pilot, lambda: str(screen.query_one("#choice-save", Button).label) == "Use managed Java 8")
+            self.assertEqual("Use managed Java 8", str(screen.query_one("#choice-save", Button).label))
             screen.query_one("#choice-save", Button).press()
             await self._settle(pilot, lambda: core.save_workspace_choice.await_count == 1)
             core.save_workspace_choice.assert_awaited_with(
                 "beta", profile_config="/profiles/beta.toml", java_home=None,
                 managed_java_feature=8, expected_record_id="before",
             )
-            core.java_inventory.assert_not_awaited()
+            core.java_inventory.assert_awaited_with()
             await self._settle(pilot, lambda: screen.record["record_id"] == "after")
             self.assertEqual(8, screen.entries["beta"]["managed_java_feature"])
-            screen.query_one("#choice-acquire", Button).press()
             await self._settle(pilot, lambda: core.acquire_workspace_java.await_count == 1)
             core.acquire_workspace_java.assert_awaited_with("beta", expected_record_id="after")
+            await self._settle(pilot, lambda: "reused its existing copy" in str(
+                screen.query_one("#choice-status").render()
+            ))
 
-    async def test_manual_java_path_saves_without_inventory(self) -> None:
+    async def test_default_java_25_remains_available_with_no_installed_jdks(self) -> None:
         core = _core()
+        core.java_inventory = AsyncMock(return_value={
+            "format": "workbench-java-inventory-v1", "candidates": [],
+        })
+        core.save_workspace_choice = AsyncMock(return_value=_record(revision="after"))
+        core.acquire_workspace_java = AsyncMock(return_value={
+            "receipt": {"policy": {"feature_version": 25},
+                        "target": {"java_home_uri": "file:///state/jdks/temurin-25"}},
+            "outcome": "provisioned",
+        })
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            app.push_screen(WorkspaceChoicesScreen(_record()))
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen)
+                               and core.java_inventory.await_count == 1)
+            screen = app.screen
+            screen.query_one("#choice-workspace", Select).value = "beta"
+            await self._settle(pilot, lambda: screen.selected_name == "beta")
+            self.assertEqual("default", screen.query_one("#choice-java-mode", Select).value)
+            self.assertEqual({}, screen.detected_java)
+            self.assertEqual("Use recommended Java", str(screen.query_one("#choice-save", Button).label))
+            self.assertIn("Cleanroom", str(screen.query_one(".screen-intro").render()))
+            screen.query_one("#choice-save", Button).press()
+            await self._settle(pilot, lambda: core.acquire_workspace_java.await_count == 1)
+            core.save_workspace_choice.assert_not_awaited()
+            core.acquire_workspace_java.assert_awaited_with("beta", expected_record_id="before")
+            await self._settle(pilot, lambda: "acquired a copy" in str(
+                screen.query_one("#choice-status").render()
+            ))
+
+    async def test_workspace_and_java_choices_stay_fixed_during_acquisition(self) -> None:
+        core = _core()
+        core.save_workspace_choice = AsyncMock(return_value=_record(revision="after", feature=8))
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def acquire(*args, **kwargs):
+            started.set()
+            await release.wait()
+            return {"receipt": {"policy": {"feature_version": 8},
+                                "target": {"java_home_uri": "file:///state/beta-8"}},
+                    "outcome": "reused"}
+
+        core.acquire_workspace_java = AsyncMock(side_effect=acquire)
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            app.push_screen(WorkspaceChoicesScreen(_record()))
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen)
+                               and bool(app.screen.query("#choice-workspace")))
+            screen = app.screen
+            screen.query_one("#choice-workspace", Select).value = "beta"
+            await self._settle(pilot, lambda: screen.selected_name == "beta")
+            screen.query_one("#choice-java-mode", Select).value = "managed-8"
+            screen.query_one("#choice-save", Button).press()
+            await self._settle(pilot, started.is_set)
+            self.assertTrue(screen.query_one("#choice-workspace", Select).disabled)
+            self.assertTrue(screen.query_one("#choice-java-mode", Select).disabled)
+            self.assertTrue(screen.query_one("#choice-profile", Input).disabled)
+            release.set()
+            await self._settle(pilot, lambda: "beta-8" in str(screen.query_one("#choice-status").render()))
+            self.assertEqual("beta", screen.selected_name)
+            self.assertFalse(screen.query_one("#choice-workspace", Select).disabled)
+
+    async def test_failed_download_can_retry_without_saving_again(self) -> None:
+        core = _core()
+        core.save_workspace_choice = AsyncMock(return_value=_record(revision="after", feature=8))
+        core.acquire_workspace_java = AsyncMock(side_effect=[
+            CoreClientError("workbench manifest cannot be opened safely"),
+            {"receipt": {"policy": {"feature_version": 8},
+                         "target": {"java_home_uri": "file:///state/jdks/temurin-8"}},
+             "outcome": "reused"},
+        ])
+        app = WorkbenchApp(core)
+        async with app.run_test(size=(110, 38)) as pilot:
+            app.push_screen(WorkspaceChoicesScreen(_record()))
+            await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen)
+                               and bool(app.screen.query("#choice-workspace")))
+            screen = app.screen
+            screen.query_one("#choice-workspace", Select).value = "beta"
+            await self._settle(pilot, lambda: screen.selected_name == "beta")
+            screen.query_one("#choice-java-mode", Select).value = "managed-8"
+            screen.query_one("#choice-save", Button).press()
+            await self._settle(pilot, lambda: "manifest cannot be opened safely" in str(
+                screen.query_one("#choice-status").render()
+            ))
+            self.assertIn("Java choice saved", str(screen.query_one("#choice-status").render()))
+            self.assertIn("Check or clear Workbench configuration", str(
+                screen.query_one("#choice-status").render()
+            ))
+            screen.query_one("#choice-save", Button).press()
+            await self._settle(pilot, lambda: core.acquire_workspace_java.await_count == 2)
+            core.save_workspace_choice.assert_awaited_once()
+            self.assertEqual("after", screen.record["record_id"])
+
+    async def test_manual_java_path_saves_even_when_inventory_fails(self) -> None:
+        core = _core()
+        core.java_inventory = AsyncMock(side_effect=CoreClientError("inventory unavailable"))
         core.save_workspace_choice = AsyncMock(return_value=_record("/custom/jdk", revision="after"))
         app = WorkbenchApp(core)
         async with app.run_test(size=(110, 38)) as pilot:
@@ -415,7 +525,8 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
                 "beta", profile_config="/profiles/beta.toml", java_home="/custom/jdk",
                 managed_java_feature=None, expected_record_id="before",
             )
-            core.java_inventory.assert_not_awaited()
+            core.java_inventory.assert_awaited_with()
+            core.acquire_workspace_java.assert_not_awaited()
 
     async def test_stale_revision_remains_visible(self) -> None:
         core = _core()
@@ -426,6 +537,9 @@ class WorkspaceChoiceScreenTests(IsolatedAsyncioTestCase):
             await self._settle(pilot, lambda: isinstance(app.screen, WorkspaceChoicesScreen)
                                and bool(app.screen.query("#choice-save")))
             screen = app.screen
+            screen.query_one("#choice-workspace", Select).value = "beta"
+            await self._settle(pilot, lambda: screen.selected_name == "beta")
+            screen.query_one("#choice-java-mode", Select).value = "managed-8"
             screen.query_one("#choice-save", Button).press()
             await self._settle(pilot, lambda: core.save_workspace_choice.await_count == 1)
             await self._settle(pilot, lambda: "changed after review" in str(screen.query_one("#choice-status").render()))

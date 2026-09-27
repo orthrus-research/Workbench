@@ -302,6 +302,7 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
             print(f"Saved workspace selection: {selected.name}")
         return 0
     if selected.operation == "acquire":
+        from .configuration import default_client_configuration_path
         if selected.name is None or selected.path is not None or selected.default or selected.profile_config is not None or selected.java_home is not None or selected.java_feature is not None or selected.clear_profile or selected.clear_java:
             parser.error("workspace acquire requires NAME and an optional --expected-record-id")
         from .environment_resolution import resolve_environment
@@ -327,7 +328,7 @@ def main(argv: Sequence[str] | None = None, *, suite_root: Path | None = None) -
         operation = resolved.operation_selection()
         if operation.java_home is not None:
             parser.error("workspace uses a supplied Java path; there is nothing to acquire")
-        config = operation.profile_configuration or Path("workbench.toml")
+        config = operation.profile_configuration or default_client_configuration_path(suite)
         result = CoreManagedJava(state_root=resolved.state_root, selection=operation).ensure(
             suite, config_path=config,
         )

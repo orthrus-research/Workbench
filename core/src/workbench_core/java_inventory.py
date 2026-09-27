@@ -69,16 +69,32 @@ def inspect_java_inventory(*, policy: Mapping[str, Any] | None = None,
     for origin, java in java_candidates(environment=environment, homes=homes, roots=roots, host=selected_host):
         row = {"origin": origin, "executable": str(java), "state": "unavailable",
                "compatibility": "not-assessed", "reason": None, "probe": None,
-               "feature_version": None, "jdk": False}
+               "feature_version": None, "jdk": False, "java_home": None}
         try:
             probe = probe_java(java)
             version = re.match(r"^(?:1\.)?(\d+)(?:[.+_-]|$)", probe["java_version"])
             if version is None:
                 raise JavaRuntimeError("Java reported an unsupported version string")
-            compiler = Path(probe["java_home"]) / "bin" / ("javac.exe" if selected_host["os"] == "windows" else "javac")
+            compiler_name = "javac.exe" if selected_host["os"] == "windows" else "javac"
+            # Java 8 commonly reports <JDK>/jre as java.home, while javac
+            # lives under the enclosing JDK.
+            candidate_home = java.parent.parent
+            reported_home = Path(probe["java_home"])
+            if (reported_home.name == "jre"
+                    and (reported_home.parent / "bin" / compiler_name).is_file()):
+                jdk_home = reported_home.parent
+            elif (reported_home / "bin" / compiler_name).is_file():
+                jdk_home = reported_home
+            elif ((candidate_home / "release").is_file()
+                    and (candidate_home / "bin" / compiler_name).is_file()):
+                jdk_home = candidate_home
+            else:
+                jdk_home = None
             reason = _probe_mismatch(probe, policy, selected_host) if policy is not None else None
             row.update(state="available", probe=probe, feature_version=int(version.group(1)),
-                       jdk=compiler.is_file(), reason=reason,
+                       jdk=jdk_home is not None,
+                       java_home=str(jdk_home if jdk_home is not None else reported_home),
+                       reason=reason,
                        compatibility=("incompatible" if reason else "matches-profile") if policy else "not-assessed")
         except (JavaRuntimeError, OSError, UnicodeError) as error:
             row["reason"] = str(error)

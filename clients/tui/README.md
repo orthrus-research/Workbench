@@ -86,13 +86,16 @@ Core retains the earlier files and checks the records again before copying.
 Home also offers **Choose workspace profile and Java** for registered named
 workspaces. Textual reads and saves these local choices through Core's
 `settings workspace` JSON interface with a revision check. Java choices are
-the profile default (Java 25 for Cleanroom), an explicit managed Java 8
-release, or a supplied local path. **Acquire saved Java** asks Core to fetch
-the selected managed release into the stable Workbench state root. **Find
-Java** is optional; entering a path requires no inventory or compatibility
-probe. Core saves each workspace's choice in the stable `workspaces.json`
-record. A supplied path remains unverified until a consuming operation uses
-it; selecting Java 8 does not establish Cleanroom compatibility.
+the recommended managed Java 25 for Cleanroom, an optional managed Java 8
+release, a detected local JDK, or a supplied local path. Textual asks Core to
+look for installed JDKs when this screen opens; discovery does not require a
+valid profile configuration. One action saves the choice and, for managed Java,
+asks Core to acquire it into the stable Workbench state root. If acquisition
+fails after saving, the same action retries without saving again. Selecting a
+detected JDK uses the supplied-path route; it requires no profile compatibility
+check and remains unverified until a consuming operation uses it. Core saves
+each workspace's choice in the stable `workspaces.json` record. Selecting
+Java 8 does not establish Cleanroom compatibility.
 
 At startup, Textual asks Core to check the latest published Supersymmetry
 release. When a newer release is available, **Version up** asks Core to
@@ -135,11 +138,15 @@ file and must be supplied again on import without managed acquisition.
 - **Setup:** Full developer, review-only, and saved-selection repair journeys.
   Choose paths, check dependencies, inspect a Core plan, and confirm its exact
   selection and effects before Core applies it. Core rechecks the plan ID.
-  Java discovery is read-only. A blank repair field retains the saved value;
-  the resulting selection is visible in the plan and confirmation dialog.
-- **Workspace choices:** Select a named workspace, save a profile and Java
-  choice in Core's versioned user registry, acquire managed Java on demand,
-  and export or import a Core-reviewed environment selection.
+  Detected JDKs appear on the setup screen and can fill the Java home field.
+  Core checks a chosen path against the profile during setup. Discovery is
+  read-only and does not depend on a valid profile. A blank repair field
+  retains the saved value; the resulting selection is visible in the plan and
+  confirmation dialog.
+- **Workspace choices:** Select a named workspace, use a detected or supplied
+  Java path, or save and acquire managed Java in one action. Core's versioned
+  user registry holds the choice. Export or import a Core-reviewed environment
+  selection separately.
 - **Modules:** Tabs, tables, and a detail panel compare installed module and
   profile records. Highlighting a row reveals its capabilities or resources;
   missing or unavailable components retain their reported reason.

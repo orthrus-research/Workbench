@@ -19,6 +19,7 @@ from workbench_api.state_paths import default_runtime_state_root
 from workbench_api.modules import EnvironmentSelection
 
 from .artifact_store import fetch_verified_artifact
+from .configuration import default_client_configuration_path
 from .durable_records import read_private_single_link_bytes
 from .environment_resolution import resolve_environment
 from .managed_java import CoreManagedJava
@@ -251,14 +252,13 @@ def _install(action: str, *, state_root: Path, config_home: Path,
         plan_prism_data_root, initialize_prism_data_root,
     )
     from .tooling_provision import prepare_prism_launcher
-    if not (suite_root / "workbench.toml").is_file():
+    if (not (suite_root / "workbench.toml").is_file()
+            and not (suite_root / "core/pyproject.toml").is_file()):
         suite_root = repository_root(__file__)
     choice, source, launcher, java_state_root, selection = _selected_install_context(
         state_root, config_home, suite_root,
     )
-    default_config = (Path("workbench.toml") if (suite_root / "workbench.toml").is_file()
-                      else Path(__file__).resolve().parent / "data/client-workbench.toml")
-    config_path = selection.profile_configuration or default_config
+    config_path = selection.profile_configuration or default_client_configuration_path(suite_root)
     platform = source.get("source_platform")
     if (action in {"install-prepare", "install-apply", "install-reconcile"}
             and choice.get("source_kind") == "user-prism-zip"

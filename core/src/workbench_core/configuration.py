@@ -47,6 +47,31 @@ class WorkbenchConfigurationError(ValueError):
     """The active Workbench configuration cannot be resolved safely."""
 
 
+def default_client_configuration_path(suite_root: Path | str) -> Path:
+    """Select the client default in a source checkout or installed resources.
+
+    A present source manifest remains authoritative, including a symlink or
+    non-regular file that the configuration reader must reject. Installed
+    resources do not carry the repository's top-level ``workbench.toml``;
+    their equivalent client selection ships with Core instead.
+    """
+
+    candidate = Path(suite_root) / CONFIGURATION_PATH
+    try:
+        os.lstat(candidate)
+    except FileNotFoundError:
+        suite = Path(suite_root)
+        if suite.name == "workbench_resources" and suite.parent.name in {
+            "site-packages", "dist-packages",
+        }:
+            return Path(__file__).resolve().parent / "data/client-workbench.toml"
+        return CONFIGURATION_PATH
+    except OSError:
+        # Let the configuration reader report an inaccessible source manifest.
+        pass
+    return CONFIGURATION_PATH
+
+
 @dataclass(frozen=True, slots=True)
 class SourceSnapshot:
     """Immutable bytes and identity for one safely read source document."""
