@@ -736,7 +736,9 @@ def _run_recipe_owner_review(
 ) -> int:
     """Run the V1 owner once and publish either its full record or compact V2."""
 
-    from workbench_pack_program_studio.cli import run as groovy_run
+    from workbench_pack_program_studio.cli import (
+        core_git_observation_runner, run as groovy_run,
+    )
     from workbench_pack_program_studio.review import build_recipe_review_v2
 
     json_output = _recipe_review_flag(arguments, "--json")
@@ -764,6 +766,7 @@ def _run_recipe_owner_review(
             error=sys.stderr,
             candidate_git_binding=candidate_git_binding,
             baseline_git_binding=baseline_git_binding,
+            git_observation_runner=core_git_observation_runner,
             result_callback=captured.append,
         )
         return _recipe_review_strict_all_exit(
@@ -786,6 +789,7 @@ def _run_recipe_owner_review(
         error=error,
         candidate_git_binding=candidate_git_binding,
         baseline_git_binding=baseline_git_binding,
+        git_observation_runner=core_git_observation_runner,
         result_callback=captured.append,
     )
     if error.getvalue():

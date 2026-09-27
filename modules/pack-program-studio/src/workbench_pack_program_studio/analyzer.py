@@ -16,6 +16,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from workbench_project_intelligence.git_observation import (
     GitObservationError,
+    GitObservationRunner,
     configured_git_executable,
     observation_environment,
     safe_git_prefix,
@@ -96,6 +97,7 @@ def analyze_program(
     *,
     context: AnalysisContext,
     git_binding_override: Mapping[str, Any] | None = None,
+    git_observation_runner: GitObservationRunner | None = None,
     source_bytes: Mapping[str, bytes] | None = None,
 ) -> dict[str, Any]:
     """Analyze one exact source tree without executing Groovy or Minecraft."""
@@ -237,7 +239,7 @@ def analyze_program(
         "run_config_sha256": sha256_bytes(run_config_raw),
         "source_sha256": source_identity,
         "git": (
-            _git_binding(pack_root)
+            _git_binding(pack_root, runner=git_observation_runner)
             if git_binding_override is None
             else _validated_git_binding(git_binding_override)
         ),
@@ -1452,7 +1454,9 @@ def _collisions(effects: Sequence[Mapping[str, Any]], profile: LoadedProfile) ->
     return sorted(result, key=lambda row: (row["policy_id"], json.dumps(row["value"], sort_keys=True)))
 
 
-def _git_binding(pack_root: Path) -> dict[str, Any] | None:
+def _git_binding(
+    pack_root: Path, *, runner: GitObservationRunner | None = None,
+) -> dict[str, Any] | None:
     try:
         executable = configured_git_executable()
     except GitObservationError as exc:
@@ -1460,18 +1464,10 @@ def _git_binding(pack_root: Path) -> dict[str, Any] | None:
     if executable is None:
         return None
     try:
-        top = subprocess.run(
-            [
-                executable,
-                "-C",
-                display_filesystem_path(pack_root),
-                "rev-parse",
-                "--show-toplevel",
-            ],
-            check=False,
-            capture_output=True,
-            timeout=5,
-            env=observation_environment(),
+        top = _run_git_observation(
+            [executable, "-C", display_filesystem_path(pack_root),
+             "rev-parse", "--show-toplevel"],
+            runner=runner,
         )
         if top.returncode:
             return None
@@ -1484,15 +1480,13 @@ def _git_binding(pack_root: Path) -> dict[str, Any] | None:
             repository,
             executable=executable,
             timeout=5,
+            runner=runner,
         )
-        head = subprocess.run(
+        head = _run_git_observation(
             [*prefix, "-C", repository_argument, "rev-parse", "HEAD"],
-            check=False,
-            capture_output=True,
-            timeout=5,
-            env=observation_environment(),
+            runner=runner,
         )
-        status = subprocess.run(
+        status = _run_git_observation(
             [
                 *prefix,
                 "-C",
@@ -1502,10 +1496,7 @@ def _git_binding(pack_root: Path) -> dict[str, Any] | None:
                 "-z",
                 "--untracked-files=normal",
             ],
-            check=False,
-            capture_output=True,
-            timeout=5,
-            env=observation_environment(),
+            runner=runner,
         )
         if head.returncode or status.returncode:
             return None
@@ -1526,6 +1517,20 @@ def _git_binding(pack_root: Path) -> dict[str, Any] | None:
         ) from exc
     except (OSError, UnicodeError, ValueError, subprocess.SubprocessError):
         return None
+
+
+def _run_git_observation(
+    argv: Sequence[str], *, runner: GitObservationRunner | None,
+) -> subprocess.CompletedProcess[bytes]:
+    if runner is None:
+        return subprocess.run(
+            argv, check=False, capture_output=True, timeout=5,
+            env=observation_environment(),
+        )
+    return runner(
+        argv, cwd=Path.cwd(), timeout=5,
+        environment=observation_environment(),
+    )
 
 
 def _git_single_line(raw: bytes) -> str | None:

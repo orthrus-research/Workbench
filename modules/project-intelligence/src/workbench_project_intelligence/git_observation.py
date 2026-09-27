@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-from typing import Mapping, Sequence
+from typing import Mapping, Protocol, Sequence
 
 
 _FILTER_KEY = re.compile(
@@ -17,6 +17,15 @@ _FILTER_KEY = re.compile(
 
 class GitObservationError(RuntimeError):
     """Raised when Git cannot be made safe enough for read-only observation."""
+
+
+class GitObservationRunner(Protocol):
+    """Optional process host for the same raw Git observation command."""
+
+    def __call__(
+        self, argv: Sequence[str], *, cwd: Path, timeout: float,
+        environment: Mapping[str, str],
+    ) -> subprocess.CompletedProcess[bytes]: ...
 
 
 def configured_git_executable(
@@ -85,6 +94,7 @@ def safe_git_prefix(
     *,
     executable: str | None = None,
     timeout: float = 5.0,
+    runner: GitObservationRunner | None = None,
 ) -> list[str]:
     """Return Git argv prefix with every configured content filter disabled.
 
@@ -105,15 +115,18 @@ def safe_git_prefix(
         "core.untrackedCache=false",
     ]
     try:
-        configured = subprocess.run(
-            [*base, "-C", str(root), "config", "--null", "--name-only", "--list"],
-            check=False,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout,
-            env=observation_environment(),
-        )
+        command = [*base, "-C", str(root), "config", "--null", "--name-only", "--list"]
+        if runner is None:
+            configured = subprocess.run(
+                command, check=False, stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=timeout, env=observation_environment(),
+            )
+        else:
+            configured = runner(
+                command, cwd=Path.cwd(), timeout=timeout,
+                environment=observation_environment(),
+            )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise GitObservationError(
             "Git configuration could not be inventoried without execution"
@@ -177,6 +190,7 @@ def run_git_observation(
 
 
 __all__ = [
+    "GitObservationRunner",
     "GitObservationError",
     "configured_git_executable",
     "observation_environment",

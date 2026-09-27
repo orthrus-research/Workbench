@@ -12,7 +12,10 @@ from pathlib import Path, PurePosixPath
 import stat
 import subprocess
 from typing import Any, Mapping, Sequence
+
 from urllib.parse import quote, urlsplit
+
+from workbench_project_intelligence.git_observation import GitObservationRunner
 
 from .analyzer import AnalysisContext, analyze_program
 from .language_model import (
@@ -51,6 +54,7 @@ def build_language_service_result(
     diagnostic_timeout: float,
     java: Path | None = None,
     runtime_receipt: Path | None = None,
+    git_observation_runner: GitObservationRunner | None = None,
 ) -> dict[str, Any]:
     if context.side != "client":
         raise PackProgramError(
@@ -62,7 +66,10 @@ def build_language_service_result(
     diagnostic_timeout = _validated_timeout(
         diagnostic_timeout, "diagnostic timeout"
     )
-    program = analyze_program(source, pack_profile, context=context)
+    program = analyze_program(
+        source, pack_profile, context=context,
+        git_observation_runner=git_observation_runner,
+    )
     profile_value = language_profile.value
     bounds = profile_value["bounds"]
     if pack_profile.platform_profile_id != language_profile.platform_profile_id:

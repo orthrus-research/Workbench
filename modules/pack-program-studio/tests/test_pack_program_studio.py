@@ -31,7 +31,10 @@ from workbench_pack_program_studio import (  # noqa: E402
     load_profile,
     validate_report,
 )
-from workbench_pack_program_studio.cli import run as cli_run  # noqa: E402
+from workbench_pack_program_studio.cli import (  # noqa: E402
+    core_git_observation_runner, run as cli_run,
+)
+import workbench_pack_program_studio.cli as cli_module  # noqa: E402
 import workbench_pack_program_studio.analyzer as analyzer_module  # noqa: E402
 import workbench_pack_program_studio.profile as profile_module  # noqa: E402
 from workbench_pack_program_studio.lexer import calls, tokenize  # noqa: E402
@@ -869,6 +872,97 @@ class PackProgramStudioTests(unittest.TestCase):
         self.assertEqual(4, run.call_count)
         self.assertTrue(all("text" not in call.kwargs for call in run.call_args_list))
         self.assertIn("-z", run.call_args_list[3].args[0])
+
+    def test_git_binding_injected_runner_preserves_raw_streams_and_filter_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "r\u00e9pertoire"
+            repository.mkdir()
+            revision = "a" * 40
+            responses = iter((
+                subprocess.CompletedProcess((), 0, (str(repository) + "\n").encode(), b""),
+                subprocess.CompletedProcess((), 0, b"filter.demo.clean\0", b""),
+                subprocess.CompletedProcess((), 0, (revision + "\n").encode(), b""),
+                subprocess.CompletedProcess((), 0, b" M dirty-file\0", b""),
+            ))
+            calls = []
+
+            def runner(argv, *, cwd, timeout, environment):
+                calls.append((tuple(argv), cwd, timeout, dict(environment)))
+                return next(responses)
+
+            with patch.object(analyzer_module.subprocess, "run", side_effect=AssertionError("direct Git bypass")):
+                binding = analyzer_module._git_binding(repository, runner=runner)
+        self.assertEqual(
+            {"repository_root": str(repository.resolve()), "revision": revision, "dirty": True},
+            binding,
+        )
+        self.assertEqual(4, len(calls))
+        self.assertTrue(all(row[2] == 5 and row[3]["GIT_OPTIONAL_LOCKS"] == "0" for row in calls))
+        self.assertTrue(all(row[1] == Path.cwd() for row in calls))
+        self.assertIn("filter.demo.clean=", calls[2][0])
+        self.assertIn("-z", calls[3][0])
+
+    def test_core_git_runner_preserves_binary_streams_and_five_second_deadline(self) -> None:
+        from workbench_api.processes import ProcessResult
+        with patch(
+            "workbench_pack_program_studio.cli.execute_process",
+            return_value=ProcessResult(17, b"\xff\x00", b"\xfe\n"),
+        ) as execute:
+            result = core_git_observation_runner(
+                [sys.executable, "--version"], cwd=Path.cwd(), timeout=5,
+                environment={"GIT_OPTIONAL_LOCKS": "0"},
+            )
+        self.assertEqual(17, result.returncode)
+        self.assertEqual(b"\xff\x00", result.stdout)
+        self.assertEqual(b"\xfe\n", result.stderr)
+        self.assertEqual(5, execute.call_args.kwargs["timeout_seconds"])
+        self.assertIsNone(execute.call_args.kwargs["output_limit"])
+        self.assertEqual({"GIT_OPTIONAL_LOCKS": "0"}, execute.call_args.kwargs["environment"])
+
+    def test_direct_dev_and_check_compose_core_git_runner(self) -> None:
+        with (
+            patch("workbench_core.host_services.install_local_host_services") as install,
+            patch.object(cli_module, "run", return_value=0) as run,
+        ):
+            for operation in ("dev", "check"):
+                self.assertEqual(0, cli_module.main([operation], root=ROOT))
+                self.assertIs(
+                    core_git_observation_runner,
+                    run.call_args.kwargs["git_observation_runner"],
+                )
+        self.assertEqual(2, install.call_count)
+
+    @unittest.skipUnless(os.name == "posix", "Core Git probe requires a POSIX test host")
+    def test_core_git_binding_matches_source_only_real_git(self) -> None:
+        from workbench_core.host_services import install_local_host_services
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory) / "repository"
+            repository.mkdir()
+            git = shutil.which("git")
+            self.assertIsNotNone(git)
+            for arguments in (
+                ("init", "--quiet"),
+                ("config", "user.name", "Workbench Test"),
+                ("config", "user.email", "workbench@example.invalid"),
+            ):
+                subprocess.run([git, "-C", str(repository), *arguments], check=True, capture_output=True)
+            (repository / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+            for arguments in (("add", "tracked.txt"), ("commit", "--quiet", "-m", "fixture")):
+                subprocess.run([git, "-C", str(repository), *arguments], check=True, capture_output=True)
+            with patch.dict(os.environ, {"WORKBENCH_GIT_EXECUTABLE": git}):
+                historical = analyzer_module._git_binding(repository)
+                install_local_host_services()
+                supervised = analyzer_module._git_binding(
+                    repository, runner=core_git_observation_runner,
+                )
+                self.assertEqual(historical, supervised)
+                (repository / "tracked.txt").write_text("changed\n", encoding="utf-8")
+                self.assertEqual(
+                    analyzer_module._git_binding(repository),
+                    analyzer_module._git_binding(
+                        repository, runner=core_git_observation_runner,
+                    ),
+                )
 
     def test_git_binding_honors_setup_selection_outside_path(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

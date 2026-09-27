@@ -11,10 +11,14 @@ import json
 import os
 from pathlib import Path
 import signal
+import subprocess
 import sys
 from tempfile import NamedTemporaryFile
 import threading
-from typing import Any, Callable, Mapping, TextIO
+from typing import Any, Callable, Mapping, Sequence, TextIO
+
+from workbench_api.processes import ProcessError, execute_process
+from workbench_project_intelligence.git_observation import GitObservationRunner
 
 from .analyzer import AnalysisContext
 from .language_profile import resolve_language_profile
@@ -382,6 +386,7 @@ def run(
     baseline_git_binding: Mapping[str, Any] | None = None,
     result_callback: Callable[[dict[str, Any]], None] | None = None,
     session_custody: WorkingAllocations | None = None,
+    git_observation_runner: GitObservationRunner | None = None,
 ) -> int:
     """Run a command; session callers bind Core first (as `main` does)."""
 
@@ -426,6 +431,7 @@ def run(
                 runtime_diagnosis=args.runtime_diagnosis,
                 candidate_git_binding=candidate_git_binding,
                 baseline_git_binding=baseline_git_binding,
+                git_observation_runner=git_observation_runner,
             )
             rendered = render_report(
                 value,
@@ -459,6 +465,7 @@ def run(
                 diagnostic_timeout=args.diagnostic_timeout,
                 java=args.java,
                 runtime_receipt=args.runtime_receipt,
+                git_observation_runner=git_observation_runner,
             )
             rendered = render_language_result(value)
         else:
@@ -549,8 +556,8 @@ def main(
     session_custody: WorkingAllocations | None = None,
 ) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if arguments and arguments[0] == "session":
-        # A direct module entry uses the same physical host as Core dispatch.
+    if arguments and arguments[0] in {"dev", "check", "session"}:
+        # Direct module commands use the same process host as Core dispatch.
         from workbench_core.host_services import install_local_host_services
         install_local_host_services()
     repository = (
@@ -574,6 +581,32 @@ def main(
         output=sys.stdout,
         error=sys.stderr,
         session_custody=session_custody,
+        git_observation_runner=(
+            core_git_observation_runner
+            if arguments and arguments[0] in {"dev", "check"} else None
+        ),
+    )
+
+
+def core_git_observation_runner(
+    argv: Sequence[str], *, cwd: Path, timeout: float,
+    environment: Mapping[str, str],
+) -> subprocess.CompletedProcess[bytes]:
+    """Run one read-only Git observation through Core with raw stream parity."""
+
+    try:
+        # Core requires an absolute executable; keep the selected symlink and
+        # argv spelling so Git sees the same path as the historical runner.
+        command = [str(Path(argv[0]).expanduser().absolute()), *argv[1:]]
+        result = execute_process(
+            command, cwd=cwd, stdin=b"", environment=environment,
+            cancelled=threading.Event(), timeout_seconds=timeout,
+            output_limit=None,
+        )
+    except (OSError, ProcessError, IndexError) as exc:
+        raise OSError(f"Core Git observation failed: {exc}") from exc
+    return subprocess.CompletedProcess(
+        tuple(argv), result.exit_code, result.stdout, result.stderr,
     )
 
 

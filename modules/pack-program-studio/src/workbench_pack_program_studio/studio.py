@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from workbench_project_intelligence.git_observation import GitObservationRunner
+
 from .analyzer import AnalysisContext, analyze_program, assess_change, compare_programs
 from .model import (
     REPORT_FORMAT,
@@ -27,12 +29,14 @@ def build_report(
     runtime_diagnosis: Path | None = None,
     candidate_git_binding: Mapping[str, Any] | None = None,
     baseline_git_binding: Mapping[str, Any] | None = None,
+    git_observation_runner: GitObservationRunner | None = None,
 ) -> dict[str, Any]:
     candidate = analyze_program(
         source,
         profile,
         context=context,
         git_binding_override=candidate_git_binding,
+        git_observation_runner=git_observation_runner,
     )
     baseline_program = (
         None
@@ -42,6 +46,7 @@ def build_report(
             profile,
             context=context,
             git_binding_override=baseline_git_binding,
+            git_observation_runner=git_observation_runner,
         )
     )
     comparison = (
