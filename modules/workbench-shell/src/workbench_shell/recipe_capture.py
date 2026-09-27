@@ -665,7 +665,7 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
             _write_run_input_record(attempt, 'launch.json', launch)
             _current(attempt, request)
             cancel.check()
-            if workspace_storage.inventory(execution, cancelled=cancel.is_set) != execution_files:
+            if execution_workspace.inventory(cancelled=cancel.is_set) != execution_files:
                 raise ValueError('execution runtime changed before launch')
             if workspace_storage.inventory(attempt / 'java', cancelled=cancel.is_set) != prepared['java_files']:
                 raise ValueError('execution Java changed before launch')

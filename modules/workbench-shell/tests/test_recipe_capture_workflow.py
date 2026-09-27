@@ -28,7 +28,9 @@ from workbench_api.fixture_selections import fixture_selections_scope
 from workbench_atlas_categorical_graph import CategoricalGraphBundleBuilder, edge_record, node_record
 from workbench_core import capture_workspace as core_capture_workspace
 from workbench_core import check_storage, durable_records, host_filesystem as core_filesystem, runtime_java, tool_process
-from workbench_core.capture_workspace_port import HOST as core_capture_workspace_host
+from workbench_core.capture_workspace_port import (
+    HOST as core_capture_workspace_host, _ExecutionWorkspace,
+)
 from workbench_core.fixture_selection_port import CoreFixtureSelections
 from workbench_core.managed_attempts import CoreManagedAttempts
 from workbench_core.storage.registered import ResourceCatalog
@@ -1345,10 +1347,19 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
 
     def test_execution_overrides_use_attempt_bound_core_workspace(self):
         prepared = self.prepare()
+        original_inventory = _ExecutionWorkspace.inventory
+        inventories = []
+
+        def observe_inventory(workspace, *, cancelled):
+            rows = original_inventory(workspace, cancelled=cancelled)
+            inventories.append((workspace, rows, cancelled))
+            return rows
+
         with patch.object(capture, 'capture_execution_workspace',
                           wraps=capture.capture_execution_workspace) as selected, \
              patch.object(check_storage, 'copy_manifest',
-                          wraps=check_storage.copy_manifest) as copied:
+                          wraps=check_storage.copy_manifest) as copied, \
+             patch.object(_ExecutionWorkspace, 'inventory', observe_inventory):
             result = self.run_capture(prepared)
         selected.assert_called_once()
         attempt = self.attempt(result)
@@ -1359,6 +1370,10 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.assertEqual((attempt / 'runtime', execution,
                           json.loads((attempt / 'prepared.json').read_bytes())['runtime_files']),
                          copied.call_args.args)
+        self.assertEqual(2, len(inventories))
+        self.assertTrue(all(callable(cancelled) for _, _, cancelled in inventories))
+        self.assertEqual(inventories[0][1], inventories[1][1])
+        self.assertEqual(execution, inventories[1][0]._root())
         self.assertEqual(b'fixture-only=true\n', (execution / 'server.properties').read_bytes())
         self.assertEqual(b'eula=true\n', (execution / 'eula.txt').read_bytes())
         rows = json.loads((attempt / 'runtime-lock.json').read_bytes())['runtime_files']
@@ -1367,6 +1382,31 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             self.assertIn({'path': name, 'size': path.stat().st_size,
                            'sha256': sha256(path.read_bytes()).hexdigest(), 'mode': 0o644}, rows)
         self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_prelaunch_execution_inventory_cancellation_blocks_replay(self):
+        prepared = self.prepare()
+        attempt = self.attempt(prepared)
+        original_inventory = _ExecutionWorkspace.inventory
+        polls = 0
+
+        def cancel_at_second_inventory(workspace, *, cancelled):
+            nonlocal polls
+            polls += 1
+            if polls == 2:
+                self.cancelled.set()
+            return original_inventory(workspace, cancelled=cancelled)
+
+        with patch.object(_ExecutionWorkspace, 'inventory', cancel_at_second_inventory):
+            with self.assertRaisesRegex(core_capture_workspace.CaptureWorkspaceError,
+                                        'cancelled'):
+                self.run_capture(prepared)
+        self.assertEqual(2, polls)
+        self.assertTrue((attempt / 'run-started.json').is_file())
+        self.assertEqual('failed', capture.show(self.state, prepared['attempt_id'])['state'])
+        self.cancelled.clear()
+        with self.assertRaisesRegex(ValueError, 'already attempted'):
+            self.run_capture(prepared)
+        self.native.assert_not_called()
 
     def test_partial_runtime_copy_retains_tree_and_blocks_native_replay(self):
         prepared = self.prepare()
