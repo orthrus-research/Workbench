@@ -16,7 +16,8 @@ import stat
 from typing import Any, Callable, Mapping, NoReturn, Sequence, cast
 import uuid
 from workbench_api.host_filesystem import (
-    HostFilesystemError, PrivateOwnedMarker, acquire_private_owned_marker,
+    DurableRecordError, HostFilesystemError, PrivateOwnedMarker,
+    acquire_private_owned_marker,
     fsync_directory as _fsync_directory,
     publish_immutable_bytes,
     read_private_single_link_bytes,
@@ -259,7 +260,14 @@ def _release_transaction_lock(
 ) -> None:
     """Remove only the same visible lock created by this transaction."""
 
-    lease.release()
+    try:
+        lease.release()
+    except DurableRecordError as exc:
+        if exc.code != "changed":
+            raise
+        # The transaction may already be committed. Core closed the held lease
+        # and preserved a substituted marker; that marker belongs to review,
+        # not to this transaction's cleanup.
 
 
 def _close_transaction_lock(lease: PrivateOwnedMarker) -> None:
