@@ -28,6 +28,9 @@ from workbench_api.host_filesystem import (
     secure_private_path,
 )
 from workbench_api.record_stores import open_record_store
+from workbench_api.simulation_scratch import (
+    SimulationScratchError, capture_simulation_git, simulation_git_capture_active,
+)
 from workbench_blueprints import standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
 
@@ -228,26 +231,41 @@ def _git(
         git = configured_git_executable(executable)
     except BlueprintsGitBindingError as exc:
         _fail("BPP110_GIT", str(repo), str(exc))
-    try:
-        result = subprocess.run(
-            [git, "-C", str(repo), *arguments],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except (OSError, subprocess.CalledProcessError) as exc:
-        detail = (
-            exc.stderr.decode("utf-8", errors="replace").strip()
-            if isinstance(exc, subprocess.CalledProcessError)
-            else str(exc)
-        )
-        _fail("BPP110_GIT", str(repo), detail)
+    if simulation_git_capture_active():
+        try:
+            captured = capture_simulation_git(
+                [git, "-C", str(repo), *arguments], cwd=repo,
+            )
+        except SimulationScratchError as exc:
+            _fail("BPP110_GIT", str(repo), str(exc))
+        if captured.exit_code != 0:
+            _fail(
+                "BPP110_GIT", str(repo),
+                captured.stderr.decode("utf-8", errors="replace").strip(),
+            )
+        output = captured.stdout
+    else:
+        try:
+            result = subprocess.run(
+                [git, "-C", str(repo), *arguments],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except (OSError, subprocess.CalledProcessError) as exc:
+            detail = (
+                exc.stderr.decode("utf-8", errors="replace").strip()
+                if isinstance(exc, subprocess.CalledProcessError)
+                else str(exc)
+            )
+            _fail("BPP110_GIT", str(repo), detail)
+        output = result.stdout
     if text:
         try:
-            return result.stdout.decode("utf-8").strip()
+            return output.decode("utf-8").strip()
         except UnicodeDecodeError as exc:
             _fail("BPP111_GIT_ENCODING", str(repo), str(exc))
-    return result.stdout
+    return output
 
 
 def _nul_records(value: bytes) -> list[bytes]:

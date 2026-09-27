@@ -18,7 +18,8 @@ argument has the same local, digest-checked meaning as V1 simulation. The
 direct CLI derives the target from the validated session and binds Core's
 scratch host to that target and the selected configuration home. Installed
 dispatch binds the same Core host to its selected workspace and configuration
-home; an observation outside that selected workspace is refused.
+home; an observation whose session or reviewed target differs from that
+selected workspace is refused before scratch allocation.
 
 The separate `susy-blueprints-observation-result-v2` envelope reports
 `observed-unqualified` and exits with code 5 on stdout when an observation was
@@ -32,12 +33,19 @@ result.
 
 The V2 observation and its separate private evidence record identify the
 scratch lease and report `retained-process-absence-unproven`. They report the
-current process handling precisely: Git calls wait for their direct child;
-Bubblewrap commands create an initial process group and the timeout path
-signals that group. Neither observation proves that detached descendants are
-absent. No V2 result says that scratch was deleted. Candidate bytes can remain
-in the owner-private Core lease; the public result includes only identifiers,
-gate status/digests, and the retention state.
+current process handling precisely: Core runs V2 Git calls with a five minute
+timeout, a 1 MiB input limit, and a 4 MiB limit for each output stream. Core
+retains private process captures for launched V2 Git calls, including
+incomplete captures when supervision fails after capture startup. The private
+evidence lists completed Git capture IDs and exact attempt names under the
+retained lease; its reader refuses duplicate attempt names.
+Historical V2 records without this list keep their original meaning. Git
+supervision proves closure of its original process group only. Bubblewrap
+commands create an initial process group and the timeout path signals that
+group. Neither observation proves that detached descendants are absent. No V2
+result says that scratch was deleted. Candidate bytes can remain in the
+owner-private Core lease; the public result includes only identifiers, gate
+status/digests, and the retention state.
 
 V2 private evidence uses `blueprints-simulation-evidence-v2.schema.json`, a
 separate content-addressed `v2/objects` namespace, and a
@@ -45,13 +53,14 @@ separate content-addressed `v2/objects` namespace, and a
 canonical bytes, schema, and gate digests. The historical V1 reader and
 `local-simulation-evidence:sha256:` locator continue to mean the original V1
 cleanup claim. Core's temporary-lease inventory is the current authority for
-whether retained scratch still exists. `read_v2` validates evidence bytes but
-does not reopen the physical lease; the recorded disposition is a
-publication-time claim. Current lease state requires a separate Core catalog
-readback.
+whether retained scratch still exists. `read_v2` validates the typed Git
+capture references and evidence bytes but does not reopen the physical lease
+or captured streams; the recorded disposition is a publication-time claim.
+Current lease and process-capture state requires separate Core readback.
 
 Before a V2 observation can become a releasable simulation, Core must own
-the Git and Bubblewrap process lifecycle, prove full process absence across
-interruptions and restarts, and provide a safe retained-lease disposition.
+the Bubblewrap process lifecycle, prove full process absence for Git and
+Bubblewrap across interruptions and restarts, and provide a safe retained
+lease disposition.
 That work needs separate native checks on Linux, WSL Linux filesystems, WSL
 Windows mounts, and Windows. This V2 route makes none of those claims.

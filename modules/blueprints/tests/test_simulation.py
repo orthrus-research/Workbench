@@ -31,6 +31,7 @@ from _support import (
 )
 from workbench_api.simulation_scratch import simulation_scratch_scope
 from workbench_core.simulation_scratch import CoreSimulationScratch
+from workbench_core import process_capture
 from workbench_core.temporary_leases import CoreTemporaryLeases
 
 REPO_ROOT = WORKBENCH_ROOT
@@ -346,12 +347,18 @@ class SimulationTest(unittest.TestCase):
         }
         with simulation_scratch_scope(host), patch.object(
             simulation, "_command_result", return_value=command,
-        ):
+        ), patch.object(
+            planner, "capture_simulation_git", wraps=planner.capture_simulation_git,
+        ) as planner_capture, patch.object(
+            simulation, "capture_simulation_git", wraps=simulation.capture_simulation_git,
+        ) as simulation_capture:
             result = self._simulator().execute(
                 self.planning_result, intake=self.intake, target_manifest=self.target,
                 planning_evidence=self.planning_evidence,
                 environment_lock=self.environment, custody_mode="retained-v2",
             )
+        self.assertGreater(planner_capture.call_count, 0)
+        self.assertGreater(simulation_capture.call_count, 0)
         self.assertNotIn("simulation", result)
         observation = result["observation_v2"]
         self.assertEqual("observed-unqualified", observation["status"])
@@ -362,6 +369,9 @@ class SimulationTest(unittest.TestCase):
             result["evidence_locator_v2"]
         )
         self.assertEqual(observation["scratch_lease_id"], evidence["scratch_lease_id"])
+        self.assertEqual("core-original-group-only", observation["git_supervision"])
+        self.assertEqual("core-original-group-only", evidence["git_supervision"])
+        self.assertGreater(len(evidence["git_captures"]), 0)
         self.assertEqual("BPX128_COMMAND_FAILED", next(
             row["reason_code"] for row in evidence["gates"]
             if row["stage_id"] == "isolated-compilation"
@@ -377,6 +387,18 @@ class SimulationTest(unittest.TestCase):
         self.assertEqual("retained-unproven", rows[0]["status"])
         self.assertEqual(observation["scratch_lease_id"], rows[0]["lease_id"])
         self.assertTrue(Path(rows[0]["path"]).is_dir())
+        capture_root = Path(rows[0]["path"]) / "git-captures"
+        self.assertEqual(
+            {row["attempt"] for row in evidence["git_captures"]},
+            {item.name for item in capture_root.iterdir()},
+        )
+        for capture in evidence["git_captures"]:
+            attempt = capture_root / capture["attempt"]
+            started = json.loads((attempt / "started.json").read_text(encoding="utf-8"))
+            process_capture.retained_files(
+                attempt, binding=started["binding"],
+                expected_id=capture["capture_id"], verify=True,
+            )
 
     def test_v2_all_domain_gates_pass_but_observation_stays_unqualified(self) -> None:
         self.workspace_root = (
@@ -393,21 +415,35 @@ class SimulationTest(unittest.TestCase):
         }
         with simulation_scratch_scope(host), patch.object(
             simulation, "_command_result", return_value=command,
-        ):
+        ), patch.object(
+            planner, "capture_simulation_git", wraps=planner.capture_simulation_git,
+        ) as planner_capture, patch.object(
+            simulation, "capture_simulation_git", wraps=simulation.capture_simulation_git,
+        ) as simulation_capture:
             result = self._simulator().execute(
                 self.planning_result, intake=self.intake, target_manifest=self.target,
                 planning_evidence=self.planning_evidence,
                 environment_lock=self.environment, custody_mode="retained-v2",
             )
+        self.assertGreater(planner_capture.call_count, 0)
+        self.assertGreater(simulation_capture.call_count, 0)
         observation = result["observation_v2"]
         self.assertEqual("passed", observation["gate_status"])
         self.assertEqual("observed-unqualified", observation["status"])
         self.assertTrue(all(row["status"] == "passed" for row in observation["gates"]))
         self.assertNotIn("simulation", result)
+        evidence = simulation.SimulationEvidenceStore(self.evidence_root).read_v2(
+            result["evidence_locator_v2"]
+        )
+        self.assertGreater(len(evidence["git_captures"]), 10)
         rows = CoreTemporaryLeases.inventory_catalog(
             self.configuration_home, workspace=self.repository,
         )
         self.assertEqual("retained-unproven", rows[0]["status"])
+        self.assertEqual(
+            {row["attempt"] for row in evidence["git_captures"]},
+            {item.name for item in (Path(rows[0]["path"]) / "git-captures").iterdir()},
+        )
 
     def test_v2_requires_core_scratch_binding_before_scratch_creation(self) -> None:
         self.workspace_root = (
@@ -791,6 +827,28 @@ class SimulationEvidenceCustodyTests(unittest.TestCase):
             with sealed_store_scope(workspace, root / "config"):
                 locator = store.put_v2(evidence)
                 self.assertEqual(evidence, store.read_v2(locator))
+                captured = copy.deepcopy(evidence)
+                captured["git_supervision"] = "core-original-group-only"
+                captured["git_captures"] = [{
+                    "attempt": "a" * 32,
+                    "capture_id": "process-capture:sha256:" + "b" * 64,
+                }]
+                self.assertEqual(captured, store.read_v2(store.put_v2(captured)))
+                missing = copy.deepcopy(captured)
+                missing.pop("git_captures")
+                with self.assertRaises(simulation.SimulationDiagnostic):
+                    store.put_v2(missing)
+                duplicate = copy.deepcopy(captured)
+                duplicate["git_captures"].append({
+                    "attempt": "a" * 32,
+                    "capture_id": "process-capture:sha256:" + "c" * 64,
+                })
+                with self.assertRaises(simulation.SimulationDiagnostic) as duplicated:
+                    store.read_v2(store.put_v2(duplicate))
+                self.assertEqual("BPX155_GIT_CAPTURE", duplicated.exception.code)
+                captured["git_captures"][0]["capture_id"] = "invalid"
+                with self.assertRaises(simulation.SimulationDiagnostic):
+                    store.put_v2(captured)
                 with self.assertRaises(simulation.SimulationDiagnostic):
                     store.put_v2({**evidence, "disposable_worktrees_removed": True})
                 bad_gate = copy.deepcopy(evidence)

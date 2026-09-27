@@ -42,7 +42,7 @@
       "type": "string", "pattern": "^workbench-temporary-lease-v1:[0-9a-f]{32}$"
     },
     "scratch_disposition": {"const": "retained-process-absence-unproven"},
-    "git_supervision": {"const": "direct-child-wait-only"},
+    "git_supervision": {"enum": ["direct-child-wait-only", "core-original-group-only"]},
     "sandbox_supervision": {"const": "initial-process-group-only"},
     "descendant_absence": {"const": "unproven"}
   }

@@ -28,7 +28,8 @@ from workbench_api.host_filesystem import (
 )
 from workbench_api.record_stores import open_record_store
 from workbench_api.simulation_scratch import (
-    SimulationScratchError, allocate_simulation_scratch,
+    SimulationScratchError, allocate_simulation_scratch, capture_simulation_git,
+    simulation_git_capture_active, simulation_git_capture_scope,
 )
 from workbench_blueprints import planner, standards
 from workbench_blueprints.layout import SCHEMA_ROOT, WORKBENCH_ROOT
@@ -558,6 +559,9 @@ class SimulationEvidenceStore:
         if not isinstance(evidence, dict) or standards.canonical_json(evidence).encode("utf-8") != content:
             _fail("BPX153_EVIDENCE_CANONICAL", locator, "V2 evidence is not canonical")
         _validate(evidence, SIMULATION_EVIDENCE_V2_SCHEMA, locator)
+        captures = evidence.get("git_captures", [])
+        if len({row["attempt"] for row in captures}) != len(captures):
+            _fail("BPX155_GIT_CAPTURE", locator, "V2 Git attempt identity is duplicated")
         for row in evidence["gates"]:
             projected = dict(row)
             observed = projected.pop("evidence_sha256")
@@ -571,20 +575,31 @@ def _git(repository: Path, *arguments: str, input_bytes: bytes | None = None) ->
         git = planner.configured_git_executable()
     except planner.BlueprintsGitBindingError as exc:
         _fail("BPX117_GIT", str(repository), str(exc))
-    result = subprocess.run(
-        [git, "-C", str(repository), *arguments],
-        input=input_bytes,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0:
+    if simulation_git_capture_active():
+        try:
+            captured = capture_simulation_git(
+                [git, "-C", str(repository), *arguments],
+                cwd=repository, stdin=b"" if input_bytes is None else input_bytes,
+            )
+        except SimulationScratchError as exc:
+            _fail("BPX117_GIT", str(repository), str(exc))
+        exit_code, stdout, stderr = captured.exit_code, captured.stdout, captured.stderr
+    else:
+        result = subprocess.run(
+            [git, "-C", str(repository), *arguments],
+            input=input_bytes,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        exit_code, stdout, stderr = result.returncode, result.stdout, result.stderr
+    if exit_code != 0:
         _fail(
             "BPX117_GIT",
             str(repository),
-            result.stderr.decode("utf-8", "replace").strip(),
+            stderr.decode("utf-8", "replace").strip(),
         )
-    return result.stdout
+    return stdout
 
 
 def _safe_parent(root: Path, relative: str) -> Path:
@@ -670,25 +685,29 @@ def _reconstruct_target(
         git = planner.configured_git_executable()
     except planner.BlueprintsGitBindingError as exc:
         _fail("BPX117_GIT", str(source), str(exc))
-    result = subprocess.run(
-        [
-            git,
-            "clone",
-            "--quiet",
-            "--no-local",
-            "--no-hardlinks",
-            str(source),
-            str(destination),
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0:
+    command = [
+        git, "clone", "--quiet", "--no-local", "--no-hardlinks",
+        str(source), str(destination),
+    ]
+    if simulation_git_capture_active():
+        try:
+            captured = capture_simulation_git(command, cwd=source)
+        except SimulationScratchError as exc:
+            _fail("BPX117_GIT", str(source), str(exc))
+        exit_code, stderr = captured.exit_code, captured.stderr
+    else:
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        exit_code, stderr = result.returncode, result.stderr
+    if exit_code != 0:
         _fail(
             "BPX117_GIT",
             str(source),
-            result.stderr.decode("utf-8", "replace").strip(),
+            stderr.decode("utf-8", "replace").strip(),
         )
     _git(destination, "checkout", "--quiet", "--detach", manifest["revision"])
     for row in manifest["entries"]:
@@ -1211,20 +1230,10 @@ class Simulator:
             if gate["required"]
         }
 
-        if custody_mode == "v1":
-            self.workspace_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        source_before = planner.capture_target_state(
-            self.target_repository, target_manifest["repository_id"]
-        )
-        if source_before != target_manifest:
-            _fail(
-                "BPX120_TARGET_RACE",
-                str(self.target_repository),
-                "target changed before simulation",
-            )
         temporary = None
         scratch_context = None
         scratch_reference = None
+        git_captures: list[dict[str, str]] = []
         if custody_mode == "retained-v2":
             try:
                 scratch_context = allocate_simulation_scratch(
@@ -1235,10 +1244,38 @@ class Simulator:
                 _fail("BPX158_SCRATCH", str(self.workspace_root), str(exc))
             root = scratch_reference.path
         else:
+            self.workspace_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            if scratch_reference is not None:
+                with simulation_git_capture_scope(scratch_reference, git_captures):
+                    source_before = planner.capture_target_state(
+                        self.target_repository, target_manifest["repository_id"]
+                    )
+            else:
+                source_before = planner.capture_target_state(
+                    self.target_repository, target_manifest["repository_id"]
+                )
+            if source_before != target_manifest:
+                _fail(
+                    "BPX120_TARGET_RACE",
+                    str(self.target_repository),
+                    "target changed before simulation",
+                )
+        except BaseException:
+            if scratch_context is not None:
+                scratch_context.__exit__(*sys.exc_info())
+            raise
+        if scratch_reference is None:
             temporary = tempfile.TemporaryDirectory(
                 prefix="blueprints-simulation.", dir=self.workspace_root
             )
             root = Path(temporary.name)
+        git_scope = (
+            simulation_git_capture_scope(scratch_reference, git_captures)
+            if scratch_reference is not None else None
+        )
+        if git_scope is not None:
+            git_scope.__enter__()
         try:
             for stage in plan["validation_stages"]:
                 ordinal = stage["ordinal"]
@@ -1545,15 +1582,26 @@ class Simulator:
                 if status != "passed":
                     failed = True
         finally:
-            if scratch_context is not None:
-                scratch_context.__exit__(*sys.exc_info())
-            else:
-                assert temporary is not None
-                temporary.cleanup()
+            completion = sys.exc_info()
+            try:
+                if git_scope is not None:
+                    git_scope.__exit__(*completion)
+            finally:
+                if scratch_context is not None:
+                    scratch_context.__exit__(*completion)
+                else:
+                    assert temporary is not None
+                    temporary.cleanup()
 
-        source_after = planner.capture_target_state(
-            self.target_repository, target_manifest["repository_id"]
-        )
+        if scratch_reference is not None:
+            with simulation_git_capture_scope(scratch_reference, git_captures):
+                source_after = planner.capture_target_state(
+                    self.target_repository, target_manifest["repository_id"]
+                )
+        else:
+            source_after = planner.capture_target_state(
+                self.target_repository, target_manifest["repository_id"]
+            )
         if source_after != target_manifest:
             _fail(
                 "BPX148_SOURCE_MUTATED",
@@ -1601,7 +1649,8 @@ class Simulator:
                 "status": "observed-unqualified",
                 "scratch_lease_id": scratch_reference.lease_id,
                 "scratch_disposition": "retained-process-absence-unproven",
-                "git_supervision": "direct-child-wait-only",
+                "git_supervision": "core-original-group-only",
+                "git_captures": git_captures,
                 "sandbox_supervision": "initial-process-group-only",
                 "descendant_absence": "unproven",
             })
@@ -1634,7 +1683,7 @@ class Simulator:
                 "gates": public_gates,
                 "scratch_lease_id": scratch_reference.lease_id,
                 "scratch_disposition": "retained-process-absence-unproven",
-                "git_supervision": "direct-child-wait-only",
+                "git_supervision": "core-original-group-only",
                 "sandbox_supervision": "initial-process-group-only",
                 "descendant_absence": "unproven",
             }

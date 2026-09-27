@@ -215,6 +215,7 @@ def dispatch(
                 simulation_scratch = simulation_scratch_scope(CoreSimulationScratch(
                     workspace=context.workspace,
                     configuration_home=context.configuration_home,
+                    cancelled=context.cancelled,
                 ))
             policy_stores = state_root_policies_scope(CoreStateRootPolicies(
                 suite_root=context.workspace if suite_root is None else suite_root,

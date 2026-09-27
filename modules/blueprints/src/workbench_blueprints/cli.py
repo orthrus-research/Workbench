@@ -328,6 +328,12 @@ def main(
                     "BPI159_CORE_CUSTODY", "/workspace",
                     "V2 session is outside the selected Core workspace",
                 )
+            target = _direct_target(arguments)
+            if target != selected_workspace.resolve():
+                raise interface.InterfaceDiagnostic(
+                    "BPI159_CORE_CUSTODY", "/target-repository",
+                    "V2 target differs from the selected Core workspace",
+                )
         if record_store_host_bound():
             custody = nullcontext()
         else:

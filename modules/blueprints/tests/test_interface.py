@@ -244,6 +244,31 @@ class InterfaceTest(unittest.TestCase):
             self.fixture.configuration_home, workspace=self.fixture.repository,
         ))
 
+    def test_installed_v2_refuses_changed_target_before_core_lease(self) -> None:
+        core = self._core("instructions")
+        core.plan(self.fixture.planning_evidence)
+        pointer = (self.workspace / "current.json").read_bytes()
+        environment_lock = self._write_json("changed-target-lock.json", self.fixture.environment)
+        out, err = StringIO(), StringIO()
+        with patch("workbench_blueprints.cli.record_store_host_bound", return_value=True), patch(
+            "workbench_blueprints.cli._direct_target",
+            return_value=self.fixture.root / "external-target",
+        ):
+            code = cli.main(
+                ["--workspace", str(self.workspace), "observe-simulation-v2",
+                 "--environment-lock", str(environment_lock)],
+                selected_workspace=self.fixture.repository,
+                selected_configuration_home=self.fixture.configuration_home,
+                stdout=out, stderr=err,
+            )
+        self.assertEqual(4, code)
+        self.assertEqual("", out.getvalue())
+        self.assertEqual("BPI159_CORE_CUSTODY", json.loads(err.getvalue())["diagnostics"][0]["code"])
+        self.assertEqual(pointer, (self.workspace / "current.json").read_bytes())
+        self.assertEqual([], CoreTemporaryLeases.inventory_catalog(
+            self.fixture.configuration_home, workspace=self.fixture.repository,
+        ))
+
     def test_installed_v2_refuses_redirected_session_inside_selected_workspace(self) -> None:
         core = self._core("instructions")
         core.plan(self.fixture.planning_evidence)

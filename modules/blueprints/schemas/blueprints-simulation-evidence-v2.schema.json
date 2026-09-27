@@ -11,6 +11,16 @@
     "git_supervision", "sandbox_supervision", "descendant_absence"
   ],
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"git_supervision": {"const": "core-original-group-only"}}},
+      "then": {"required": ["git_captures"]}
+    },
+    {
+      "if": {"properties": {"git_supervision": {"const": "direct-child-wait-only"}}},
+      "then": {"not": {"required": ["git_captures"]}}
+    }
+  ],
   "properties": {
     "schema_version": {"const": 2},
     "format": {"const": "susy-blueprints-simulation-evidence-v2"},
@@ -54,7 +64,22 @@
       "type": "string", "pattern": "^workbench-temporary-lease-v1:[0-9a-f]{32}$"
     },
     "scratch_disposition": {"const": "retained-process-absence-unproven"},
-    "git_supervision": {"const": "direct-child-wait-only"},
+    "git_supervision": {"enum": ["direct-child-wait-only", "core-original-group-only"]},
+    "git_captures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["attempt", "capture_id"],
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+          "capture_id": {
+            "type": "string", "pattern": "^process-capture:sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
     "sandbox_supervision": {"const": "initial-process-group-only"},
     "descendant_absence": {"const": "unproven"}
   },

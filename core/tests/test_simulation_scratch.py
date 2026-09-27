@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
+import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -13,6 +15,7 @@ from workbench_api.simulation_scratch import (
     SimulationScratchError, allocate_simulation_scratch, simulation_scratch_scope,
 )
 from workbench_core.modules import InstalledModule, dispatch
+from workbench_core import process_capture
 from workbench_core.simulation_scratch import CoreSimulationScratch
 from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
@@ -70,6 +73,49 @@ class SimulationScratchTests(unittest.TestCase):
                 with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as reference:
                     (reference.path / ".workbench-temporary-lease.json").write_bytes(b"changed\n")
         self.assertTrue(reference.path.is_dir())
+
+    def test_git_capture_retains_exact_output_and_refuses_oversize_input(self) -> None:
+        with simulation_scratch_scope(self.host):
+            with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as reference:
+                result = self.host.capture_git(
+                    reference, [sys.executable, "-c", "import sys; sys.stdout.write('captured')"],
+                    cwd=self.workspace, stdin=b"",
+                )
+                self.assertEqual(0, result.exit_code)
+                self.assertEqual(b"captured", result.stdout)
+                with self.assertRaisesRegex(SimulationScratchError, "input exceeds"):
+                    self.host.capture_git(
+                        reference, [sys.executable, "-c", "pass"],
+                        cwd=self.workspace, stdin=b"x" * (1024 * 1024 + 1),
+                    )
+        attempts = list((reference.path / "git-captures").iterdir())
+        self.assertEqual([result.attempt_name], [item.name for item in attempts])
+        started = json.loads((attempts[0] / "started.json").read_text(encoding="utf-8"))
+        retained = process_capture.retained_files(
+            attempts[0], binding=started["binding"], expected_id=result.capture_id,
+            verify=True,
+        )
+        self.assertEqual(4, len(retained))
+        self.assertEqual("retained-unproven", CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.workspace,
+        )[0]["status"])
+
+    def test_git_capture_output_limit_retains_incomplete_attempt(self) -> None:
+        with simulation_scratch_scope(self.host):
+            with allocate_simulation_scratch(parent=self.parent, plan_id=_PLAN) as reference:
+                with self.assertRaisesRegex(SimulationScratchError, "byte bound"):
+                    self.host.capture_git(
+                        reference,
+                        [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'x' * 4194305)"],
+                        cwd=self.workspace, stdin=b"",
+                    )
+        attempts = list((reference.path / "git-captures").iterdir())
+        self.assertEqual(1, len(attempts))
+        record = json.loads((attempts[0] / "capture.json").read_text(encoding="utf-8"))
+        self.assertEqual("incomplete", record["state"])
+        self.assertEqual("retained-unproven", CoreTemporaryLeases.inventory_catalog(
+            self.configuration_home, workspace=self.workspace,
+        )[0]["status"])
 
     def test_parent_outside_selected_workspace_is_refused(self) -> None:
         outside = self.workspace.parent / "elsewhere"
