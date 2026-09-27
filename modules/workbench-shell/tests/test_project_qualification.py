@@ -45,7 +45,7 @@ from workbench_core.state_root_selection import (  # noqa: E402
     effective_state_root, select_state_root,
 )
 from workbench_api.record_stores import (  # noqa: E402
-    record_store_host_bound, record_store_scope,
+    RecordStoreReference, record_store_host_bound, record_store_scope,
 )
 from workbench_core.storage.record_stores import CoreRecordStores  # noqa: E402
 from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
@@ -84,6 +84,21 @@ def _status(project: Path, state_root: Path) -> dict[str, object]:
         profile_selector="supersymmetry",
         state_root=state_root,
     )
+
+
+def _apply_with_core(
+    suite_root: Path, project: Path, *, profile_selector: str,
+    state_root: Path, expected_plan_id: str,
+) -> dict[str, object]:
+    host = CoreRecordStores(
+        workspace=suite_root, configuration_home=state_root.parent / "user-config",
+        owner_id="workbench-shell",
+    )
+    with record_store_scope(host):
+        return apply_qualification_plan(
+            suite_root, project, profile_selector=profile_selector,
+            state_root=state_root, expected_plan_id=expected_plan_id,
+        )
 
 
 def _git_status(project: Path) -> str:
@@ -211,6 +226,87 @@ class ProjectQualificationTests(unittest.TestCase):
                 str(state_root / "project-qualification-v1/bindings"), rows[0]["path"],
             )
 
+    def test_direct_library_refuses_new_unbound_write_but_reopens_historical_binding(self) -> None:
+        with _temporary_directory() as temporary:
+            root = Path(temporary)
+            project = create_supersymmetry_project(root)
+            state_root = root / "external-state"
+            plan = build_qualification_plan(_status(project, state_root))
+            self.assertFalse(record_store_host_bound())
+            with self.assertRaisesRegex(ProjectQualificationError, "Core custody"):
+                apply_qualification_plan(
+                    REPOSITORY_ROOT, project, profile_selector="supersymmetry",
+                    state_root=state_root, expected_plan_id=plan["plan_id"],
+                )
+            self.assertFalse(state_root.exists())
+
+            qualified = _apply_with_core(
+                REPOSITORY_ROOT, project, profile_selector="supersymmetry",
+                state_root=state_root, expected_plan_id=plan["plan_id"],
+            )
+            binding_path = Path(qualified["binding"]["path"])
+            original = binding_path.read_bytes()
+            current = _status(project, state_root)
+            self.assertTrue(current["qualified"])
+            reuse_plan = build_qualification_plan(current)
+            self.assertEqual("reuse-current-binding", reuse_plan["actions"][0]["operation"])
+            reused = apply_qualification_plan(
+                REPOSITORY_ROOT, project, profile_selector="supersymmetry",
+                state_root=state_root, expected_plan_id=reuse_plan["plan_id"],
+            )
+            self.assertEqual("reused", reused["outcome"])
+            self.assertEqual(original, binding_path.read_bytes())
+            self.assertFalse(record_store_host_bound())
+
+    def test_direct_library_refuses_missing_core_target_store_before_binding_write(self) -> None:
+        with _temporary_directory() as temporary:
+            root = Path(temporary)
+            project = create_supersymmetry_project(root)
+            state_root = root / "external-state"
+            plan = build_qualification_plan(_status(project, state_root))
+            host = CoreRecordStores(
+                workspace=REPOSITORY_ROOT, configuration_home=root / "user-config",
+                owner_id="workbench-shell",
+            )
+            with record_store_scope(host), patch.object(
+                qualification_module, "open_target_record_store", return_value=None,
+            ) as opened:
+                with self.assertRaisesRegex(ProjectQualificationError, "Core custody"):
+                    apply_qualification_plan(
+                        REPOSITORY_ROOT, project, profile_selector="supersymmetry",
+                        state_root=state_root, expected_plan_id=plan["plan_id"],
+                    )
+            opened.assert_called_once_with(
+                "project-qualification-v1", state_root, project,
+            )
+            self.assertFalse(Path(plan["binding"]["path"]).exists())
+
+    def test_direct_library_refuses_core_store_bound_to_another_workspace(self) -> None:
+        with _temporary_directory() as temporary:
+            root = Path(temporary)
+            project = create_supersymmetry_project(root)
+            state_root = root / "external-state"
+            plan = build_qualification_plan(_status(project, state_root))
+            host = CoreRecordStores(
+                workspace=REPOSITORY_ROOT, configuration_home=root / "user-config",
+                owner_id="workbench-shell",
+            )
+            wrong = RecordStoreReference(
+                store_id="wrong", family="project-qualification-v1",
+                owner_id="workbench-shell", workspace=REPOSITORY_ROOT,
+                root=Path(plan["binding"]["path"]).parent,
+                retention="protected-until-reviewed-policy",
+            )
+            with record_store_scope(host), patch.object(
+                qualification_module, "open_target_record_store", return_value=wrong,
+            ):
+                with self.assertRaisesRegex(ProjectQualificationError, "target binding changed"):
+                    apply_qualification_plan(
+                        REPOSITORY_ROOT, project, profile_selector="supersymmetry",
+                        state_root=state_root, expected_plan_id=plan["plan_id"],
+                    )
+            self.assertFalse(Path(plan["binding"]["path"]).exists())
+
     def test_direct_cli_apply_catalogs_target_at_historical_v1_path(self) -> None:
         with _temporary_directory() as temporary:
             root = Path(temporary)
@@ -268,7 +364,7 @@ class ProjectQualificationTests(unittest.TestCase):
                 qualification_module, "replace_private_bytes", side_effect=raced,
             ):
                 with self.assertRaisesRegex(ProjectQualificationError, "cannot publish"):
-                    apply_qualification_plan(
+                    _apply_with_core(
                         REPOSITORY_ROOT, project,
                         profile_selector="supersymmetry",
                         state_root=state_root, expected_plan_id=plan["plan_id"],
@@ -376,7 +472,7 @@ class ProjectQualificationTests(unittest.TestCase):
             self.assertEqual(PLAN_FORMAT, plan["format"])
             self.assertEqual("atomic-private-record-create", plan["actions"][0]["operation"])
 
-            result = apply_qualification_plan(
+            result = _apply_with_core(
                 REPOSITORY_ROOT,
                 project,
                 profile_selector="supersymmetry",
@@ -427,7 +523,7 @@ class ProjectQualificationTests(unittest.TestCase):
                 planned_workspace["dirty_fingerprint"],
                 drifted_plan["workspace"]["dirty_fingerprint"],
             )
-            result = apply_qualification_plan(
+            result = _apply_with_core(
                 REPOSITORY_ROOT,
                 project,
                 profile_selector="supersymmetry",
@@ -484,7 +580,7 @@ class ProjectQualificationTests(unittest.TestCase):
             project = create_supersymmetry_project(root)
             state_root = root / "external-state"
             plan = build_qualification_plan(_status(project, state_root))
-            result = apply_qualification_plan(
+            result = _apply_with_core(
                 REPOSITORY_ROOT,
                 project,
                 profile_selector="supersymmetry",
@@ -851,7 +947,7 @@ class ProjectQualificationTests(unittest.TestCase):
                     ProjectQualificationError,
                     "physically aliases",
                 ):
-                    apply_qualification_plan(
+                    _apply_with_core(
                         REPOSITORY_ROOT,
                         project,
                         profile_selector="supersymmetry",
@@ -879,7 +975,7 @@ class ProjectQualificationTests(unittest.TestCase):
                     ProjectQualificationError,
                     "cannot secure qualification state: path is not owner-private",
                 ):
-                    apply_qualification_plan(
+                    _apply_with_core(
                         REPOSITORY_ROOT,
                         project,
                         profile_selector="supersymmetry",

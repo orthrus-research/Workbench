@@ -1250,6 +1250,11 @@ def apply_qualification_plan(
         raise ProjectQualificationError(
             "the current workspace is incompatible and cannot be qualified"
         )
+    if (current_plan["actions"][0]["operation"] != "reuse-current-binding"
+            and not record_store_host_bound()):
+        raise ProjectQualificationError(
+            "project qualification writes require Workbench Core custody"
+        )
     binding_path = Path(current_plan["binding"]["path"])
     target = Path(str(current_status["workspace"]["root"]))
     effective_state_root = _state_base(state_root)
@@ -1274,9 +1279,18 @@ def apply_qualification_plan(
             opened_store = open_target_record_store(
                 "project-qualification-v1", effective_state_root, target,
             )
-            if opened_store is not None and opened_store.root != binding_path.parent:
-                raise ProjectQualificationError("Core qualification binding namespace changed")
             operation = locked_plan["actions"][0]["operation"]
+            if operation != "reuse-current-binding" and opened_store is None:
+                raise ProjectQualificationError(
+                    "project qualification writes require Workbench Core custody"
+                )
+            if opened_store is not None and (
+                opened_store.root != binding_path.parent
+                or opened_store.workspace != target
+                or opened_store.family != "project-qualification-v1"
+                or opened_store.owner_id != "workbench-shell"
+            ):
+                raise ProjectQualificationError("Core qualification target binding changed")
             if operation == "reuse-current-binding":
                 outcome = "reused"
                 retained = _load_binding(binding_path)

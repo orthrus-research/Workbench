@@ -116,6 +116,12 @@ checkout by lexical and physical identity. Workbench resolves a non-existing
 state root through its nearest real existing parent, rejects symlink/reparse,
 same-file, and same-Git-directory aliases, and repeats the physical check after
 creating state directories but before creating a lock, staging file, or binding.
+New bindings and replacements require a Core record-store host bound to the
+explicit target workspace. The standalone CLI binds that host for the consented
+apply, and installed dispatch supplies its selected host. Direct library calls
+without Core custody can still inspect and reuse an exact historical binding,
+but cannot create or replace one.
+
 Workbench creates owner-private
 directories and an owner-private regular file, rejects symlink or special-file
 substitution, writes through an exclusive temporary file, atomically replaces
