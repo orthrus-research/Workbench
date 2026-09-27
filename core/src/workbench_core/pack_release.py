@@ -21,6 +21,7 @@ from urllib.request import Request, urlopen
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
 from packaging.version import Version
+from workbench_api.durable_resources import DurableResourceError
 from workbench_api.host_filesystem import DurableRecordError
 from workbench_api.profiles import profile_resources
 from workbench_api.state_paths import default_runtime_state_root
@@ -552,6 +553,39 @@ class PackReleaseService:
         result = self._result("inputs", "planned", choice, None)
         return {**result, "artifact_state": "verified", "input_plan": plan}
 
+    def local_inputs(self, source_path: Path, policy_path: Path) -> dict[str, Any]:
+        """Review local bytes against manifest IDs without asserting their origin."""
+
+        from .pack_release_local import review_local_inputs
+
+        first = self.inputs()
+        if first["status"] != "planned":
+            return {"schema": "workbench.pack-release.local-inputs.v1",
+                    "action": "local-inputs", "status": first["status"],
+                    "reason": first["reason"], "local_input_plan": None}
+        input_plan = first["input_plan"]
+        selected = first["selected"]
+        try:
+            plan = review_local_inputs(
+                input_plan, source_path=source_path, policy_path=policy_path,
+                archive_path=Path(selected["artifact_path"]),
+            )
+        except (DurableRecordError, DurableResourceError, OSError, ValueError) as exc:
+            return {"schema": "workbench.pack-release.local-inputs.v1",
+                    "action": "local-inputs", "status": "unavailable",
+                    "reason": str(exc), "local_input_plan": None}
+        current = self.inputs()
+        if (current["status"] != "planned"
+                or current["input_plan"]["plan_id"] != input_plan["plan_id"]
+                or current["selected"] != selected):
+            return {"schema": "workbench.pack-release.local-inputs.v1",
+                    "action": "local-inputs", "status": "stale",
+                    "reason": "selected client archive changed during local review",
+                    "local_input_plan": None}
+        return {"schema": "workbench.pack-release.local-inputs.v1",
+                "action": "local-inputs", "status": "planned", "reason": None,
+                "local_input_plan": plan}
+
     def check(self) -> dict[str, Any]:
         choice = self._read_choice()
         try:
@@ -681,15 +715,20 @@ class PackReleaseService:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="workbench pack release")
-    parser.add_argument("action", choices=("show", "check", "accept", "ignore", "prepare", "inputs"))
+    parser.add_argument("action", choices=("show", "check", "accept", "ignore", "prepare", "inputs", "local-inputs"))
     parser.add_argument("--profile", required=True, choices=(PROFILE,))
     parser.add_argument("--expected-release-id")
+    parser.add_argument("--sources", type=Path)
     parser.add_argument("--json", action="store_true")
     selected = parser.parse_args(argv)
-    if selected.action in {"show", "check", "inputs"} and selected.expected_release_id is not None:
-        parser.error("show, check, and inputs do not accept an expected release ID")
+    if selected.action in {"show", "check", "inputs", "local-inputs"} and selected.expected_release_id is not None:
+        parser.error("show, check, inputs, and local-inputs do not accept an expected release ID")
     if selected.action in {"accept", "ignore", "prepare"} and selected.expected_release_id is None:
         parser.error("accept, ignore, and prepare require --expected-release-id")
+    if selected.action == "local-inputs" and selected.sources is None:
+        parser.error("local-inputs requires --sources")
+    if selected.action != "local-inputs" and selected.sources is not None:
+        parser.error("--sources is only accepted by local-inputs")
     resources = profile_resources("release-authority")
     if PROFILE not in resources:
         raise ValueError("Supersymmetry release authority profile is unavailable")
@@ -698,14 +737,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         config_home=default_user_config_home(),
         state_root=default_runtime_state_root(),
     )
+    if selected.action == "local-inputs":
+        policies = profile_resources("release-local-input-policy")
+        if PROFILE not in policies:
+            raise ValueError("Supersymmetry local input policy profile is unavailable")
     result = (service.show() if selected.action == "show" else
               service.check() if selected.action == "check" else
               service.inputs() if selected.action == "inputs" else
+              service.local_inputs(selected.sources, policies[PROFILE]) if selected.action == "local-inputs" else
               service.accept(selected.expected_release_id) if selected.action == "accept" else
               service.ignore(selected.expected_release_id) if selected.action == "ignore" else
               service.prepare(selected.expected_release_id))
     if selected.json:
         print(json.dumps(result, sort_keys=True))
+    elif selected.action == "local-inputs":
+        print(f"Supersymmetry local inputs: {result['status'].replace('_', ' ')}")
+        if result["reason"]:
+            print(f"  Reason: {result['reason']}")
+        if result["local_input_plan"] is not None:
+            plan = result["local_input_plan"]
+            print(f"  Local bytes verified: {plan['local_bytes_verified']}")
+            print(f"  Required files unresolved: {plan['required_unresolved']}")
+            print(f"  Optional files selected but unresolved: {plan['optional_selected_unresolved']}")
+            print("  CurseForge file identity: unproven by local hash")
     else:
         print(f"Supersymmetry release: {result['status'].replace('_', ' ')}")
         if result["candidate"]:

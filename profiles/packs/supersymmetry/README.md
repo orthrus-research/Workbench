@@ -47,6 +47,27 @@ CurseForge project/file IDs, required flags and archive member counts. The plan
 has a content identity but no download URLs or verified mod bytes. It does not
 install the client or substitute the release for a Cleanroom source lock.
 
+The pack-owned [local input policy](runtime/release-local-input-policy-v1.json)
+lets Core review files the user obtained separately. Save an owner-private JSON
+document following the [local sources schema](../../../core/src/workbench_core/schemas/workbench-pack-release-local-sources-v1.schema.json).
+It names the selected input plan ID, an explicit list of optional IDs to include,
+and any available source rows. Each source row supplies one manifest
+`project_id`/`file_id` pair, an absolute Linux `local_path`, its matching
+`filename`, byte `size` and `sha256:` digest. Missing required files and
+selected optional files appear as unresolved; an unselected optional file is
+separate. Review it with `workbench pack release local-inputs --profile
+supersymmetry --sources /absolute/private/local-sources.json --json`.
+
+Core holds each supplied file and its parent while checking its exact bytes,
+rejects redirects, linked files and conflicting `mods/` names, and returns a
+path-free [local input plan](../../../core/src/workbench_core/schemas/workbench-pack-release-local-input-plan-v1.schema.json).
+The source document and its paths remain local. This read-only review does not
+prove that a byte stream belongs to its declared CurseForge file ID, acquire
+the files into Workbench, extract the overrides, install a client or qualify a
+Cleanroom instance. A later acquisition must recheck the live inputs.
+Even `local-byte-set-reviewed` is insufficient to authorize installation until
+the file-ID provenance is independently established by a reviewed owner policy.
+
 ## Contents
 
 - `source-locks/`: exact upstream source and binary provenance.

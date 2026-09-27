@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Path-free local byte review for a selected pack release V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile", "source_kind", "input_plan_id", "release_id", "asset_sha256", "policy_id", "destination_root", "files", "local_bytes_verified", "required_unresolved", "optional_selected_unresolved", "optional_unselected", "completeness_state", "curseforge_file_identity_state", "acquisition_state", "installation_state", "plan_id"],
+  "properties": {
+    "format": {"const": "workbench-pack-release-local-input-plan-v1"},
+    "schema_version": {"const": 1},
+    "profile": {"const": "supersymmetry"},
+    "source_kind": {"const": "user-supplied-local-files"},
+    "input_plan_id": {"type": "string", "pattern": "^workbench-pack-release-input-plan:sha256:[0-9a-f]{64}$"},
+    "release_id": {"type": "string", "pattern": "^(github-release|profile-release):sha256:[0-9a-f]{64}$"},
+    "asset_sha256": {"$ref": "#/$defs/digest"},
+    "policy_id": {"type": "string", "pattern": "^workbench-pack-release-local-input-policy:sha256:[0-9a-f]{64}$"},
+    "destination_root": {"const": "mods"},
+    "files": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/file"}},
+    "local_bytes_verified": {"type": "integer", "minimum": 0},
+    "required_unresolved": {"type": "integer", "minimum": 0},
+    "optional_selected_unresolved": {"type": "integer", "minimum": 0},
+    "optional_unselected": {"type": "integer", "minimum": 0},
+    "completeness_state": {"enum": ["local-byte-set-reviewed", "local-bytes-unresolved"]},
+    "curseforge_file_identity_state": {"const": "unproven-by-local-hash"},
+    "acquisition_state": {"const": "not-acquired"},
+    "installation_state": {"const": "not-installed"},
+    "plan_id": {"type": "string", "pattern": "^workbench-pack-release-local-input-plan:sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id", "file_id", "required", "selection", "local_byte_state", "filename", "size", "sha256"],
+      "properties": {
+        "project_id": {"type": "integer", "minimum": 1},
+        "file_id": {"type": "integer", "minimum": 1},
+        "required": {"type": "boolean"},
+        "selection": {"enum": ["required", "selected", "unselected"]},
+        "local_byte_state": {"enum": ["local-bytes-verified", "required-unresolved", "optional-selected-unresolved", "optional-unselected"]},
+        "filename": {"type": ["string", "null"]},
+        "size": {"type": ["integer", "null"]},
+        "sha256": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "format": "workbench-supersymmetry-release-local-input-policy-v1",
+  "schema_version": 1,
+  "profile": "supersymmetry",
+  "input_plan_format": "workbench-pack-release-input-plan-v1",
+  "source_kind": "user-supplied-local-files",
+  "destination_root": "mods",
+  "allowed_extensions": [".jar", ".zip"],
+  "max_file_bytes": 536870912,
+  "max_total_bytes": 8589934592,
+  "optional_selection": "explicit"
+}

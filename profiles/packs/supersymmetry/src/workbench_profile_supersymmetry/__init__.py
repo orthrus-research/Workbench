@@ -10,6 +10,7 @@ def profile():
         'registration-source': 'src/workbench_profile_supersymmetry/__init__.py',
         'acquisition': 'acquisition-v1.json',
         'release-authority': 'release-authority-v1.json',
+        'release-local-input-policy': 'runtime/release-local-input-policy-v1.json',
         'manual-artifacts': 'runtime/manual-artifacts-v1.json',
         'worldgen': 'worldgen/worldgen-iteration-profile-v2.json',
         'registration-catalog': 'registration/catalog-v1.json',

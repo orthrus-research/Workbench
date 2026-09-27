@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Private user-supplied files for a selected pack release V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "input_plan_id", "optional_selected", "sources"],
+  "properties": {
+    "format": {"const": "workbench-pack-release-local-sources-v1"},
+    "schema_version": {"const": 1},
+    "input_plan_id": {"type": "string", "pattern": "^workbench-pack-release-input-plan:sha256:[0-9a-f]{64}$"},
+    "optional_selected": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/id"}},
+    "sources": {
+      "type": "array", "maxItems": 10000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["project_id", "file_id", "local_path", "filename", "size", "sha256"],
+        "properties": {
+          "project_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+          "file_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+          "local_path": {"type": "string", "minLength": 2},
+          "filename": {"type": "string", "minLength": 1},
+          "size": {"type": "integer", "minimum": 1},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id", "file_id"],
+      "properties": {
+        "project_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "file_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+      }
+    }
+  }
+}

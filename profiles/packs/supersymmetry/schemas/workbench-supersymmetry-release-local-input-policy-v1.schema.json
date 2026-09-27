@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Supersymmetry local released-client input policy V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile", "input_plan_format", "source_kind", "destination_root", "allowed_extensions", "max_file_bytes", "max_total_bytes", "optional_selection"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-release-local-input-policy-v1"},
+    "schema_version": {"const": 1},
+    "profile": {"const": "supersymmetry"},
+    "input_plan_format": {"const": "workbench-pack-release-input-plan-v1"},
+    "source_kind": {"const": "user-supplied-local-files"},
+    "destination_root": {"const": "mods"},
+    "allowed_extensions": {"const": [".jar", ".zip"]},
+    "max_file_bytes": {"type": "integer", "minimum": 1, "maximum": 536870912},
+    "max_total_bytes": {"type": "integer", "minimum": 1, "maximum": 8589934592},
+    "optional_selection": {"const": "explicit"}
+  }
+}

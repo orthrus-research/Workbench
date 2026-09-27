@@ -58,6 +58,23 @@ class ReleaseAuthorityTests(unittest.TestCase):
         self.assertIn("release-authority-v1.json", bundled)
         self.assertIn("schemas/workbench-supersymmetry-release-authority-v1.schema.json", bundled)
 
+    def test_local_client_input_policy_is_pack_owned_and_packaged(self) -> None:
+        owner = profile()
+        policy_path = owner.resource("release-local-input-policy")
+        self.assertEqual("release-local-input-policy-v1.json", policy_path.name)
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        schema = json.loads(
+            (owner.root / "schemas/workbench-supersymmetry-release-local-input-policy-v1.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(policy)
+        self.assertEqual("mods", policy["destination_root"])
+        self.assertEqual("explicit", policy["optional_selection"])
+        bundled = tomllib.loads((owner.root / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]["workbench_resources.profiles.packs.supersymmetry"]
+        self.assertIn("runtime/release-local-input-policy-v1.json", bundled)
+        self.assertIn("schemas/workbench-supersymmetry-release-local-input-policy-v1.schema.json", bundled)
+
 
 if __name__ == "__main__":
     unittest.main()
