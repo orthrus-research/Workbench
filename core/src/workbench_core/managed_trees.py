@@ -16,7 +16,7 @@ from typing import Callable, Iterator, Mapping
 from uuid import uuid4
 
 from workbench_api.managed_trees import (
-    ManagedTreeError, ManagedTreeReference, ManagedTreeTarget,
+    ManagedCheckSource, ManagedTreeError, ManagedTreeReference, ManagedTreeTarget,
 )
 from workbench_api.durable_resources import DurableResourceError, ResourceReference
 
@@ -289,6 +289,29 @@ class CoreManagedTrees:
         self.location_sources = dict(location_sources or {})
         self.check_cancelled = check_cancelled
         self.catalog = ResourceCatalog(configuration_home)
+
+    def for_check_source(self, source: ManagedCheckSource) -> CoreManagedTrees:
+        """Bind a dependent tree to its registered check source before staging.
+
+        The destination remains selected by this host's output roles. Core
+        rechecks the source at publication and anchors its tree consumer there.
+        """
+        if (not isinstance(source, ManagedCheckSource)
+                or not isinstance(source.root, Path) or not source.root.is_absolute()
+                or not isinstance(source.reference_id, str)
+                or _CHECK_ID.fullmatch(source.reference_id) is None):
+            raise ManagedTreeError("tree.references", "select an exact Core check source")
+        self.check_cancelled()
+        try:
+            check_lifecycle.resolve_tree_reference(source.root, source.reference_id)
+        except (ValueError, OSError, RuntimeError) as exc:
+            raise ManagedTreeError("tree.references", str(exc)) from exc
+        return CoreManagedTrees(
+            workspace=source.root, configuration_home=self.configuration_home,
+            locations=self.locations, owner_id=self.owner_id,
+            policy_id=self.policy_id, location_sources=self.location_sources,
+            check_cancelled=self.check_cancelled,
+        )
 
     def _resource_host(self):
         from .storage.registered import CoreDurableResources

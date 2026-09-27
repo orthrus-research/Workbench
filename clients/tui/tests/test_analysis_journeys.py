@@ -87,6 +87,13 @@ class AnalysisResultTests(unittest.TestCase):
         self.assertIn("Native status: rejected", axiom)
         self.assertIn("Findings in this page: 1", axiom)
         self.assertIn("Original native failure", axiom)
+        mixed_coverage = _analysis_summary("axiom", {
+            "result": {"state": "completed", "coverage": "complete",
+                       "native": {"result": {"assessment": {"coverage": "incomplete"}}}},
+        })
+        self.assertIn("Captured evidence: complete", mixed_coverage)
+        self.assertIn("Native assessment: incomplete", mixed_coverage)
+        self.assertNotIn("\nCoverage: complete", mixed_coverage)
         bounded = _analysis_summary("axiom", {
             "result": {"state": "completed", "findings_count": 101,
                        "finding_page": {"payload": {"records": [

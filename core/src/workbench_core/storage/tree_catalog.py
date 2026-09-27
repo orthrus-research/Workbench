@@ -46,6 +46,7 @@ _ATLAS_GRAPH_ID = re.compile(r"workbench-atlas-graph-set-v[23]:sha256:[0-9a-f]{6
 _MAX_RECORD_BYTES = 4 * 1024 * 1024
 _MAX_MEMBERS = 4096
 _MAX_ATLAS_MANIFEST_BYTES = 16 * 1024 * 1024
+_MAX_TREE_FILE_BYTES = 16 * 1024**3
 
 
 def _nonce(tree_id: str) -> str:
@@ -79,7 +80,9 @@ def inventory_members(
         if is_directory:
             directories.append({"path": relative, "kind": "directory", "classification": "authoritative"})
     files = []
-    for row in check_storage.tree_manifest(root, cancelled=cancelled):
+    for row in check_storage.tree_manifest(
+        root, cancelled=cancelled, max_file_bytes=_MAX_TREE_FILE_BYTES,
+    ):
         files.append({"path": row["path"], "kind": "file", "size": row["size"],
                       "sha256": row["sha256"], "mode": row["mode"],
                       "classification": "derived" if row["path"] in derived_members else "authoritative"})

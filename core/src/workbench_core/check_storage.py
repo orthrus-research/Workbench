@@ -253,7 +253,10 @@ def manifest_paths(root, *, exclude=(), contained_directory_links=False, cancell
 def tree_manifest(
     root, *, exclude=(), contained_file_links=False,
     contained_directory_links=False, cancelled=lambda: False,
+    max_file_bytes=2 * 1024**3,
 ):
+    if type(max_file_bytes) is not int or not 0 < max_file_bytes <= 32 * 1024**3:
+        raise CheckStorageError("select a bounded runtime file size")
     root = ordinary(root, directory=True)
     rows, seen, total = [], set(), 0
     for relative, directory in manifest_paths(
@@ -272,7 +275,7 @@ def tree_manifest(
         before = native_path(path).stat()
         total += before.st_size
         if (
-            before.st_size > 2 * 1024**3
+            before.st_size > max_file_bytes
             or total > 32 * 1024**3
             or len(rows) >= 100_000
         ):

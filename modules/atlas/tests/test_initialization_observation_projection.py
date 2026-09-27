@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from workbench_api.managed_trees import managed_trees_scope
+from workbench_api.managed_trees import ManagedCheckSource, managed_trees_scope
 from workbench_core.managed_trees import CoreManagedTrees
 from workbench_atlas_categorical_graph import CategoricalGraphQuery
 from workbench_atlas_observations.projection import (
@@ -19,7 +19,7 @@ from workbench_atlas_observations.cli import main
 from workbench_atlas_observations import projection
 
 
-def reader_fixture():
+def reader_fixture(source_root):
     report = {"id": "result:fixture", "state": "completed", "findings": [], "native": {
         "status": "native-failed", "result": {"initialization": {"status": "native-failed"},
         "execution": {"nativeInitialization": {
@@ -38,8 +38,10 @@ def reader_fixture():
     reader = SimpleNamespace(manifest=manifest, request={"baseline": None, "inputs": {"context": {
         "id": "supersymmetry:fixture", "initializationStage": "recipes", "side": "server"}}},
         custody={"id": "check-custody:sha256:" + "a" * 64,
+                 "root": str(source_root),
                  "snapshot_id": manifest["id"], "context": {"owner": "axiom"}},
         custody_reference="workbench-check-v1:" + "a" * 64,
+        check_source=ManagedCheckSource(source_root, "workbench-check-v1:" + "a" * 64),
         scope_supported=True, unsupported_sections=[], read_record=lambda section, key: report)
     return reader, report
 
@@ -53,6 +55,14 @@ class InitializationProjectionTests(unittest.TestCase):
             locations={"evidence": root / "evidence"}, owner_id="atlas",
         )
         self.enterContext(managed_trees_scope(self._trees))
+        def synthetic_source(workspace, reference):
+            self.assertEqual(self._trees.workspace, Path(workspace))
+            self.assertEqual("workbench-check-v1:" + "a" * 64, reference)
+            return {}
+        self.enterContext(patch(
+            "workbench_core.check_lifecycle.resolve_tree_reference",
+            side_effect=synthetic_source,
+        ))
         # Domain fixtures are synthetic; Core check reference admission is
         # covered with registered check custody in the Core dependency tests.
         @contextmanager
@@ -74,7 +84,7 @@ class InitializationProjectionTests(unittest.TestCase):
         ))
 
     def test_cli_accepts_parent_segments_and_symlinked_parent_receipts(self):
-        reader, _ = reader_fixture()
+        reader, _ = reader_fixture(self._trees.workspace)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "parent").mkdir()
@@ -94,7 +104,7 @@ class InitializationProjectionTests(unittest.TestCase):
                         self.assertEqual(json.loads(output.getvalue())["graph_set_id"], view.manifest["graph_set_id"])
 
     def test_dangling_output_symlink_is_not_followed(self):
-        reader, _ = reader_fixture()
+        reader, _ = reader_fixture(self._trees.workspace)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             destination = root / "output"
@@ -105,7 +115,7 @@ class InitializationProjectionTests(unittest.TestCase):
             self.assertFalse((root / "absent").exists())
 
     def test_cancel_during_final_stream_validation_removes_unpublished_staging(self):
-        reader, _ = reader_fixture()
+        reader, _ = reader_fixture(self._trees.workspace)
         state = {"verifying": False, "checks": 0}
         original = projection.validate_bundle_directory
         failure = RuntimeError("cancelled final projection verification")
@@ -128,7 +138,7 @@ class InitializationProjectionTests(unittest.TestCase):
             self.assertEqual("failed", self._trees.catalog.inventory()["trees"][0]["status"])
 
     def test_native_failure_and_incomplete_coverage_survive_successful_projection(self):
-        reader, report = reader_fixture()
+        reader, report = reader_fixture(self._trees.workspace)
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "graph"
             receipt = project_retained_observations(reader, output, profile_id="supersymmetry")
@@ -146,7 +156,7 @@ class InitializationProjectionTests(unittest.TestCase):
             self.assertFalse(any(p.name.startswith(".atlas-observations-") for p in Path(tmp).iterdir()))
 
     def test_cancellation_during_projection_never_exposes_complete_graph(self):
-        reader, _ = reader_fixture()
+        reader, _ = reader_fixture(self._trees.workspace)
         calls = 0
         def cancel():
             nonlocal calls
@@ -164,13 +174,13 @@ class InitializationProjectionTests(unittest.TestCase):
         for mutation in (lambda r: setattr(r, "scope_supported", False),
                          lambda r: r.manifest["producer"].update(id="other"),
                          lambda r: r.manifest["sections"][0].update(schema="future")):
-            reader, _ = reader_fixture()
+            reader, _ = reader_fixture(self._trees.workspace)
             mutation(reader)
             with tempfile.TemporaryDirectory() as tmp:
                 with self.assertRaises(ObservationProjectionError):
                     project_retained_observations(reader, Path(tmp)/"graph", profile_id="supersymmetry")
                 self.assertEqual(list(Path(tmp).iterdir()), [])
-        reader, _ = reader_fixture()
+        reader, _ = reader_fixture(self._trees.workspace)
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ObservationProjectionError, "paired side"):
                 project_retained_observations(reader, Path(tmp)/"graph", side="candidate", profile_id="supersymmetry")
@@ -180,8 +190,11 @@ class InitializationProjectionTests(unittest.TestCase):
             lambda reader: setattr(reader, "custody_reference", "workbench-check-v1:" + "b" * 64),
             lambda reader: reader.custody.update(snapshot_id="snapshot:other"),
             lambda reader: reader.custody.update(id="unsealed"),
+            lambda reader: setattr(reader, "check_source", ManagedCheckSource(
+                Path("/wrong-source"), reader.custody_reference,
+            )),
         ):
-            reader, _ = reader_fixture()
+            reader, _ = reader_fixture(self._trees.workspace)
             change(reader)
             with self.subTest(reader=reader), tempfile.TemporaryDirectory() as tmp:
                 output = Path(tmp) / "graph"
@@ -190,7 +203,7 @@ class InitializationProjectionTests(unittest.TestCase):
                 self.assertFalse(output.exists())
 
     def test_original_evidence_is_exact_and_rejects_wrong_snapshot(self):
-        reader, report = reader_fixture()
+        reader, report = reader_fixture(self._trees.workspace)
         ref = {"snapshot_id": "snapshot:fixture", "section": "report", "record_key": "value",
                "json_pointer": "/native/result/execution/nativeInitialization/nativeStoredFurnaceRecipes/smelting/0"}
         resolved = resolve_retained_evidence(reader, [ref])

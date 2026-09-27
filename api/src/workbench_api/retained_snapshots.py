@@ -14,6 +14,7 @@ from typing import Any, Protocol
 from packaging.utils import canonicalize_name
 
 from .modules import ModuleError
+from .managed_trees import ManagedCheckSource
 from .profiles import require_optional_distribution
 
 
@@ -39,6 +40,7 @@ class RetainedSnapshotReader(Protocol):
     manifest: Mapping[str, Any]
     custody: Mapping[str, Any]
     custody_reference: str  # Exact registered Core check, for managed dependents.
+    check_source: ManagedCheckSource  # Exact Core check registry and reference.
     scope_supported: bool
     unsupported_sections: set[str]
 

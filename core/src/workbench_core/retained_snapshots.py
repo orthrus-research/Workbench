@@ -13,6 +13,7 @@ from pathlib import Path
 import stat
 
 from workbench_api.retained_snapshots import RetainedSnapshotAdmission, RetainedSnapshotProvider
+from workbench_api.managed_trees import ManagedCheckSource
 from . import check_lifecycle as lifecycle
 from . import check_snapshots as snapshots
 from . import check_storage as storage
@@ -106,6 +107,9 @@ class _Reader:
         self._opened = opened
         self.request, self.custody = request, custody
         self.custody_reference = lifecycle.reference_id(custody)
+        self.check_source = ManagedCheckSource(
+            root=Path(custody['root']), reference_id=self.custody_reference,
+        )
         self.manifest = opened.manifest
         self.publication = opened.publication
         self.scope_supported = opened.scope_supported

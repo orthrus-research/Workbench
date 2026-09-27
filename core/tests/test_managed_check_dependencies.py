@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from workbench_api import DurableResourceError
-from workbench_api.managed_trees import ManagedTreeError
+from workbench_api.managed_trees import ManagedCheckSource, ManagedTreeError
 from workbench_core import check_lifecycle as life
 from workbench_core import check_retention
 from workbench_core.host_filesystem import file_lease
@@ -68,6 +68,41 @@ class ManagedCheckDependenciesTests(unittest.TestCase):
             with self.assertRaisesRegex(manager.RuntimeManagerError, "no longer eligible"):
                 manager.execute_cleanup(self.workspace, before)
         self.assertTrue(self.source.attempt.exists())
+
+    def test_check_source_binding_publishes_from_another_selected_workspace(self):
+        selected = self.source.base / "selected-pack-workspace"
+        selected.mkdir()
+        client = CoreManagedTrees(
+            workspace=selected, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="atlas",
+        )
+        source = ManagedCheckSource(self.workspace, self.reference_id)
+        bound = client.for_check_source(source)
+        output = self.evidence / "cross-workspace-graph"
+        with bound.stage("evidence", output.name, requested_path=output) as stage:
+            stage.path.mkdir()
+            (stage.path / "manifest.json").write_text('{"source":"registered"}')
+            tree = stage.publish(validate=lambda path: self.assertTrue(
+                (path / "manifest.json").is_file()), references=(source.reference_id,))
+        self.assertEqual(output, tree.path)
+        self.assertEqual(self.workspace, tree.workspace)
+        self.assertEqual((self.reference_id,), bound.describe(tree.tree_id).references)
+        catalog = ResourceCatalog(self.config)
+        self.assertEqual([tree.tree_id], [row["tree_id"] for row in
+                         catalog.inventory(workspace=self.workspace)["trees"]])
+        self.assertEqual([], catalog.inventory(workspace=selected)["trees"])
+        self.assertIn("referenced-managed-tree", self.source.item()["deletion"]["reason_codes"])
+
+    def test_check_source_binding_rejects_unregistered_root_before_staging(self):
+        selected = self.source.base / "selected-pack-workspace"
+        selected.mkdir()
+        client = CoreManagedTrees(
+            workspace=selected, configuration_home=self.config,
+            locations={"evidence": self.evidence}, owner_id="atlas",
+        )
+        with self.assertRaisesRegex(ManagedTreeError, "not registered"):
+            client.for_check_source(ManagedCheckSource(selected, self.reference_id))
+        self.assertFalse(self.evidence.exists())
 
     def test_catalog_inventory_closes_foreign_check_edge_and_exact_anchor(self):
         tree = self.publish()

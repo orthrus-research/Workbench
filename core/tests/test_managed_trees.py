@@ -20,6 +20,7 @@ from workbench_core.modules import InstalledModule, dispatch
 from workbench_core.storage.registered import CoreDurableResources, ResourceCatalog
 from workbench_core.storage.tree_catalog import (
     ABORT_KIND, COMMIT_KIND, DERIVED_INTENT_KIND, INTENT_KIND, TreeCatalog,
+    inventory_members,
 )
 from workbench_core.storage import manager
 from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
@@ -52,6 +53,22 @@ class ManagedTreeTests(unittest.TestCase):
                 derived_members=derived,
             )
         return result
+
+    def test_portable_tree_has_a_bounded_file_limit_above_runtime_images(self) -> None:
+        import workbench_core.storage.tree_catalog as catalog_module
+
+        self.assertGreater(catalog_module._MAX_TREE_FILE_BYTES, 2 * 1024**3)
+        self.assertLessEqual(catalog_module._MAX_TREE_FILE_BYTES, 32 * 1024**3)
+        source = self.home / "small-tree"
+        source.mkdir()
+        (source / "member").write_bytes(b"three")
+        with self.assertRaisesRegex(check_storage.CheckStorageError, "exceeds its bound"):
+            check_storage.tree_manifest(source, max_file_bytes=4)
+        with patch.object(catalog_module, "_MAX_TREE_FILE_BYTES", 4):
+            with self.assertRaisesRegex(check_storage.CheckStorageError, "exceeds its bound"):
+                inventory_members(source)
+        with patch.object(catalog_module, "_MAX_TREE_FILE_BYTES", 5):
+            self.assertEqual(5, inventory_members(source)[0]["size"])
 
     def test_typed_temporary_lease_reference_blocks_disposal_and_reopens(self) -> None:
         leases = CoreTemporaryLeases(

@@ -1540,11 +1540,16 @@ def _analysis_summary(owner: str, record: Mapping[str, Any]) -> str:
             lines.append(f"Owner exit code: {record['exit_code']}")
         for key, label in (("native_status", "Native status"),
                            ("attempt_id", "Attempt"), ("findings_count", "Findings"),
-                           ("coverage", "Coverage"), ("context_id", "Checked context"),
+                           ("coverage", "Captured evidence"), ("context_id", "Checked context"),
                            ("setup_state", "Setup"), ("setup_id", "Setup ID")):
             value = result.get(key)
             if value is not None:
                 lines.append(f"{label}: {value}")
+        native = result.get("native")
+        native_result = native.get("result") if isinstance(native, dict) else None
+        assessment = native_result.get("assessment") if isinstance(native_result, dict) else None
+        if isinstance(assessment, dict) and assessment.get("coverage") is not None:
+            lines.append(f"Native assessment: {assessment['coverage']}")
         if (result.get("native_outcome") is not None
                 and result.get("native_outcome") != result.get("native_status")):
             lines.append(f"Native outcome: {result['native_outcome']}")
@@ -1777,6 +1782,7 @@ class AtlasImportScreen(KeyboardFormScreen):
         yield Static("Open this check in Atlas", classes="screen-heading")
         yield Static(
             "Atlas will verify Axiom's retained check and publish a new observation graph. "
+            "This can take several minutes and use several GB of local disk space. "
             "The original check and pack files stay unchanged.", classes="screen-intro",
         )
         yield Static("↑/↓ Choose  ·  Enter Edit or Run  ·  Esc Back", classes="keyboard-hint")
@@ -1830,14 +1836,16 @@ class AtlasImportScreen(KeyboardFormScreen):
                 "Import this check into Atlas?",
                 f"Retained check: {self.source}\nNew graph: {target}\nSide: {side}\n\n"
                 "Atlas will verify the retained evidence through the selected pack profile "
-                "and publish a new graph under Core's custody. This does not rerun Axiom.",
+                "and publish a new graph under Core's custody. This can take several minutes "
+                "and use several GB of local disk space. The original check and pack files "
+                "stay unchanged; Axiom will not run again.",
                 confirm_label="Import graph",
             ))
             if not approved:
                 return
             self.busy = True
             self.query_one("#atlas-import-run", Button).disabled = True
-            status.update("Verifying retained evidence and publishing the Atlas graph…")
+            status.update("Building the Atlas graph… This can take several minutes; please wait.")
             output = await self.core.import_reviewed_atlas_snapshot(
                 catalog, action, values, review
             )

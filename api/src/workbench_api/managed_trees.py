@@ -52,6 +52,14 @@ class ManagedTreeTarget:
     domain_id: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class ManagedCheckSource:
+    """Core-verified retained check source for a dependent managed tree."""
+
+    root: Path
+    reference_id: str
+
+
 class ManagedTreeStage(Protocol):
     tree_id: str
     path: Path  # Absent until the owner creates the payload.
@@ -71,6 +79,10 @@ class ManagedTrees(Protocol):
     workspace: Path  # Exact workspace bound by the host.
     owner_id: str  # Module owner selected by the host.
     max_file_reference_bytes: int  # Bounded Core resource snapshot capacity.
+
+    def for_check_source(self, source: ManagedCheckSource) -> ManagedTrees:
+        """Bind dependent trees to the check's registry, preserving output roles."""
+        ...
 
     def retain_file_reference(
         self, role: str, name: str, source: Path, *,
@@ -123,6 +135,6 @@ def managed_trees_bound() -> bool:
 
 
 __all__ = [
-    "ManagedTreeError", "ManagedTreeReference", "ManagedTreeStage", "ManagedTreeTarget", "ManagedTrees",
+    "ManagedCheckSource", "ManagedTreeError", "ManagedTreeReference", "ManagedTreeStage", "ManagedTreeTarget", "ManagedTrees",
     "managed_trees", "managed_trees_bound", "managed_trees_scope",
 ]

@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import re
 
-from workbench_api.managed_trees import managed_trees
+from workbench_api.managed_trees import ManagedCheckSource, managed_trees
 
 from workbench_atlas_categorical_graph import (
     CategoricalGraphBundleBuilder, validate_bundle_directory,
@@ -59,13 +59,19 @@ def project_retained_observations(reader, output, *, side="single",
     custody = getattr(reader, "custody", None)
     reference = getattr(reader, "custody_reference", None)
     custody_id = custody.get("id") if isinstance(custody, dict) else None
+    source = getattr(reader, "check_source", None)
     context = custody.get("context") if isinstance(custody, dict) else None
     if (not isinstance(custody, dict) or custody.get("snapshot_id") != manifest["id"]
             or not isinstance(context, dict) or context.get("owner") != "axiom"
             or not isinstance(custody_id, str)
             or re.fullmatch(r"check-custody:sha256:[0-9a-f]{64}", custody_id) is None
-            or reference != "workbench-check-v1:" + custody_id.rsplit(":", 1)[1]):
+            or reference != "workbench-check-v1:" + custody_id.rsplit(":", 1)[1]
+            or not isinstance(custody.get("root"), str)
+            or not isinstance(source, ManagedCheckSource)
+            or source.reference_id != reference
+            or source.root != Path(custody["root"])):
         raise ObservationProjectionError("retained observation has no exact Core custody reference")
+    tree_host = managed_trees().for_check_source(source)
     code = _code_binding()
     output = Path(output)
     if output.is_symlink():
@@ -97,7 +103,7 @@ def project_retained_observations(reader, output, *, side="single",
         "native_outcome": manifest["native_outcome"], "coverage": manifest["coverage"],
         "sections": manifest["sections"], "projection_sources": code,
     }
-    with managed_trees().stage("evidence", output.name, requested_path=output) as stage:
+    with tree_host.stage("evidence", output.name, requested_path=output) as stage:
         builder = CategoricalGraphBundleBuilder(stage.path, scope=scope, evidence_binding=binding,
             evidence_authority="retained-observations-v1", check_cancelled=check)
         builder.add_partition("initialization", classification="original retained initialization observations",
