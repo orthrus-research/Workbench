@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from hashlib import sha256
+from io import BytesIO
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -193,9 +194,9 @@ def _archive_member_path(info: ZipInfo) -> PurePosixPath:
     return member
 
 
-def _extract_client_archive(archive: Path, instance_root: Path) -> None:
+def _extract_client_archive(archive: Path | bytes, instance_root: Path) -> None:
     try:
-        with ZipFile(archive) as source:
+        with ZipFile(BytesIO(archive) if isinstance(archive, bytes) else archive) as source:
             infos = source.infolist()
             if not infos:
                 raise RuntimeBootstrapError(
@@ -630,13 +631,49 @@ def _cataloged_bootstrap(tree_host, fixture_root: Path):
     return reference
 
 
+def _source_domain(plan: dict[str, Any]) -> str:
+    return f"{plan['plan_id']}:cleanroom-client-zip"
+
+
+def _verify_bootstrap_source_edge(
+    tree_host, cataloged, receipt: dict[str, Any],
+) -> None:
+    # Zero references permit only historical-style receipt readback. Their
+    # absence cannot prove whether this tree predates the edge or lost history.
+    if not cataloged.references:
+        return
+    if len(cataloged.references) != 1:
+        raise RuntimeBootstrapError(
+            "Core runtime bootstrap has an unexpected source dependency set"
+        )
+    try:
+        source, data = tree_host.read_file_reference(cataloged.references[0])
+    except (ManagedTreeError, OSError, ValueError) as exc:
+        raise RuntimeBootstrapError(
+            "Core runtime bootstrap source cannot be reopened exactly: " + str(exc)
+        ) from exc
+    artifact = receipt["artifact"]
+    if (
+        source.role != "evidence"
+        or source.domain_id != _source_domain(receipt)
+        or source.bytes != artifact["size"]
+        or source.sha256 != "sha256:" + artifact["sha256"]
+        or len(data) != artifact["size"]
+        or sha256(data).hexdigest() != artifact["sha256"]
+    ):
+        raise RuntimeBootstrapError(
+            "Core runtime bootstrap source differs from its V1 receipt"
+        )
+
+
 def _prepare_bootstrap_fixture(
     staging: Path, plan: dict[str, Any], *, cache_path: Path,
+    archive_source: Path | bytes,
     artifact: dict[str, str], artifact_size: int,
     artifact_source_revision: str, fixture_root: Path,
 ) -> tuple[dict[str, Any], bytes]:
     instance_root = staging / "instance"
-    _extract_client_archive(cache_path, instance_root)
+    _extract_client_archive(archive_source, instance_root)
     _validate_client_instance(
         instance_root,
         minecraft_version=plan["project"].get("minecraft_version"),
@@ -701,10 +738,16 @@ def materialize_client_bootstrap(
             raise RuntimeBootstrapError(
                 "Core runtime bootstrap identity differs from its receipt"
             )
+        if cataloged is not None:
+            _verify_bootstrap_source_edge(tree_host, cataloged, reused["receipt"])
         return reused
     if cataloged is not None:
         raise RuntimeBootstrapError(
             "Core runtime bootstrap target is missing after reconciliation"
+        )
+    if tree_host is not None and artifact_size > tree_host.max_file_reference_bytes:
+        raise RuntimeBootstrapError(
+            "Cleanroom client ZIP exceeds Core's source-reference byte limit"
         )
 
     if tree_host is not None and (
@@ -736,13 +779,35 @@ def materialize_client_bootstrap(
     except VerifiedArtifactError as exc:
         raise RuntimeBootstrapError(str(exc)) from exc
     cache_path, artifact_outcome = acquired.path, acquired.outcome
+    if acquired.sha256 != artifact["sha256"] or acquired.size != artifact_size:
+        raise RuntimeBootstrapError(
+            "Core verified another Cleanroom client artifact"
+        )
     if tree_host is not None:
+        try:
+            source_reference = tree_host.retain_file_reference(
+                "evidence", "cleanroom-client-source.zip", cache_path,
+                sha256=artifact["sha256"], size=artifact_size,
+                domain_id=_source_domain(plan),
+            )
+            reopened_source, source_bytes = tree_host.read_file_reference(
+                source_reference.resource_id,
+            )
+        except (ManagedTreeError, OSError, ValueError) as exc:
+            raise RuntimeBootstrapError(
+                "Core cannot retain Cleanroom client source: " + str(exc)
+            ) from exc
+        if reopened_source != source_reference:
+            raise RuntimeBootstrapError(
+                "Core reopened another Cleanroom client source"
+            )
         try:
             with tree_host.stage(
                 "artifacts", fixture_root.name, requested_path=fixture_root,
             ) as tree_stage:
                 receipt, receipt_bytes = _prepare_bootstrap_fixture(
                     tree_stage.path, plan, cache_path=cache_path,
+                    archive_source=source_bytes,
                     artifact=artifact, artifact_size=artifact_size,
                     artifact_source_revision=artifact_source_revision,
                     fixture_root=fixture_root,
@@ -761,6 +826,7 @@ def materialize_client_bootstrap(
                 reference = tree_stage.publish(
                     validate=validate_staged_tree,
                     domain_id=receipt["bootstrap_id"],
+                    references=(source_reference.resource_id,),
                     inventory_policy="posix-exact-v1",
                 )
         except (ManagedTreeError, OSError, ValueError) as exc:
@@ -780,6 +846,7 @@ def materialize_client_bootstrap(
             artifact_source_revision=artifact_source_revision,
             fixture_root=fixture_root,
         )
+        _verify_bootstrap_source_edge(tree_host, reference, receipt)
         return {
             "format": "workbench-runtime-bootstrap-result-v1",
             "schema_version": 1,
@@ -798,6 +865,7 @@ def materialize_client_bootstrap(
     try:
         receipt, _receipt_bytes = _prepare_bootstrap_fixture(
             staging, plan, cache_path=cache_path,
+            archive_source=cache_path,
             artifact=artifact, artifact_size=artifact_size,
             artifact_source_revision=artifact_source_revision,
             fixture_root=fixture_root,

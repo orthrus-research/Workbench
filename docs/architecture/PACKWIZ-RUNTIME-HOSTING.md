@@ -118,6 +118,13 @@ its catalog state was lost. That read does not adopt the fixture or authorize
 cleanup. Incomplete stages remain for review.
 Core refuses publication when the selected filesystem cannot provide its
 atomic no-replace directory operation; Windows keeps its existing V1 route.
+For a new Linux fixture, Core also snapshots the verified ZIP as a bounded
+workspace resource. Shell extracts the bytes reopened through Core, and the
+fixture tree references that issued source ID. The V1 receipt stays unchanged;
+fixtures without this edge remain readable under their original checks. A
+missing edge does not prove when a fixture was created or restore lost history.
+Core refuses a newly selected client ZIP above its 32 MiB resource limit before
+acquisition. Such a profile needs a larger source-reference contract.
 
 For Prism Launcher and MultiMC clients, the materializer enforces these
 invariants:

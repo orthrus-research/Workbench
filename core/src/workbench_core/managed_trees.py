@@ -6,6 +6,7 @@ from contextlib import ExitStack, contextmanager
 import ctypes
 from datetime import datetime, timezone
 import errno
+from hashlib import sha256
 import os
 from pathlib import Path
 import re
@@ -23,7 +24,7 @@ from . import check_lifecycle, check_storage
 from .durable_files import _directory as pinned_directory, read_verified
 from .host_filesystem import fsync_directory, secure_private_path
 from .output_routing import _WINDOWS_RESERVED
-from .storage.registered import ResourceCatalog
+from .storage.registered import ResourceCatalog, _MAX_BYTES
 from .storage.tree_catalog import (
     COMMIT_KIND, INTENT_KIND, DERIVED_INTENT_KIND, EXACT_INTENT_KIND, RESERVATION_KIND,
     _content_sha256, _store_id, inventory_members, atlas_manifest_baseline,
@@ -284,6 +285,7 @@ class CoreManagedTrees:
         self.locations = dict(locations)
         self.owner_id = owner_id
         self.policy_id = policy_id
+        self.max_file_reference_bytes = _MAX_BYTES
         self.location_sources = dict(location_sources or {})
         self.check_cancelled = check_cancelled
         self.catalog = ResourceCatalog(configuration_home)
@@ -309,7 +311,7 @@ class CoreManagedTrees:
 
         if (not isinstance(source, Path) or not source.is_absolute()
                 or type(sha256) is not str or re.fullmatch(r"[0-9a-f]{64}", sha256) is None
-                or type(size) is not int or not 0 <= size <= 32 * 1024 * 1024):
+                or type(size) is not int or not 0 <= size <= self.max_file_reference_bytes):
             raise ManagedTreeError("tree.references", "dependency file identity is invalid")
         try:
             data = read_verified(source, expected_size=size, expected_sha256=sha256)
@@ -331,6 +333,28 @@ class CoreManagedTrees:
             )
         except (DurableResourceError, OSError) as exc:
             raise ManagedTreeError("tree.references", "dependency evidence cannot be retained") from exc
+
+    def read_file_reference(
+        self, resource_id: str,
+    ) -> tuple[ResourceReference, bytes]:
+        """Reopen one exact Core-issued file resource under this owner binding."""
+
+        try:
+            resource_host = self._resource_host()
+            reference = resource_host.describe(resource_id)
+            if reference.owner_id != self.owner_id:
+                raise ManagedTreeError(
+                    "tree.references", "dependency file belongs to another owner",
+                )
+            data = resource_host.read_bytes(resource_id)
+        except (DurableResourceError, OSError) as exc:
+            raise ManagedTreeError(
+                "tree.references", "dependency file cannot be reopened exactly",
+            ) from exc
+        if (len(data) != reference.bytes
+                or "sha256:" + sha256(data).hexdigest() != reference.sha256):
+            raise ManagedTreeError("tree.references", "dependency file changed during reopen")
+        return reference, data
 
     def _cancelled(self) -> bool:
         try:

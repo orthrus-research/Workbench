@@ -70,6 +70,7 @@ class ManagedTreeStage(Protocol):
 class ManagedTrees(Protocol):
     workspace: Path  # Exact workspace bound by the host.
     owner_id: str  # Module owner selected by the host.
+    max_file_reference_bytes: int  # Bounded Core resource snapshot capacity.
 
     def retain_file_reference(
         self, role: str, name: str, source: Path, *,
@@ -80,6 +81,10 @@ class ManagedTrees(Protocol):
         self, role: str, name: str, data: bytes, *,
         references: tuple[str, ...] = (), domain_id: str | None = None,
     ) -> ResourceReference: ...
+
+    def read_file_reference(
+        self, resource_id: str,
+    ) -> tuple[ResourceReference, bytes]: ...
 
     def stage(
         self, role: str, name: str, *, requested_path: Path | None = None,

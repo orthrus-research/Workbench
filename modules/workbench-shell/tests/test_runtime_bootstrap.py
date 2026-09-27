@@ -31,6 +31,7 @@ from workbench_api import verified_artifacts  # noqa: E402
 from workbench_api.managed_trees import ManagedTreeError, managed_trees  # noqa: E402
 from workbench_core.host_services import install_local_host_services  # noqa: E402
 from workbench_core.packwiz_tree_scope import direct_packwiz_tree_scope  # noqa: E402
+from workbench_core.storage.registered import ResourceCatalog  # noqa: E402
 from workbench_core.storage.tree_catalog import TreeCatalog  # noqa: E402
 
 
@@ -186,7 +187,10 @@ class RuntimeBootstrapTest(unittest.TestCase):
             with patch(
                 "workbench_shell.runtime_bootstrap.acquire_verified_artifact",
                 wraps=verified_artifacts.acquire_verified_artifact,
-            ) as acquire:
+            ) as acquire, patch(
+                "workbench_shell.runtime_bootstrap._extract_client_archive",
+                wraps=bootstrap._extract_client_archive,
+            ) as extract:
                 created = self._materialize(
                     plan,
                     artifact_size=archive.stat().st_size,
@@ -233,6 +237,9 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 / sha256(archive.read_bytes()).hexdigest()
             )
             self.assertTrue(cache_path.is_file())
+            if sys.platform.startswith("linux"):
+                self.assertIsInstance(extract.call_args.args[0], bytes)
+            self.assertNotIn("resource_id", receipt["artifact"])
             fixture_root = Path(
                 receipt["target"]["fixture_root_uri"].removeprefix("file://")
             )
@@ -244,6 +251,13 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 self.assertEqual(cataloged.domain_id, receipt["bootstrap_id"])
                 self.assertEqual(cataloged.inventory_policy, "posix-exact-v1")
                 self.assertEqual(cataloged.derived_status, "current")
+                self.assertEqual(len(cataloged.references), 1)
+                with self._tree_scope(state_root):
+                    source, source_bytes = managed_trees().read_file_reference(
+                        cataloged.references[0],
+                    )
+                self.assertEqual(source.domain_id, plan["plan_id"] + ":cleanroom-client-zip")
+                self.assertEqual(source_bytes, archive.read_bytes())
 
             reused = self._materialize(
                 plan,
@@ -298,6 +312,144 @@ class RuntimeBootstrapTest(unittest.TestCase):
                 with self.assertRaises(ManagedTreeError) as missing:
                     managed_trees().lookup_target("artifacts", fixture_root)
             self.assertEqual(missing.exception.code, "tree.unavailable")
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
+    def test_pre_source_edge_core_tree_reopens_without_fabricated_link(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            fixture_root = bootstrap._local_path(
+                plan["target"]["fixture_root_uri"], "fixture root",
+            )
+            with self._tree_scope(state_root):
+                host = managed_trees()
+                with host.stage(
+                    "artifacts", fixture_root.name, requested_path=fixture_root,
+                ) as stage:
+                    receipt, _bytes = bootstrap._prepare_bootstrap_fixture(
+                        stage.path, plan, cache_path=archive,
+                        archive_source=archive,
+                        artifact=bootstrap._client_artifact(plan),
+                        artifact_size=archive.stat().st_size,
+                        artifact_source_revision=SOURCE_REVISION,
+                        fixture_root=fixture_root,
+                    )
+                    reference = stage.publish(
+                        validate=lambda _: None,
+                        domain_id=receipt["bootstrap_id"],
+                        inventory_policy="posix-exact-v1",
+                    )
+            self.assertEqual(reference.references, ())
+            reopened = self._materialize(
+                plan, artifact_size=archive.stat().st_size,
+                artifact_source_revision=SOURCE_REVISION,
+                state_root=state_root,
+            )
+            self.assertEqual(reopened["outcome"], "reused")
+            self.assertEqual(reopened["receipt"], receipt)
+            with self._tree_scope(state_root):
+                self.assertEqual(managed_trees().reconcile(reference.tree_id).references, ())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
+    def test_interrupted_source_snapshot_retains_unknown_before_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            fixture_root = bootstrap._local_path(
+                plan["target"]["fixture_root_uri"], "fixture root",
+            )
+            original_write = ResourceCatalog._write
+            interrupted = False
+
+            def interrupted_commit(catalog, name, nonce, kind, body):
+                nonlocal interrupted
+                if name == "commits" and not interrupted:
+                    interrupted = True
+                    raise OSError("synthetic lost source commit")
+                return original_write(catalog, name, nonce, kind, body)
+
+            with patch.object(ResourceCatalog, "_write", interrupted_commit):
+                with self.assertRaisesRegex(
+                    RuntimeBootstrapError, "Core cannot retain Cleanroom client source",
+                ):
+                    self._materialize(
+                        plan, artifact_size=archive.stat().st_size,
+                        artifact_source_revision=SOURCE_REVISION,
+                        state_root=state_root,
+                    )
+            self.assertTrue(interrupted)
+            self.assertFalse(fixture_root.exists())
+            self.assertEqual(
+                len(list((root / "config/resources-v1/intents").glob("*.json"))), 1,
+            )
+            self.assertEqual(
+                len(list((root / "config/resources-v1/commits").glob("*.json"))), 0,
+            )
+            self.assertEqual(
+                len(list((state_root / "evidence/outputs/workbench-shell").glob("*"))), 2,
+            )
+            rows = ResourceCatalog(root / "config").inventory(
+                workspace=Path("/workspace/supersymmetry"),
+            )["resources"]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["status"], "published-uncommitted")
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
+    def test_oversized_source_refuses_before_acquisition(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            with patch(
+                "workbench_shell.runtime_bootstrap.acquire_verified_artifact",
+            ) as acquire:
+                with self.assertRaisesRegex(
+                    RuntimeBootstrapError, "source-reference byte limit",
+                ):
+                    self._materialize(
+                        plan, artifact_size=32 * 1024 * 1024 + 1,
+                        artifact_source_revision=SOURCE_REVISION,
+                        state_root=state_root,
+                    )
+            acquire.assert_not_called()
+            self.assertFalse(state_root.exists())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
+    def test_changed_retained_source_refuses_new_tree_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "cleanroom.zip"
+            _write_archive(archive)
+            state_root = root / "state"
+            plan = _plan(state_root, archive)
+            created = self._materialize(
+                plan, artifact_size=archive.stat().st_size,
+                artifact_source_revision=SOURCE_REVISION,
+                state_root=state_root,
+            )
+            fixture_root = bootstrap._local_path(
+                created["receipt"]["target"]["fixture_root_uri"], "fixture root",
+            )
+            with self._tree_scope(state_root):
+                host = managed_trees()
+                target = host.lookup_target("artifacts", fixture_root)
+                source_id = host.reconcile(target.tree_id).references[0]
+                source, _bytes = host.read_file_reference(source_id)
+            source.path.write_bytes(b"x" * source.bytes)
+            with self.assertRaisesRegex(RuntimeBootstrapError, "requires review"):
+                self._materialize(
+                    plan, artifact_size=archive.stat().st_size,
+                    artifact_source_revision=SOURCE_REVISION,
+                    state_root=state_root,
+                )
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux managed tree route")
     def test_published_without_commit_reconciles_exact_tree(self) -> None:
@@ -373,6 +525,11 @@ class RuntimeBootstrapTest(unittest.TestCase):
             self.assertEqual(
                 len(list(fixture_root.parent.glob(".workbench-tree-*.pending"))), 1,
             )
+            rows = ResourceCatalog(root / "config").inventory(
+                workspace=Path("/workspace/supersymmetry"),
+            )["resources"]
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["status"], "committed")
             with self.assertRaisesRegex(
                 RuntimeBootstrapError, "requires review",
             ):
