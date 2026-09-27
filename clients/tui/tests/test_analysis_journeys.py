@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 from textual.widgets import Button, Input, OptionList, RichLog
 
@@ -531,20 +532,23 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(str(expected_output), values["output"])
                 self.assertEqual("single", values["side"])
                 self.assertTrue(values["json"])
-                receipt = app.screen
-                core.run_reviewed_command = AsyncMock(return_value=owner_output(
-                    "atlas.observations-search", {
-                        "format": "workbench-atlas-observation-search-v1",
-                        "context": {"root": str(expected_output)}, "query": "iron",
-                        "results": [], "page": {"next_cursor": None},
-                    }
-                ))
+                session = Mock()
+                session.request = AsyncMock(return_value={
+                    "format": "workbench-atlas-observation-search-v1",
+                    "context": {"root": str(expected_output)}, "query": "iron",
+                    "results": [], "page": {"next_cursor": None},
+                })
+                session.close = AsyncMock()
+                core.open_atlas_observation_session = AsyncMock(return_value=session)
                 await pilot.press("s")
-                await self._settle(pilot, lambda: isinstance(app.screen, AtlasObservationSearchScreen))
+                await self._settle(pilot, lambda: isinstance(app.screen, AtlasObservationSearchScreen)
+                                   and app.screen.session is session)
                 search = app.screen
                 search.query_one("#atlas-observation-query", Input).value = "iron"
                 search.query_one("#atlas-observation-search", Button).press()
-                await self._settle(pilot, lambda: core.run_reviewed_command.await_count == 1)
+                await self._settle(pilot, lambda: session.request.await_count == 1)
+                session.request.assert_awaited_once_with("search", {"query": "iron", "limit": 50})
+                core.run_reviewed_command.assert_not_awaited()
 
     async def test_import_receipt_opens_graph_search_and_keyboard_inspection(self) -> None:
         core = catalog_core()
@@ -567,25 +571,25 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
             second_node = {"id": "observation-2", "kind": "material",
                            "semantic_key": "workbench:copper", "evidence": []}
 
-            async def reviewed_result(_catalog, action, values, _review, *, console="plain",
-                                      workspace=None):
-                self.assertEqual("jsonl", console)
-                self.assertEqual(str(root), values["path"])
-                self.assertIsNone(workspace)
-                if action["command_id"] == "atlas.observations-search":
-                    self.assertEqual("iron", values["query"])
-                    return owner_output(action["command_id"], {
+            async def session_result(operation, arguments):
+                if operation == "search":
+                    self.assertEqual("iron", arguments["query"])
+                    return {
                         "format": "workbench-atlas-observation-search-v1",
                         "query": "iron", "context": {"root": str(root)},
                         "results": [first_node, second_node], "page": {"next_cursor": None},
-                    })
-                self.assertEqual("observation-2", values["selection_id"])
-                return owner_output(action["command_id"], {
+                    }
+                self.assertEqual("inspect", operation)
+                self.assertEqual("observation-2", arguments["selection_id"])
+                return {
                     "format": "workbench-atlas-observation-inspection-v1",
                     "context": {"root": str(root)}, "selection": second_node,
-                })
+                }
 
-            core.run_reviewed_command = AsyncMock(side_effect=reviewed_result)
+            session = Mock()
+            session.request = AsyncMock(side_effect=session_result)
+            session.close = AsyncMock()
+            core.open_atlas_observation_session = AsyncMock(return_value=session)
             app = WorkbenchApp(core)
             async with app.run_test(size=(100, 30)) as pilot:
                 await self._settle(pilot, lambda: app.view.catalog is not None)
@@ -599,7 +603,7 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("S Search graph", str(app.screen.query_one(".keyboard-hint").content))
                 await pilot.press("s")
                 await self._settle(pilot, lambda: isinstance(app.screen, AtlasObservationSearchScreen)
-                                   and bool(app.screen.query("#atlas-observation-query")))
+                                   and app.screen.session is session)
                 search = app.screen
                 search.query_one("#atlas-observation-query", Input).value = "iron"
                 search.query_one("#atlas-observation-search", Button).press()
@@ -632,14 +636,20 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
                                    and search.selected["id"] == "observation-2")
                 await pilot.press("enter")
                 await pilot.pause(0.1)
-                self.assertEqual(4, core.run_reviewed_command.await_count,
+                self.assertEqual(4, session.request.await_count,
                                  str(search.query_one("#atlas-observation-status").content)
                                  + " focus=" + repr(app.focused)
                                  + " selected=" + repr(search.selected))
                 await self._settle(pilot, lambda: isinstance(app.screen, AnalysisResultScreen))
                 self.assertIn("Selected: workbench:copper",
                               _analysis_summary("atlas", app.screen.record))
-                self.assertEqual(4, core.run_reviewed_command.await_count)
+                self.assertEqual(4, session.request.await_count)
+                await pilot.press("escape")
+                await self._settle(pilot, lambda: app.screen is search)
+                session.close.assert_not_awaited()
+                await pilot.press("escape")
+                await self._settle(pilot, lambda: app.screen is not search)
+                session.close.assert_awaited_once()
 
     async def test_result_shortcuts_do_not_open_unavailable_actions(self) -> None:
         core = catalog_core()
@@ -661,6 +671,70 @@ class AnalysisJourneyTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("S Search graph", hint)
             await pilot.press("i", "s")
             self.assertIs(app.screen, screen)
+
+    async def test_leaving_graph_closes_session_during_pending_search(self) -> None:
+        core = catalog_core()
+        core.catalog.return_value["commands"].append({
+            "command_id": "atlas.observations-search", "title": "Search observations",
+            "risk": "read-only", "preview": "none", "availability": "experimental",
+            "options": [{"key": "path", "kind": "path", "nargs": "one"}],
+            "document": None,
+        })
+        entered = asyncio.Event()
+        hold = asyncio.Event()
+
+        async def pending(_operation, _arguments):
+            entered.set()
+            await hold.wait()
+            return {"format": "workbench-atlas-observation-search-v1",
+                    "results": [], "page": {"next_cursor": None}}
+
+        session = Mock()
+        session.request = AsyncMock(side_effect=pending)
+        session.close = AsyncMock()
+        core.open_atlas_observation_session = AsyncMock(return_value=session)
+        with tempfile.TemporaryDirectory() as temporary:
+            app = WorkbenchApp(core)
+            async with app.run_test(size=(58, 24)) as pilot:
+                await self._settle(pilot, lambda: app.view.catalog is not None)
+                screen = AtlasObservationSearchScreen(app.view.catalog, Path(temporary))
+                app.push_screen(screen)
+                await self._settle(pilot, lambda: screen.session is session)
+                screen.query_one("#atlas-observation-query", Input).value = "circuit"
+                screen.query_one("#atlas-observation-search", Button).press()
+                await asyncio.wait_for(entered.wait(), timeout=2)
+                app.pop_screen()
+                await self._settle(pilot, lambda: app.screen is not screen)
+                await self._settle(pilot, lambda: session.close.await_count == 1)
+                session.close.assert_awaited_once()
+                hold.set()
+
+    async def test_leaving_graph_cancels_pending_verification(self) -> None:
+        core = catalog_core()
+        started = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def verify(_path):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+        core.open_atlas_observation_session = AsyncMock(side_effect=verify)
+        with tempfile.TemporaryDirectory() as temporary:
+            app = WorkbenchApp(core)
+            async with app.run_test(size=(58, 24)) as pilot:
+                await self._settle(pilot, lambda: app.view.catalog is not None)
+                screen = AtlasObservationSearchScreen(app.view.catalog, Path(temporary))
+                app.push_screen(screen)
+                await asyncio.wait_for(started.wait(), timeout=2)
+                self.assertTrue(screen.query_one("#atlas-observation-search", Button).disabled)
+                self.assertIn("Verifying graph once", str(screen.query_one(
+                    "#atlas-observation-status").content))
+                app.pop_screen()
+                await asyncio.wait_for(cancelled.wait(), timeout=2)
 
 
 if __name__ == "__main__":

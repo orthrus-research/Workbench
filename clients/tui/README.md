@@ -176,9 +176,9 @@ file and must be supplied again on import without managed acquisition.
   Documents open through Core's catalog binding. Actions requiring repeated
   inputs or changes to local files stay out of this runnable list until their
   interaction is implemented. Core also marks actions unavailable when their
-  installed command or document is absent. Interactive Atlas sessions are not
-  shown because the TUI has no persistent input stream for them. Runs do not
-  retain console sessions.
+  installed command or document is absent. The generic list excludes raw
+  interactive Atlas sessions; the dedicated observation screen below owns its
+  persistent input stream. Generic catalog runs do not retain console sessions.
 - **Atlas recipe search:** Choose a pack source or captured graph in Workflows,
   enter a term, then use arrows and Enter to inspect a result. A captured graph
   also offers recorded links. Source-only results are labeled as text matches,
@@ -198,6 +198,8 @@ file and must be supplied again on import without managed acquisition.
   reviews the exact original attempt and a new graph folder before Atlas
   imports the snapshot. The graph result offers **Search this graph**; arrows
   and Enter then open Atlas observations and their recorded outgoing links.
+  This screen uses a Core-dispatched Atlas session: verifying a large graph can
+  take several minutes, then searches and inspection reuse that verified graph.
   This does not rerun Axiom or infer gameplay behavior from recorded values.
 
 Core remains responsible for environment mutation, command construction, and

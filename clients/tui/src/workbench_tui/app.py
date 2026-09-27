@@ -39,7 +39,9 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
-from .core_client import CoreClient, CoreClientError, SetupInputs, CommandOutput
+from .core_client import (
+    AtlasObservationSession, CoreClient, CoreClientError, SetupInputs, CommandOutput,
+)
 from .keyboard_form import KeyboardFormScreen
 from .preferences import (
     PreferencesError,
@@ -1607,7 +1609,7 @@ def _analysis_summary(owner: str, record: Mapping[str, Any]) -> str:
         if diagnostics:
             lines.extend(("", "Diagnostics", str(diagnostics)))
         if result.get("attempt_id"):
-            lines.extend(("", "To inspect more findings, use Check history, then open this attempt."))
+            lines.extend(("", "Additional findings remain in the retained check record."))
     return "\n".join(lines) or "The owner returned a record without a compact summary. Open the full record."
 
 
@@ -2062,6 +2064,9 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
         self.next_cursor: str | None = None
         self.current_query = ""
         self.busy = False
+        self.session: AtlasObservationSession | None = None
+        self.session_error: str | None = None
+        self._session_worker: Any = None
 
     @property
     def core(self) -> CoreClient:
@@ -2077,8 +2082,8 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
         with Horizontal(classes="axiom-path-row"):
             yield Input(placeholder="Material, registration, recipe family…",
                         id="atlas-observation-query")
-            yield Button("Search", id="atlas-observation-search")
-        yield Static(f"Graph: {self.root}", id="atlas-observation-status")
+            yield Button("Search", id="atlas-observation-search", disabled=True)
+        yield Static("Verifying this observation graph…", id="atlas-observation-status")
         with Horizontal(id="workflow-body"):
             yield OptionList(id="atlas-observation-results")
             with Vertical(id="workflow-detail-panel"):
@@ -2093,6 +2098,31 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
 
     def on_mount(self) -> None:
         self.start_keyboard_navigation()
+        self._session_worker = self._open_session()
+
+    @work(exclusive=True, group="atlas-observation-session")
+    async def _open_session(self) -> None:
+        status = self.query_one("#atlas-observation-status", Static)
+        status.update("Verifying graph once… Large graphs can take several minutes.")
+        try:
+            session = await self.core.open_atlas_observation_session(self.root)
+            if not self.is_mounted:
+                await session.close()
+                return
+            self.session = session
+            self.query_one("#atlas-observation-search", Button).disabled = False
+            status.update("Graph verified. Enter a term and choose Search.")
+        except (CoreClientError, TimeoutError) as exc:
+            self.session_error = str(exc)
+            if self.is_mounted:
+                status.update(f"Atlas could not open this graph: {exc}")
+
+    async def on_unmount(self) -> None:
+        if self._session_worker is not None:
+            self._session_worker.cancel()
+        if self.session is not None:
+            await self.session.close()
+            self.session = None
 
     def on_key(self, event: events.Key) -> None:
         if isinstance(self.app.focused, OptionList):
@@ -2155,6 +2185,11 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
     async def search(self, *, more: bool = False) -> None:
         if self.busy:
             return
+        if self.session is None:
+            self.query_one("#atlas-observation-status", Static).update(
+                self.session_error or "Graph verification is still running. Please wait."
+            )
+            return
         query = self.query_one("#atlas-observation-query", Input).value.strip()
         status = self.query_one("#atlas-observation-status", Static)
         if not query:
@@ -2166,18 +2201,13 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
         if action is None:
             status.update("Atlas observation search is unavailable in this installation.")
             return
-        values: dict[str, Any] = {"path": str(self.root), "query": query,
-                                  "limit": 50, "json": True}
-        if more:
-            values["cursor"] = self.next_cursor
         self.busy = True
         try:
             status.update("Searching the verified observation graph…")
-            review = await self.core.command_review(self.catalog, action, values)
-            output = await self.core.run_reviewed_command(
-                self.catalog, action, values, review, console="jsonl",
-            )
-            record = _atlas_record(output, "atlas.observations-search")
+            arguments: dict[str, Any] = {"query": query, "limit": 50}
+            if more:
+                arguments["cursor"] = self.next_cursor
+            record = await self.session.request("search", arguments)
             if record.get("format") != "workbench-atlas-observation-search-v1":
                 raise CoreClientError("Atlas returned an unsupported observation search")
             rows = record.get("results")
@@ -2214,7 +2244,8 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
 
     @work(exclusive=True, group="atlas-observation-follow")
     async def follow(self, command_id: str) -> None:
-        if self.busy or self.selected is None or not isinstance(self.selected.get("id"), str):
+        if (self.busy or self.session is None or self.selected is None
+                or not isinstance(self.selected.get("id"), str)):
             return
         action = _atlas_read_action(self.catalog, command_id)
         if action is None:
@@ -2222,22 +2253,22 @@ class AtlasObservationSearchScreen(KeyboardFormScreen):
                 "This Atlas observation action is unavailable."
             )
             return
-        values: dict[str, Any] = {"path": str(self.root),
-                                  "selection_id": self.selected["id"], "json": True}
+        operation = ("relationships" if command_id == "atlas.observations-relationships"
+                     else "inspect")
+        arguments: dict[str, Any] = {"selection_id": self.selected["id"]}
         if command_id == "atlas.observations-relationships":
-            values.update({"direction": "outgoing", "limit": 50})
+            arguments.update({"direction": "outgoing", "limit": 50})
+        self.busy = True
         try:
-            review = await self.core.command_review(self.catalog, action, values)
-            output = await self.core.run_reviewed_command(
-                self.catalog, action, values, review, console="jsonl",
-            )
-            record = _atlas_record(output, command_id)
+            record = await self.session.request(operation, arguments)
             self.app.push_screen(AnalysisResultScreen(str(action.get("title", "Atlas result")),
                                                       "atlas", record))
         except (CoreClientError, TimeoutError) as exc:
             self.query_one("#atlas-observation-status", Static).update(
                 f"Atlas could not open this observation: {exc}"
             )
+        finally:
+            self.busy = False
 
 
 _AXIOM_MATERIAL_CONTEXT = "supersymmetry:material-authoring-pack"

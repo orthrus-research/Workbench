@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 from typing import Any, Mapping, Sequence
+from uuid import uuid4
 
 
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -32,6 +33,9 @@ _PACK_INSTANCE_PLAN_ID = re.compile(r"workbench-pack-release-client-composition-
 _PACK_INSTANCE_RECORD_ID = re.compile(r"workbench-pack-instance-choice:sha256:[0-9a-f]{64}\Z")
 _PACK_POLICY_PLAN_ID = re.compile(r"workbench-pack-release-derived-policies-plan:sha256:[0-9a-f]{64}\Z")
 _PRISM_ZIP_STAGE_PLAN_ID = re.compile(r"workbench-prism-zip-stage-plan:sha256:[0-9a-f]{64}\Z")
+_ATLAS_GRAPH_SET_ID = re.compile(r"workbench-atlas-graph-set-v[23]:sha256:[0-9a-f]{64}\Z")
+_ATLAS_SESSION_PREFIX = "workbench-atlas-observation-session-"
+_ATLAS_SESSION_MAX_FRAME = 8 * 1024 * 1024
 
 
 class CoreClientError(RuntimeError):
@@ -110,6 +114,188 @@ class SetupInputs:
             if value.strip():
                 args.extend((flag, str(Path(value).expanduser().absolute())))
         return tuple(args)
+
+
+class AtlasObservationSession:
+    """One Core-dispatched Atlas reader, with serial bounded JSONL requests."""
+
+    def __init__(self, process: asyncio.subprocess.Process,
+                 stderr_task: asyncio.Task[None], stderr_bytes: bytearray,
+                 graph_set_id: str, context: Mapping[str, Any]) -> None:
+        self.process = process
+        self.stderr_task = stderr_task
+        self.stderr_bytes = stderr_bytes
+        self.graph_set_id = graph_set_id
+        self.context = context
+        self._lock = asyncio.Lock()
+        self._closed = False
+
+    @staticmethod
+    async def _stop(process: asyncio.subprocess.Process) -> None:
+        if process.returncode is not None:
+            return
+        try:
+            process.terminate()
+        except ProcessLookupError:
+            pass
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5)
+        except TimeoutError:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            await process.wait()
+
+    @staticmethod
+    async def _read(reader: asyncio.StreamReader, *, timeout: float) -> Mapping[str, Any]:
+        try:
+            line = await asyncio.wait_for(reader.readline(), timeout=timeout)
+        except TimeoutError as exc:
+            raise CoreClientError(f"Atlas graph did not respond within {timeout:g}s") from exc
+        except ValueError as exc:
+            raise CoreClientError("Atlas graph response exceeds the client display limit") from exc
+        if not line:
+            raise CoreClientError("Atlas graph session ended before responding")
+        if len(line) > _ATLAS_SESSION_MAX_FRAME or not line.endswith(b"\n"):
+            raise CoreClientError("Atlas graph response exceeds the client display limit")
+        try:
+            value = json.loads(line.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise CoreClientError("Atlas graph returned an unreadable response") from exc
+        if not isinstance(value, dict):
+            raise CoreClientError("Atlas graph returned an unsupported response")
+        return value
+
+    @classmethod
+    async def open(cls, command: Sequence[str], cwd: Path | None,
+                   path: Path) -> AtlasObservationSession:
+        if not path.is_absolute() or not path.is_dir():
+            raise CoreClientError("Choose an existing absolute Atlas graph folder")
+        environment = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command, "atlas", "observations", "session", str(path),
+                cwd=cwd, env=environment,
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE, limit=_ATLAS_SESSION_MAX_FRAME,
+            )
+        except OSError as exc:
+            raise CoreClientError(f"cannot start selected Workbench Core: {exc}") from exc
+        assert process.stdout is not None and process.stderr is not None
+        stderr_bytes = bytearray()
+
+        async def drain_stderr() -> None:
+            while chunk := await process.stderr.read(4096):
+                remaining = 65536 - len(stderr_bytes)
+                if remaining > 0:
+                    stderr_bytes.extend(chunk[:remaining])
+
+        stderr_task = asyncio.create_task(drain_stderr())
+        try:
+            ready = await cls._read(process.stdout, timeout=600)
+            context = ready.get("context")
+            graph_id = ready.get("graph_set_id")
+            operations = ready.get("operations")
+            if (ready.get("format") != _ATLAS_SESSION_PREFIX + "ready-v1"
+                    or ready.get("schema_version") != 1
+                    or ready.get("state") != "ready"
+                    or not isinstance(graph_id, str)
+                    or _ATLAS_GRAPH_SET_ID.fullmatch(graph_id) is None
+                    or not isinstance(context, dict)
+                    or context.get("graph_set_id") != graph_id
+                    or not isinstance(operations, list)
+                    or not all(isinstance(item, str) for item in operations)
+                    or not {"search", "inspect", "relationships", "close"} <= set(operations)):
+                raise CoreClientError("Atlas graph returned an unsupported session")
+            return cls(process, stderr_task, stderr_bytes, graph_id, context)
+        except BaseException as exc:
+            await cls._stop(process)
+            await stderr_task
+            if isinstance(exc, CoreClientError) and not isinstance(exc.__cause__, TimeoutError):
+                detail = stderr_bytes.decode("utf-8", errors="replace").strip()
+                if detail and "ended before responding" in str(exc):
+                    raise CoreClientError(f"Atlas graph could not open: {detail[:1200]}") from exc
+            raise
+
+    async def request(self, operation: str, arguments: Mapping[str, Any]) -> Mapping[str, Any]:
+        if operation not in {"context", "search", "inspect", "relationships"}:
+            raise CoreClientError("unsupported Atlas graph operation")
+        async with self._lock:
+            if self._closed or self.process.returncode is not None:
+                raise CoreClientError("Atlas graph session has closed; reopen this graph")
+            request_id = uuid4().hex
+            request = {
+                "format": _ATLAS_SESSION_PREFIX + "request-v1", "schema_version": 1,
+                "request_id": request_id, "graph_set_id": self.graph_set_id,
+                "operation": operation, "arguments": dict(arguments),
+            }
+            raw = (json.dumps(request, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+            if len(raw) > 1024 * 1024:
+                raise CoreClientError("Atlas graph request exceeds the 1 MiB limit")
+            assert self.process.stdin is not None and self.process.stdout is not None
+            try:
+                self.process.stdin.write(raw)
+                await asyncio.wait_for(self.process.stdin.drain(), timeout=15)
+                response = await self._read(self.process.stdout, timeout=120)
+            except (CoreClientError, TimeoutError, BrokenPipeError,
+                    ConnectionResetError, asyncio.CancelledError) as exc:
+                await self._invalidate()
+                if isinstance(exc, (BrokenPipeError, ConnectionResetError, TimeoutError)):
+                    raise CoreClientError("Atlas graph session ended; reopen this graph") from exc
+                raise
+            if (response.get("format") != _ATLAS_SESSION_PREFIX + "response-v1"
+                    or response.get("schema_version") != 1
+                    or response.get("request_id") != request_id
+                    or response.get("graph_set_id") != self.graph_set_id):
+                await self._invalidate()
+                raise CoreClientError("Atlas graph response does not match this request")
+            if response.get("state") == "error":
+                error = response.get("error")
+                reason = error.get("message") if isinstance(error, dict) else None
+                raise CoreClientError(str(reason)[:1200] if reason else "Atlas graph could not complete the request")
+            result = response.get("result")
+            if response.get("state") != "complete" or not isinstance(result, dict):
+                await self._invalidate()
+                raise CoreClientError("Atlas graph returned an unsupported result")
+            return result
+
+    async def _invalidate(self) -> None:
+        self._closed = True
+        await self._stop(self.process)
+        await self.stderr_task
+
+    async def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            await asyncio.wait_for(self._lock.acquire(), timeout=0.2)
+        except TimeoutError:
+            await self._stop(self.process)
+        else:
+            try:
+                if self.process.returncode is None:
+                    assert self.process.stdin is not None and self.process.stdout is not None
+                    request_id = uuid4().hex
+                    frame = {"format": _ATLAS_SESSION_PREFIX + "request-v1",
+                             "schema_version": 1, "request_id": request_id,
+                             "graph_set_id": self.graph_set_id,
+                             "operation": "close", "arguments": {}}
+                    try:
+                        self.process.stdin.write((json.dumps(frame) + "\n").encode("utf-8"))
+                        await asyncio.wait_for(self.process.stdin.drain(), timeout=2)
+                        response = await self._read(self.process.stdout, timeout=3)
+                        if (response.get("format") != _ATLAS_SESSION_PREFIX + "response-v1"
+                                or response.get("request_id") != request_id
+                                or response.get("state") != "closed"):
+                            raise CoreClientError("Atlas graph did not confirm session close")
+                        await asyncio.wait_for(self.process.wait(), timeout=3)
+                    except (CoreClientError, TimeoutError, BrokenPipeError, ConnectionResetError):
+                        await self._stop(self.process)
+            finally:
+                self._lock.release()
+        await self.stderr_task
 
 
 class CoreClient:
@@ -1140,6 +1326,10 @@ class CoreClient:
         ):
             raise CoreClientError("unsupported Workbench command catalog")
         return record
+
+    async def open_atlas_observation_session(self, path: Path) -> AtlasObservationSession:
+        """Ask Core to hold one verified graph reader for this screen's lifetime."""
+        return await AtlasObservationSession.open(self.command, self.cwd, path)
 
     async def workspace_home(self, workspace: str) -> Mapping[str, Any]:
         record = await self.json_record("open", workspace, "--json")
