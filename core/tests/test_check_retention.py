@@ -19,6 +19,9 @@ class CheckRetentionTests(unittest.TestCase):
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
         self.root, self.attempt = self.fixture.root, self.fixture.attempt
+        # These cases exercise the finite-retention engine under a hypothetical
+        # complete catalog. The real W0 catalog still protects all cleanup.
+        self.enterContext(fixtures.hypothetical_complete_catalog())
 
     def enable(self, **changes):
         settings = {**retention.RECOMMENDATION, 'min_age_days': 0, 'trash_days': 0, **changes}
