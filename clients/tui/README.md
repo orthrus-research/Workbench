@@ -98,9 +98,12 @@ At startup, Textual asks Core to check the latest published Supersymmetry
 release. When a newer release is available, **Version up** asks Core to
 download and verify the published client archive, then saves that release as
 the user's pack choice in the stable configuration home. It does not replace
-files in the current workspace. **Ignore this release** remembers the exact
-release and asks again only when a newer one appears; **Later** changes
-nothing. The offer waits until Home is active if another screen is open.
+files in the current workspace. If the archive bytes change under the same
+tag, Textual shows the saved and published digests and offers **Use published
+archive** instead. **Ignore this release** or **Ignore this publication**
+remembers the exact published identity and asks again when it changes;
+**Later** changes nothing. The offer waits until Home is active if another
+screen is open.
 Refresh can retry a check. An unavailable GitHub response does not block local
 use. The published client archive is a CurseForge distribution;
 developers can still explicitly choose a source branch for their own work.
