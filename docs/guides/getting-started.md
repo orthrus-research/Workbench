@@ -21,9 +21,12 @@ curl -fsSL https://susy.work/install.sh | bash
 
 To inspect the script before running it, use
 `curl -fsSLo workbench-install-linux-x64.sh https://susy.work/install.sh && sh workbench-install-linux-x64.sh`.
-The release's `SHA256SUMS` lists the matching script and bundle hashes. Run the
-command inside a Linux shell, including on WSL2. The September 23 Linux x64
-preview remains available through the wheelhouse procedure below.
+The revised installer is also available on the release page as
+`workbench-install-linux-x64-path-v2.sh`, with its bundle and script hashes in
+`SHA256SUMS-path-v2`. The original 0.1.2 hook, checksum file and bundle remain
+available there. Run the command inside a Linux shell, including on WSL2. The
+September 23 Linux x64 preview remains available through the wheelhouse
+procedure below.
 
 The hook downloads a pinned Python 3.14 runtime and the exact release bundle,
 checks their SHA-256 hashes, then installs the release's selected native
@@ -33,8 +36,13 @@ Supersymmetry client bundle includes Core, Shell, Atlas, Axiom, the matching
 Axiom engine, the pack/platform profiles and their native dependencies. The
 hook does not select a pack, game context, Java runtime or IDE installation on
 your behalf. It prints the full `workbench-tui` path first for guided setup,
-then the optional `workbench setup --check` diagnostic and the directory of
-command shortcuts that can be added to `PATH`. The hook targets
+then the optional `workbench setup --check` diagnostic. After a completed
+installation it links `workbench` and `workbench-tui` in `~/.local/bin` and
+configures new Bash and zsh sessions to find them when those files can be
+updated safely. Existing conflicts are reported and left alone. A repeat run
+repairs the shortcuts and shell setup without downloading the bundle. Open a
+new terminal, or run `export PATH="$HOME/.local/bin:$PATH"` to use the commands
+in your current shell; a piped installer cannot change its parent shell. The hook targets
 Linux x64 with GNU libc 2.28 or newer, including a compatible WSL2 Linux
 environment. It needs HTTPS access, `curl`, `sha256sum`, `tar` and common POSIX
 shell tools; it needs no preinstalled Python, Pixi or source checkout. Download
@@ -75,7 +83,10 @@ and managed state. Run these commands in the Linux shell, not PowerShell.
 
 ### Connect the installed launcher
 
-Use the full executable path above, or add its directory to `PATH` yourself.
+For the hosted installer above, open a new Bash or zsh terminal after setup, or
+run `export PATH="$HOME/.local/bin:$PATH"` in the current shell. The direct
+wheelhouse installation in the previous section does not configure PATH: use
+its full executable path or add that environment's `bin` directory yourself.
 The examples below use `workbench` on `PATH`.
 
 Run `workbench-tui` for guided Supersymmetry setup. Choose **Set up

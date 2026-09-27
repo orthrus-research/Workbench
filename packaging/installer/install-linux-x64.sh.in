@@ -28,6 +28,86 @@ verify_hash() {
     [ "$actual" = "$2" ] || fail "downloaded $(basename "$1") differs from the reviewed SHA-256"
 }
 
+path_warning() {
+    printf 'Workbench PATH setup: %s\n' "$1" >&2
+}
+
+add_shell_path() {
+    profile=$1
+    if [ -L "$profile" ] || { [ -e "$profile" ] && [ ! -f "$profile" ]; }; then
+        path_warning "leaving existing shell profile unchanged: $profile"
+        return 1
+    fi
+    if [ -f "$profile" ] && grep -Fq '# Workbench command shortcuts (managed by installer)' "$profile"; then
+        return
+    fi
+    if ! printf '%s\n' \
+        '' \
+        '# Workbench command shortcuts (managed by installer)' \
+        'case ":${PATH:-}:" in' \
+        '    *":$HOME/.local/bin:"*) ;;' \
+        '    *) PATH="$HOME/.local/bin:${PATH:-}"; export PATH ;;' \
+        'esac' >> "$profile"; then
+        path_warning "could not update shell profile: $profile"
+        return 1
+    fi
+}
+
+configure_command_shortcuts() {
+    user_bin=$HOME/.local/bin
+    if [ -L "$user_bin" ] || { [ -e "$user_bin" ] && [ ! -d "$user_bin" ]; }; then
+        path_warning "leaving existing command directory unchanged: $user_bin"
+        return 1
+    fi
+    if ! mkdir -p "$user_bin"; then
+        path_warning "could not create command directory: $user_bin"
+        return 1
+    fi
+    for name in workbench workbench-tui; do
+        shortcut=$user_bin/$name
+        target=$install_root/bin/$name
+        if [ -L "$shortcut" ] && [ "$(readlink "$shortcut")" = "$target" ]; then
+            continue
+        fi
+        if [ -e "$shortcut" ] || [ -L "$shortcut" ]; then
+            path_warning "leaving existing command unchanged: $shortcut"
+            return 1
+        fi
+    done
+    for name in workbench workbench-tui; do
+        shortcut=$user_bin/$name
+        target=$install_root/bin/$name
+        if [ ! -L "$shortcut" ] && [ ! -e "$shortcut" ]; then
+            if ! ln -s "$target" "$shortcut"; then
+                path_warning "could not create command shortcut: $shortcut"
+                return 1
+            fi
+        fi
+    done
+    if [ -e "$HOME/.bash_profile" ] || [ -L "$HOME/.bash_profile" ]; then
+        bash_login=$HOME/.bash_profile
+    elif [ -e "$HOME/.bash_login" ] || [ -L "$HOME/.bash_login" ]; then
+        bash_login=$HOME/.bash_login
+    else
+        bash_login=$HOME/.profile
+    fi
+    profiles_ready=1
+    add_shell_path "$bash_login" || profiles_ready=0
+    add_shell_path "$HOME/.bashrc" || profiles_ready=0
+    add_shell_path "$HOME/.zshrc" || profiles_ready=0
+    [ "$profiles_ready" = 1 ]
+}
+
+show_command_shortcuts() {
+    printf 'Command shortcuts: %s/bin\n' "$install_root"
+    if [ "$shortcuts_ready" = 1 ]; then
+        printf '%s\n' 'For future Bash and zsh terminals, use workbench or workbench-tui.'
+        printf '%s\n' 'For this terminal, run: export PATH="$HOME/.local/bin:$PATH"'
+    else
+        printf '%s\n' 'Automatic PATH setup needs attention; use the full launcher paths above.'
+    fi
+}
+
 check_host() {
     [ "$(uname -s)" = Linux ] || fail 'this release requires Linux x64; no other host bundle is qualified'
     [ "$(uname -m)" = x86_64 ] || fail 'this release requires Linux x64; no other architecture is qualified'
@@ -99,7 +179,6 @@ already_installed() {
         printf 'Workbench %s is already installed.\n' "$RELEASE_TAG"
         printf 'Open guided setup: %s/bin/workbench-tui\n' "$destination"
         printf 'Check setup: %s/bin/workbench setup --check\n' "$destination"
-        printf 'Command shortcuts: %s/bin (add this directory to PATH if desired).\n' "$install_root"
         printf 'Axiom engine ZIP: %s\n' \
             "$retained_bundle"/axiom/workbench-axiom-engine-*.zip
         return 0
@@ -109,7 +188,7 @@ already_installed() {
 
 main() {
     umask 077
-    for command in curl sha256sum awk tar mktemp getconf uname; do
+    for command in curl sha256sum awk tar mktemp getconf uname readlink; do
         command -v "$command" >/dev/null 2>&1 || fail "required host command is missing: $command"
     done
     check_host
@@ -133,6 +212,9 @@ main() {
     trap 'rmdir "$lock" 2>/dev/null || true' EXIT
 
     if already_installed; then
+        shortcuts_ready=0
+        configure_command_shortcuts && shortcuts_ready=1
+        show_command_shortcuts
         return
     fi
     [ ! -e "$install_root/bundles/$RELEASE_TAG" ] && [ ! -L "$install_root/bundles/$RELEASE_TAG" ] \
@@ -186,6 +268,8 @@ PY
     printf '{\n  "format": "workbench-hook-install-v1",\n  "state": "installed",\n  "release_tag": "%s",\n  "archive_sha256": "%s",\n  "python_runtime_id": "%s"\n}\n' \
         "$RELEASE_TAG" "$BUNDLE_SHA256" "$PYTHON_RUNTIME_ID" > "$hook_receipt"
     mv "$hook_receipt" "$destination/workbench-hook.json"
+    shortcuts_ready=0
+    configure_command_shortcuts && shortcuts_ready=1
     printf '\nWorkbench %s installed.\n' "$RELEASE_TAG"
     if [ -x "$destination/bin/workbench-tui" ]; then
         printf 'Open guided setup: %s/bin/workbench-tui\n' "$destination"
@@ -196,10 +280,10 @@ PY
     else
         printf 'IDE clients: %s/bundles/%s/clients\n' "$install_root" "$RELEASE_TAG"
     fi
-    printf 'Command shortcuts: %s/bin (add this directory to PATH if desired).\n' "$install_root"
+    show_command_shortcuts
     printf 'Axiom engine ZIP: %s\n' \
         "$install_root/bundles/$RELEASE_TAG"/axiom/workbench-axiom-engine-*.zip
-    printf 'No shell profile or existing installation was changed.\n'
+    printf 'The installed version remains separate from existing installations.\n'
 }
 
 main "$@"

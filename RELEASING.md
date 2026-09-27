@@ -121,14 +121,26 @@ limits; the procedure below describes the target for later releases.
 curl -fsSL https://susy.work/install.sh | bash
 ```
 
-The 0.1.2 release carries the exact hook and archive hashes in `SHA256SUMS`.
+The 0.1.2 release retains its original hook and archive hashes in `SHA256SUMS`.
+Its revised PATH setup hook is a separate
+`workbench-install-linux-x64-path-v2.sh` asset with
+`SHA256SUMS-path-v2`; it uses the same verified bundle and does not replace the
+original release files. Keep both checksum records and bind each hook revision
+to its source commit in the release notes.
 For later editions, bind the reviewed tag and hook SHA-256 in release notes.
 Offer a download-and-inspect variant beside the one-line command, which needs
 the caller's `pipefail` setting to report an initial `curl` failure reliably.
 The hook contains the archive URL and SHA-256, plus a separately pinned
 `python-build-standalone` runtime URL and SHA-256. It installs in the user's
-XDG data directory without sudo, Pixi, a source checkout, a system Python, or
-shell profile changes. It installs one named bundle edition. Both editions
+XDG data directory without sudo, Pixi, a source checkout, or a system Python.
+It does not alter system-wide shell settings. After a completed install, the
+revised 0.1.2 hook links its commands in `~/.local/bin` and configures future
+Bash and zsh sessions to find them. A repeat run repairs that setup without
+downloading the bundle again. Existing conflicting files are preserved and
+reported for manual resolution.
+The pipe runs in a child shell, so users must open a new terminal or run
+`export PATH="$HOME/.local/bin:$PATH"` in the current shell. The hook installs
+one named bundle edition. Both editions
 retain the matching Axiom
 engine; the full Suite edition also retains IDE clients. The Supersymmetry
 client edition omits those IDE clients. Only Linux x64 with GNU libc 2.28 or
@@ -172,9 +184,12 @@ before advertising them.
    a fresh supported host with no Python or Pixi on `PATH`. Record the pinned
    Python acquisition, clean installation, CLI setup check, terminal client
    launch, repeated-run behavior, changed-download refusal and retained failed
-   receipt. For the Supersymmetry edition, also prove fresh acquisition of all
-   required pack files through the Workbench-specific provider key, Textual
-   choices, exact instance installation, Java and launcher binding, and a real
+   receipt. For a hook that sets up PATH, also prove new-shell discovery,
+   current-shell guidance, repeat-run repair and preservation of existing
+   conflicting shortcuts. For the Supersymmetry edition, also prove fresh
+   acquisition of all required pack files through the Workbench-specific
+   provider key, Textual choices, exact instance installation, Java and
+   launcher binding, and a real
    client launch checkpoint. Until that provider path is available, a complete
    Prism instance ZIP import chosen in Textual is an interim route and does not qualify fresh
    acquisition. For the full Suite edition, independently qualify its retained
@@ -185,6 +200,13 @@ before advertising them.
    already qualified bytes after the ordinary release controls and review are
    satisfied. Verify public downloads and their hashes before updating the
    README's current release entry point.
+
+For a correction that changes only the hook, render it from the original
+descriptor and unchanged archive into a new output directory. Upload it under
+a new asset name with a separately named checksum file. Preserve the original
+release assets and checksum file, then update the site only after verifying
+that the new public hook still pins the original bundle. A new release tag
+would require an independently assembled bundle with that tag in its manifest.
 
 ## Clean-root public history and future updates
 

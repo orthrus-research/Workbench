@@ -51,9 +51,14 @@ This also works in a compatible WSL2 Linux shell. Keep Workbench's state on the
 Linux filesystem. The installer verifies a pinned Python runtime and the
 matching release bundle, installs in your user directory, and prints the full
 path to `workbench-tui` for guided setup. It does not require sudo or a source
-checkout, and it does not add commands to your `PATH`. To inspect the script
-first, download `workbench-install-linux-x64.sh` and verify it against
-`SHA256SUMS` on the [release page](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-0.1.2).
+checkout. After a successful install, it makes `workbench` and `workbench-tui`
+available through `~/.local/bin` in new Bash or zsh sessions when those startup
+files can be updated safely. Existing conflicting files are left alone and
+reported. Open a new terminal, or run `export PATH="$HOME/.local/bin:$PATH"` to
+use the commands in your current shell. To inspect the current script first,
+download `workbench-install-linux-x64-path-v2.sh` and verify it against
+`SHA256SUMS-path-v2` on the [release page](https://github.com/orthrus-research/Workbench/releases/tag/linux-x64-mvp-0.1.2).
+The original 0.1.2 installer and bundle remain available there.
 
 In Textual, open one project and choose a workflow. Workbench does not provide
 the external game files: you can import a complete Prism instance ZIP, while

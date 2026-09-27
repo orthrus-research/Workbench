@@ -130,7 +130,7 @@ class InstallHookTests(unittest.TestCase):
         self.commands.mkdir()
         for name in (
             "sha256sum", "awk", "tar", "gzip", "mktemp", "mkdir", "rmdir",
-            "rm", "mv", "grep", "ln", "chmod", "cp", "basename",
+            "rm", "mv", "grep", "ln", "readlink", "chmod", "cp", "basename",
         ):
             executable = shutil.which(name)
             self.assertIsNotNone(executable, name)
@@ -247,6 +247,23 @@ class InstallHookTests(unittest.TestCase):
         self.assertEqual(self._sha(self.bundle_archive), hook_receipt["archive_sha256"])
         self.assertTrue((destination / "bin/workbench").is_file())
         self.assertTrue((destination / "bin/workbench-tui").is_file())
+        for name in ("workbench", "workbench-tui"):
+            shortcut = self.home / ".local/bin" / name
+            self.assertTrue(shortcut.is_symlink())
+            self.assertEqual(self.install_root / "bin" / name, Path(shortcut.readlink()))
+        for profile in (".profile", ".bashrc", ".zshrc"):
+            self.assertEqual(1, (self.home / profile).read_text().count(
+                "# Workbench command shortcuts (managed by installer)"))
+        shell = subprocess.run(
+            ["/bin/sh", "-c", '. "$HOME/.bashrc"; command -v workbench; command -v workbench-tui'],
+            env={"HOME": str(self.home), "PATH": str(self.commands)},
+            capture_output=True, check=False,
+        )
+        self.assertEqual(0, shell.returncode, shell.stderr.decode())
+        self.assertEqual(
+            [str(self.home / ".local/bin/workbench"), str(self.home / ".local/bin/workbench-tui")],
+            shell.stdout.decode().splitlines(),
+        )
         self.assertEqual(["verified", "installed"], self.action_log.read_text().splitlines())
         self.assertEqual(2, len(self.download_log.read_text().splitlines()))
         self.assertTrue((self.install_root / "runtimes/cpython-3.14.7+20260924/python/bin/python3.14").is_file())
@@ -275,6 +292,7 @@ class InstallHookTests(unittest.TestCase):
         self.assertLess(output.index("Open guided setup:"), output.index("Check setup:"))
         self.assertIn("Choose Set up Supersymmetry instance", output)
         self.assertIn(f"Command shortcuts: {self.install_root}/bin", output)
+        self.assertIn('For this terminal, run: export PATH="$HOME/.local/bin:$PATH"', output)
         self.assertNotIn("IDE clients:", output)
         self.assertIn(
             f"Axiom engine ZIP: {self.install_root}/bundles/test-v1/axiom/workbench-axiom-engine-0.1.0.zip",
@@ -332,6 +350,10 @@ class InstallHookTests(unittest.TestCase):
         receipt = (destination / "workbench-install.json").read_bytes()
         hook_receipt = (destination / "workbench-hook.json").read_bytes()
         downloads = self.download_log.read_bytes()
+        # Simulate a 0.1.2 install made before automatic PATH setup existed.
+        shutil.rmtree(self.home / ".local/bin")
+        for profile in (".profile", ".bashrc", ".zshrc"):
+            (self.home / profile).unlink()
         second = self.invoke(TEST_CURL_FAIL="1")
         self.assertEqual(0, second.returncode, second.stderr.decode())
         self.assertIn("already installed", second.stdout.decode())
@@ -346,6 +368,50 @@ class InstallHookTests(unittest.TestCase):
         self.assertEqual(receipt, (destination / "workbench-install.json").read_bytes())
         self.assertEqual(hook_receipt, (destination / "workbench-hook.json").read_bytes())
         self.assertEqual(downloads, self.download_log.read_bytes())
+        for name in ("workbench", "workbench-tui"):
+            self.assertTrue((self.home / ".local/bin" / name).is_symlink())
+        for profile in (".profile", ".bashrc", ".zshrc"):
+            self.assertEqual(1, (self.home / profile).read_text().count(
+                "# Workbench command shortcuts (managed by installer)"))
+        third = self.invoke(TEST_CURL_FAIL="1")
+        self.assertEqual(0, third.returncode, third.stderr.decode())
+        self.assertEqual(downloads, self.download_log.read_bytes())
+        for profile in (".profile", ".bashrc", ".zshrc"):
+            self.assertEqual(1, (self.home / profile).read_text().count(
+                "# Workbench command shortcuts (managed by installer)"))
+
+    def test_existing_command_is_preserved_without_changing_shell_profiles(self) -> None:
+        user_bin = self.home / ".local/bin"
+        user_bin.mkdir(parents=True)
+        existing = user_bin / "workbench"
+        existing.write_text("existing command\n", encoding="utf-8")
+        result = self.invoke()
+        self.assertEqual(0, result.returncode, result.stderr.decode())
+        self.assertEqual("existing command\n", existing.read_text())
+        self.assertFalse((user_bin / "workbench-tui").exists())
+        self.assertIn("leaving existing command unchanged", result.stderr.decode())
+        self.assertIn("Automatic PATH setup needs attention", result.stdout.decode())
+        self.assertFalse((self.home / ".bashrc").exists())
+
+    def test_existing_bash_login_profile_is_extended_idempotently(self) -> None:
+        bash_profile = self.home / ".bash_profile"
+        bash_profile.write_text("# existing login setup\n", encoding="utf-8")
+        first = self.invoke()
+        self.assertEqual(0, first.returncode, first.stderr.decode())
+        second = self.invoke(TEST_CURL_FAIL="1")
+        self.assertEqual(0, second.returncode, second.stderr.decode())
+        self.assertEqual(1, bash_profile.read_text().count(
+            "# Workbench command shortcuts (managed by installer)"))
+        self.assertTrue(bash_profile.read_text().startswith("# existing login setup\n"))
+        self.assertFalse((self.home / ".profile").exists())
+
+    def test_custom_xdg_data_home_uses_standard_user_command_directory(self) -> None:
+        custom_data = self.root / "custom data"
+        result = self.invoke(XDG_DATA_HOME=str(custom_data))
+        self.assertEqual(0, result.returncode, result.stderr.decode())
+        for name in ("workbench", "workbench-tui"):
+            self.assertEqual(custom_data / "workbench/bin" / name,
+                             Path((self.home / ".local/bin" / name).readlink()))
 
     def test_failed_install_is_retained_without_active_launcher(self) -> None:
         result = self.invoke(TEST_INSTALL_FAIL="1")
