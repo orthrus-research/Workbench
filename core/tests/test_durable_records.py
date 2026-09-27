@@ -16,9 +16,11 @@ from unittest.mock import patch
 from workbench_api.host_filesystem import (
     DurableRecordError, acquire_private_owned_marker, append_private_line,
     count_interrupted_create_once_stages, count_uncertain_record_stages,
-    inspect_private_journal, private_exclusive_marker, private_record_lock,
+    inspect_private_journal, measure_ordinary_single_link_file,
+    private_exclusive_marker, private_record_lock,
     publish_commit_witness_bytes, publish_create_once_bytes,
-    publish_immutable_bytes, read_bounded_bytes, read_bounded_single_link_bytes,
+    publish_immutable_bytes, publish_immutable_stream,
+    read_bounded_bytes, read_bounded_single_link_bytes,
     read_private_bytes,
     read_private_single_link_bytes, remove_private_bytes, replace_private_bytes,
     update_preference_bytes,
@@ -176,6 +178,149 @@ class DurableRecordTests(unittest.TestCase):
         self.assertEqual(1, len(stages))
         self.assertEqual(1, count_uncertain_record_stages(self.root, targets=('current.json',)))
         self.assertEqual(b'pending\n', stages[0].read_bytes())
+
+    def test_streamed_immutable_record_exceeds_small_record_bound_without_buffering(self) -> None:
+        block = b"x" * (1024 * 1024)
+        expected = sha256()
+        for _ in range(33):
+            expected.update(block)
+        expected.update(b"\n")
+        # The iterable is consumed once; the report is larger than the usual
+        # 32 MiB record limit without constructing a second whole-file value.
+        def chunks():
+            for _ in range(33):
+                yield block
+            yield b"\n"
+        receipt = publish_immutable_stream(self.path, chunks())
+        self.assertEqual({"path": str(self.path), "size": 33 * len(block) + 1,
+                          "sha256": expected.hexdigest()}, receipt)
+        self.assertEqual([], list(self.root.glob('.current.json.*.tmp')))
+        if os.name != 'nt':
+            self.path.chmod(0o644)
+        self.assertEqual(receipt, measure_ordinary_single_link_file(
+            self.path, expected_size=receipt['size'], expected_sha256=receipt['sha256'],
+        ))
+        with self.assertRaises(DurableRecordError):
+            measure_ordinary_single_link_file(
+                self.path, expected_size=receipt['size'] - 1, expected_sha256=receipt['sha256'],
+            )
+        with self.assertRaises(DurableRecordError):
+            measure_ordinary_single_link_file(
+                self.path, expected_size=receipt['size'], expected_sha256='0' * 64,
+            )
+
+    def test_streamed_immutable_interruption_preserves_stage_and_final_state(self) -> None:
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        for moment in ('before-stage-flush', 'before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                def interrupt_link(source, target, *args, **kwargs):
+                    if moment == 'before-link' and Path(target) == self.path:
+                        raise OSError('stream link interrupted')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    if (Path(directory) == self.root
+                            and (moment == 'before-stage-flush'
+                                 or moment == 'after-link-before-flush' and self.path.exists())):
+                        raise OSError('stream flush interrupted')
+                    return original_flush(directory)
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaises(DurableRecordError):
+                        publish_immutable_stream(self.path, (b'whole', b' record\n'))
+                stages = list(self.root.glob('.current.json.*.tmp'))
+                self.assertEqual(1, len(stages))
+                self.assertEqual(moment == 'after-link-before-flush', self.path.exists())
+                self.assertEqual(1, count_uncertain_record_stages(self.root, targets=('current.json',)))
+                self.assertEqual(b'' if moment == 'before-stage-flush' else b'whole record\n',
+                                 stages[0].read_bytes())
+                stages[0].unlink()
+                self.path.unlink(missing_ok=True)
+
+    def test_streamed_immutable_cancellation_retains_uncertain_stage(self) -> None:
+        for moment in ('before-link', 'after-link'):
+            with self.subTest(moment=moment):
+                def cancel() -> None:
+                    stages = list(self.root.glob('.current.json.*.tmp'))
+                    if stages and (moment == 'before-link' or self.path.exists()):
+                        raise ValueError('stream cancelled')
+
+                with self.assertRaisesRegex(ValueError, 'stream cancelled'):
+                    publish_immutable_stream(self.path, (b'whole record\n',),
+                                             check_cancelled=cancel)
+                stages = list(self.root.glob('.current.json.*.tmp'))
+                self.assertEqual(1, len(stages))
+                self.assertEqual(moment == 'after-link', self.path.exists())
+                self.assertEqual(1, count_uncertain_record_stages(self.root, targets=('current.json',)))
+                self.assertEqual(b'' if moment == 'before-link' else b'whole record\n',
+                                 stages[0].read_bytes())
+                stages[0].unlink()
+                self.path.unlink(missing_ok=True)
+
+    def test_streamed_immutable_cleanup_failures_keep_final_and_report_write_error(self) -> None:
+        original_unlink = Path.unlink
+        original_flush = durable_records.fsync_directory
+        for moment in ('stage-unlink', 'final-parent-flush'):
+            with self.subTest(moment=moment):
+                flushes = 0
+
+                def interrupt_unlink(path, *args, **kwargs):
+                    if moment == 'stage-unlink' and path.name.startswith('.current.json.'):
+                        raise OSError('stream stage unlink interrupted')
+                    return original_unlink(path, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    nonlocal flushes
+                    if Path(directory) == self.root:
+                        flushes += 1
+                        if moment == 'final-parent-flush' and flushes == 3:
+                            raise OSError('stream final flush interrupted')
+                    return original_flush(directory)
+
+                with (patch.object(Path, 'unlink', interrupt_unlink),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaises(DurableRecordError) as raised:
+                        publish_immutable_stream(self.path, (b'whole record\n',))
+                self.assertEqual('write', raised.exception.code)
+                self.assertEqual(b'whole record\n', self.path.read_bytes())
+                self.assertEqual(moment == 'stage-unlink',
+                                 bool(list(self.root.glob('.current.json.*.tmp'))))
+                with self.assertRaises(DurableRecordError):
+                    publish_immutable_stream(self.path, (b'never replayed\n',))
+                for stage in self.root.glob('.current.json.*.tmp'):
+                    stage.unlink()
+                self.path.unlink()
+
+    def test_streamed_immutable_secure_failure_retains_stage_as_unsafe(self) -> None:
+        with patch.object(durable_records, 'secure_private_path',
+                          side_effect=durable_records.HostFilesystemError('cannot protect stage')):
+            with self.assertRaises(DurableRecordError) as raised:
+                publish_immutable_stream(self.path, (b'never written\n',))
+        self.assertEqual('unsafe', raised.exception.code)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(1, len(list(self.root.glob('.current.json.*.tmp'))))
+
+    def test_streamed_ordinary_measure_rejects_link_and_redirect(self) -> None:
+        receipt = publish_immutable_stream(self.path, (b'historical\n',))
+        if os.name != 'nt':
+            self.path.chmod(0o644)
+        other = self.root / 'other.json'
+        os.link(self.path, other)
+        with self.assertRaises(DurableRecordError) as linked:
+            measure_ordinary_single_link_file(
+                self.path, expected_size=receipt['size'], expected_sha256=receipt['sha256'],
+            )
+        self.assertEqual('unsafe', linked.exception.code)
+        other.unlink()
+        redirected = self.root / 'redirected.json'
+        redirected.symlink_to(self.path)
+        with self.assertRaises(DurableRecordError) as redirected_error:
+            measure_ordinary_single_link_file(
+                redirected, expected_size=receipt['size'], expected_sha256=receipt['sha256'],
+            )
+        self.assertEqual('unsafe', redirected_error.exception.code)
 
     def test_uncertain_record_stage_inventory_preserves_unknown_legacy_and_redirects(self) -> None:
         old = self.root / ('.record-' + 'a' * 32)

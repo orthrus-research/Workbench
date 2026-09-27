@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import re
 import stat
-from typing import Callable
+from typing import Callable, Iterable
 
 
 from workbench_api.host_filesystem import HostFilesystemError
@@ -369,6 +369,15 @@ def read_bounded_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
     return read(path, byte_limit=byte_limit)
 
 
+def measure_ordinary_single_link_file(
+    path: Path, *, expected_size: int, expected_sha256: str,
+    check_cancelled: Callable[[], None] | None = None,
+) -> dict[str, str | int]:
+    from .durable_records import measure_ordinary_single_link_file as measure
+    return measure(path, expected_size=expected_size, expected_sha256=expected_sha256,
+                   check_cancelled=check_cancelled)
+
+
 def update_preference_bytes(
     path: Path, transform: Callable[[bytes | None], bytes], *, byte_limit: int,
 ) -> bytes:
@@ -381,6 +390,14 @@ def publish_immutable_bytes(
 ) -> None:
     from .durable_records import publish_immutable_bytes as publish
     publish(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+
+def publish_immutable_stream(
+    path: Path, chunks: Iterable[bytes], *,
+    check_cancelled: Callable[[], None] | None = None,
+) -> dict[str, str | int]:
+    from .durable_records import publish_immutable_stream as publish
+    return publish(path, chunks, check_cancelled=check_cancelled)
 
 
 def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:

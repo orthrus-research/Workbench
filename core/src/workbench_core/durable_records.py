@@ -6,6 +6,7 @@ publication, verified reads, and the expected-byte compare for current records.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from contextlib import contextmanager
 from hashlib import sha256
 import os
@@ -15,11 +16,12 @@ import secrets
 import stat
 import tempfile
 from time import monotonic, sleep
-from typing import Iterator
+from typing import Callable, Iterator
 
 from workbench_api.host_filesystem import DurableRecordError, HostFilesystemError
 
 from .host_filesystem import file_lease, fsync_directory, private_path, secure_private_path
+from .filesystem_paths import native_path
 
 
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -146,6 +148,76 @@ def read_bounded_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
     return _read_bytes(path, byte_limit=byte_limit, private=False, single_link=True)
 
 
+def _measure_stream(
+    path: Path, *, expected_size: int, expected_sha256: str,
+    private: bool, single_link: bool, check_cancelled: Callable[[], None],
+) -> dict[str, str | int]:
+    if (not isinstance(path, Path) or not path.is_absolute()
+            or type(expected_size) is not int or expected_size < 0
+            or type(expected_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None):
+        raise DurableRecordError("bounds", "streamed record needs an exact path, size and digest")
+    if private:
+        _parent(path)
+    else:
+        from . import check_storage
+        try:
+            check_storage.ordinary(path)
+        except (OSError, ValueError) as exc:
+            raise DurableRecordError("unsafe", "streamed record traverses an unsafe ordinary path") from exc
+    visible = _ordinary(path, byte_limit=expected_size, private=private, single_link=single_link)
+    if visible.st_size != expected_size:
+        raise DurableRecordError("changed", "streamed record size differs")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    digest, count = sha256(), 0
+    try:
+        descriptor = os.open(native_path(path), flags)
+        try:
+            opened = os.fstat(descriptor)
+            if (not stat.S_ISREG(opened.st_mode) or _identity(opened) != _identity(visible)
+                    or (opened.st_mode, opened.st_nlink) != (visible.st_mode, visible.st_nlink)):
+                raise DurableRecordError("changed", "streamed record changed before reading")
+            while True:
+                check_cancelled()
+                chunk = os.read(descriptor, 1024 * 1024)
+                if not chunk:
+                    break
+                count += len(chunk)
+                if count > expected_size:
+                    raise DurableRecordError("changed", "streamed record grew while reading")
+                digest.update(chunk)
+            after = os.fstat(descriptor)
+        finally:
+            os.close(descriptor)
+        final = _ordinary(path, byte_limit=expected_size, private=private, single_link=single_link)
+        if not private:
+            try:
+                check_storage.ordinary(path)
+            except (OSError, ValueError) as exc:
+                raise DurableRecordError("unsafe", "streamed record traverses an unsafe ordinary path") from exc
+    except DurableRecordError:
+        raise
+    except OSError as exc:
+        raise DurableRecordError("unavailable", f"cannot measure streamed record: {exc}") from exc
+    if (count != expected_size or digest.hexdigest() != expected_sha256
+            or any((_identity(item), item.st_mode, item.st_nlink)
+                   != (_identity(visible), visible.st_mode, visible.st_nlink)
+                   for item in (opened, after, final))):
+        raise DurableRecordError("changed", "streamed record bytes or custody changed")
+    return {"path": str(path), "size": count, "sha256": digest.hexdigest()}
+
+
+def measure_ordinary_single_link_file(
+    path: Path, *, expected_size: int, expected_sha256: str,
+    check_cancelled: Callable[[], None] | None = None,
+) -> dict[str, str | int]:
+    """Verify exact historical ordinary bytes without buffering the file."""
+    return _measure_stream(
+        path, expected_size=expected_size, expected_sha256=expected_sha256,
+        private=False, single_link=True, check_cancelled=check_cancelled or (lambda: None),
+    )
+
+
 @contextmanager
 def _prepared(
     path: Path, data: bytes, *, create_once_stage: bool = False,
@@ -223,6 +295,81 @@ def publish_immutable_bytes(
             if _identity(published) != _identity(secured) or read_private_bytes(path, byte_limit=byte_limit) != data:
                 raise DurableRecordError("changed", "published immutable record changed")
     fsync_directory(path.parent)
+
+
+def publish_immutable_stream(
+    path: Path, chunks: Iterable[bytes], *,
+    check_cancelled: Callable[[], None] | None = None,
+) -> dict[str, str | int]:
+    """Publish one exact private file from chunks, retaining uncertain stages.
+
+    The stage name is flushed before the final hard link. No content-size cap is
+    invented here; the owner supplies its complete report and cancellation.
+    """
+    _parent(path)
+    if isinstance(chunks, (bytes, bytearray, memoryview, str)) or not isinstance(chunks, Iterable):
+        raise DurableRecordError("bounds", "streamed record requires byte chunks")
+    if check_cancelled is not None and not callable(check_cancelled):
+        raise DurableRecordError("bounds", "streamed record cancellation callback is invalid")
+    poll = check_cancelled or (lambda: None)
+    if path.exists() or path.is_symlink():
+        raise DurableRecordError("collision", "immutable streamed record already exists")
+    stage = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    try:
+        descriptor = os.open(native_path(stage), flags, 0o600)
+    except OSError as exc:
+        raise DurableRecordError("write", f"cannot stage immutable stream: {exc}") from exc
+    digest, size = sha256(), 0
+    try:
+        try:
+            secure_private_path(stage, directory=False)
+        except HostFilesystemError as exc:
+            raise DurableRecordError("unsafe", f"cannot secure immutable stream stage: {exc}") from exc
+        fsync_directory(path.parent)
+        for chunk in chunks:
+            poll()
+            if type(chunk) is not bytes:
+                raise DurableRecordError("bounds", "streamed record yielded a non-byte chunk")
+            remaining = memoryview(chunk)
+            while remaining:
+                written = os.write(descriptor, remaining)
+                if written <= 0:
+                    raise DurableRecordError("write", "streamed record write made no progress")
+                remaining = remaining[written:]
+            digest.update(chunk)
+            size += len(chunk)
+        os.fsync(descriptor)
+    except DurableRecordError:
+        raise
+    except OSError as exc:
+        raise DurableRecordError("write", f"cannot write immutable stream: {exc}") from exc
+    finally:
+        os.close(descriptor)
+    expected_sha256 = digest.hexdigest()
+    _measure_stream(stage, expected_size=size, expected_sha256=expected_sha256,
+                    private=True, single_link=True, check_cancelled=poll)
+    try:
+        os.link(native_path(stage), native_path(path), follow_symlinks=False)
+    except FileExistsError as exc:
+        raise DurableRecordError("collision", "immutable streamed record raced") from exc
+    except OSError as exc:
+        raise DurableRecordError("write", f"cannot publish immutable stream: {exc}") from exc
+    published = _ordinary(path, byte_limit=size)
+    staged = _ordinary(stage, byte_limit=size)
+    if (_identity(published) != _identity(staged)
+            or published.st_nlink != 2 or staged.st_nlink != 2):
+        raise DurableRecordError("changed", "published immutable stream changed custody")
+    _measure_stream(path, expected_size=size, expected_sha256=expected_sha256,
+                    private=True, single_link=False, check_cancelled=poll)
+    try:
+        fsync_directory(path.parent)
+        native_path(stage).unlink()
+        fsync_directory(path.parent)
+    except OSError as exc:
+        raise DurableRecordError("write", f"cannot finish immutable stream publication: {exc}") from exc
+    return _measure_stream(path, expected_size=size, expected_sha256=expected_sha256,
+                           private=True, single_link=True, check_cancelled=poll)
 
 
 def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:
@@ -778,6 +925,7 @@ def inspect_private_journal(path: Path, *, byte_limit: int) -> dict:
 
 __all__ = [
     "read_private_bytes", "read_bounded_bytes", "read_bounded_single_link_bytes", "publish_immutable_bytes",
+    "measure_ordinary_single_link_file", "publish_immutable_stream",
     "replace_private_bytes", "remove_private_bytes", "private_record_lock", "append_private_line",
     "inspect_private_journal",
 ]

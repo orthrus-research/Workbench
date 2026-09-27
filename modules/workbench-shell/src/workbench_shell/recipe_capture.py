@@ -11,8 +11,9 @@ from threading import Event
 
 from workbench_api.processes import capture_process, ProcessError, open_process_output, read_captured_process
 from workbench_api.host_filesystem import (
-    count_uncertain_record_stages, publish_commit_witness_bytes,
-    publish_immutable_bytes, read_bounded_bytes, read_bounded_single_link_bytes,
+    count_uncertain_record_stages, measure_ordinary_single_link_file,
+    publish_commit_witness_bytes, publish_immutable_bytes, publish_immutable_stream,
+    read_bounded_bytes, read_bounded_single_link_bytes,
     read_private_single_link_bytes,
 )
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
@@ -98,6 +99,36 @@ def _write_run_input_record(attempt, name, value):
     # publication leaves that attempt non-runnable while retaining its evidence.
     publish_immutable_bytes(attempt / name, storage.canonical(value) + b'\n',
                             byte_limit=_RECORD_BYTE_LIMIT)
+
+
+def _write_audit_record(attempt, report, *, check_cancelled):
+    # JSONEncoder.iterencode uses the same V1 options as check_storage.canonical
+    # while keeping a complete audit out of a second whole-report byte buffer.
+    encoder = json.JSONEncoder(sort_keys=True, separators=(',', ':'),
+                               allow_nan=False, ensure_ascii=True)
+
+    def chunks():
+        chunk_size = 64 * 1024
+        pending = bytearray()
+        for part in encoder.iterencode(report):
+            # The V1 encoder emits ASCII escapes. Bound both each encoded
+            # fragment and the number of writes to Core's staged file.
+            for offset in range(0, len(part), chunk_size):
+                check_cancelled()
+                fragment = part[offset:offset + chunk_size].encode('ascii')
+                if len(pending) + len(fragment) > chunk_size:
+                    yield bytes(pending)
+                    pending.clear()
+                if len(fragment) == chunk_size:
+                    yield fragment
+                else:
+                    pending.extend(fragment)
+        check_cancelled()
+        pending.extend(b'\n')
+        yield bytes(pending)
+
+    return publish_immutable_stream(attempt / 'audit.json', chunks(),
+                                    check_cancelled=check_cancelled)
 
 
 def _decode_unique_json(raw):
@@ -660,14 +691,16 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
                         or projection.get('capture_manifest_sha256') != _file(attempt / 'capture/manifest.json')['sha256']):
                     raise ValueError('profile returned an invalid recipe graph projection receipt')
                 report = audit_recipe_dead_ends(view, check_cancelled=cancel.check)
-            storage.write_json(attempt / 'audit.json', report, byte_limit=None)
+            audit = _write_audit_record(attempt, report, check_cancelled=cancel.check)
             cancel.check()
             return _write_result_record(attempt,
                                         {'format': RESULT, 'request_id': request['id'], 'prepared_id': prepared['id'],
                                          'attempt_id': identity, 'state': 'complete', 'native_admitted': True,
                                          'process': process.reference, 'launch_id': launch['id'], 'projection': projection,
-                                         'input_manifest': _file(input_path), 'audit': _file(attempt / 'audit.json'),
-                                         'custody': {name: _file(attempt / name, check_cancelled=cancel.check) for name in _CUSTODY},
+                                         'input_manifest': _file(input_path), 'audit': audit,
+                                         'custody': {name: audit if name == 'audit.json' else
+                                                     _file(attempt / name, check_cancelled=cancel.check)
+                                                     for name in _CUSTODY},
                                          'capture_files': workspace_storage.inventory(attempt / 'capture', cancelled=cancel.is_set),
                                          'observer_files': workspace_storage.inventory(attempt / 'observer-build', cancelled=cancel.is_set),
                                          'summary': report['summary'], 'coverage': report['coverage']})
@@ -707,7 +740,17 @@ def show(root, identity, *, cancelled=None):
             if set(result.get('custody', {})) != set(_CUSTODY):
                 raise ValueError('retained capture custody is incomplete')
             for name in _CUSTODY:
-                if _file(attempt / name, check_cancelled=cancel.check) != result['custody'][name]:
+                declared = result['custody'][name]
+                if name == 'audit.json':
+                    if not isinstance(declared, dict) or set(declared) != {'path', 'size', 'sha256'}:
+                        raise ValueError('retained capture audit custody is incomplete')
+                    observed = measure_ordinary_single_link_file(
+                        attempt / name, expected_size=declared['size'],
+                        expected_sha256=declared['sha256'], check_cancelled=cancel.check,
+                    )
+                else:
+                    observed = _file(attempt / name, check_cancelled=cancel.check)
+                if observed != declared:
                     raise ValueError('retained capture evidence changed')
             for name, key in (('capture', 'capture_files'), ('observer-build', 'observer_files')):
                 if workspace_storage.inventory(attempt / name, cancelled=cancel.is_set) != result[key]:

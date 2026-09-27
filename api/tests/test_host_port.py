@@ -19,6 +19,12 @@ class HostPortTests(unittest.TestCase):
                 port.update_preference_bytes(Path("unused"), lambda _old: b"new", byte_limit=16)
             with self.assertRaisesRegex(port.HostFilesystemError, "no filesystem host"):
                 port.read_bounded_single_link_bytes(Path("unused"), byte_limit=16)
+            with self.assertRaisesRegex(port.HostFilesystemError, "no filesystem host"):
+                port.publish_immutable_stream(Path("unused"), (b"bytes",))
+            with self.assertRaisesRegex(port.HostFilesystemError, "no filesystem host"):
+                port.measure_ordinary_single_link_file(
+                    Path("unused"), expected_size=5, expected_sha256="0" * 64,
+                )
 
     def test_host_is_explicit_and_cannot_be_replaced(self):
         observed = []
@@ -41,6 +47,12 @@ class HostPortTests(unittest.TestCase):
                 port.update_preference_bytes(Path("unused"), lambda _old: b"new", byte_limit=16)
             with self.assertRaisesRegex(port.HostFilesystemError, "single-link bounded reads"):
                 port.read_bounded_single_link_bytes(Path("unused"), byte_limit=16)
+            with self.assertRaisesRegex(port.HostFilesystemError, "streaming immutable publication"):
+                port.publish_immutable_stream(Path("unused"), (b"bytes",))
+            with self.assertRaisesRegex(port.HostFilesystemError, "streaming ordinary-file verification"):
+                port.measure_ordinary_single_link_file(
+                    Path("unused"), expected_size=5, expected_sha256="0" * 64,
+                )
             with self.assertRaisesRegex(port.HostFilesystemError, "owned markers"):
                 port.acquire_private_owned_marker(Path("unused"), b"token")
 
@@ -52,6 +64,21 @@ class HostPortTests(unittest.TestCase):
                 b"reviewed\n",
             )
             self.assertEqual(observed[-1], (Path("selected"), 16))
+
+            stream_receipt = {"path": "selected", "size": 5, "sha256": "0" * 64}
+            host.publish_immutable_stream = lambda path, chunks, *, check_cancelled: (
+                observed.append((path, tuple(chunks), check_cancelled)) or stream_receipt
+            )
+            host.measure_ordinary_single_link_file = (
+                lambda path, *, expected_size, expected_sha256, check_cancelled:
+                observed.append((path, expected_size, expected_sha256, check_cancelled)) or stream_receipt
+            )
+            self.assertEqual(stream_receipt, port.publish_immutable_stream(Path("selected"), (b"bytes",)))
+            self.assertEqual((Path("selected"), (b"bytes",), None), observed[-1])
+            self.assertEqual(stream_receipt, port.measure_ordinary_single_link_file(
+                Path("selected"), expected_size=5, expected_sha256="0" * 64,
+            ))
+            self.assertEqual((Path("selected"), 5, "0" * 64, None), observed[-1])
 
             @contextmanager
             def lease(descriptor, *, exclusive):

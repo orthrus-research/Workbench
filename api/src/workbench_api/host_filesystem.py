@@ -1,5 +1,6 @@
 """Filesystem security port. The host explicitly supplies its implementation."""
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Callable, ContextManager, Protocol
 
@@ -32,11 +33,19 @@ class HostFilesystem(Protocol):
     def read_private_single_link_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
     def read_bounded_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
     def read_bounded_single_link_bytes(self, path: Path, *, byte_limit: int) -> bytes: ...
+    def measure_ordinary_single_link_file(
+        self, path: Path, *, expected_size: int, expected_sha256: str,
+        check_cancelled: Callable[[], None] | None = None,
+    ) -> dict[str, str | int]: ...
     def update_preference_bytes(
         self, path: Path, transform: Callable[[bytes | None], bytes],
         *, byte_limit: int,
     ) -> bytes: ...
     def publish_immutable_bytes(self, path: Path, data: bytes, *, byte_limit: int, idempotent: bool = False) -> None: ...
+    def publish_immutable_stream(
+        self, path: Path, chunks: Iterable[bytes], *,
+        check_cancelled: Callable[[], None] | None = None,
+    ) -> dict[str, str | int]: ...
     def publish_create_once_bytes(self, path: Path, data: bytes, *, byte_limit: int) -> None: ...
     def publish_commit_witness_bytes(self, path: Path, data: bytes, *, byte_limit: int) -> None: ...
     def count_interrupted_create_once_stages(self, path: Path) -> int: ...
@@ -141,6 +150,18 @@ def read_bounded_single_link_bytes(path: Path, *, byte_limit: int) -> bytes:
     return operation(path, byte_limit=byte_limit)
 
 
+def measure_ordinary_single_link_file(
+    path: Path, *, expected_size: int, expected_sha256: str,
+    check_cancelled: Callable[[], None] | None = None,
+) -> dict[str, str | int]:
+    """Verify a historical ordinary file by streaming its exact expected bytes."""
+    operation = getattr(_filesystem(), "measure_ordinary_single_link_file", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide streaming ordinary-file verification")
+    return operation(path, expected_size=expected_size, expected_sha256=expected_sha256,
+                     check_cancelled=check_cancelled)
+
+
 def update_preference_bytes(
     path: Path, transform: Callable[[bytes | None], bytes], *, byte_limit: int,
 ) -> bytes:
@@ -165,6 +186,17 @@ def publish_immutable_bytes(
     if not callable(operation):
         raise HostFilesystemError("selected filesystem host does not provide immutable record publication")
     operation(path, data, byte_limit=byte_limit, idempotent=idempotent)
+
+
+def publish_immutable_stream(
+    path: Path, chunks: Iterable[bytes], *,
+    check_cancelled: Callable[[], None] | None = None,
+) -> dict[str, str | int]:
+    """Ask Core to stream one immutable private file at its historical path."""
+    operation = getattr(_filesystem(), "publish_immutable_stream", None)
+    if not callable(operation):
+        raise HostFilesystemError("selected filesystem host does not provide streaming immutable publication")
+    return operation(path, chunks, check_cancelled=check_cancelled)
 
 
 def publish_create_once_bytes(path: Path, data: bytes, *, byte_limit: int) -> None:

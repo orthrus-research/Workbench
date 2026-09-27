@@ -1246,9 +1246,19 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.native.assert_not_called()
 
     def test_complete_audit_reopens_after_checkout_edit_without_profile_loading(self):
-        result = self.run_capture()
+        with patch.object(capture, 'publish_immutable_stream',
+                          wraps=capture.publish_immutable_stream) as published:
+            result = self.run_capture()
         self.assertEqual(('complete', 1), (result['state'], result['summary']['recipe_count']))
         attempt = self.attempt(result)
+        audit_path = attempt / 'audit.json'
+        audit_raw = audit_path.read_bytes()
+        self.assertEqual(check_storage.canonical(json.loads(audit_raw)) + b'\n', audit_raw)
+        self.assertEqual({'path': str(audit_path), 'size': len(audit_raw),
+                          'sha256': sha256(audit_raw).hexdigest()}, result['audit'])
+        self.assertEqual(result['audit'], result['custody']['audit.json'])
+        published.assert_called_once()
+        self.assertEqual(audit_path, published.call_args.args[0])
         input_path = attempt / 'input-manifest.json'
         input_raw = input_path.read_bytes()
         self.assertEqual(check_storage.canonical(json.loads(input_raw)) + b'\n', input_raw)
@@ -1271,13 +1281,19 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             expected_id=result['process']['id'],
         )
         if os.name != 'nt':
-            historical = [input_path, result_path, *run_inputs]
+            historical = [input_path, result_path, audit_path, *run_inputs]
             for path in historical:
                 path.chmod(0o644)
             try:
-                with patch.object(capture, 'read_bounded_single_link_bytes',
-                                  wraps=capture.read_bounded_single_link_bytes) as historical_read:
+                with (patch.object(capture, 'read_bounded_single_link_bytes',
+                                   wraps=capture.read_bounded_single_link_bytes) as historical_read,
+                      patch.object(capture, 'measure_ordinary_single_link_file',
+                                   wraps=capture.measure_ordinary_single_link_file) as audit_read):
                     self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+                audit_read.assert_called_once()
+                self.assertEqual((audit_path,), audit_read.call_args.args)
+                self.assertEqual(result['audit']['size'], audit_read.call_args.kwargs['expected_size'])
+                self.assertEqual(result['audit']['sha256'], audit_read.call_args.kwargs['expected_sha256'])
                 self.assertEqual(
                     [(attempt / 'request.json',), (attempt / 'request.json',),
                      (result_path,), (attempt / 'prepared.json',),
@@ -1294,6 +1310,70 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.assertEqual(1, self.native.call_count)
         with self.assertRaisesRegex(ValueError, 'already attempted'):
             self.run_capture({'attempt_id': result['attempt_id'], 'id': result['prepared_id']})
+
+    def test_streamed_audit_preserves_v1_json_bytes_with_unicode(self):
+        attempt = self.root / 'Standalone audit é 資料'
+        attempt.mkdir(mode=0o700)
+        report = {'z': ['é', {'資料': True}], 'a': {'empty': [], 'count': 2},
+                  'large': 'x' * 70000,
+                  'rows': [{'number': number, 'label': 'é'} for number in range(10000)]}
+        original_publish = capture.publish_immutable_stream
+        chunk_sizes = []
+
+        def observe_chunks(path, chunks, **kwargs):
+            def observed():
+                for chunk in chunks:
+                    chunk_sizes.append(len(chunk))
+                    yield chunk
+            return original_publish(path, observed(), **kwargs)
+
+        with patch.object(capture, 'publish_immutable_stream', side_effect=observe_chunks):
+            receipt = capture._write_audit_record(attempt, report, check_cancelled=lambda: None)
+        raw = (attempt / 'audit.json').read_bytes()
+        self.assertEqual(check_storage.canonical(report) + b'\n', raw)
+        self.assertGreater(len(raw), 2 * 64 * 1024)
+        self.assertLess(len(chunk_sizes), 16)
+        self.assertTrue(all(0 < size <= 64 * 1024 for size in chunk_sizes))
+        self.assertEqual({'path': str(attempt / 'audit.json'), 'size': len(raw),
+                          'sha256': sha256(raw).hexdigest()}, receipt)
+
+    def test_audit_interruption_retains_stage_and_blocks_native_replay(self):
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                prepared = self.prepare()
+                attempt = self.attempt(prepared)
+                audit_path = attempt / 'audit.json'
+                failed_once = False
+
+                def interrupt_link(source, destination, *args, **kwargs):
+                    if moment == 'before-link' and Path(destination) == audit_path:
+                        raise OSError('synthetic audit link interruption')
+                    return original_link(source, destination, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    nonlocal failed_once
+                    if (moment == 'after-link-before-flush' and not failed_once
+                            and Path(directory) == attempt and audit_path.exists()):
+                        failed_once = True
+                        raise OSError('synthetic audit flush interruption')
+                    return original_flush(directory)
+
+                native_before = self.native.call_count
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaises(filesystem_port.DurableRecordError):
+                        self.run_capture(prepared)
+                self.assertEqual(native_before + 1, self.native.call_count)
+                self.assertEqual(moment == 'after-link-before-flush', audit_path.exists())
+                stages = list(attempt.glob('.audit.json.*.tmp'))
+                self.assertEqual(1, len(stages))
+                self.assertTrue(stages[0].read_bytes().endswith(b'\n'))
+                self.assertEqual('failed', capture.show(self.state, prepared['attempt_id'])['state'])
+                with self.assertRaisesRegex(ValueError, 'already attempted'):
+                    self.run_capture(prepared)
+                self.assertEqual(native_before + 1, self.native.call_count)
 
     def test_profile_change_during_execution_prevents_projection(self):
         prepared = self.prepare()
@@ -1334,7 +1414,7 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         result = self.run_capture()
         attempt = self.attempt(result)
         for relative in ('prepared.json', 'launch.json', 'runtime-lock.json', 'protocol.json',
-                         'input-manifest.json',
+                         'input-manifest.json', 'audit.json',
                          'capture/manifest.json', 'capture/recipes.json',
                          'observer-build/fixture-observer.jar', 'observer-build/compiler/stdout.raw'):
             path = attempt / relative
