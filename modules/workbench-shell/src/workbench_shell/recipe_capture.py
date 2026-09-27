@@ -12,7 +12,7 @@ from threading import Event
 from workbench_api.processes import capture_process, ProcessError, open_process_output, read_captured_process
 from workbench_api.host_filesystem import (
     count_uncertain_record_stages, publish_commit_witness_bytes,
-    publish_immutable_bytes, read_bounded_single_link_bytes,
+    publish_immutable_bytes, read_bounded_bytes, read_bounded_single_link_bytes,
     read_private_single_link_bytes,
 )
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
@@ -249,6 +249,23 @@ def _read_prepare_failure_record(attempt, *, request_id):
     return value
 
 
+def _write_transition_marker(attempt, name, value):
+    # Keep V1 bytes and retain Core's stage if a pre-native marker is uncertain.
+    publish_commit_witness_bytes(attempt / name, storage.canonical(value) + b'\n',
+                                 byte_limit=_WITNESS_BYTE_LIMIT)
+
+
+def _read_transition_marker(attempt, name, expected=None):
+    # An interrupted Core commit may still link its retained stage to the
+    # final marker. This bounded read inspects it without admitting a retry.
+    raw = read_bounded_bytes(attempt / name, byte_limit=_WITNESS_BYTE_LIMIT)
+    observed = _decode_unique_json(raw)
+    if (not isinstance(observed, dict) or expected is not None and observed != expected
+            or raw != storage.canonical(observed) + b'\n'):
+        raise ValueError('retained capture transition marker changed')
+    return observed
+
+
 def _owner(profile):
     owner = require_profile_extension(GROUP, profile)
     if getattr(owner, 'PROFILE_API_VERSION', None) != 1:
@@ -472,7 +489,8 @@ def prepare(root, identity, confirm, *, cancelled):
             publish_immutable_bytes(attempt / 'prepare-intent.json',
                                     storage.canonical(intent) + b'\n',
                                     byte_limit=_WITNESS_BYTE_LIMIT)
-            storage.write_json(attempt / 'prepare-started.json', {'request_id': request['id']})
+            _write_transition_marker(attempt, 'prepare-started.json',
+                                     {'request_id': request['id']})
             retained = workspace_storage.materialize(
                 attempt, runtime_root=Path(request['runtime']), runtime_files=request['runtime_files'],
                 java_home=Path(request['java_home']), java_files=request['java_files'],
@@ -567,7 +585,9 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
             raise ValueError('prepared runtime changed')
         if workspace_storage.inventory(attempt / 'java', cancelled=cancel.is_set) != prepared['java_files']:
             raise ValueError('prepared Java changed')
-        storage.write_json(attempt / 'run-started.json', {'request_id': request['id'], 'prepared_id': prepared['id'], 'explicit_eula_acceptance': True})
+        _write_transition_marker(attempt, 'run-started.json',
+                                 {'request_id': request['id'], 'prepared_id': prepared['id'],
+                                  'explicit_eula_acceptance': True})
         stage = 'execution-preparation'
         try:
             execution = attempt / 'execution'
@@ -655,6 +675,17 @@ def show(root, identity, *, cancelled=None):
     reference, request = load(root, identity)
     attempt = reference.path
     _source(attempt, request, cancelled=cancel.is_set)
+    if os.path.lexists(native_path(attempt / 'prepare-started.json')):
+        _read_transition_marker(attempt, 'prepare-started.json',
+                                {'request_id': request['id']})
+    run_marker = None
+    if os.path.lexists(native_path(attempt / 'run-started.json')):
+        run_marker = _read_transition_marker(attempt, 'run-started.json')
+        if (set(run_marker) != {'request_id', 'prepared_id', 'explicit_eula_acceptance'}
+                or run_marker['request_id'] != request['id']
+                or type(run_marker['prepared_id']) is not str
+                or run_marker['explicit_eula_acceptance'] is not True):
+            raise ValueError('retained capture transition marker changed')
     has_plan_intent = os.path.lexists(native_path(attempt / 'plan-intent.json'))
     has_request_ready = os.path.lexists(native_path(attempt / 'request-ready.json'))
     if ((attempt / 'result.json').exists() or os.path.lexists(native_path(attempt / 'prepare-failed.json'))):
@@ -664,6 +695,8 @@ def show(root, identity, *, cancelled=None):
     if (attempt / 'result.json').exists():
         result = _read_result_record(attempt, request_id=request['id'])
         if result['state'] == 'complete':
+            if run_marker is not None and run_marker['prepared_id'] != result['prepared_id']:
+                raise ValueError('retained capture transition marker changed')
             if set(result.get('custody', {})) != set(_CUSTODY):
                 raise ValueError('retained capture custody is incomplete')
             for name in _CUSTODY:
@@ -710,6 +743,8 @@ def show(root, identity, *, cancelled=None):
         return _read_prepare_failure_record(attempt, request_id=request['id'])
     if os.path.lexists(native_path(attempt / 'prepared.json')):
         prepared, prepared_raw = _read_prepared_record(attempt, request_id=request['id'])
+        if run_marker is not None and run_marker['prepared_id'] != prepared['id']:
+            raise ValueError('retained capture transition marker changed')
         if (attempt / 'run-started.json').exists():
             if has_plan_intent or has_request_ready:
                 _verify_request_ready(attempt, request, _request_raw(attempt, request),

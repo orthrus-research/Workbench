@@ -564,6 +564,134 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
             ready_path.chmod(0o600)
         self.assertEqual(result, capture.show(self.state, result['attempt_id']))
 
+    def test_transition_markers_keep_v1_bytes_and_historical_readback(self):
+        with patch.object(capture, 'publish_commit_witness_bytes',
+                          wraps=capture.publish_commit_witness_bytes) as published:
+            result = self.run_capture()
+        attempt = self.attempt(result)
+        request = json.loads((attempt / 'request.json').read_bytes())
+        prepared = json.loads((attempt / 'prepared.json').read_bytes())
+        markers = {
+            'prepare-started.json': {'request_id': request['id']},
+            'run-started.json': {'request_id': request['id'], 'prepared_id': prepared['id'],
+                                 'explicit_eula_acceptance': True},
+        }
+        self.assertTrue({attempt / name for name in markers} <=
+                        {call.args[0] for call in published.call_args_list})
+        for name, value in markers.items():
+            path = attempt / name
+            self.assertEqual(check_storage.canonical(value) + b'\n', path.read_bytes())
+            if os.name != 'nt':
+                path.chmod(0o644)
+        try:
+            with patch.object(capture, 'read_bounded_bytes',
+                              wraps=capture.read_bounded_bytes) as historical_read:
+                self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+            seen = [call.args[0] for call in historical_read.call_args_list]
+            self.assertTrue({attempt / name for name in markers} <= set(seen))
+        finally:
+            if os.name != 'nt':
+                for name in markers:
+                    (attempt / name).chmod(0o600)
+
+    def test_changed_transition_markers_refuse_complete_readback(self):
+        result = self.run_capture()
+        attempt = self.attempt(result)
+        for name in ('prepare-started.json', 'run-started.json'):
+            path = attempt / name
+            original = path.read_bytes()
+            for changed in (b'{"request_id":"first","request_id":"second"}\n',
+                            b' ' + original):
+                with self.subTest(name=name, changed=changed[:20]):
+                    path.write_bytes(changed)
+                    try:
+                        with self.assertRaises((OSError, ValueError)):
+                            capture.show(self.state, result['attempt_id'])
+                    finally:
+                        path.write_bytes(original)
+            if os.name != 'nt':
+                path.chmod(0o600)
+        self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_prepare_marker_interruption_retains_stage_and_refuses_retry(self):
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                request = self.plan()
+                attempt = self.attempt(request)
+                marker = attempt / 'prepare-started.json'
+                interrupted = False
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    nonlocal interrupted
+                    if Path(target) == marker and moment == 'before-link' and not interrupted:
+                        interrupted = True
+                        raise OSError('synthetic prepare marker interruption')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    nonlocal interrupted
+                    if Path(directory) == attempt and marker.exists() and not interrupted:
+                        interrupted = True
+                        raise OSError('synthetic prepare marker interruption')
+                    return original_flush(directory)
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaisesRegex(OSError, 'synthetic prepare marker interruption'):
+                        self.prepare(request)
+                self.assertTrue(interrupted)
+                self.assertEqual(moment == 'after-link-before-flush', marker.exists())
+                [stage] = list(attempt.glob('.prepare-started.json.*.tmp'))
+                stage_raw = stage.read_bytes()
+                failure = capture.show(self.state, request['attempt_id'])
+                self.assertEqual(('failed', False), (failure['state'], failure['native_admitted']))
+                with self.assertRaisesRegex(ValueError, 'already attempted'):
+                    self.prepare(request)
+                self.assertEqual(stage_raw, stage.read_bytes())
+                self.assertFalse((attempt / 'prepared.json').exists())
+                self.native.assert_not_called()
+
+    def test_run_marker_interruption_refuses_native_execution_and_replay(self):
+        original_link = durable_records.os.link
+        original_flush = durable_records.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                prepared = self.prepare()
+                attempt = self.attempt(prepared)
+                marker = attempt / 'run-started.json'
+                interrupted = False
+
+                def interrupt_link(source, target, *args, **kwargs):
+                    nonlocal interrupted
+                    if Path(target) == marker and moment == 'before-link' and not interrupted:
+                        interrupted = True
+                        raise OSError('synthetic run marker interruption')
+                    return original_link(source, target, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    nonlocal interrupted
+                    if Path(directory) == attempt and marker.exists() and not interrupted:
+                        interrupted = True
+                        raise OSError('synthetic run marker interruption')
+                    return original_flush(directory)
+
+                with (patch.object(durable_records.os, 'link', side_effect=interrupt_link),
+                      patch.object(durable_records, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaisesRegex(OSError, 'synthetic run marker interruption'):
+                        self.run_capture(prepared)
+                self.assertTrue(interrupted)
+                self.assertEqual(moment == 'after-link-before-flush', marker.exists())
+                [stage] = list(attempt.glob('.run-started.json.*.tmp'))
+                stage_raw = stage.read_bytes()
+                self.assertEqual('interrupted', capture.show(self.state, prepared['attempt_id'])['state'])
+                with self.assertRaisesRegex(ValueError, 'uncertain record stage|already attempted'):
+                    self.run_capture(prepared)
+                self.assertEqual(stage_raw, stage.read_bytes())
+                self.assertFalse((attempt / 'result.json').exists())
+                self.native.assert_not_called()
+
     def test_export_requires_complete_verified_local_custody(self):
         from workbench_atlas_recipe_health import completed_scan
 
