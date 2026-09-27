@@ -14,6 +14,7 @@ from workbench_api.managed_trees import ManagedTreeError
 from workbench_api.transport_trees import TransportTreeError
 from workbench_core import check_storage
 from workbench_core import transport_trees as module
+from workbench_core.storage import manager
 from workbench_core.storage.registered import ResourceCatalog
 from workbench_core.transport_trees import CoreTransportTrees, inventory_tree, summarize_rows
 
@@ -67,6 +68,27 @@ class TransportTreeTests(unittest.TestCase):
         self.assertEqual({"tree", "export-manifest.json"}, {entry.name for entry in reference.path.iterdir()})
         self.assertFalse((reference.path / "transport-intent.json").exists())
         self.assertFalse(hasattr(reference, "members"))
+
+    def test_cleanup_reference_projection_includes_transport_target_and_stage(self) -> None:
+        reference = self._publish()
+        row = ResourceCatalog(self.config).inventory(workspace=self.workspace)["transport_trees"][0]
+        sibling = reference.path.parent / "unrelated"
+
+        def item(path: Path) -> dict:
+            return {"path": str(path), "deletion": {
+                "state": "eligible", "recoverability": "trash", "reason_codes": [],
+            }}
+
+        items = [item(path) for path in (
+            reference.path, reference.path / "tree", reference.path.parent,
+            Path(row["staging"]), sibling,
+        )]
+        with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(self.config)}):
+            manager._protect_registered_resources(self.workspace, items)
+        for selected in items[:-1]:
+            self.assertIn("registered-resource", selected["deletion"]["reason_codes"])
+        self.assertNotIn("registered-resource", items[-1]["deletion"]["reason_codes"])
+        self.assertIn("registered-catalog-unproven", items[-1]["deletion"]["reason_codes"])
 
     def test_resource_catalog_validates_foreign_transport_records_without_payload_scan(self) -> None:
         selected = self._publish("selected")

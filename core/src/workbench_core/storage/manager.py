@@ -1305,6 +1305,9 @@ def _protect_registered_resources(workspace: Path, items: list[dict[str, Any]]) 
         record_stores = registered["record_stores"]
         trees = registered["trees"]
         working_allocations = registered["working_allocations"]
+        temporary_leases = registered["temporary_leases"]
+        transport_trees = registered["transport_trees"]
+        reusable_projections = registered["reusable_projections"]
         # A manifest proves this catalog's identity, not that an older
         # configuration home or workspace never had other registered outputs.
         # No current root generation carries a complete-history proof.
@@ -1314,6 +1317,9 @@ def _protect_registered_resources(workspace: Path, items: list[dict[str, Any]]) 
         record_stores = None
         trees = None
         working_allocations = None
+        temporary_leases = None
+        transport_trees = None
+        reusable_projections = None
         catalog_unproven = True
         limitation = f"Core resource catalog is unavailable; workspace cleanup is protected: {type(exc).__name__}"
     else:
@@ -1321,6 +1327,29 @@ def _protect_registered_resources(workspace: Path, items: list[dict[str, Any]]) 
             "Core resource catalog historical coverage is unproven; workspace cleanup is protected"
             if catalog_unproven else None
         )
+    owned_roots = []
+    if record_stores is not None:
+        owned_roots.extend(Path(row["path"]) for row in record_stores)
+        owned_roots.extend(
+            selected for row in trees
+            for selected in (Path(row["path"]), Path(row["staging"]))
+        )
+        owned_roots.extend(Path(row["path"]) for row in working_allocations)
+        owned_roots.extend(
+            Path(row["path"]) for row in temporary_leases
+            if row["status"] != "disposed"
+        )
+        owned_roots.extend(
+            Path(row["path"]).with_name(
+                ".workbench-temporary-" + row["lease_id"].rsplit(":", 1)[1] + ".disposing"
+            ) for row in temporary_leases
+            if row["status"] in {"disposal-incomplete", "disposal-unknown"}
+        )
+        owned_roots.extend(
+            selected for row in transport_trees
+            for selected in (Path(row["path"]), Path(row["staging"]))
+        )
+        owned_roots.extend(Path(row["path"]) for row in reusable_projections)
     for item in items:
         item_path = Path(item["path"])
         registered_match = records is not None and (
@@ -1328,15 +1357,8 @@ def _protect_registered_resources(workspace: Path, items: list[dict[str, Any]]) 
                 Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
                 for row in records
             ) or any(
-                Path(row["path"]) == item_path or _inside(Path(row["path"]), item_path)
-                for row in record_stores
-            ) or any(
-                selected == item_path or _inside(selected, item_path)
-                for row in trees for selected in (Path(row["path"]), Path(row["staging"]))
-            ) or any(
-                _inside(Path(row["path"]), item_path)
-                or _inside(item_path, Path(row["path"]))
-                for row in working_allocations
+                _inside(root, item_path) or _inside(item_path, root)
+                for root in owned_roots
             )
         )
         if records is None or catalog_unproven or registered_match:

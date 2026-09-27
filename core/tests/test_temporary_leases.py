@@ -1,5 +1,6 @@
 """Disposable Core scratch custody and conservative restart recovery."""
 
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -8,6 +9,7 @@ from unittest.mock import patch
 
 from workbench_api.durable_resources import DurableResourceError
 from workbench_core import check_storage
+from workbench_core.storage import manager
 from workbench_core.storage.registered import ResourceCatalog
 from workbench_core.temporary_leases import CoreTemporaryLeases, TemporaryLeaseError
 
@@ -65,6 +67,26 @@ class TemporaryLeaseTests(unittest.TestCase):
         self.assertEqual([current.lease_id], [
             row["lease_id"] for row in catalog.inventory(workspace=self.workspace)["temporary_leases"]
         ])
+
+    def test_cleanup_reference_projection_includes_current_lease_root_and_children(self) -> None:
+        reference = self.host.allocate("system", "current")
+        sibling = self.scratch / "unrelated"
+
+        def item(path: Path) -> dict:
+            return {"path": str(path), "deletion": {
+                "state": "eligible", "recoverability": "trash", "reason_codes": [],
+            }}
+
+        items = [item(path) for path in (
+            reference.path, reference.path / "payload", reference.path.parent, sibling,
+        )]
+        with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(self.config)}):
+            manager._protect_registered_resources(self.workspace, items)
+        for row in items[:-1]:
+            self.assertIn("registered-resource", row["deletion"]["reason_codes"])
+            self.assertEqual("protected", row["deletion"]["state"])
+        self.assertNotIn("registered-resource", items[-1]["deletion"]["reason_codes"])
+        self.assertIn("registered-catalog-unproven", items[-1]["deletion"]["reason_codes"])
 
     def test_catalog_refuses_orphan_and_unsafe_children_globally(self) -> None:
         current = self.host.allocate("system", "known")
@@ -256,6 +278,12 @@ class TemporaryLeaseTests(unittest.TestCase):
         self.assertEqual("disposal-incomplete", ResourceCatalog(self.config).inventory(
             workspace=self.workspace,
         )["temporary_leases"][0]["status"])
+        item = {"path": str(tombstone), "deletion": {
+            "state": "eligible", "recoverability": "trash", "reason_codes": [],
+        }}
+        with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(self.config)}):
+            manager._protect_registered_resources(self.workspace, [item])
+        self.assertIn("registered-resource", item["deletion"]["reason_codes"])
         with self.assertRaisesRegex(TemporaryLeaseError, "not confirmed drained"):
             restarted.reconcile(reference.lease_id, drained=lambda: False)
         restarted.reconcile(reference.lease_id, drained=lambda: True)

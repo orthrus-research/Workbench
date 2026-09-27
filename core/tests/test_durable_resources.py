@@ -697,7 +697,7 @@ provider.publish_bytes('evidence', 'result.json', b'incomplete\\n')
             self.assertEqual(plan["status"], "blocked")
 
     def test_cleanup_protects_registered_mutable_store(self) -> None:
-        from workbench_core.storage.manager import inventory_storage
+        from workbench_core.storage import manager
 
         store = CoreRecordStores(
             workspace=self.workspace, configuration_home=self.config,
@@ -705,7 +705,7 @@ provider.publish_bytes('evidence', 'result.json', b'incomplete\\n')
         ).open("work-session-v2", self.workspace)
         (store.root / "retained.json").write_bytes(b"retained\n")
         with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(self.config)}):
-            report = inventory_storage(self.workspace)
+            report = manager.inventory_storage(self.workspace)
         containing = [
             row for row in report["items"]
             if store.root == Path(row["path"]) or store.root.is_relative_to(Path(row["path"]))
@@ -713,6 +713,12 @@ provider.publish_bytes('evidence', 'result.json', b'incomplete\\n')
         self.assertTrue(containing)
         self.assertTrue(all(row["deletion"]["state"] == "protected" for row in containing))
         self.assertTrue(all("registered-resource" in row["deletion"]["reason_codes"] for row in containing))
+        child = {"path": str(store.root / "retained.json"), "deletion": {
+            "state": "eligible", "recoverability": "trash", "reason_codes": [],
+        }}
+        with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(self.config)}):
+            manager._protect_registered_resources(self.workspace, [child])
+        self.assertIn("registered-resource", child["deletion"]["reason_codes"])
 
     def test_cleanup_fails_closed_when_catalog_record_is_corrupt(self) -> None:
         from workbench_core.storage.manager import inventory_storage
