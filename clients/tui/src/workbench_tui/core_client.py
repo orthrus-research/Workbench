@@ -25,6 +25,8 @@ _MIGRATION_FORMAT = "workbench-user-config-migration-v1"
 _MIGRATION_STATES = {"ready", "conflict", "nothing-to-import", "explicit-config-home", "imported"}
 _MIGRATION_FILE_STATES = {"copy", "already-present", "conflict", "copied"}
 _WORKSPACE_FORMATS = {"workbench-user-workspaces-v1", "workbench-user-workspaces-v2", "workbench-user-workspaces-v3"}
+_PACK_RELEASE_SCHEMA = "workbench.pack-release.v1"
+_PACK_RELEASE_ID = re.compile(r"github-release:sha256:[0-9a-f]{64}\Z")
 
 
 class CoreClientError(RuntimeError):
@@ -215,6 +217,71 @@ class CoreClient:
         if not isinstance(record.get("version"), str):
             raise CoreClientError("Core version record is incomplete")
         return record
+
+    @staticmethod
+    def _pack_release_record(record: Any, *, action: str) -> Mapping[str, Any]:
+        statuses = {
+            "check": {"update_available", "current", "ignored", "unavailable"},
+            "accept": {"accepted"},
+            "ignore": {"ignored"},
+        }
+        if (
+            not isinstance(record, dict)
+            or record.get("schema") != _PACK_RELEASE_SCHEMA
+            or record.get("action") != action
+            or record.get("status") not in statuses[action]
+            or not isinstance(record.get("selected_version"), str)
+        ):
+            raise CoreClientError("Core returned an unsupported pack release result")
+        candidate = record.get("candidate")
+        if record["status"] == "update_available" or action in {"accept", "ignore"}:
+            if (
+                not isinstance(candidate, dict)
+                or not isinstance(candidate.get("release_id"), str)
+                or _PACK_RELEASE_ID.fullmatch(candidate["release_id"]) is None
+                or not isinstance(candidate.get("version"), str)
+                or not isinstance(candidate.get("tag"), str)
+                or not isinstance(candidate.get("asset_name"), str)
+                or type(candidate.get("asset_size")) is not int
+                or candidate["asset_size"] <= 0
+            ):
+                raise CoreClientError("Core returned an incomplete pack release candidate")
+        elif candidate is not None and not isinstance(candidate, dict):
+            raise CoreClientError("Core returned an invalid pack release candidate")
+        if action == "accept" and not isinstance(record.get("artifact_path"), str):
+            raise CoreClientError("Core did not report the verified pack archive")
+        return record
+
+    async def pack_release_check(self) -> Mapping[str, Any]:
+        record = await self.json_record(
+            "pack", "release", "check", "--profile", "supersymmetry", "--json",
+            timeout=15,
+        )
+        return self._pack_release_record(record, action="check")
+
+    async def pack_release_accept(self, release_id: str) -> Mapping[str, Any]:
+        if _PACK_RELEASE_ID.fullmatch(release_id) is None:
+            raise CoreClientError("select the exact release offered by Core")
+        record = await self.json_record(
+            "pack", "release", "accept", "--profile", "supersymmetry",
+            "--expected-release-id", release_id, "--json", timeout=600,
+        )
+        result = self._pack_release_record(record, action="accept")
+        if result["candidate"]["release_id"] != release_id:
+            raise CoreClientError("Core selected a different pack release")
+        return result
+
+    async def pack_release_ignore(self, release_id: str) -> Mapping[str, Any]:
+        if _PACK_RELEASE_ID.fullmatch(release_id) is None:
+            raise CoreClientError("select the exact release offered by Core")
+        record = await self.json_record(
+            "pack", "release", "ignore", "--profile", "supersymmetry",
+            "--expected-release-id", release_id, "--json", timeout=15,
+        )
+        result = self._pack_release_record(record, action="ignore")
+        if result["candidate"]["release_id"] != release_id:
+            raise CoreClientError("Core ignored a different pack release")
+        return result
 
     @staticmethod
     def _workspace_record(record: Any) -> Mapping[str, Any]:

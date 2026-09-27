@@ -273,7 +273,7 @@ Screen.narrow-brand #actions-panel {
     background: $panel;
 }
 
-ReviewModal {
+ReviewModal, ReleaseUpdateModal {
     align: center middle;
     background: $background 65%;
 }
@@ -384,18 +384,18 @@ Screen.-narrow #workflow-detail-panel .button-row Button {
     margin-right: 1;
 }
 
-ReviewModal.-narrow #review-dialog {
+ReviewModal.-narrow #review-dialog, ReleaseUpdateModal.-narrow #review-dialog {
     width: 95%;
     height: 90%;
     padding: 0 1;
 }
 
-ReviewModal.-narrow #review-dialog .button-row {
+ReviewModal.-narrow #review-dialog .button-row, ReleaseUpdateModal.-narrow #review-dialog .button-row {
     layout: vertical;
     margin: 0;
 }
 
-ReviewModal.-narrow #review-dialog .button-row Button {
+ReviewModal.-narrow #review-dialog .button-row Button, ReleaseUpdateModal.-narrow #review-dialog .button-row Button {
     width: 100%;
     margin-right: 0;
 }

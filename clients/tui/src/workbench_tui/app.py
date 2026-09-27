@@ -148,6 +148,43 @@ class ReviewModal(ModalScreen[bool]):
         self.dismiss(event.button.id == "review-confirm")
 
 
+class ReleaseUpdateModal(ModalScreen[str]):
+    """Present Core's exact published pack release choice."""
+
+    def __init__(self, check: Mapping[str, Any]) -> None:
+        super().__init__()
+        candidate = check["candidate"]
+        self.candidate = candidate
+        size_mib = candidate["asset_size"] / (1024 * 1024)
+        self.body = (
+            f"Saved pack: {check['selected_version']}\n"
+            f"Latest published release: {candidate['version']}\n"
+            f"Published: {candidate.get('published_at') or 'unknown'}\n"
+            f"Client archive: {candidate['asset_name']} ({size_mib:.1f} MiB)\n"
+            f"{candidate.get('release_url') or ''}\n\n"
+            "Version up asks Core to verify and retain the release archive, then "
+            "saves it as your pack choice. Your current workspace files are not changed. "
+            "Ignore this release keeps your saved choice and prompts again for a newer release."
+        )
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="review-dialog"):
+            yield Static("Supersymmetry update available", id="review-heading")
+            with VerticalScroll(id="review-scroll"):
+                yield Static(Text(self.body), id="review-body")
+            with Horizontal(classes="button-row"):
+                yield Button("Later", id="release-later")
+                yield Button("Ignore this release", id="release-ignore")
+                yield Button("Version up", id="release-accept", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss({
+            "release-later": "later",
+            "release-ignore": "ignore",
+            "release-accept": "accept",
+        }[event.button.id])
+
+
 class ResultScreen(Screen[None]):
     def __init__(self, heading: str, output: str) -> None:
         super().__init__()
@@ -1282,6 +1319,7 @@ class WorkbenchApp(App[None]):
         self.initial_profile_config = initial_profile_config
         self.view = EnvironmentView()
         self._migration_busy = False
+        self._pack_release_checked = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=self.preferences.show_clock, icon="W", id="home-header")
@@ -1391,6 +1429,7 @@ class WorkbenchApp(App[None]):
         )
 
     def action_refresh_environment(self) -> None:
+        self._pack_release_checked = False
         self.refresh_environment()
 
     def open_setup(self) -> None:
@@ -1492,6 +1531,9 @@ class WorkbenchApp(App[None]):
             self.view = view
             self._render_home()
             return
+        if not self._pack_release_checked:
+            self._pack_release_checked = True
+            self.check_pack_release()
         requests = (
             ("environment", lambda: self.core.environment_resolve(self.initial_workspace)),
             ("setup", lambda: self.core.setup_check(
@@ -1520,6 +1562,41 @@ class WorkbenchApp(App[None]):
                 view.problems.append(f"Workspace Home: {exc}")
         self.view = view
         self._render_home()
+
+    @work(exclusive=True, group="pack-release-check")
+    async def check_pack_release(self) -> None:
+        try:
+            check = await self.core.pack_release_check()
+        except (CoreClientError, TimeoutError):
+            # Startup and offline use remain available when GitHub cannot be reached.
+            return
+        if check["status"] != "update_available":
+            return
+        choice = await self.push_screen_wait(ReleaseUpdateModal(check))
+        release_id = check["candidate"]["release_id"]
+        if choice == "later":
+            return
+        try:
+            if choice == "ignore":
+                result = await self.core.pack_release_ignore(release_id)
+                self.notify(
+                    f"Ignored Supersymmetry {result['candidate']['version']} until a newer release."
+                )
+                return
+            self.notify("Core is verifying and preparing the Supersymmetry release archive…")
+            result = await self.core.pack_release_accept(release_id)
+        except (CoreClientError, TimeoutError) as exc:
+            self.push_screen(ResultScreen(
+                "Supersymmetry choice could not be saved",
+                f"{exc}\n\nReturn Home and refresh to check the latest release again.",
+            ))
+            return
+        self.push_screen(ResultScreen(
+            "Supersymmetry release prepared",
+            f"Saved pack: {result['selected_version']}\n"
+            f"Verified archive: {result['artifact_path']}\n\n"
+            "Your current workspace files were not changed.",
+        ))
 
     def _render_home(self) -> None:
         if not self.screen_stack:
@@ -1635,7 +1712,7 @@ class WorkbenchApp(App[None]):
             else:
                 self.open_setup()
         elif action == "refresh":
-            self.refresh_environment()
+            self.action_refresh_environment()
         elif action == "migrate":
             self.open_config_migration()
 

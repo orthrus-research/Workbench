@@ -94,6 +94,17 @@ probe. Core saves each workspace's choice in the stable `workspaces.json`
 record. A supplied path remains unverified until a consuming operation uses
 it; selecting Java 8 does not establish Cleanroom compatibility.
 
+At startup, Textual asks Core to check the latest published Supersymmetry
+release. When a newer release is available, **Version up** asks Core to
+download and verify the published client archive, then saves that release as
+the user's pack choice in the stable configuration home. It does not replace
+files in the current workspace. **Ignore this release** remembers the exact
+release and asks again only when a newer one appears; **Later** changes
+nothing. Refresh can retry a check. An unavailable GitHub response does not
+block local use. The published client archive is a CurseForge distribution;
+developers can still explicitly choose a source branch for their own work.
+The archive by itself does not establish a runnable Cleanroom fixture.
+
 **Export environment** asks Core to publish a small, path-free selection file
 for the saved workspace. **Import environment** takes that file, a local
 workspace name and an existing project directory. Textual displays Core's
