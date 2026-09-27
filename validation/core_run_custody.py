@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 _SUITE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _MAX_CI_PLAN = 4 * 1024 * 1024
 _MAX_CI_COLLECTION = 4 * 1024 * 1024
+_MAX_DIRECT_COLLECTION = 32 * 1024 * 1024
 SOURCE_CI_COLLECTION_FILES = {
     "validation-native-fixtures": "native-fixtures-not-run.json",
     "blueprints-native-fixtures": "blueprints-native-fixtures-not-run.json",
@@ -39,6 +40,15 @@ def _source_core() -> None:
     for source in (source_root / "api/src", source_root / "core/src"):
         if str(source) not in sys.path:
             sys.path.insert(0, str(source))
+
+
+def selected_core_configuration_home() -> Path:
+    """Freeze the user's Core home before suite imports can change the process."""
+
+    _source_core()
+    from workbench_core.user_config_home import default_user_config_home
+
+    return default_user_config_home()
 
 
 def allocate_validation_run(root: Path, run_id: str):
@@ -305,6 +315,40 @@ def _source_ci_collection_target(root: Path, suite_name: str, selected_path: Pat
     if ".." in supplied.parts or Path(os.path.abspath(supplied)) != target:
         raise ValueError("source-CI collection differs from its historical path")
     return selected_root, target
+
+
+def publish_standalone_collection(
+    root: Path, suite_name: str, payload: bytes, *, selected_path: Path,
+    configuration_home: Path,
+) -> Path:
+    """Publish one direct collection at its exact V1 path through Core."""
+
+    if (type(suite_name) is not str or _SUITE_NAME.fullmatch(suite_name) is None
+            or suite_name in {".", ".."} or type(payload) is not bytes
+            or not 0 < len(payload) <= _MAX_DIRECT_COLLECTION
+            or not isinstance(selected_path, Path) or ".." in selected_path.parts):
+        raise ValueError("direct collection selection or payload is invalid")
+    selected_root = Path(root).resolve(strict=True)
+    target = Path(os.path.abspath(selected_path.expanduser()))
+    if target in {
+        selected_root / ".workbench/validation" / name
+        for name in SOURCE_CI_COLLECTION_FILES.values()
+    }:
+        raise ValueError("source-CI collection requires its admitted Core route")
+    _source_core()
+    from workbench_core.storage.record_stores import CoreRecordStores
+
+    if (not isinstance(configuration_home, Path) or not configuration_home.is_absolute()
+            or ".." in configuration_home.parts):
+        raise ValueError("direct collection needs an absolute Core configuration home")
+    provider = CoreRecordStores(
+        workspace=selected_root, configuration_home=configuration_home,
+        owner_id="validation",
+    )
+    provider.publish_validation_collection_target(
+        target, payload, byte_limit=_MAX_DIRECT_COLLECTION,
+    )
+    return selected_path
 
 
 def _source_ci_collection_store(
@@ -673,6 +717,7 @@ def publish_ci_plan(
 
 __all__ = [
     "allocate_validation_run", "allocate_validation_scratch", "publish_ci_plan",
+    "selected_core_configuration_home", "publish_standalone_collection",
     "publish_validation_timing", "open_validation_invocation", "allocate_ide_toolchain_stage",
     "reject_existing_ide_toolchain_stage",
     "review_ide_toolchain_stages_on_reuse",

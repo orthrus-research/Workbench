@@ -135,6 +135,16 @@ not-run inventory before source validation continues. Core secures an older
 unchanged. An existing report or uncertain publication stage requires review
 or a fresh checkout; these collections do not execute the native fixtures.
 
+For a direct test inventory, use `--collect-only` with
+`--report .workbench/validation/my-collection.json` and a fresh report name.
+Core records the selected parent and publishes the same V1
+JSON bytes once. Outside `.workbench/validation/`, the report parent must
+already exist with owner-private access (mode 0700 on Linux); a report in a
+shared checkout root, a redirected parent, an existing target or an uncertain
+write stage is refused. Core does not change an arbitrary parent’s permissions.
+Direct collections have a 32 MiB size bound. The fixed source-CI report names
+above use their dedicated CI route.
+
 Measurements separate configuration/import/collection, module and class
 fixtures, test setup, bodies, teardown and cleanup. Nested phase measurements
 exclude their children to avoid double counting. Suite elapsed time includes

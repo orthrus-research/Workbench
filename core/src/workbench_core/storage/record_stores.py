@@ -194,45 +194,26 @@ class CoreRecordStores:
         )
 
     def open_validation_invocation_target(self, target: Path) -> RecordStoreReference:
-        """Register one explicitly selected validation result parent.
+        """Register one explicitly selected validation result parent."""
 
-        Only validation's own diagnostic parent may be created or secured in
-        place. Other selected parents must already have private custody; Core
-        never changes permissions on an arbitrary external directory.
-        """
+        return self._open_explicit_validation_target(
+            target, family="validation-invocation-explicit-v1",
+        )
 
-        if self.owner_id != "validation" or not isinstance(target, Path) or not target.is_absolute():
-            raise DurableResourceError("resource.policy", "explicit invocation needs an absolute validation target")
-        if target.name in {"", ".", ".."} or ".." in target.parts:
-            raise DurableResourceError("resource.policy", "explicit invocation target is not an exact file path")
-        target = Path(os.path.abspath(target))
+    def open_validation_collection_target(self, target: Path) -> RecordStoreReference:
+        """Register a direct collection report under its exact selected parent."""
+
+        return self._open_explicit_validation_target(
+            target, family="validation-collection-explicit-v1",
+        )
+
+    def _open_explicit_validation_target(
+        self, target: Path, *, family: str,
+    ) -> RecordStoreReference:
+        """Keep explicit validation families separate under the same custody."""
+
+        target = self._select_explicit_validation_target(target)
         parent = target.parent
-        diagnostic = self.workspace / ".workbench/validation"
-        for reserved in (
-            diagnostic / "runs", diagnostic / "invocations",
-            diagnostic / "test-timings", diagnostic / "ci",
-        ):
-            if target == reserved or target.is_relative_to(reserved):
-                raise DurableResourceError("resource.policy", "explicit invocation overlaps Core validation storage")
-        if target.is_relative_to(self.catalog.configuration_home):
-            raise DurableResourceError("resource.policy", "explicit invocation overlaps Core configuration storage")
-        try:
-            _state_root(parent)
-            if parent == diagnostic or parent.is_relative_to(diagnostic):
-                _private_directory(parent)
-                secure_private_path(parent, directory=True)
-            elif not private_path(parent, directory=True):
-                raise DurableResourceError(
-                    "resource.unsafe", "explicit invocation parent must already be owner-private",
-                )
-            _state_root(parent)
-        except DurableResourceError:
-            raise
-        except (OSError, ValueError) as exc:
-            raise DurableResourceError("resource.unsafe", "explicit invocation parent is unavailable or redirected") from exc
-        if not private_path(parent, directory=True):
-            raise DurableResourceError("resource.unsafe", "explicit invocation parent lost private custody")
-        family = "validation-invocation-explicit-v1"
         store_id = self.catalog.register_record_store(
             family=family, owner_id=self.owner_id, workspace=self.workspace, root=parent,
         )
@@ -241,6 +222,77 @@ class CoreRecordStores:
             workspace=self.workspace, root=parent,
             retention="protected-until-reviewed-policy",
         )
+
+    def _select_explicit_validation_target(self, target: Path) -> Path:
+        """Admit an exact target before any catalog registration.
+
+        Only validation's own diagnostic parent may be created or secured in
+        place. Other selected parents must already have private custody; Core
+        never changes permissions on an arbitrary external directory.
+        """
+
+        if self.owner_id != "validation" or not isinstance(target, Path) or not target.is_absolute():
+            raise DurableResourceError("resource.policy", "explicit validation needs an absolute target")
+        if target.name in {"", ".", ".."} or ".." in target.parts:
+            raise DurableResourceError("resource.policy", "explicit validation target is not an exact file path")
+        target = Path(os.path.abspath(target))
+        parent = target.parent
+        diagnostic = self.workspace / ".workbench/validation"
+        for reserved in (
+            diagnostic / "runs", diagnostic / "invocations",
+            diagnostic / "test-timings", diagnostic / "ci",
+        ):
+            if target == reserved or target.is_relative_to(reserved):
+                raise DurableResourceError("resource.policy", "explicit validation target overlaps Core validation storage")
+        if target.is_relative_to(self.catalog.configuration_home):
+            raise DurableResourceError("resource.policy", "explicit validation target overlaps Core configuration storage")
+        try:
+            _state_root(parent)
+            if parent == diagnostic or parent.is_relative_to(diagnostic):
+                _private_directory(parent)
+                secure_private_path(parent, directory=True)
+            elif not private_path(parent, directory=True):
+                raise DurableResourceError(
+                    "resource.unsafe",
+                    "explicit validation parent must already be owner-private; "
+                    "choose .workbench/validation/ or a private directory",
+                )
+            _state_root(parent)
+        except DurableResourceError:
+            raise
+        except (OSError, ValueError) as exc:
+            raise DurableResourceError("resource.unsafe", "explicit validation parent is unavailable or redirected") from exc
+        if not private_path(parent, directory=True):
+            raise DurableResourceError("resource.unsafe", "explicit validation parent lost private custody")
+        return target
+
+    def publish_validation_collection_target(
+        self, target: Path, data: bytes, *, byte_limit: int,
+    ) -> RecordStoreReference:
+        """Create one direct V1 collection at the selected path through Core."""
+
+        if (type(data) is not bytes or type(byte_limit) is not int
+                or not 0 < len(data) <= byte_limit <= 32 * 1024 * 1024):
+            raise DurableResourceError("resource.policy", "collection report bytes exceed their bound")
+        selected = self._select_explicit_validation_target(target)
+        before = selected.parent.lstat()
+        if selected.exists() or selected.is_symlink():
+            raise DurableResourceError("resource.changed", "collection report already exists")
+        if count_interrupted_create_once_stages(selected):
+            raise DurableResourceError("resource.incomplete", "collection report has an uncertain stage")
+        store = self.open_validation_collection_target(selected)
+        if selected.parent != store.root:
+            raise DurableResourceError("resource.changed", "collection report parent changed")
+        admitted = store.root.lstat()
+        if (before.st_dev, before.st_ino) != (admitted.st_dev, admitted.st_ino):
+            raise DurableResourceError("resource.changed", "collection report parent changed during registration")
+        publish_create_once_bytes(selected, data, byte_limit=byte_limit)
+        if read_private_single_link_bytes(selected, byte_limit=byte_limit) != data:
+            raise DurableResourceError("resource.changed", "collection report changed after publication")
+        after = store.root.lstat()
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise DurableResourceError("resource.changed", "collection report parent changed during publication")
+        return store
 
     def publish_review_artifact(
         self, family: str, target: Path, data: bytes, *, byte_limit: int,

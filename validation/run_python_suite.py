@@ -386,6 +386,11 @@ def main() -> int:
         report=args.report,
         temporary_root=args.temporary_root,
     )
+    collection_home = None
+    if args.collect_only and args.report is not None and not args.core_ci_collection:
+        from core_run_custody import selected_core_configuration_home
+
+        collection_home = selected_core_configuration_home()
     selected = SUITES_BY_NAME[args.suite]
     phases = PhaseClock()
     try:
@@ -432,7 +437,13 @@ def main() -> int:
                     ROOT, selected.name, _json_bytes(document), selected_path=args.report,
                 )
             else:
-                _write_json(args.report, document)
+                from core_run_custody import publish_standalone_collection
+
+                assert collection_home is not None
+                publish_standalone_collection(
+                    ROOT, selected.name, _json_bytes(document),
+                    selected_path=args.report, configuration_home=collection_home,
+                )
         print(f"[{selected.name}] collected {count} tests without import errors.")
         return 0
 

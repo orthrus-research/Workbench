@@ -30,7 +30,10 @@ from run_python_suite import (  # noqa: E402
     TimingResult,
 )
 from orchestration import OrchestrationFailure, load_suite_report, load_test_inventory
-from core_run_custody import allocate_validation_run, publish_validation_run_record
+from core_run_custody import (
+    allocate_validation_run, publish_standalone_collection,
+    publish_validation_run_record,
+)
 from orchestration import create_run_paths
 from workbench_api.working_allocations import WorkingAllocationError
 from workbench_api.host_filesystem import DurableRecordError
@@ -150,24 +153,37 @@ class PythonSuiteIsolationTests(unittest.TestCase):
     def test_fixture_inventory_reports_exact_not_run_cases_without_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             report = Path(temporary) / "native-not-run.json"
+            config = Path(temporary) / "config"
             command = [sys.executable, str(VALIDATION_ROOT / "run_python_suite.py"),
                        "validation-native-fixtures", "--collect-only", "--report", str(report)]
-            first = subprocess.run(command, capture_output=True, text=True, check=False)
+            env = {**os.environ, "WORKBENCH_CONFIG_HOME": str(config)}
+            first = subprocess.run(command, capture_output=True, text=True, check=False, env=env)
             self.assertEqual(0, first.returncode, first.stderr)
-            body = json.loads(report.read_text(encoding="utf-8"))
+            raw = report.read_bytes()
+            body = json.loads(raw)
             self.assertEqual("not-run", body["state"])
             self.assertEqual(18, len(body["test_ids"]))
             self.assertTrue(all(test.startswith("test_axiom_native_execution.") for test in body["test_ids"]))
-            second = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertEqual((json.dumps(body, indent=2, sort_keys=True) + "\n").encode(), raw)
+            self.assertEqual(0o600, report.stat().st_mode & 0o777)
+            from workbench_core.storage.registered import ResourceCatalog
+            rows = ResourceCatalog(config).inventory(workspace=VALIDATION_ROOT.parent)["record_stores"]
+            self.assertEqual(
+                [("validation-collection-explicit-v1", str(report.parent))],
+                [(row["family"], row["path"]) for row in rows],
+            )
+            second = subprocess.run(command, capture_output=True, text=True, check=False, env=env)
             self.assertNotEqual(0, second.returncode)
             self.assertIn("refusing to replace", second.stderr)
+            self.assertEqual(raw, report.read_bytes())
 
     def test_blueprints_sandbox_inventory_reports_not_run_cases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             report = Path(temporary) / "blueprints-not-run.json"
+            env = {**os.environ, "WORKBENCH_CONFIG_HOME": str(Path(temporary) / "config")}
             command = [sys.executable, str(VALIDATION_ROOT / "run_python_suite.py"),
                        "blueprints-native-fixtures", "--collect-only", "--report", str(report)]
-            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            completed = subprocess.run(command, capture_output=True, text=True, check=False, env=env)
             self.assertEqual(0, completed.returncode, completed.stderr)
             body = json.loads(report.read_text(encoding="utf-8"))
             self.assertEqual("not-run", body["state"])
@@ -179,6 +195,93 @@ class PythonSuiteIsolationTests(unittest.TestCase):
                 {"test_conformance", "test_interface", "test_lifecycle", "test_simulation"},
                 {test.split(".", 1)[0] for test in body["test_ids"]},
             )
+
+    def test_direct_collection_refuses_unsafe_or_protected_parent_without_chmod(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "checkout"
+            root.mkdir()
+            config = base / "config"
+            shared = base / "shared"
+            shared.mkdir(mode=0o755)
+            redirected = base / "redirected"
+            redirected.symlink_to(shared, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "choose .workbench/validation/"):
+                publish_standalone_collection(
+                    root, "validation", b"{}\n", selected_path=shared / "report.json",
+                    configuration_home=config,
+                )
+            self.assertFalse((shared / "report.json").exists())
+            for target in (redirected / "report.json", config / "report.json",
+                           root / ".workbench/validation/runs/foreign.json"):
+                with self.subTest(target=target):
+                    with self.assertRaises((OSError, ValueError)):
+                        publish_standalone_collection(
+                            root, "validation", b"{}\n", selected_path=target,
+                            configuration_home=config,
+                        )
+                    self.assertFalse(target.exists())
+            self.assertEqual(0o755, shared.stat().st_mode & 0o777)
+            self.assertFalse(config.exists())
+
+    def test_direct_collection_cannot_take_source_ci_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "checkout"
+            root.mkdir()
+            config = base / "config"
+            target = root / ".workbench/validation/native-fixtures-not-run.json"
+            with self.assertRaisesRegex(ValueError, "source-CI collection"):
+                publish_standalone_collection(
+                    root, "validation-native-fixtures", b"{}\n",
+                    selected_path=target, configuration_home=config,
+                )
+            self.assertFalse(target.exists())
+            self.assertFalse(config.exists())
+
+    def test_direct_collection_uncertain_stage_blocks_before_registration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "checkout"
+            root.mkdir()
+            config = base / "config"
+            target = base / "collection.json"
+            stage = base / ".collection.json.interrupted.tmp"
+            stage.write_bytes(b"unfinished")
+            prior = stage.read_bytes()
+            with self.assertRaises((OSError, ValueError)):
+                publish_standalone_collection(
+                    root, "validation", b"{}\n", selected_path=target,
+                    configuration_home=config,
+                )
+            self.assertFalse(target.exists())
+            self.assertEqual(prior, stage.read_bytes())
+            self.assertFalse(config.exists())
+
+    def test_direct_collection_freezes_core_home_before_suite_import(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "checkout"
+            root.mkdir()
+            config = base / "config"
+            report = base / "collection.json"
+
+            def collect(_selected):
+                os.environ["WORKBENCH_CONFIG_HOME"] = str(base / "foreign-config")
+                return unittest.TestSuite([unittest.FunctionTestCase(lambda: None)])
+
+            arguments = ["run_python_suite.py", "validation", "--collect-only", "--report", str(report)]
+            with patch.dict(os.environ, {"WORKBENCH_CONFIG_HOME": str(config)}), \
+                    patch("run_python_suite.ROOT", root), \
+                    patch("run_python_suite._configure_suite"), \
+                    patch("run_python_suite._discover_tests", side_effect=collect), \
+                    patch.object(sys, "argv", arguments), \
+                    patch("sys.stdout", new_callable=StringIO):
+                self.assertEqual(0, suite_main())
+            from workbench_core.storage.registered import ResourceCatalog
+            rows = ResourceCatalog(config).inventory(workspace=root)["record_stores"]
+            self.assertEqual(["validation-collection-explicit-v1"], [row["family"] for row in rows])
+            self.assertFalse((base / "foreign-config").exists())
 
     def test_core_ci_collection_flag_rejects_generic_or_foreign_targets_before_collection(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
