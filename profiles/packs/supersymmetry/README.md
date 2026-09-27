@@ -95,6 +95,15 @@ uses its stable runtime state root as the shared pack-byte workspace identity;
 these bytes are independent of a developer project checkout and are bound to
 the selected release and pack policy by the retained plan ID.
 
+Core's `plan_mod_augmentation`, `apply_mod_augmentation`, and
+`reopen_mod_augmentation` operations can combine a retained Prism mod Core
+tree with the two separately reviewed local JARs declared in the
+[version-bound augmentation policy](runtime/release-mod-augmentation-policy-v1.json).
+They publish a new exact Core tree under `mods/`, reference and preserve the
+prior tree, and record both local file identities without source paths. The
+new tree can be reopened after the local sources disappear. This retains
+reviewed bytes; it does not establish CurseForge origin or install mods.
+
 The selected 0.1.16.16 client manifest also declares three required file IDs
 that the [pack-owned placement policy](runtime/release-resourcepack-input-policy-v1.json)
 classifies as resource packs under that input plan:

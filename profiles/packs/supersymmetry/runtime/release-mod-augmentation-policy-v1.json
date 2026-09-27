@@ -1,0 +1,30 @@
+{
+  "format": "workbench-supersymmetry-release-mod-augmentation-policy-v1",
+  "schema_version": 1,
+  "profile": "supersymmetry",
+  "input_plan_format": "workbench-pack-release-input-plan-v1",
+  "input_plan_id": "workbench-pack-release-input-plan:sha256:8c188e58c33556c6dae0a5d7de8a069054bc0f45d3bccb6607adca9850673f0f",
+  "release_id": "profile-release:sha256:4b881312a29cf0fa1464be1b4531690c755306350bc9ecfec01682cbb2bf92c1",
+  "version": "0.1.16.16",
+  "manifest_sha256": "sha256:a4d67c7961e281c6ba9ecfffa58c9de2d14f3a424c9498537166dd6687b04d7d",
+  "external_file_count": 193,
+  "destination_root": "mods",
+  "sources": [
+    {
+      "project_id": 300957,
+      "file_id": 3143467,
+      "filename": "OpenGlasses-MC1.12.2-2.2-53.jar",
+      "size": 410861,
+      "sha1": "b8fb78b8b7e7486a40966cf283833fa04abc84b6",
+      "sha256": "sha256:b9b78c5a769c00b4f8bd47d6e0618080068469d4159ee95406d81e1c57b416e3"
+    },
+    {
+      "project_id": 346326,
+      "file_id": 3248796,
+      "filename": "Commons0815-1.12.2-1.4.0.jar",
+      "size": 316392,
+      "sha1": "076ed53a86f503add06c252856a1a8ad7b0d2667",
+      "sha256": "sha256:b8302780b2d234fb686c48b149ea8705291dca2a5f4b252a1e1e1ae3759bef5d"
+    }
+  ]
+}

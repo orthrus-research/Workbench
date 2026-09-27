@@ -96,6 +96,27 @@ class ReleaseAuthorityTests(unittest.TestCase):
         self.assertIn("runtime/release-resourcepack-input-policy-v1.json", bundled)
         self.assertIn("schemas/workbench-supersymmetry-release-resourcepack-input-policy-v1.schema.json", bundled)
 
+    def test_older_fixture_mod_policy_is_selected_release_owned_and_packaged(self) -> None:
+        owner = profile()
+        policy_path = owner.resource("release-mod-augmentation-policy")
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        schema = json.loads(
+            (owner.root / "schemas/workbench-supersymmetry-release-mod-augmentation-policy-v1.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(policy)
+        self.assertEqual("0.1.16.16", policy["version"])
+        self.assertEqual("workbench-pack-release-input-plan:sha256:8c188e58c33556c6dae0a5d7de8a069054bc0f45d3bccb6607adca9850673f0f", policy["input_plan_id"])
+        self.assertEqual("mods", policy["destination_root"])
+        self.assertEqual({(300957, 3143467), (346326, 3248796)},
+                         {(row["project_id"], row["file_id"]) for row in policy["sources"]})
+        self.assertTrue(all(row["filename"].endswith(".jar") and row["size"] > 0
+                            for row in policy["sources"]))
+        bundled = tomllib.loads((owner.root / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]["workbench_resources.profiles.packs.supersymmetry"]
+        self.assertIn("runtime/release-mod-augmentation-policy-v1.json", bundled)
+        self.assertIn("schemas/workbench-supersymmetry-release-mod-augmentation-policy-v1.schema.json", bundled)
+
 
 if __name__ == "__main__":
     unittest.main()

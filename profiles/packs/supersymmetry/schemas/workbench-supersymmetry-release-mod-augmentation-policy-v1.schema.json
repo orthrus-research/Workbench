@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Supersymmetry selected release older-fixture mod augmentation policy V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "schema_version", "profile", "input_plan_format", "input_plan_id", "release_id", "version", "manifest_sha256", "external_file_count", "destination_root", "sources"],
+  "properties": {
+    "format": {"const": "workbench-supersymmetry-release-mod-augmentation-policy-v1"},
+    "schema_version": {"const": 1},
+    "profile": {"const": "supersymmetry"},
+    "input_plan_format": {"const": "workbench-pack-release-input-plan-v1"},
+    "input_plan_id": {"type": "string", "pattern": "^workbench-pack-release-input-plan:sha256:[0-9a-f]{64}$"},
+    "release_id": {"type": "string", "pattern": "^profile-release:sha256:[0-9a-f]{64}$"},
+    "version": {"const": "0.1.16.16"},
+    "manifest_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "external_file_count": {"const": 193},
+    "destination_root": {"const": "mods"},
+    "sources": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["project_id", "file_id", "filename", "size", "sha1", "sha256"],
+        "properties": {
+          "project_id": {"type": "integer", "minimum": 1},
+          "file_id": {"type": "integer", "minimum": 1},
+          "filename": {"type": "string", "pattern": "^[^/\\\\]+\\.jar$"},
+          "size": {"type": "integer", "minimum": 1, "maximum": 536870912},
+          "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}
