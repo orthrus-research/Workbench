@@ -49,6 +49,7 @@ _ROOT_KNOWN = (
 # Keep those sealed manifest bytes stable while inventorying the auxiliary root.
 _ROOT_AUXILIARY = ("registration-attempt-leases",)
 RECORD_STORE_KIND = "workbench-record-store-v1"
+RECORD_STORE_FORWARD_KIND = "workbench-record-store-forward-witness-v1"
 RESERVATION_KIND = "workbench-resource-reservation-v1"
 INTENT_KIND = "workbench-resource-intent-v1"
 COMMIT_KIND = "workbench-resource-commit-v1"
@@ -428,6 +429,152 @@ class ResourceCatalog:
             if _read_sealed(path, RECORD_STORE_KIND) != expected:
                 raise DurableResourceError("resource.changed", "record store registration changed")
         return store_id
+
+    def _forward_record_store_witness(
+        self, *, family: str, owner_id: str, workspace: Path, root: Path,
+        store_id: str, registration_id: str, root_info: os.stat_result,
+        root_record: Mapping[str, object],
+    ) -> tuple[Path, bytes]:
+        """Bind one new registration to a pre-write, candidate-scoped V2 file."""
+
+        digest = store_id.rsplit(":", 1)[1]
+        target = workspace / ".workbench/record-store-forward-v1" / f"{digest}.json"
+        if target.is_relative_to(root) or root.is_relative_to(target.parent):
+            raise DurableResourceError("resource.policy", "record store overlaps its forward witness")
+        witness = _sealed(RECORD_STORE_FORWARD_KIND, {
+            "format": RECORD_STORE_FORWARD_KIND, "schema_version": 1,
+            "configuration_home": str(self.configuration_home),
+            "catalog_root_id": root_record["id"],
+            "catalog_root_epoch": root_record["root_epoch"],
+            "workspace": str(workspace), "family": family, "owner_id": owner_id,
+            "store_id": store_id, "registration_id": registration_id,
+            "root": str(root), "root_device": root_info.st_dev,
+            "root_inode": root_info.st_ino,
+            "historical_completeness": "unproven",
+        })
+        return target, check_storage.canonical(witness) + b"\n"
+
+    def register_record_store_forward(
+        self, *, family: str, owner_id: str, workspace: Path, root: Path,
+    ) -> tuple[str, str]:
+        """Opt in one new registration to a V2 issued witness before its row.
+
+        This requires a newly born V2 catalog. The witness covers only this
+        registration; old stores and all other families remain unproven.
+        """
+
+        digest, store_id, expected, raw = self._record_store_registration(
+            family=family, owner_id=owner_id, workspace=workspace, root=root,
+        )
+        if root.is_symlink() or not root.is_dir() or not private_path(root, directory=True):
+            raise DurableResourceError("resource.unsafe", "record store is not an owner-private directory")
+        issuance.preflight_workspace(workspace)
+        issuance.preflight_workspace_epoch(self, workspace)
+        self._ensure(fresh_epoch=True)
+        root_record = self.fresh_root_epoch()
+        if root_record is None:
+            raise DurableResourceError(
+                "resource.unsupported", "forward registration requires a newly born V2 catalog root",
+            )
+        path = self._directory("stores") / f"{digest}.json"
+        with private_record_lock(self._directory("leases") / f"{digest}.record-store.lock", wait=True):
+            root_info = root.lstat()
+            if not stat.S_ISDIR(root_info.st_mode) or not private_path(root, directory=True):
+                raise DurableResourceError("resource.changed", "record store root changed before issuance")
+            witness_path, witness_bytes = self._forward_record_store_witness(
+                family=family, owner_id=owner_id, workspace=workspace, root=root,
+                store_id=store_id, registration_id=expected["id"],
+                root_info=root_info, root_record=root_record,
+            )
+            if path.exists() or path.is_symlink() or any(
+                entry.name.startswith(f".{path.name}.") for entry in path.parent.iterdir()
+            ):
+                raise DurableResourceError(
+                    "resource.changed", "record store already has registration or uncertain stage",
+                )
+            if witness_path.exists() or witness_path.is_symlink() or (
+                witness_path.parent.exists() and any(
+                    entry.name.startswith(f".{witness_path.name}.")
+                    for entry in witness_path.parent.iterdir()
+                )
+            ):
+                raise DurableResourceError("resource.changed", "forward witness already exists or is uncertain")
+            publisher = CoreDurableResources(
+                workspace=workspace, configuration_home=self.configuration_home,
+                locations={"evidence": workspace / ".workbench"},
+                owner_id="workbench-core", post_birth_issuance=True,
+                allow_explicit_filename=True,
+            )
+            reference = publisher.publish_bytes(
+                "evidence", witness_path.name, witness_bytes,
+                requested_path=witness_path, domain_id=store_id,
+            )
+            if self.post_birth_coverage(
+                reference.resource_id, workspace=workspace,
+                owner_id="workbench-core", target=witness_path,
+            ) != "post-birth-covered" or self.read_bytes(reference.resource_id) != witness_bytes:
+                raise DurableResourceError("resource.changed", "forward witness did not reopen")
+            after_root = root.lstat()
+            if (after_root.st_dev, after_root.st_ino) != (root_info.st_dev, root_info.st_ino):
+                raise DurableResourceError("resource.changed", "record store root changed after issuance")
+            publish_immutable_bytes(path, raw, byte_limit=1024 * 1024)
+            if _read_sealed(path, RECORD_STORE_KIND) != expected:
+                raise DurableResourceError("resource.changed", "record store registration changed")
+        return store_id, reference.resource_id
+
+    def inspect_forward_record_store_registration(
+        self, *, family: str, owner_id: str, workspace: Path, root: Path,
+        witness_resource_id: str,
+    ) -> dict[str, object]:
+        """Reopen one exact current pair without inferring missing history."""
+
+        digest, store_id, expected, raw = self._record_store_registration(
+            family=family, owner_id=owner_id, workspace=workspace, root=root,
+        )
+        _resource_nonce(witness_resource_id)
+        root_record = self.fresh_root_epoch()
+        if root_record is None:
+            raise DurableResourceError("resource.unsupported", "forward inspection requires a V2 catalog root")
+        try:
+            root_info = root.lstat()
+        except OSError as exc:
+            raise DurableResourceError("resource.unavailable", "record store root is unavailable") from exc
+        if not stat.S_ISDIR(root_info.st_mode) or not private_path(root, directory=True):
+            raise DurableResourceError("resource.changed", "record store root is unsafe")
+        witness_path, witness_bytes = self._forward_record_store_witness(
+            family=family, owner_id=owner_id, workspace=workspace, root=root,
+            store_id=store_id, registration_id=expected["id"],
+            root_info=root_info, root_record=root_record,
+        )
+        if self.post_birth_coverage(
+            witness_resource_id, workspace=workspace,
+            owner_id="workbench-core", target=witness_path,
+        ) != "post-birth-covered" or self.read_bytes(witness_resource_id) != witness_bytes:
+            raise DurableResourceError("resource.changed", "forward witness differs from exact registration")
+        path = self._directory("stores") / f"{digest}.json"
+        if any(entry.name.startswith(f".{path.name}.") for entry in path.parent.iterdir()):
+            raise DurableResourceError("resource.changed", "record store registration has an uncertain stage")
+        if path.exists() or path.is_symlink():
+            if read_private_single_link_bytes(path, byte_limit=1024 * 1024) != raw:
+                raise DurableResourceError("resource.changed", "record store registration bytes changed")
+            status = "current-registration"
+        else:
+            status = "witnessed-registration-unavailable"
+        if self.post_birth_coverage(
+            witness_resource_id, workspace=workspace,
+            owner_id="workbench-core", target=witness_path,
+        ) != "post-birth-covered" or self.fresh_root_epoch() != root_record:
+            raise DurableResourceError("resource.changed", "forward witness changed during inspection")
+        after_root = root.lstat()
+        if (after_root.st_dev, after_root.st_ino) != (root_info.st_dev, root_info.st_ino):
+            raise DurableResourceError("resource.changed", "record store root changed during inspection")
+        return {
+            "format": "workbench-record-store-forward-inspection-v1",
+            "workspace": str(workspace), "store_id": store_id,
+            "witness_resource_id": witness_resource_id, "status": status,
+            "historical_completeness": "unproven", "cleanup_authority": "none",
+            "root_state": self.verify_root(),
+        }
 
     def reconcile_interrupted_record_store_registration(
         self, *, family: str, owner_id: str, workspace: Path, root: Path,
