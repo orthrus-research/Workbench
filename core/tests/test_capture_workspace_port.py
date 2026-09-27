@@ -121,6 +121,92 @@ class CaptureWorkspacePortTests(unittest.TestCase):
         self.assertFalse((self.execution / "two.txt").exists())
         self.assertEqual(b"second file\n", (runtime / "two.txt").read_bytes())
 
+    def test_prepared_runtime_preserves_historical_inventory_and_create_only_observer(self) -> None:
+        runtime = self.reference.path / "runtime"
+        (runtime / "mods").mkdir(parents=True)
+        (runtime / "baseline.txt").write_bytes(b"reviewed runtime\n")
+        historical = capture_workspace.inventory(runtime)
+        raw = b"built observer bytes\n"
+        build = self.reference.path / "observer-build"
+        build.mkdir(mode=0o700)
+        artifact = build / "observer.jar"
+        artifact.write_bytes(raw)
+        record = {"path": str(artifact), "size": len(raw), "sha256": sha256(raw).hexdigest()}
+        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST)):
+            prepared = port.capture_prepared_workspace(self.reference)
+            self.assertEqual(historical, prepared.inventory())
+            row = prepared.create_from_build("mods/observer.jar", record)
+            self.assertEqual({"path": "mods/observer.jar", "size": len(raw),
+                              "sha256": sha256(raw).hexdigest(), "mode": 0o644}, row)
+            self.assertIn(row, prepared.inventory())
+            with self.assertRaisesRegex(capture_workspace.CaptureWorkspaceError,
+                                        "absent target"):
+                prepared.create_from_build("mods/observer.jar", record)
+        self.assertEqual(raw, (runtime / "mods/observer.jar").read_bytes())
+        reopened_attempts = self._attempts("workbench-shell")
+        with (managed_attempts_scope(reopened_attempts), patch.object(port, "_host", HOST)):
+            reopened = port.capture_prepared_workspace(
+                reopened_attempts.open("recipe-capture-v1", "recipe-capture", self.reference.attempt_id),
+            )
+            self.assertEqual(capture_workspace.inventory(runtime), reopened.inventory())
+
+    def test_prepared_runtime_refuses_foreign_or_retargeted_attempt_before_write(self) -> None:
+        runtime = self.reference.path / "runtime"
+        runtime.mkdir(mode=0o700)
+        foreign_attempts = self._attempts("other-owner")
+        foreign = foreign_attempts.allocate("recipe-capture-v1", "recipe-capture")
+        (foreign.path / "runtime").mkdir(mode=0o700)
+        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST),
+              patch.object(capture_workspace, "replace_file") as replaced):
+            with self.assertRaises(ManagedAttemptError):
+                port.capture_prepared_workspace(foreign).create_from_build("observer.jar", {})
+            with self.assertRaises(ManagedAttemptError):
+                port.capture_prepared_workspace(
+                    replace(self.reference, path=foreign.path),
+                ).create_from_build("observer.jar", {})
+            replaced.assert_not_called()
+        self.assertEqual([], list(runtime.iterdir()))
+        self.assertEqual([], list((foreign.path / "runtime").iterdir()))
+
+    def test_prepared_runtime_refuses_changed_or_external_build_artifact(self) -> None:
+        runtime = self.reference.path / "runtime"
+        runtime.mkdir(mode=0o700)
+        build = self.reference.path / "observer-build"
+        build.mkdir(mode=0o700)
+        artifact = build / "observer.jar"
+        artifact.write_bytes(b"original")
+        record = {"path": str(artifact), "size": 8,
+                  "sha256": sha256(b"original").hexdigest()}
+        outside = self.root / "outside.jar"
+        outside.write_bytes(b"original")
+        with (managed_attempts_scope(self.attempts), patch.object(port, "_host", HOST)):
+            prepared = port.capture_prepared_workspace(self.reference)
+            artifact.write_bytes(b"changed!")
+            with self.assertRaisesRegex(capture_workspace.CaptureWorkspaceError,
+                                        "changed before publication"):
+                prepared.create_from_build("observer.jar", record)
+            artifact.write_bytes(b"original")
+            original_read = check_storage.read_bytes
+
+            def change_during_read(path):
+                raw = original_read(path)
+                artifact.write_bytes(b"changed during read")
+                return raw
+
+            with patch.object(check_storage, "read_bytes", side_effect=change_during_read):
+                with self.assertRaisesRegex(capture_workspace.CaptureWorkspaceError,
+                                            "changed during read"):
+                    prepared.create_from_build("observer.jar", record)
+            with self.assertRaisesRegex(capture_workspace.CaptureWorkspaceError,
+                                        "outside this attempt"):
+                prepared.create_from_build("observer.jar", {**record, "path": str(outside)})
+            with self.assertRaisesRegex(capture_workspace.CaptureWorkspaceError,
+                                        "path is invalid"):
+                prepared.create_from_build(
+                    "observer.jar", {**record, "path": str(build) + "/./observer.jar"},
+                )
+        self.assertEqual([], list(runtime.iterdir()))
+
     def test_foreign_or_retargeted_attempt_refuses_before_write(self) -> None:
         foreign_attempts = self._attempts("other-owner")
         foreign = foreign_attempts.allocate("recipe-capture-v1", "recipe-capture")

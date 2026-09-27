@@ -26,8 +26,16 @@ class CaptureExecutionWorkspace(Protocol):
     def inventory(self, *, cancelled: Callable[[], bool] = lambda: False) -> list[dict]: ...
 
 
+class CapturePreparedWorkspace(Protocol):
+    def create_from_build(self, relative: str, artifact: dict) -> dict: ...
+
+    def inventory(self, *, cancelled: Callable[[], bool] = lambda: False) -> list[dict]: ...
+
+
 class CaptureWorkspaces(Protocol):
     def execution(self, attempt: ManagedAttemptReference) -> CaptureExecutionWorkspace: ...
+
+    def prepared(self, attempt: ManagedAttemptReference) -> CapturePreparedWorkspace: ...
 
 
 _host: CaptureWorkspaces | None = None
@@ -35,7 +43,8 @@ _host: CaptureWorkspaces | None = None
 
 def bind_capture_workspaces(host: CaptureWorkspaces) -> None:
     global _host
-    if not callable(getattr(host, "execution", None)):
+    if (not callable(getattr(host, "execution", None))
+            or not callable(getattr(host, "prepared", None))):
         raise CaptureWorkspaceHostError("Core capture workspace host is incomplete")
     if _host is not None and _host is not host:
         raise CaptureWorkspaceHostError("a different Core capture workspace host is already bound")
@@ -48,7 +57,14 @@ def capture_execution_workspace(attempt: ManagedAttemptReference) -> CaptureExec
     return _host.execution(attempt)
 
 
+def capture_prepared_workspace(attempt: ManagedAttemptReference) -> CapturePreparedWorkspace:
+    if _host is None:
+        raise CaptureWorkspaceHostError("no Core capture workspace host is bound")
+    return _host.prepared(attempt)
+
+
 __all__ = [
-    "CaptureExecutionWorkspace", "CaptureWorkspaceHostError", "CaptureWorkspaces",
-    "bind_capture_workspaces", "capture_execution_workspace",
+    "CaptureExecutionWorkspace", "CapturePreparedWorkspace", "CaptureWorkspaceHostError",
+    "CaptureWorkspaces", "bind_capture_workspaces", "capture_execution_workspace",
+    "capture_prepared_workspace",
 ]

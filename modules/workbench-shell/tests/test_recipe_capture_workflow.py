@@ -29,7 +29,7 @@ from workbench_atlas_categorical_graph import CategoricalGraphBundleBuilder, edg
 from workbench_core import capture_workspace as core_capture_workspace
 from workbench_core import check_storage, durable_records, host_filesystem as core_filesystem, runtime_java, tool_process
 from workbench_core.capture_workspace_port import (
-    HOST as core_capture_workspace_host, _ExecutionWorkspace,
+    HOST as core_capture_workspace_host, _ExecutionWorkspace, _PreparedWorkspace,
 )
 from workbench_core.fixture_selection_port import CoreFixtureSelections
 from workbench_core.managed_attempts import CoreManagedAttempts
@@ -1130,6 +1130,135 @@ class RecipeCaptureWorkflowTests(unittest.TestCase):
         self.assertTrue((self.runtime / 'groovy/stale.groovy').exists())
         self.assertFalse((self.runtime / 'mods/fixture-observer.jar').exists())
         self.assertTrue((runtime / 'mods/fixture-observer.jar').exists())
+
+    def test_prepared_observer_override_and_pre_run_inventory_use_bound_core_workspace(self):
+        request = self.plan()
+        inventories = []
+        original_inventory = _PreparedWorkspace.inventory
+
+        def observe_inventory(workspace, *, cancelled):
+            rows = original_inventory(workspace, cancelled=cancelled)
+            inventories.append((workspace._root(), rows))
+            return rows
+
+        with (patch.object(capture, 'capture_prepared_workspace',
+                           wraps=capture.capture_prepared_workspace) as selected,
+              patch.object(_PreparedWorkspace, 'inventory', observe_inventory)):
+            prepared = self.prepare(request)
+            result = self.run_capture(prepared)
+        attempt = self.attempt(prepared)
+        self.assertEqual(2, selected.call_count)
+        self.assertTrue(all(call.args[0].path == attempt for call in selected.call_args_list))
+        self.assertEqual(2, len(inventories))
+        self.assertEqual([(attempt / 'runtime', prepared['runtime_files'])] * 2, inventories)
+        artifact = prepared['observer_build']['artifact']
+        observer = attempt / 'runtime/mods/fixture-observer.jar'
+        self.assertEqual((artifact['size'], artifact['sha256']),
+                         (observer.stat().st_size, sha256(observer.read_bytes()).hexdigest()))
+        self.assertIn({'path': 'mods/fixture-observer.jar', 'size': artifact['size'],
+                       'sha256': artifact['sha256'], 'mode': 0o644}, prepared['runtime_files'])
+        self.assertEqual(prepared, json.loads((attempt / 'prepared.json').read_bytes()))
+        self.assertEqual(result, capture.show(self.state, result['attempt_id']))
+
+    def test_prepared_observer_override_faults_retain_v1_disposition_and_block_native_run(self):
+        original_link = core_capture_workspace.os.link
+        original_flush = check_storage.fsync_directory
+        for moment in ('before-link', 'after-link-before-flush'):
+            with self.subTest(moment=moment):
+                request = self.plan()
+                attempt = self.attempt(request)
+                observer = attempt / 'runtime/mods/fixture-observer.jar'
+                interrupted = False
+
+                def interrupt_link(source, destination, *args, **kwargs):
+                    if moment == 'before-link' and Path(destination) == observer:
+                        raise OSError('synthetic prepared observer link interruption')
+                    return original_link(source, destination, *args, **kwargs)
+
+                def interrupt_flush(directory):
+                    nonlocal interrupted
+                    if (moment == 'after-link-before-flush' and not interrupted
+                            and Path(directory) == observer.parent and observer.exists()):
+                        interrupted = True
+                        raise OSError('synthetic prepared observer flush interruption')
+                    return original_flush(directory)
+
+                with (patch.object(core_capture_workspace.os, 'link', side_effect=interrupt_link),
+                      patch.object(check_storage, 'fsync_directory', side_effect=interrupt_flush)):
+                    with self.assertRaisesRegex(core_capture_workspace.CaptureWorkspaceError,
+                                                'temporary files retained'):
+                        self.prepare(request)
+                stages = list(observer.parent.glob('.capture-write-*'))
+                self.assertEqual(moment == 'before-link', bool(stages))
+                self.assertEqual(moment == 'after-link-before-flush', observer.exists())
+                self.assertTrue((attempt / 'prepare-started.json').is_file())
+                self.assertFalse((attempt / 'prepared.json').exists())
+                self.assertEqual('failed', capture.show(self.state, request['attempt_id'])['state'])
+                with self.assertRaisesRegex(ValueError, 'preparation failed'):
+                    capture.run(self.state, request['attempt_id'], 'no-prepared-id',
+                                accept_eula=True, cancelled=self.cancelled)
+                with self.assertRaisesRegex(ValueError, 'already attempted'):
+                    self.prepare(request)
+                self.assertFalse((attempt / 'run-started.json').exists())
+                self.native.assert_not_called()
+
+    def test_prepared_observer_linked_without_failure_receipt_is_interrupted(self):
+        request = self.plan()
+        attempt = self.attempt(request)
+        observer = attempt / 'runtime/mods/fixture-observer.jar'
+        original_flush = check_storage.fsync_directory
+
+        def interrupt_flush(directory):
+            if Path(directory) == observer.parent and observer.exists():
+                raise OSError('prepared observer flush unavailable')
+            return original_flush(directory)
+
+        with (patch.object(check_storage, 'fsync_directory', side_effect=interrupt_flush),
+              patch.object(capture, '_fail', side_effect=OSError('failure receipt unavailable'))):
+            with self.assertRaisesRegex(OSError, 'failure receipt unavailable'):
+                self.prepare(request)
+        self.assertTrue(observer.is_file())
+        self.assertFalse((attempt / 'prepared.json').exists())
+        self.assertFalse((attempt / 'prepare-failed.json').exists())
+        self.assertEqual('interrupted', capture.show(self.state, request['attempt_id'])['state'])
+        with self.assertRaises(OSError):
+            capture.run(self.state, request['attempt_id'], 'no-prepared-id',
+                        accept_eula=True, cancelled=self.cancelled)
+        with self.assertRaisesRegex(ValueError, 'already attempted'):
+            self.prepare(request)
+        self.assertFalse((attempt / 'run-started.json').exists())
+        self.native.assert_not_called()
+
+    def test_changed_or_external_observer_build_cannot_prepare_native_runtime(self):
+        original_build = self.owner.build_observer
+        for case in ('changed', 'external'):
+            with self.subTest(case=case):
+                request = self.plan()
+                attempt = self.attempt(request)
+
+                def invalid_build(*args, **kwargs):
+                    build = original_build(*args, **kwargs)
+                    artifact = Path(build['artifact']['path'])
+                    if case == 'changed':
+                        artifact.write_bytes(b'changed after build receipt')
+                    else:
+                        outside = self.root / ('external-observer-' + request['attempt_id'] + '.jar')
+                        outside.write_bytes(artifact.read_bytes())
+                        build['artifact'] = {**build['artifact'], 'path': str(outside)}
+                    return build
+
+                with patch.object(self.owner, 'build_observer', side_effect=invalid_build):
+                    with self.assertRaisesRegex(core_capture_workspace.CaptureWorkspaceError,
+                                                'changed before publication|outside this attempt'):
+                        self.prepare(request)
+                self.assertFalse((attempt / 'runtime/mods/fixture-observer.jar').exists())
+                self.assertFalse((attempt / 'prepared.json').exists())
+                self.assertEqual('failed', capture.show(self.state, request['attempt_id'])['state'])
+                with self.assertRaisesRegex(ValueError, 'preparation failed'):
+                    capture.run(self.state, request['attempt_id'], 'no-prepared-id',
+                                accept_eula=True, cancelled=self.cancelled)
+                self.assertFalse((attempt / 'run-started.json').exists())
+                self.native.assert_not_called()
 
     def test_prepared_runtime_drift_refuses_game_process(self):
         prepared = self.prepare()

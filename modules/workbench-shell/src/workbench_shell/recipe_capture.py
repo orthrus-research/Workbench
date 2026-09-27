@@ -18,7 +18,7 @@ from workbench_api.host_filesystem import (
 )
 from workbench_api.profile_extensions import require_profile_extension, profile_extension_identity
 from workbench_api.managed_attempts import managed_attempts
-from workbench_api.capture_workspaces import capture_execution_workspace
+from workbench_api.capture_workspaces import capture_execution_workspace, capture_prepared_workspace
 from workbench_api.fixture_selections import fixture_selections
 from workbench_core import check_storage as storage, capture_workspace as workspace_storage
 from workbench_core.filesystem_paths import native_path
@@ -547,11 +547,9 @@ def prepare(root, identity, confirm, *, cancelled):
             classpath = owner.observer_classpath(execution_root / 'runtime', retained['runtime_files'], request['artifact_paths'])
             build = owner.build_observer(execution_root / 'java', classpath, execution_root / 'observer-build', cancelled=cancel)
             cancel.check()
-            built = _file(Path(build['artifact']['path']))
-            if built != build['artifact']:
-                raise ValueError('built observer artifact changed')
-            workspace_storage.replace_file(runtime, request['descriptor']['observer_path'], storage.read_bytes(Path(built['path'])))
-            runtime_files = workspace_storage.inventory(runtime, cancelled=cancel.is_set)
+            prepared_workspace = capture_prepared_workspace(reference)
+            prepared_workspace.create_from_build(request['descriptor']['observer_path'], build['artifact'])
+            runtime_files = prepared_workspace.inventory(cancelled=cancel.is_set)
             if workspace_storage.inventory(java_home, cancelled=cancel.is_set) != retained['java_files']:
                 raise ValueError('retained Java changed during observer compilation')
             _current(attempt, request)
@@ -620,7 +618,7 @@ def run(root, identity, confirm, *, accept_eula, cancelled):
         execution_root = java_execution_path(attempt)
         if str(execution_root) != prepared['execution_root']:
             raise ValueError('prepared Java execution path changed; make a new plan')
-        if workspace_storage.inventory(attempt / 'runtime', cancelled=cancel.is_set) != prepared['runtime_files']:
+        if capture_prepared_workspace(reference).inventory(cancelled=cancel.is_set) != prepared['runtime_files']:
             raise ValueError('prepared runtime changed')
         if workspace_storage.inventory(attempt / 'java', cancelled=cancel.is_set) != prepared['java_files']:
             raise ValueError('prepared Java changed')

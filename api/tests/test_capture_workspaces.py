@@ -15,6 +15,8 @@ class CaptureWorkspacesPortTests(unittest.TestCase):
         with patch.object(port, "_host", None):
             with self.assertRaisesRegex(port.CaptureWorkspaceHostError, "no Core capture workspace host"):
                 port.capture_execution_workspace(reference)
+            with self.assertRaisesRegex(port.CaptureWorkspaceHostError, "no Core capture workspace host"):
+                port.capture_prepared_workspace(reference)
             with self.assertRaisesRegex(port.CaptureWorkspaceHostError, "incomplete"):
                 port.bind_capture_workspaces(object())
 
@@ -28,10 +30,16 @@ class CaptureWorkspacesPortTests(unittest.TestCase):
                 self.seen = attempt
                 return workspace
 
+            def prepared(self, attempt):
+                self.prepared_seen = attempt
+                return workspace
+
         host = Host()
         with patch.object(port, "_host", host):
             self.assertIs(workspace, port.capture_execution_workspace(reference))
+            self.assertIs(workspace, port.capture_prepared_workspace(reference))
         self.assertIs(reference, host.seen)
+        self.assertIs(reference, host.prepared_seen)
 
 
 if __name__ == "__main__":

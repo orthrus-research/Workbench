@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
+import os
 from pathlib import Path
+import re
 from typing import Callable
 
 from workbench_api.capture_workspaces import CaptureWorkspaceHostError
@@ -53,12 +56,78 @@ class _ExecutionWorkspace:
         return capture_workspace.inventory(self._root(), cancelled=cancelled)
 
 
+class _PreparedWorkspace:
+    def __init__(self, attempts: CoreManagedAttempts, reference: ManagedAttemptReference):
+        self._attempts = attempts
+        self._reference = reference
+        self._attempt_path()
+
+    def _attempt_path(self) -> Path:
+        return self._attempts._verified_path(self._reference)
+
+    def _root(self) -> Path:
+        # Preparation and native admission both reopen the fixed runtime child.
+        return check_storage.ordinary(self._attempt_path() / "runtime", directory=True)
+
+    def create_from_build(self, relative: str, artifact: dict) -> dict:
+        # The selected builder writes a single artifact in this attempt's
+        # observer-build directory. Compare directory identity rather than
+        # spelling: Windows Java may use an exact DOS alias for the attempt.
+        if (not isinstance(artifact, dict) or set(artifact) != {"path", "size", "sha256"}
+                or not isinstance(artifact["path"], str)
+                or type(artifact["size"]) is not int or artifact["size"] < 0
+                or not isinstance(artifact["sha256"], str)
+                or re.fullmatch(r"[a-f0-9]{64}", artifact["sha256"]) is None):
+            raise capture_workspace.CaptureWorkspaceError("observer artifact identity is invalid")
+        path = Path(artifact["path"])
+        if (not path.is_absolute() or ".." in path.parts
+                or artifact["path"] != str(Path(os.path.abspath(artifact["path"])))):
+            raise capture_workspace.CaptureWorkspaceError("observer artifact path is invalid")
+        build_root = check_storage.ordinary(self._attempt_path() / "observer-build", directory=True)
+        source_parent = check_storage.ordinary(path.parent, directory=True)
+        if not os.path.samefile(native_path(source_parent), native_path(build_root)):
+            raise capture_workspace.CaptureWorkspaceError("observer artifact is outside this attempt's build")
+        directory_identity = lambda item: (item.st_dev, item.st_ino)
+        source_parent_before = directory_identity(native_path(source_parent).stat())
+        build_root_before = directory_identity(native_path(build_root).stat())
+        source = check_storage.ordinary(path)
+        before = native_path(source).stat()
+        raw = check_storage.read_bytes(path)
+        after = native_path(check_storage.ordinary(path)).stat()
+        file_identity = lambda item: (
+            item.st_dev, item.st_ino, item.st_mode, item.st_size,
+            item.st_mtime_ns, item.st_ctime_ns,
+        )
+        if file_identity(before) != file_identity(after):
+            raise capture_workspace.CaptureWorkspaceError("observer artifact changed during read")
+        source_parent_after = check_storage.ordinary(path.parent, directory=True)
+        build_root_after = check_storage.ordinary(self._attempt_path() / "observer-build", directory=True)
+        if (directory_identity(native_path(source_parent_after).stat()) != source_parent_before
+                or directory_identity(native_path(build_root_after).stat()) != build_root_before
+                or not os.path.samefile(native_path(source_parent_after), native_path(build_root_after))):
+            raise capture_workspace.CaptureWorkspaceError("observer build directory changed during read")
+        if len(raw) != artifact["size"] or sha256(raw).hexdigest() != artifact["sha256"]:
+            raise capture_workspace.CaptureWorkspaceError("observer artifact changed before publication")
+        # The observer path was excluded from selected runtime inputs. Preserve
+        # V1 create-only publication, modes and uncertain temporary files.
+        return capture_workspace.replace_file(self._root(), relative, raw)
+
+    def inventory(self, *, cancelled: Callable[[], bool] = lambda: False) -> list[dict]:
+        return capture_workspace.inventory(self._root(), cancelled=cancelled)
+
+
 class CoreCaptureWorkspaces:
     def execution(self, attempt: ManagedAttemptReference) -> _ExecutionWorkspace:
         selected = managed_attempts()
         if not isinstance(selected, CoreManagedAttempts):
             raise CaptureWorkspaceHostError("capture execution needs a Core managed-attempt host")
         return _ExecutionWorkspace(selected, attempt)
+
+    def prepared(self, attempt: ManagedAttemptReference) -> _PreparedWorkspace:
+        selected = managed_attempts()
+        if not isinstance(selected, CoreManagedAttempts):
+            raise CaptureWorkspaceHostError("capture preparation needs a Core managed-attempt host")
+        return _PreparedWorkspace(selected, attempt)
 
 
 HOST = CoreCaptureWorkspaces()
