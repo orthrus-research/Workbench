@@ -3,7 +3,7 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
     java
-    id("org.jetbrains.intellij.platform") version "2.18.1"
+    id("org.jetbrains.intellij.platform") version "2.19.0"
 }
 
 tasks.withType<org.gradle.api.tasks.bundling.AbstractArchiveTask>().configureEach {
@@ -37,10 +37,10 @@ dependencies {
         }
         testFramework(TestFrameworkType.Platform)
     }
-    testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
     testImplementation("junit:junit:4.13.2")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.13.4")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.13.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.3")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.3")
 }
 
 java {
