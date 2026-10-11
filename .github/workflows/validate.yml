@@ -54,7 +54,7 @@ jobs:
         run: python3 tools/axiom_material_ore_conformance.py --java-home "$AXIOM_JAVA_HOME" --engine-home modules/axiom/jvm/build/install/workbench-axiom-engine --images .workbench/axiom-ci-native-identities --library-root .workbench/axiom-ci-native-libraries --program .workbench/axiom-ci-native-materials --gtceu .workbench/axiom-ci-sources/gtceu --susy-core .workbench/axiom-ci-sources/susy-core --cleanroom .workbench/axiom-ci-fluid-cleanroom --supersymmetry .workbench/axiom-ci-sources/supersymmetry --groovyscript .workbench/axiom-ci-sources/groovyscript --report .workbench/axiom-ci-material-ores.json
 
       - name: Preserve Axiom JVM test failures
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: axiom-jvm-test-diagnostics
@@ -76,7 +76,7 @@ jobs:
           fetch-depth: 0
       - id: plan
         run: python3 validation/ci_validation.py plan --event-name "$GITHUB_EVENT_NAME" --event-file "$GITHUB_EVENT_PATH" --output .workbench/validation/ci/plan.json --github-output "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: validation-plan
@@ -93,7 +93,7 @@ jobs:
 
       - name: Reject project-local Pixi configuration
         run: python tools/check_pixi_project_config.py
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
@@ -158,7 +158,7 @@ jobs:
 
       - name: Check whitespace
         run: git diff --check
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: quick-validation-diagnostics
@@ -172,7 +172,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
@@ -189,7 +189,7 @@ jobs:
       - name: Resolve the exact Core-registered native upload
         id: native_upload
         run: pixi run --environment release --locked --no-config python validation/ci_artifacts.py native-assembly --diagnostics .workbench/validation/ci/native-build --github-output "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: success()
         with:
           name: native-linux-assembly
@@ -197,7 +197,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: native-diagnostics-linux-x64
@@ -211,7 +211,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
@@ -229,7 +229,7 @@ jobs:
         run: pixi run --environment release --locked --no-config python validation/validate.py --tier source-ci --policy --result .workbench/validation/source-ci-result.json
       - name: Require the real pip isolation probe
         run: pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/source-ci-result.json --group pip
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: source-ci-validation-diagnostics
@@ -244,12 +244,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
           environments: release
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: native-linux-assembly
           path: .workbench/native-suite
@@ -257,7 +257,7 @@ jobs:
         run: pixi run --environment release --locked --no-config python tools/install_workbench.py .workbench/native-suite --destination "$RUNNER_TEMP/workbench-ide-core" --diagnostics .workbench/validation/ci/ide-core-install
       - name: Validate locked IDE hosts and installed Core journeys
         run: xvfb-run -a pixi run --environment release --locked --no-config python validation/validate_ide.py --full --installed-core "$RUNNER_TEMP/workbench-ide-core/bin/workbench" --jobs 2 --diagnostics .workbench/validation/ci/ide
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: ide-validation-diagnostics
@@ -275,7 +275,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
@@ -286,7 +286,7 @@ jobs:
         run: pixi run --environment release --locked --no-config python validation/validate.py --suite cleanroom-profile --suite workbench-shell --jobs 1 --result .workbench/validation/physical-result.json
       - name: Require every physical probe to execute and pass
         run: pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/physical-result.json --group physical-cleanroom
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: physical-cleanroom-diagnostics

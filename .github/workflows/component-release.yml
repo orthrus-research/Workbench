@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
@@ -59,7 +59,7 @@ jobs:
         run: pixi run --environment release --locked --no-config python validation/validate.py --tier canonical --policy --result .workbench/validation/candidate-source-result.json
       - name: Require the real pip isolation probe
         run: pixi run --environment release --locked --no-config python validation/ci_validation.py assert-tests --result .workbench/validation/candidate-source-result.json --group pip
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: candidate-source-validation
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
@@ -96,13 +96,13 @@ jobs:
           set -euo pipefail
           pixi run --locked --no-config -e release python tools/validate_native_artifacts.py .workbench/candidate-wheelhouse/wheels
           pixi run --locked --no-config -e release python tools/publish_component_candidate.py --component "$COMPONENT" --source-directory .workbench/candidate-wheelhouse/wheels --github-output "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ needs.identify.outputs.component }}
           path: ${{ steps.candidate.outputs.path }}/
           if-no-files-found: error
           retention-days: 14
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: candidate-native-diagnostics
@@ -116,7 +116,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
         with:
           pixi-version: v0.75.0
           locked: true
@@ -130,7 +130,7 @@ jobs:
           set -euo pipefail
           xvfb-run -a pixi run --locked --no-config -e release python tools/build_release_clients.py --component "$COMPONENT" --lane public-v1 --output-dir .workbench/client-raw
           pixi run --locked --no-config -e release python tools/publish_component_candidate.py --component "$COMPONENT" --source-directory .workbench/client-raw --github-output "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ needs.identify.outputs.component }}
           path: ${{ steps.candidate.outputs.path }}/
@@ -149,7 +149,7 @@ jobs:
         run: python3 tools/build_axiom.py --provision --output .workbench/candidate
       - name: Verify the exact native artifact family
         run: python3 tools/verify_component_artifacts.py --component workbench-axiom-engine --directory .workbench/candidate
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: workbench-axiom-engine
           path: .workbench/candidate/
